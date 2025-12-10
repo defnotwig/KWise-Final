@@ -462,14 +462,23 @@ app.get('/api/metrics/json', async (req, res) => {
 // Frontend requests: http://localhost:5000/assets/parts/{category}/filename
 
 const PUBLIC_ASSETS_DIR = path.join(__dirname, 'public', 'assets');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
 console.log('🌐 Configuring static file serving:');
 console.log(`   Assets directory: ${PUBLIC_ASSETS_DIR}`);
+console.log(`   Uploads directory: ${UPLOADS_DIR}`);
 
-// Verify directory exists
+// Verify assets directory exists
 if (!fs.existsSync(PUBLIC_ASSETS_DIR)) {
     console.error('❌ PUBLIC ASSETS DIRECTORY NOT FOUND:', PUBLIC_ASSETS_DIR);
     fs.mkdirSync(PUBLIC_ASSETS_DIR, { recursive: true });
     console.log('✅ Created public/assets directory');
+}
+
+// Verify uploads directory exists (for profile images)
+if (!fs.existsSync(UPLOADS_DIR)) {
+    console.log('⚠️ UPLOADS DIRECTORY NOT FOUND - Creating...');
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    console.log('✅ Created uploads directory');
 }
 
 app.use('/assets', (req, res, next) => {

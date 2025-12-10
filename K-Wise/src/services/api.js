@@ -733,12 +733,29 @@ export const devToolsAPI = {
 };
 
 // Real-time updates using Server-Sent Events
+// ✅ CRITICAL FIX: EventSource doesn't support custom headers,
+// so we pass JWT token as query parameter
 export const realtimeAPI = {
-    subscribeToOrders: () => new EventSource(`${API_BASE_URL}/realtime/orders`),
-    subscribeToStock: () => new EventSource(`${API_BASE_URL}/realtime/stock`),
-    subscribeToLogs: () => new EventSource(`${API_BASE_URL}/realtime/logs`),
-    subscribeToNotifications: () => new EventSource(`${API_BASE_URL}/realtime/notifications`),
-    subscribeToUsers: () => new EventSource(`${API_BASE_URL}/realtime/users`)
+    subscribeToOrders: () => {
+        const token = localStorage.getItem('token');
+        return new EventSource(`${API_BASE_URL}/realtime/orders${token ? `?token=${token}` : ''}`);
+    },
+    subscribeToStock: () => {
+        const token = localStorage.getItem('token');
+        return new EventSource(`${API_BASE_URL}/realtime/stock${token ? `?token=${token}` : ''}`);
+    },
+    subscribeToLogs: () => {
+        const token = localStorage.getItem('token');
+        return new EventSource(`${API_BASE_URL}/realtime/logs${token ? `?token=${token}` : ''}`);
+    },
+    subscribeToNotifications: () => {
+        const token = localStorage.getItem('token');
+        return new EventSource(`${API_BASE_URL}/realtime/notifications${token ? `?token=${token}` : ''}`);
+    },
+    subscribeToUsers: () => {
+        const token = localStorage.getItem('token');
+        return new EventSource(`${API_BASE_URL}/realtime/users${token ? `?token=${token}` : ''}`);
+    }
 };
 
 // Health check

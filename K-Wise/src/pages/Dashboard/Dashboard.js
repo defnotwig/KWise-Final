@@ -330,7 +330,9 @@ const Dashboard = () => {
             subs.push(ordersEs);
 
             // Logs realtime: bump activity list when new log-entry appears
-            const logsEs = new EventSource(`${getApiBaseUrl()}/realtime/logs`);
+            const token = localStorage.getItem('token');
+            const logsEs = new EventSource(`${getApiBaseUrl()}/realtime/logs${token ? `?token=${token}` : ''}`);
+            
             
             logsEs.onopen = () => {
                 console.log('📡 SSE Logs connection opened');

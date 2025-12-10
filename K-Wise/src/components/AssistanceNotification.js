@@ -185,8 +185,8 @@ const AssistanceNotification = ({ io }) => {
             setShowClickPrompt(false); // Hide prompt since it's playing
           })
           .catch(err => {
-            console.error('❌ Muted autoplay failed, trying unmuted:', err);
-            // If muted autoplay fails, try unmuted
+            // ✅ FIX: Reduce console noise - autoplay blocking is expected browser behavior
+            // Try unmuted (usually also blocked, but worth trying)
             audioRef.current.muted = false;
             const playPromise = audioRef.current.play();
             
@@ -194,29 +194,26 @@ const AssistanceNotification = ({ io }) => {
               playPromise
                 .then(() => {
                   console.log('✅ Notification sound playing in LOOP mode');
-                  console.log('🔁 Loop enabled:', audioRef.current.loop);
-                  console.log('🔊 Volume:', audioRef.current.volume);
-                  console.log('⏱️ Duration:', audioRef.current.duration);
                   setIsPlaying(true);
                 })
                 .catch(finalErr => {
-                  console.error('❌ Error playing notification sound:', finalErr);
-                  console.error('Error name:', finalErr.name);
-                  console.error('Error message:', finalErr.message);
-                  
                   // Handle specific error types
                   if (finalErr.name === 'NotAllowedError') {
-                    console.warn('⚠️ Audio autoplay blocked by browser - user interaction required');
-                    console.log('💡 Showing click prompt to user');
+                    // ✅ EXPECTED: Browser blocks autoplay until user interaction
+                    // Only log once instead of multiple error messages
+                    console.log('ℹ️ Audio autoplay blocked (expected browser security) - click to enable');
                     setShowClickPrompt(true);
                     // Don't retry automatically - wait for user click
                   } else if (finalErr.name === 'NotSupportedError') {
                     console.error('❌ Audio format not supported by browser');
                   } else if (finalErr.name === 'AbortError') {
-                    console.warn('⚠️ Audio playback aborted - retrying...');
                     // Retry after a short delay
                     setTimeout(() => {
-                      audioRef.current.play().catch(e => console.error('❌ Retry failed:', e));
+                      audioRef.current.play().catch(e => {
+                        if (e.name !== 'NotAllowedError') {
+                          console.error('❌ Retry failed:', e);
+                        }
+                      });
                     }, 100);
                   }
                 });

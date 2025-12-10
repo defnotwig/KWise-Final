@@ -198,7 +198,8 @@ export function AuthProvider({ children }) {
                         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                         await getCurrentUser();
                         
-                        // Initialize Socket.IO for already-logged-in users
+                        // ✅ CRITICAL FIX: Only initialize Socket.IO if we have a valid token
+                        // This prevents auth failures on page load when user isn't logged in
                         try {
                             initializeSocket(token);
                             console.log('✅ Socket.IO initialized on app startup (existing session)');
@@ -215,6 +216,9 @@ export function AuthProvider({ children }) {
                         updateCurrentUser(null);
                     }
                 }
+            } else {
+                // ✅ FIX: No token = no Socket.IO initialization (prevents auth errors)
+                console.log('ℹ️ No token found - Socket.IO will initialize after login');
             }
             setIsLoading(false);
         };

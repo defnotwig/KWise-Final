@@ -63,8 +63,25 @@ export const initializeSocket = (token) => {
 
     socketInstance.on('connect_error', (error) => {
         connectionAttempts++;
-        // ✅ CRITICAL FIX: Only log warnings, not errors, for connection attempts
-        // This prevents console spam when backend is starting up
+        // ✅ CRITICAL FIX: Improved error handling - distinguish auth errors from network errors
+        // "Invalid namespace" usually means authentication failed (JWT expired or invalid)
+        const isAuthError = error.message && (
+            error.message.includes('Invalid namespace') || 
+            error.message.includes('Authentication error') ||
+            error.message.includes('No token provided')
+        );
+        
+        if (isAuthError) {
+            // Authentication error - log once and stop retrying
+            // ✅ FIX: Reduce to info level - expected when user isn't logged in yet
+            if (connectionAttempts === 1) {
+                console.log('ℹ️ Socket.IO requires authentication - Login to enable real-time features');
+            }
+            // Don't spam console on auth failures
+            return;
+        }
+        
+        // Network/connection errors
         if (connectionAttempts === 1) {
             console.warn(`⚠️ Socket.IO connection failed (will retry ${MAX_RECONNECT_ATTEMPTS} times):`, error.message);
         } else if (connectionAttempts >= MAX_RECONNECT_ATTEMPTS) {

@@ -3,12 +3,16 @@ const router = express.Router();
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const { protect, restrictTo } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 
 const isTest = process.env.NODE_ENV === 'test' || process.env.BYPASS_AUTH_FOR_TESTS === 'true';
 
 /**
  * Server-Sent Events (SSE) endpoints for real-time updates
  * Provides live streaming of orders and logs to admin dashboard
+ * 
+ * ✅ CRITICAL FIX: EventSource API doesn't support custom headers,
+ * so we accept tokens via query parameter for SSE endpoints
  */
 
 // Store active SSE connections
@@ -18,11 +22,58 @@ const activeConnections = {
 };
 
 /**
+ * SSE Authentication Middleware
+ * Accepts token from query parameter since EventSource doesn't support custom headers
+ */
+const sseAuth = async (req, res, next) => {
+    try {
+        // Get token from query parameter (EventSource limitation)
+        const token = req.query.token;
+        
+        if (!token) {
+            res.status(401).json({ 
+                success: false, 
+                error: 'No authentication token provided' 
+            });
+            return;
+        }
+
+        // Verify JWT token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Get user from database
+        const userResult = await query(
+            'SELECT * FROM users WHERE id = $1 AND is_active = true', 
+            [decoded.id]
+        );
+        
+        if (userResult.rows.length === 0) {
+            res.status(401).json({ 
+                success: false, 
+                error: 'User not found or inactive' 
+            });
+            return;
+        }
+
+        // Attach user to request
+        req.user = userResult.rows[0];
+        next();
+    } catch (error) {
+        logger.error('SSE authentication error:', error.message);
+        res.status(401).json({ 
+            success: false, 
+            error: 'Invalid or expired token' 
+        });
+    }
+};
+
+/**
  * GET /api/realtime/orders
  * SSE endpoint for real-time order updates
  * RBAC: admin, superadmin
+ * Authentication: Token via query parameter (?token=xxx) - EventSource limitation
  */
-router.get('/orders', protect, restrictTo('admin', 'superadmin'), async (req, res) => {
+router.get('/orders', sseAuth, restrictTo('admin', 'superadmin'), async (req, res) => {
     logger.info(`📡 SSE Orders connection established for user ${req.user.id}`);
     
     // Set SSE headers
@@ -95,8 +146,9 @@ router.get('/orders', protect, restrictTo('admin', 'superadmin'), async (req, re
  * GET /api/realtime/logs
  * SSE endpoint for real-time log updates
  * RBAC: superadmin only
+ * Authentication: Token via query parameter (?token=xxx) - EventSource limitation
  */
-router.get('/logs', protect, restrictTo('superadmin'), async (req, res) => {
+router.get('/logs', sseAuth, restrictTo('superadmin'), async (req, res) => {
     logger.info(`📡 SSE Logs connection established for user ${req.user.id}`);
     
     // Set SSE headers

@@ -460,7 +460,7 @@ class ThermalPrinterService {
     async sendData(data) {
         // ✅ ENHANCED: Auto-reconnect if not connected
         if (!this.isConnected) {
-            console.warn('⚠️ Printer not connected, attempting auto-reconnect...');
+            // Suppress warning - only show on actual print attempt failures
             const reconnected = await this.autoConnect();
             
             if (!reconnected || !this.isConnected) {
