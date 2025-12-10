@@ -1,0 +1,238 @@
+/* ADMIN SIDEBAR - Shadcn-inspired Design */
+/* High specificity to prevent kiosk conflicts */
+
+.admin-layout .sidebar,
+.admin-sidebar {
+    width: 250px;
+    background-color: var(--bg-primary, #ffffff);
+    border-right: 1px solid var(--border-color, #e2e8f0);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    height: 100vh;
+    z-index: 50;
+    left: 0;
+    top: 0;
+    transition: none; /* Remove annoying animations */
+    box-shadow: none; /* Remove shadow for cleaner look */
+}
+
+/* Fallback for existing sidebar class but only when NOT in kiosk */
+.sidebar:not(.pc-parts-container .sidebar) {
+    width: 250px;
+    background-color: var(--bg-primary, #ffffff);
+    border-right: 1px solid var(--border-color, #e2e8f0);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    height: 100vh;
+    z-index: 50;
+    left: 0;
+    top: 0;
+    box-shadow: none;
+}
+
+/* LOGO SECTION */
+.admin-layout .logo,
+.admin-sidebar .logo,
+.sidebar:not(.pc-parts-container .sidebar) .logo {
+    height: 64px; /* Fixed height header */
+    display: flex !important;
+    align-items: center;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    margin-bottom: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: flex-start;
+    gap: 0;
+}
+
+.admin-layout .logo img,
+.admin-sidebar .logo img,
+.sidebar:not(.pc-parts-container .sidebar) .logo img {
+    height: 32px !important;
+    width: 32px !important;
+    margin-right: 0.75rem;
+    margin-left: 0;
+    object-fit: contain;
+    display: block !important;
+    border-radius: 0;
+    flex-shrink: 0;
+}
+
+.admin-layout .logo span,
+.admin-sidebar .logo span,
+.sidebar:not(.pc-parts-container .sidebar) .logo span {
+    font-size: 1.125rem; /* 18px */
+    font-weight: 600;
+    color: var(--text-primary, #0f172a) !important;
+    letter-spacing: -0.025em;
+    display: inline-block !important;
+    margin-left: 0;
+    white-space: nowrap;
+}
+
+/* NAVIGATION MENU */
+.admin-layout .nav-menu,
+.admin-sidebar .nav-menu,
+.sidebar:not(.pc-parts-container .sidebar) .nav-menu {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0 0.75rem;
+    gap: 0.25rem;
+    overflow-y: auto; /* Scrollable content */
+    margin-bottom: 1rem;
+}
+
+/* NAV ITEMS */
+.admin-layout .nav-item,
+.admin-sidebar .nav-item,
+.sidebar:not(.pc-parts-container .sidebar) .nav-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem; /* 6px */
+    color: var(--text-secondary, #64748b);
+    text-decoration: none !important;
+    font-size: 0.875rem; /* 14px */
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s;
+    margin-bottom: 2px;
+    cursor: pointer;
+    transform: none !important; /* Remove transform animation */
+}
+
+.admin-layout .nav-item:hover,
+.admin-sidebar .nav-item:hover,
+.sidebar:not(.pc-parts-container .sidebar) .nav-item:hover {
+    background-color: var(--bg-secondary, #f1f5f9);
+    color: var(--text-primary, #0f172a);
+    transform: none !important;
+}
+
+.admin-layout .nav-item.active,
+.admin-sidebar .nav-item.active,
+.sidebar:not(.pc-parts-container .sidebar) .nav-item.active {
+    background-color: #00e083 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    transform: none !important;
+}
+
+/* ICONS */
+.admin-layout .nav-item .icon,
+.admin-sidebar .nav-item .icon,
+.sidebar:not(.pc-parts-container .sidebar) .nav-item .icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.75rem;
+    font-size: 1.125rem; /* 18px */
+    min-width: 20px;
+}
+
+.admin-layout .nav-item .label,
+.admin-sidebar .nav-item .label,
+.sidebar:not(.pc-parts-container .sidebar) .nav-item .label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* LOGOUT BUTTON */
+.admin-layout .logout-btn,
+.admin-sidebar .logout-btn,
+.sidebar:not(.pc-parts-container .sidebar) .logout-btn {
+    margin: 1rem 0.75rem;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    border-radius: 0.375rem;
+    color: #ef4444 !important; /* Red-500 */
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    width: auto;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.admin-layout .logout-btn:hover,
+.admin-sidebar .logout-btn:hover,
+.sidebar:not(.pc-parts-container .sidebar) .logout-btn:hover {
+    background-color: #fef2f2 !important; /* Red-50 */
+    color: #dc2626 !important; /* Red-600 */
+}
+
+.admin-layout .logout-btn .icon,
+.admin-sidebar .logout-btn .icon,
+.sidebar:not(.pc-parts-container .sidebar) .logout-btn .icon {
+    margin-right: 0.75rem;
+    font-size: 1.125rem;
+    min-width: 20px;
+}
+
+/* THEME SUPPORT */
+[data-theme="dark"] .admin-layout .sidebar,
+[data-theme="dark"] .admin-sidebar,
+[data-theme="dark"] .sidebar:not(.pc-parts-container .sidebar) {
+    --bg-primary: #020817; /* Slate-950 */
+    --bg-secondary: #1e293b; /* Slate-800 */
+    --text-primary: #f8fafc; /* Slate-50 */
+    --text-secondary: #94a3b8; /* Slate-400 */
+    --border-color: #1e293b; /* Slate-800 */
+    background-color: var(--bg-primary) !important;
+    border-right: 1px solid var(--border-color) !important;
+    box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-layout .nav-item:hover,
+[data-theme="dark"] .admin-sidebar .nav-item:hover,
+[data-theme="dark"] .sidebar:not(.pc-parts-container .sidebar) .nav-item:hover {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-left: none !important;
+    border-radius: 0.375rem !important;
+}
+
+[data-theme="dark"] .admin-layout .nav-item.active,
+[data-theme="dark"] .admin-sidebar .nav-item.active,
+[data-theme="dark"] .sidebar:not(.pc-parts-container .sidebar) .nav-item.active {
+    background-color: #00e083 !important;
+    color: #ffffff !important;
+    border-left: none !important;
+    border-radius: 0.375rem !important;
+}
+
+[data-theme="dark"] .admin-layout .logo span,
+[data-theme="dark"] .admin-sidebar .logo span,
+[data-theme="dark"] .sidebar:not(.pc-parts-container .sidebar) .logo span {
+    color: var(--text-primary) !important;
+}
+
+/* Blue Theme */
+[data-theme="blue"] .admin-layout .sidebar,
+[data-theme="blue"] .admin-sidebar,
+[data-theme="blue"] .sidebar:not(.pc-parts-container .sidebar) {
+    --bg-primary: #eff6ff;
+    --bg-secondary: #dbeafe;
+    --text-primary: #1e40af;
+    --text-secondary: #3730a3;
+    --border-color: #93c5fd;
+}
+
+/* Green Theme */
+[data-theme="green"] .admin-layout .sidebar,
+[data-theme="green"] .admin-sidebar,
+[data-theme="green"] .sidebar:not(.pc-parts-container .sidebar) {
+    --bg-primary: #f0fdf4;
+    --bg-secondary: #dcfce7;
+    --text-primary: #166534;
+    --text-secondary: #15803d;
+    --border-color: #86efac;
+}

@@ -1,0 +1,370 @@
+/**
+ * TASK 7: AUTO-GENERATE ORDERS STYLES
+ * Styling for admin test order generation utility
+ */
+
+.auto-generate-orders {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.auto-generate-header {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.auto-generate-header h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+.auto-generate-header .subtitle {
+    color: #7f8c8d;
+    font-size: 1rem;
+}
+
+/* Configuration Sections */
+.auto-generate-config {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.config-section {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.config-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
+}
+
+.config-row {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+}
+
+.config-row label {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.config-row .label-text {
+    color: #2c3e50;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.config-row .label-hint {
+    color: #95a5a6;
+    font-size: 0.85rem;
+    font-weight: normal;
+}
+
+.config-row input[type="text"],
+.config-row input[type="number"] {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.config-row input[type="text"]:focus,
+.config-row input[type="number"]:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.config-row input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    accent-color: #3498db;
+}
+
+.config-row input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.config-row-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Actions */
+.auto-generate-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.auto-generate-actions button {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 200px;
+}
+
+.btn-generate {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-generate:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-cleanup {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.btn-cleanup:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+}
+
+.auto-generate-actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Error Display */
+.auto-generate-error {
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.auto-generate-error .error-icon {
+    font-size: 1.5rem;
+}
+
+.auto-generate-error .error-message {
+    color: #c0392b;
+    font-weight: 500;
+}
+
+/* Results Display */
+.auto-generate-results {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.results-header {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.results-header h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    color: #27ae60;
+}
+
+.results-header p {
+    color: #7f8c8d;
+    margin: 0;
+}
+
+.results-summary {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.summary-stat {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 150px;
+}
+
+.summary-stat .stat-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.summary-stat .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.summary-stat .stat-value.success {
+    color: #27ae60;
+}
+
+.summary-stat .stat-value.error {
+    color: #e74c3c;
+}
+
+/* Errors List */
+.results-errors {
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.results-errors h4 {
+    margin-top: 0;
+    color: #c0392b;
+}
+
+.results-errors ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.results-errors li {
+    color: #c0392b;
+    margin-bottom: 0.5rem;
+}
+
+/* Orders Preview */
+.results-preview h4 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.orders-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.order-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.order-customer {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.order-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.order-status.status-pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.order-status.status-processing {
+    background-color: #cfe2ff;
+    color: #084298;
+}
+
+.order-status.status-completed {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.order-status.status-cancelled {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.order-details {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.order-date {
+    font-size: 0.85rem;
+    color: #adb5bd;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .auto-generate-config {
+        grid-template-columns: 1fr;
+    }
+
+    .config-row-group {
+        grid-template-columns: 1fr;
+    }
+
+    .auto-generate-actions {
+        flex-direction: column;
+    }
+
+    .auto-generate-actions button {
+        width: 100%;
+    }
+
+    .results-summary {
+        flex-direction: column;
+    }
+
+    .orders-list {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,859 @@
+/* eslint-disable no-unused-vars */
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { FiPlus, FiEdit, FiTrash2, FiUpload, FiImage, FiX } from 'react-icons/fi';
+import './StockDetail.css';
+import './StockDetail.admin-scope.css'; // Scoped admin styles (Issue 2)
+
+/**
+ * Enhanced Stock Detail Component
+ * 
+ * This component provides file-based image management for stock items.
+ */
+
+const StockDetail = () => {
+    const { category } = useParams(); // Get category from URL parameters
+    const mountedRef = useRef(true);
+    const [items, setItems] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [currentItem, setCurrentItem] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Phase 2: Removed image_url from form data
+    const [formData, setFormData] = useState({
+        name: '',
+        brand: '',
+        price: '',
+        stock: '',
+        description: '',
+        imageFile: null
+    });
+
+    // Image preview state
+    const [imagePreview, setImagePreview] = useState(null);
+    const [modalImage, setModalImage] = useState(null);
+    const [imageErrors, setImageErrors] = useState(new Set());
+
+    // Helper function to handle image errors
+    const handleImageError = useCallback((itemId) => {
+        setImageErrors(prev => new Set([...prev, itemId]));
+    }, []);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        console.log('🚀 StockDetail: Component mounted, category:', category);
+        mountedRef.current = true;
+        return () => {
+            console.log('🧹 StockDetail: Component unmounting');
+            mountedRef.current = false;
+            // Clean up image preview URL
+            if (imagePreview) {
+                URL.revokeObjectURL(imagePreview);
+            }
+        };
+    }, [category, imagePreview]);
+
+    // Load items using enhanced API
+    const loadItems = useCallback(async () => {
+        if (!category || !mountedRef.current) return;
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            console.log('📡 Fetching items for category:', category);
+            
+            // Use the main stock API
+            const response = await fetch(`http://localhost:5000/api/stock?category=${encodeURIComponent(category)}&limit=50`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.success && mountedRef.current) {
+                console.log('✅ Items loaded successfully:', data.data.length);
+                setItems(data.data || []);
+            } else {
+                throw new Error(data.message || 'Failed to load items');
+            }
+
+        } catch (error) {
+            console.error('❌ Error loading items:', error);
+            if (mountedRef.current) {
+                setError('Failed to load items: ' + error.message);
+                setItems([]);
+            }
+        } finally {
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
+        }
+    }, [category, mountedRef]);
+
+    // Handle category changes
+    useEffect(() => {
+        console.log('📂 StockDetail: Category changed to:', category);
+        setItems([]);
+        setError(null);
+        setIsLoading(true);
+        loadItems();
+    }, [category, loadItems]);
+
+    // Handle form input changes
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    // Phase 2: Handle file upload with preview
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select a valid image file');
+                return;
+            }
+
+            // Validate file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                imageFile: file
+            }));
+
+            // Create preview URL
+            if (imagePreview) {
+                URL.revokeObjectURL(imagePreview);
+            }
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreview(previewUrl);
+
+            console.log('📸 Image file selected:', file.name, 'Size:', file.size);
+        }
+    };
+
+    // Upload image separately for an existing item lacking an image
+    const handleSeparateImageUpload = async (file, item) => {
+        try {
+            if (!file || !item) return;
+            if (!file.type.startsWith('image/')) return alert('Invalid image file');
+            if (file.size > 5 * 1024 * 1024) return alert('File too large (max 5MB)');
+            const fd = new FormData();
+            fd.append('image', file);
+            const endpoint = `http://localhost:5000/api/images/${encodeURIComponent(category)}/${item.id}`;
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+                body: fd
+            });
+            if (!res.ok) {
+                try { const err = await res.json(); throw new Error(err.message || 'Upload failed'); } catch { throw new Error('Upload failed'); }
+            }
+            await loadItems();
+        } catch (err) {
+            console.error('Separate image upload failed:', err.message);
+            alert('Image upload failed: ' + err.message);
+        }
+    };
+
+    // Clear image selection
+    const clearImage = () => {
+        setFormData(prev => ({
+            ...prev,
+            imageFile: null
+        }));
+        
+        if (imagePreview) {
+            URL.revokeObjectURL(imagePreview);
+            setImagePreview(null);
+        }
+    };
+
+    // Reset form
+    const resetForm = () => {
+        setFormData({
+            name: '',
+            brand: '',
+            price: '',
+            stock: '',
+            description: '',
+            imageFile: null
+        });
+        
+        if (imagePreview) {
+            URL.revokeObjectURL(imagePreview);
+            setImagePreview(null);
+        }
+    };
+
+    // Handle add item
+    const handleAddItem = async (e) => {
+        e.preventDefault();
+        if (isSubmitting) return;
+
+        try {
+            setIsSubmitting(true);
+
+            // Validate required fields
+            if (!formData.name.trim() || !formData.price) {
+                alert('Please fill in required fields (name and price)');
+                return;
+            }
+
+            console.log('➕ Adding new item:', formData.name);
+
+            // Create FormData for file upload
+            const submitData = new FormData();
+            submitData.append('name', formData.name.trim());
+            submitData.append('category', category);
+            submitData.append('brand', formData.brand.trim() || '');
+            submitData.append('price', parseFloat(formData.price) || 0);
+            submitData.append('stock', parseInt(formData.stock) || 0);
+            submitData.append('description', formData.description.trim() || '');
+            
+            // Add image file if selected
+            if (formData.imageFile) {
+                submitData.append('image', formData.imageFile);
+                console.log('📸 Including image file:', formData.imageFile.name);
+            }
+
+            const response = await fetch('http://localhost:5000/api/stock', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    // Note: Don't set Content-Type for FormData - browser will set it with boundary
+                },
+                body: submitData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('✅ Item added successfully:', data.data);
+                
+                // Refresh items list
+                await loadItems();
+                
+                // Reset form and close modal
+                resetForm();
+                setShowAddModal(false);
+                
+                alert('Item added successfully!');
+            } else {
+                throw new Error(data.message || 'Failed to add item');
+            }
+
+        } catch (error) {
+            console.error('❌ Error adding item:', error);
+            alert('Failed to add item: ' + error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Handle edit item
+    const handleEditItem = async (e) => {
+        e.preventDefault();
+        if (isSubmitting || !currentItem) return;
+
+        try {
+            setIsSubmitting(true);
+
+            console.log('✏️ Updating item:', currentItem.id);
+
+            // Create FormData for file upload
+            const submitData = new FormData();
+            submitData.append('name', formData.name.trim());
+            submitData.append('category', category);
+            submitData.append('brand', formData.brand.trim() || '');
+            submitData.append('price', parseFloat(formData.price) || 0);
+            submitData.append('stock', parseInt(formData.stock) || 0);
+            submitData.append('description', formData.description.trim() || '');
+            
+            // Add image file if new one is selected
+            if (formData.imageFile) {
+                submitData.append('image', formData.imageFile);
+                console.log('📸 Updating image file:', formData.imageFile.name);
+            }
+
+            const response = await fetch(`http://localhost:5000/api/stock/${currentItem.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: submitData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('✅ Item updated successfully:', data.data);
+                
+                // Refresh items list
+                await loadItems();
+                
+                // Reset form and close modal
+                resetForm();
+                setShowEditModal(false);
+                setCurrentItem(null);
+                
+                alert('Item updated successfully!');
+            } else {
+                throw new Error(data.message || 'Failed to update item');
+            }
+
+        } catch (error) {
+            console.error('❌ Error updating item:', error);
+            alert('Failed to update item: ' + error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Handle delete item
+    const handleDeleteItem = async (item) => {
+        if (!window.confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            console.log('🗑️ Deleting item:', item.id);
+
+            const response = await fetch(`http://localhost:5000/api/stock/${item.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('✅ Item deleted successfully');
+                
+                // Refresh items list
+                await loadItems();
+                
+                alert('Item deleted successfully!');
+            } else {
+                throw new Error(data.message || 'Failed to delete item');
+            }
+
+        } catch (error) {
+            console.error('❌ Error deleting item:', error);
+            alert('Failed to delete item: ' + error.message);
+        }
+    };
+
+    // Open edit modal with item data
+    const openEditModal = (item) => {
+        setCurrentItem(item);
+        setFormData({
+            name: item.name || '',
+            brand: item.brand || '',
+            price: item.price || '',
+            stock: item.stock || '',
+            description: item.description || '',
+            imageFile: null // Always start with no file selected for editing
+        });
+        setImagePreview(null); // Clear preview for editing
+        setShowEditModal(true);
+    };
+
+    // Format currency
+    const formatCurrency = (amount) => {
+        const safeAmount = Number(amount) || 0;
+        return `₱${safeAmount.toLocaleString()}`;
+    };
+
+    if (isLoading) {
+        return (
+            <div className="stock-detail">
+                <div className="loading">
+                    <div className="spinner"></div>
+                    <p>Loading {category} items...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="stock-detail">
+                <div className="error-message">
+                    <p>{error}</p>
+                    <button onClick={loadItems} className="retry-btn">
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="stock-detail kw-admin-stock">
+            {/* Header */}
+            <div className="stock-header">
+                <h2>{category} Stock Management</h2>
+                <p className="subtitle">File-based Image Management System</p>
+                <button 
+                    className="add-btn"
+                    onClick={() => setShowAddModal(true)}
+                >
+                    <FiPlus /> Add New {category}
+                </button>
+            </div>
+
+            {/* Items Grid */}
+            <div className="items-grid">
+                {items.length === 0 ? (
+                    <div className="empty-state">
+                        <FiImage size={48} />
+                        <p>No {category} items found</p>
+                        <button 
+                            className="add-btn"
+                            onClick={() => setShowAddModal(true)}
+                        >
+                            <FiPlus /> Add First Item
+                        </button>
+                    </div>
+                ) : (
+                    items.map((item) => (
+                        <div key={item.id} className="item-card">
+                            {/* Item Image */}
+                            <div className="item-image">
+                                {(item.image_url || item.file_path) ? (
+                                    <>
+                                        <img
+                                            src={`http://localhost:5000${item.image_url || item.file_path}`}
+                                            alt={item.name}
+                                            onClick={() => setModalImage(`http://localhost:5000${item.image_url || item.file_path}`)}
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                const placeholder = e.target.nextSibling;
+                                                if (placeholder) placeholder.style.display = 'flex';
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="preview-btn"
+                                            title="Preview Image"
+                                            onClick={() => setModalImage(`http://localhost:5000${item.image_url || item.file_path}`)}
+                                        >
+                                            <FiImage />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="image-placeholder">
+                                        <FiImage />
+                                        <span>No Image</span>
+                                        <label className="inline-upload">
+                                            <FiUpload />
+                                            <input
+                                                type="file"
+                                                style={{ display: 'none' }}
+                                                accept="image/*"
+                                                onChange={(e) => e.target.files[0] && handleSeparateImageUpload(e.target.files[0], item)}
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Item Details */}
+                            <div className="item-details">
+                                <h3 className="name-with-preview">
+                                    <span>{item.name}</span>
+                                    {(item.image_url || item.file_path) && (
+                                        <button
+                                            type="button"
+                                            className="preview-btn"
+                                            title="Preview Image"
+                                            onClick={() => setModalImage(`http://localhost:5000${item.image_url || item.file_path}`)}
+                                        >
+                                            <FiImage />
+                                        </button>
+                                    )}
+                                </h3>
+                                {item.brand && <p className="brand">{item.brand}</p>}
+                                <p className="price">{formatCurrency(item.price)}</p>
+                                <p className="stock">Stock: {item.stock}</p>
+                                {item.description && (
+                                    <p className="description">{item.description}</p>
+                                )}
+                            </div>
+
+                            {/* Item Actions */}
+                            <div className="item-actions">
+                                <button 
+                                    className="edit-btn"
+                                    onClick={() => openEditModal(item)}
+                                >
+                                    <FiEdit /> Edit
+                                </button>
+                                <button 
+                                    className="delete-btn"
+                                    onClick={() => handleDeleteItem(item)}
+                                >
+                                    <FiTrash2 /> Delete
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Add Modal */}
+            {showAddModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h3>Add New {category}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowAddModal(false);
+                                    resetForm();
+                                }}
+                            >
+                                <FiX />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddItem} className="modal-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label htmlFor="name">Name *</label>
+                                    <input
+                                        type="text"
+                                        id="name"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="brand">Brand</label>
+                                    <input
+                                        type="text"
+                                        id="brand"
+                                        name="brand"
+                                        value={formData.brand}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label htmlFor="price">Price *</label>
+                                    <input
+                                        type="number"
+                                        id="price"
+                                        name="price"
+                                        value={formData.price}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                        step="0.01"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="stock">Stock</label>
+                                    <input
+                                        type="number"
+                                        id="stock"
+                                        name="stock"
+                                        value={formData.stock}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="description">Description</label>
+                                <textarea
+                                    id="description"
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    rows="3"
+                                />
+                            </div>
+
+                            {/* Phase 2: File Upload Section */}
+                            <div className="form-group">
+                                <label htmlFor="image">Product Image</label>
+                                <div className="file-upload-section">
+                                    <input
+                                        type="file"
+                                        id="image"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        style={{ display: 'none' }}
+                                    />
+                                    
+                                    {!formData.imageFile ? (
+                                        <label htmlFor="image" className="file-upload-btn">
+                                            <FiUpload /> Choose Image File
+                                        </label>
+                                    ) : (
+                                        <div className="file-selected">
+                                            <div className="file-info">
+                                                <FiImage />
+                                                <span>{formData.imageFile.name}</span>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={clearImage}
+                                                    className="clear-file-btn"
+                                                >
+                                                    <FiX />
+                                                </button>
+                                            </div>
+                                            
+                                            {imagePreview && (
+                                                <div className="image-preview">
+                                                    <img src={imagePreview} alt="Preview" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    <p className="file-help">
+                                        Upload image files only (JPEG, PNG, WebP). Max size: 5MB.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button 
+                                    type="button" 
+                                    className="cancel-btn"
+                                    onClick={() => {
+                                        setShowAddModal(false);
+                                        resetForm();
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="submit-btn"
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? 'Adding...' : 'Add Item'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Modal */}
+            {showEditModal && currentItem && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h3>Edit {currentItem.name}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowEditModal(false);
+                                    setCurrentItem(null);
+                                    resetForm();
+                                }}
+                            >
+                                <FiX />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleEditItem} className="modal-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label htmlFor="edit-name">Name *</label>
+                                    <input
+                                        type="text"
+                                        id="edit-name"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="edit-brand">Brand</label>
+                                    <input
+                                        type="text"
+                                        id="edit-brand"
+                                        name="brand"
+                                        value={formData.brand}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label htmlFor="edit-price">Price *</label>
+                                    <input
+                                        type="number"
+                                        id="edit-price"
+                                        name="price"
+                                        value={formData.price}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                        step="0.01"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="edit-stock">Stock</label>
+                                    <input
+                                        type="number"
+                                        id="edit-stock"
+                                        name="stock"
+                                        value={formData.stock}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="edit-description">Description</label>
+                                <textarea
+                                    id="edit-description"
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    rows="3"
+                                />
+                            </div>
+
+                            {/* Current Image Display */}
+                            {currentItem.image_url && (
+                                <div className="form-group">
+                                    <label>Current Image</label>
+                                    <div className="current-image">
+                                        <img 
+                                            src={`http://localhost:5000${currentItem.image_url}`} 
+                                            alt={currentItem.name}
+                                            style={{ maxWidth: '200px', maxHeight: '150px' }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Phase 2: File Upload for Update */}
+                            <div className="form-group">
+                                <label htmlFor="edit-image">Update Image (Optional)</label>
+                                <div className="file-upload-section">
+                                    <input
+                                        type="file"
+                                        id="edit-image"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        style={{ display: 'none' }}
+                                    />
+                                    
+                                    {!formData.imageFile ? (
+                                        <label htmlFor="edit-image" className="file-upload-btn">
+                                            <FiUpload /> Choose New Image
+                                        </label>
+                                    ) : (
+                                        <div className="file-selected">
+                                            <div className="file-info">
+                                                <FiImage />
+                                                <span>{formData.imageFile.name}</span>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={clearImage}
+                                                    className="clear-file-btn"
+                                                >
+                                                    <FiX />
+                                                </button>
+                                            </div>
+                                            
+                                            {imagePreview && (
+                                                <div className="image-preview">
+                                                    <img src={imagePreview} alt="Preview" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button 
+                                    type="button" 
+                                    className="cancel-btn"
+                                    onClick={() => {
+                                        setShowEditModal(false);
+                                        setCurrentItem(null);
+                                        resetForm();
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="submit-btn"
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? 'Updating...' : 'Update Item'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {modalImage && (
+                <div className="image-modal-overlay" onClick={() => setModalImage(null)}>
+                    <div className="image-modal" onClick={(e)=> e.stopPropagation()}>
+                        <button className="close-modal" onClick={() => setModalImage(null)}><FiX /></button>
+                        <img src={modalImage} alt="Preview" />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default StockDetail;

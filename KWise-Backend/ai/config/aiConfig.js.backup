@@ -1,0 +1,72 @@
+/**
+ * AI Configuration for K-Wise System
+ * Following K-Wise coding standards and architecture
+ */
+
+const aiConfig = {
+  // Ollama DeepSeek R1 Configuration - Performance Optimized
+  ollama: {
+    baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+    model: process.env.OLLAMA_MODEL || 'deepseek-r1:1.5b',
+    timeout: parseInt(process.env.OLLAMA_TIMEOUT) || 8000, // Reduced to 8 seconds for faster response
+    maxRetries: parseInt(process.env.OLLAMA_MAX_RETRIES) || 2, // Reduced retries for speed
+    retryDelay: 1000 // Faster retry
+  },
+
+  // Cache Configuration for Performance
+  cache: {
+    enabled: process.env.AI_CACHE_ENABLED !== 'false',
+    ttl: parseInt(process.env.AI_CACHE_TTL) || 3600, // 1 hour
+    maxSize: parseInt(process.env.AI_CACHE_MAX_SIZE) || 1000,
+    keyPrefix: 'kwise_ai_'
+  },
+
+  // Rate Limiting Configuration
+  rateLimit: {
+    enabled: process.env.AI_RATE_LIMIT_ENABLED !== 'false',
+    requests: parseInt(process.env.AI_RATE_LIMIT_REQUESTS) || 100,
+    window: parseInt(process.env.AI_RATE_LIMIT_WINDOW) || 3600000, // 1 hour
+    skipSuccessfulHits: true
+  },
+
+  // AI Service Configuration
+  service: {
+    enabled: process.env.AI_ENABLED === 'true',
+    fallbackEnabled: process.env.AI_FALLBACK_ENABLED !== 'false',
+    debugMode: process.env.NODE_ENV === 'development' || process.env.AI_DEBUG === 'true',
+    healthCheckInterval: parseInt(process.env.AI_HEALTH_CHECK_INTERVAL) || 60000 // 1 minute
+  },
+
+  // Generation Parameters for Different Use Cases - Performance Optimized
+  parameters: {
+    compatibility: {
+      temperature: 0.1,
+      top_p: 0.9,
+      max_tokens: 800, // Further reduced for faster response
+      stop: ['Human:', 'Assistant:', '\n\n']
+    },
+    recommendations: {
+      temperature: 0.2,
+      top_p: 0.8,
+      max_tokens: 600, // Optimized for speed
+      stop: ['Human:', 'Assistant:', '\n\n']
+    },
+    diagnostics: {
+      temperature: 0.15,
+      top_p: 0.85,
+      max_tokens: 700, // Reduced for faster response
+      stop: ['Human:', 'Assistant:', '\n\n']
+    },
+    futureUpgrade: {
+      temperature: 0.05, // Very low for technical precision
+      top_p: 0.7,
+      max_tokens: 900, // Optimized for detailed technical analysis
+      stop: ['Human:', 'Assistant:', '\n\n', '---'],
+      num_predict: 900,
+      num_ctx: 2048,
+      repeat_penalty: 1.1
+    }
+  }
+};
+
+module.exports = aiConfig;

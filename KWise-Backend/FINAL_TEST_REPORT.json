@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-11-04T01:57:54.583Z",
+  "summary": {
+    "total": 8,
+    "passed": 3,
+    "failed": 5,
+    "warnings": 0,
+    "successRate": "37.5%"
+  },
+  "tests": [
+    {
+      "name": "Backend Health",
+      "status": "PASS",
+      "duration": 38
+    },
+    {
+      "name": "Database Connection",
+      "status": "PASS",
+      "duration": 4
+    },
+    {
+      "name": "Cache Stats",
+      "status": "FAIL",
+      "error": "Request failed with status code 401"
+    },
+    {
+      "name": "Cache Metrics",
+      "status": "FAIL",
+      "error": "Request failed with status code 404"
+    },
+    {
+      "name": "Compatibility Analysis",
+      "status": "FAIL",
+      "error": "Request failed with status code 400"
+    },
+    {
+      "name": "Upgrade Recommendations",
+      "status": "FAIL",
+      "error": "Request failed with status code 404"
+    },
+    {
+      "name": "Cache Statistics",
+      "status": "FAIL",
+      "error": "Request failed with status code 401"
+    }
+  ],
+  "recommendation": "REVIEW"
+}

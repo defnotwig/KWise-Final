@@ -1,0 +1,430 @@
+{
+  "timestamp": "2025-11-09T16:47:59.084Z",
+  "summary": {
+    "totalTests": 20,
+    "passed": 8,
+    "failed": 12,
+    "warnings": 0,
+    "overallRating": 2.25,
+    "executionTime": 107425
+  },
+  "sections": {
+    "ollamaService": {
+      "tests": [
+        {
+          "name": "Service Availability",
+          "passed": true,
+          "duration": 47,
+          "version": {
+            "version": "0.12.10"
+          },
+          "responseTime": "47ms"
+        },
+        {
+          "name": "DeepSeek Models Available",
+          "passed": true,
+          "duration": 7,
+          "totalModels": 4,
+          "deepseekModels": [
+            "deepseek-r1:1.5b",
+            "deepseek-r1:7b",
+            "deepseek-r1:8b"
+          ],
+          "responseTime": "7ms"
+        },
+        {
+          "name": "Cold Start Response",
+          "passed": true,
+          "duration": 395,
+          "responseTime": "395ms",
+          "threshold": "15000ms",
+          "actual": "Sure"
+        },
+        {
+          "name": "Warm Response",
+          "passed": true,
+          "duration": 360,
+          "responseTime": "360ms",
+          "threshold": "3000ms"
+        },
+        {
+          "name": "Backend AI Health",
+          "passed": true,
+          "duration": 11,
+          "responseTime": "11ms",
+          "status": "healthy",
+          "models": 4,
+          "targetModel": "deepseek-r1:1.5b"
+        }
+      ],
+      "rating": 5,
+      "issues": []
+    },
+    "compatibilityFilter": {
+      "tests": [
+        {
+          "name": "PC-Parts Product Page - Compatible With",
+          "passed": true,
+          "duration": 28330,
+          "responseTime": "28330ms",
+          "aiUsed": false,
+          "compatibleProducts": 0,
+          "source": "deterministic"
+        },
+        {
+          "name": "PC Customized with AI - Component Selection",
+          "passed": false,
+          "duration": 60000,
+          "error": "Request failed with status code 400"
+        },
+        {
+          "name": "PC Customized Manually - Component Selection",
+          "passed": false,
+          "duration": 60000,
+          "error": "Request failed with status code 400"
+        },
+        {
+          "name": "PC Upgrade - Component Replacement",
+          "passed": false,
+          "duration": 60000,
+          "error": "Request failed with status code 400"
+        }
+      ],
+      "rating": 0,
+      "issues": [
+        {
+          "severity": "major",
+          "description": "Very slow response for PC-Parts Product Page - Compatible With",
+          "recommendation": "Implement aggressive caching and query optimization"
+        },
+        {
+          "severity": "minor",
+          "description": "Empty compatibility results",
+          "recommendation": "Check database products or relax filtering criteria"
+        },
+        {
+          "severity": "major",
+          "description": "PC Customized with AI - Component Selection failed with error",
+          "recommendation": "Check backend logs and endpoint implementation"
+        },
+        {
+          "severity": "major",
+          "description": "PC Customized Manually - Component Selection failed with error",
+          "recommendation": "Check backend logs and endpoint implementation"
+        },
+        {
+          "severity": "major",
+          "description": "PC Upgrade - Component Replacement failed with error",
+          "recommendation": "Check backend logs and endpoint implementation"
+        }
+      ]
+    },
+    "futureUpgrade": {
+      "tests": [
+        {
+          "name": "Entry-Level Build - CPU",
+          "passed": false,
+          "duration": 60000,
+          "error": "data.recommendations?.some is not a function"
+        },
+        {
+          "name": "Entry-Level Build - GPU",
+          "passed": false,
+          "duration": 60000,
+          "error": "data.recommendations?.some is not a function"
+        },
+        {
+          "name": "Mid-Tier Build - CPU",
+          "passed": false,
+          "duration": 60000,
+          "error": "data.recommendations?.some is not a function"
+        },
+        {
+          "name": "Mid-Tier Build - GPU",
+          "passed": false,
+          "duration": 60000,
+          "error": "data.recommendations?.some is not a function"
+        },
+        {
+          "name": "High-End Build - CPU",
+          "passed": false,
+          "duration": 60000,
+          "error": "data.recommendations?.some is not a function"
+        },
+        {
+          "name": "High-End Build - GPU",
+          "passed": false,
+          "duration": 60000,
+          "error": "data.recommendations?.some is not a function"
+        }
+      ],
+      "rating": 0,
+      "issues": [
+        {
+          "severity": "major",
+          "description": "Future upgrade endpoint failed",
+          "recommendation": "Check AI service availability and external market service"
+        },
+        {
+          "severity": "major",
+          "description": "Future upgrade endpoint failed",
+          "recommendation": "Check AI service availability and external market service"
+        },
+        {
+          "severity": "major",
+          "description": "Future upgrade endpoint failed",
+          "recommendation": "Check AI service availability and external market service"
+        },
+        {
+          "severity": "major",
+          "description": "Future upgrade endpoint failed",
+          "recommendation": "Check AI service availability and external market service"
+        },
+        {
+          "severity": "major",
+          "description": "Future upgrade endpoint failed",
+          "recommendation": "Check AI service availability and external market service"
+        },
+        {
+          "severity": "major",
+          "description": "Future upgrade endpoint failed",
+          "recommendation": "Check AI service availability and external market service"
+        }
+      ]
+    },
+    "aiQuality": {
+      "tests": [
+        {
+          "name": "Technical Accuracy",
+          "passed": false,
+          "duration": 23722,
+          "responseTime": "23722ms",
+          "qualityScore": "0%",
+          "matchedKeywords": 0,
+          "totalKeywords": 4,
+          "responseLength": 0
+        },
+        {
+          "name": "Helpful Reasoning",
+          "passed": false,
+          "duration": 10401,
+          "responseTime": "10401ms",
+          "qualityScore": "0%",
+          "matchedKeywords": 0,
+          "totalKeywords": 4,
+          "responseLength": 0
+        },
+        {
+          "name": "Philippine Market Awareness",
+          "passed": false,
+          "duration": 10837,
+          "responseTime": "10837ms",
+          "qualityScore": "0%",
+          "matchedKeywords": 0,
+          "totalKeywords": 4,
+          "responseLength": 0
+        }
+      ],
+      "rating": 0,
+      "issues": [
+        {
+          "severity": "major",
+          "description": "AI giving irrelevant responses for Technical Accuracy",
+          "recommendation": "Review prompt engineering or switch to more capable model"
+        },
+        {
+          "severity": "major",
+          "description": "AI giving irrelevant responses for Helpful Reasoning",
+          "recommendation": "Review prompt engineering or switch to more capable model"
+        },
+        {
+          "severity": "major",
+          "description": "AI giving irrelevant responses for Philippine Market Awareness",
+          "recommendation": "Review prompt engineering or switch to more capable model"
+        }
+      ]
+    },
+    "performance": {
+      "tests": [
+        {
+          "name": "Cache Performance",
+          "passed": true,
+          "duration": 1032,
+          "firstRequest": "3269ms",
+          "secondRequest": "1032ms",
+          "speedup": "68%",
+          "cached": "YES"
+        }
+      ],
+      "rating": 5,
+      "issues": []
+    },
+    "errorHandling": {
+      "tests": [
+        {
+          "name": "Fallback Mechanism",
+          "passed": true,
+          "duration": 0,
+          "fallbackWorking": "YES"
+        }
+      ],
+      "rating": 5,
+      "issues": []
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "high",
+      "category": "performance",
+      "recommendation": "Implement aggressive caching strategy - avg response time is 52083ms"
+    },
+    {
+      "priority": "high",
+      "category": "general",
+      "recommendation": "Consider upgrading to DeepSeek R1 7B or 8B model for better AI quality"
+    }
+  ],
+  "detailedLogs": [
+    "[2025-11-09T16:47:59.087Z] 🧪 [OllamaService] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:47:59.088Z] 🧪 [OllamaService] TESTING: Ollama DeepSeek R1 Service",
+    "[2025-11-09T16:47:59.088Z] 🧪 [OllamaService] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:47:59.088Z] 🧪 [OllamaService] Test 1.1: Service Availability Check",
+    "[2025-11-09T16:47:59.135Z] ✅ [OllamaService] ✅ Ollama service is running (47ms)",
+    "[2025-11-09T16:47:59.135Z] ℹ️ [OllamaService]    Version: {\"version\":\"0.12.10\"}",
+    "[2025-11-09T16:47:59.135Z] 🧪 [OllamaService] Test 1.2: DeepSeek R1 Model Availability",
+    "[2025-11-09T16:47:59.143Z] ✅ [OllamaService] ✅ Found 3 DeepSeek R1 models:",
+    "[2025-11-09T16:47:59.143Z] ℹ️ [OllamaService]    - deepseek-r1:1.5b (1.12 GB)",
+    "[2025-11-09T16:47:59.143Z] ℹ️ [OllamaService]    - deepseek-r1:7b (4.68 GB)",
+    "[2025-11-09T16:47:59.143Z] ℹ️ [OllamaService]    - deepseek-r1:8b (5.23 GB)",
+    "[2025-11-09T16:47:59.143Z] 🧪 [OllamaService] Test 1.3: Model Cold Start Response Time",
+    "[2025-11-09T16:47:59.538Z] ✅ [OllamaService] ✅ EXCELLENT cold start: 395ms",
+    "[2025-11-09T16:47:59.538Z] 🧪 [OllamaService] Test 1.4: Model Warm Response Time",
+    "[2025-11-09T16:47:59.898Z] ✅ [OllamaService] ✅ EXCELLENT warm response: 360ms",
+    "[2025-11-09T16:47:59.898Z] 🧪 [OllamaService] Test 1.5: Backend AI Health Endpoint",
+    "[2025-11-09T16:47:59.909Z] ✅ [OllamaService] ✅ Backend AI health check passed (11ms)",
+    "[2025-11-09T16:47:59.909Z] ℹ️ [OllamaService]    Status: healthy",
+    "[2025-11-09T16:47:59.909Z] ℹ️ [OllamaService]    Target Model: deepseek-r1:1.5b",
+    "[2025-11-09T16:47:59.909Z] ℹ️ [OllamaService]    Available Models: nomic-embed-text:latest, deepseek-r1:1.5b, deepseek-r1:7b, deepseek-r1:8b",
+    "[2025-11-09T16:47:59.910Z] 🧪 [CompatibilityFilter] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:47:59.910Z] 🧪 [CompatibilityFilter] TESTING: AI Compatibility Filtering",
+    "[2025-11-09T16:47:59.910Z] 🧪 [CompatibilityFilter] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:47:59.910Z] 🧪 [CompatibilityFilter] \nTest 2.x: PC-Parts Product Page - Compatible With",
+    "[2025-11-09T16:47:59.910Z] ℹ️ [CompatibilityFilter]    Test compatibility suggestions on product page",
+    "[2025-11-09T16:48:28.240Z] ✅ [CompatibilityFilter]    ✅ Success (28330ms)",
+    "[2025-11-09T16:48:28.240Z] ℹ️ [CompatibilityFilter]    AI Analysis: NO",
+    "[2025-11-09T16:48:28.240Z] ℹ️ [CompatibilityFilter]    Compatible Products: 0",
+    "[2025-11-09T16:48:28.240Z] ❌ [CompatibilityFilter]    ❌ POOR performance (>10s)",
+    "[2025-11-09T16:48:28.241Z] ⚠️ [CompatibilityFilter]    ⚠️ No compatible products found",
+    "[2025-11-09T16:48:28.241Z] 🧪 [CompatibilityFilter] \nTest 2.x: PC Customized with AI - Component Selection",
+    "[2025-11-09T16:48:28.241Z] ℹ️ [CompatibilityFilter]    Test compatibility during AI-assisted build",
+    "[2025-11-09T16:48:28.248Z] ❌ [CompatibilityFilter]    ❌ Error: Request failed with status code 400",
+    "[2025-11-09T16:48:28.248Z] 🧪 [CompatibilityFilter] \nTest 2.x: PC Customized Manually - Component Selection",
+    "[2025-11-09T16:48:28.248Z] ℹ️ [CompatibilityFilter]    Test compatibility during manual build",
+    "[2025-11-09T16:48:28.253Z] ❌ [CompatibilityFilter]    ❌ Error: Request failed with status code 400",
+    "[2025-11-09T16:48:28.253Z] 🧪 [CompatibilityFilter] \nTest 2.x: PC Upgrade - Component Replacement",
+    "[2025-11-09T16:48:28.253Z] ℹ️ [CompatibilityFilter]    Test compatibility for upgrade recommendations",
+    "[2025-11-09T16:48:28.259Z] ❌ [CompatibilityFilter]    ❌ Error: Request failed with status code 400",
+    "[2025-11-09T16:48:28.260Z] 🧪 [FutureUpgrade] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:48:28.260Z] 🧪 [FutureUpgrade] TESTING: Future Upgrade Recommendations",
+    "[2025-11-09T16:48:28.260Z] 🧪 [FutureUpgrade] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:48:28.260Z] 🧪 [FutureUpgrade] \nTest 3.x: Entry-Level Build",
+    "[2025-11-09T16:48:28.260Z] ℹ️ [FutureUpgrade]    Testing upgrades for: Intel Core i3-12100",
+    "[2025-11-09T16:48:57.153Z] ❌ [FutureUpgrade]    ❌ Error: data.recommendations?.some is not a function",
+    "[2025-11-09T16:48:57.154Z] ℹ️ [FutureUpgrade]    Testing upgrades for: GTX 1650",
+    "[2025-11-09T16:48:57.165Z] ❌ [FutureUpgrade]    ❌ Error: data.recommendations?.some is not a function",
+    "[2025-11-09T16:48:57.165Z] 🧪 [FutureUpgrade] \nTest 3.x: Mid-Tier Build",
+    "[2025-11-09T16:48:57.165Z] ℹ️ [FutureUpgrade]    Testing upgrades for: AMD Ryzen 5 5600X",
+    "[2025-11-09T16:48:57.180Z] ❌ [FutureUpgrade]    ❌ Error: data.recommendations?.some is not a function",
+    "[2025-11-09T16:48:57.180Z] ℹ️ [FutureUpgrade]    Testing upgrades for: RTX 3060",
+    "[2025-11-09T16:48:57.198Z] ❌ [FutureUpgrade]    ❌ Error: data.recommendations?.some is not a function",
+    "[2025-11-09T16:48:57.198Z] 🧪 [FutureUpgrade] \nTest 3.x: High-End Build",
+    "[2025-11-09T16:48:57.198Z] ℹ️ [FutureUpgrade]    Testing upgrades for: Intel Core i9-13900K",
+    "[2025-11-09T16:48:57.215Z] ❌ [FutureUpgrade]    ❌ Error: data.recommendations?.some is not a function",
+    "[2025-11-09T16:48:57.215Z] ℹ️ [FutureUpgrade]    Testing upgrades for: RTX 4090",
+    "[2025-11-09T16:48:57.226Z] ❌ [FutureUpgrade]    ❌ Error: data.recommendations?.some is not a function",
+    "[2025-11-09T16:48:57.227Z] 🧪 [AIQuality] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:48:57.227Z] 🧪 [AIQuality] TESTING: AI Response Quality",
+    "[2025-11-09T16:48:57.227Z] 🧪 [AIQuality] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:48:57.227Z] 🧪 [AIQuality] \nTest 4.x: Technical Accuracy",
+    "[2025-11-09T16:49:20.949Z] ℹ️ [AIQuality]    Quality Score: 0%",
+    "[2025-11-09T16:49:20.949Z] ℹ️ [AIQuality]    Matched: 0/4 keywords",
+    "[2025-11-09T16:49:20.949Z] ℹ️ [AIQuality]    Response Time: 23722ms",
+    "[2025-11-09T16:49:20.949Z] ❌ [AIQuality]    ❌ POOR quality",
+    "[2025-11-09T16:49:20.950Z] 🧪 [AIQuality] \nTest 4.x: Helpful Reasoning",
+    "[2025-11-09T16:49:31.351Z] ℹ️ [AIQuality]    Quality Score: 0%",
+    "[2025-11-09T16:49:31.351Z] ℹ️ [AIQuality]    Matched: 0/4 keywords",
+    "[2025-11-09T16:49:31.351Z] ℹ️ [AIQuality]    Response Time: 10401ms",
+    "[2025-11-09T16:49:31.351Z] ❌ [AIQuality]    ❌ POOR quality",
+    "[2025-11-09T16:49:31.352Z] 🧪 [AIQuality] \nTest 4.x: Philippine Market Awareness",
+    "[2025-11-09T16:49:42.189Z] ℹ️ [AIQuality]    Quality Score: 0%",
+    "[2025-11-09T16:49:42.190Z] ℹ️ [AIQuality]    Matched: 0/4 keywords",
+    "[2025-11-09T16:49:42.190Z] ℹ️ [AIQuality]    Response Time: 10837ms",
+    "[2025-11-09T16:49:42.190Z] ❌ [AIQuality]    ❌ POOR quality",
+    "[2025-11-09T16:49:42.190Z] 🧪 [Performance] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:42.191Z] 🧪 [Performance] TESTING: Performance & Caching",
+    "[2025-11-09T16:49:42.191Z] 🧪 [Performance] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:42.191Z] 🧪 [Performance] \nTest 5.1: Cache Hit Rate Test",
+    "[2025-11-09T16:49:42.191Z] ℹ️ [Performance]    Request 1: Cache MISS expected",
+    "[2025-11-09T16:49:45.460Z] ℹ️ [Performance]    Request 2: Cache HIT expected",
+    "[2025-11-09T16:49:46.492Z] ℹ️ [Performance]    First Request: 3269ms",
+    "[2025-11-09T16:49:46.492Z] ℹ️ [Performance]    Second Request: 1032ms",
+    "[2025-11-09T16:49:46.492Z] ℹ️ [Performance]    Speedup: 68%",
+    "[2025-11-09T16:49:46.492Z] ✅ [Performance]    ✅ EXCELLENT caching (68% speedup)",
+    "[2025-11-09T16:49:46.493Z] 🧪 [ErrorHandling] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.493Z] 🧪 [ErrorHandling] TESTING: Error Handling & Resilience",
+    "[2025-11-09T16:49:46.493Z] 🧪 [ErrorHandling] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.493Z] 🧪 [ErrorHandling] \nTest 6.1: Invalid Input Handling",
+    "[2025-11-09T16:49:46.498Z] ⚠️ [ErrorHandling]    ⚠️ Request threw exception (expected)",
+    "[2025-11-09T16:49:46.498Z] 🧪 [ErrorHandling] \nTest 6.2: Fallback Mechanism",
+    "[2025-11-09T16:49:46.510Z] ✅ [ErrorHandling]    ✅ Fallback mechanism working",
+    "[2025-11-09T16:49:46.510Z] 🧪 [Rating] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.510Z] 🧪 [Rating] CALCULATING RATINGS",
+    "[2025-11-09T16:49:46.510Z] 🧪 [Rating] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.511Z] ℹ️ [Rating] ollamaService: 5.0/5.0 (100% pass rate)",
+    "[2025-11-09T16:49:46.511Z] ℹ️ [Rating] compatibilityFilter: 0.0/5.0 (25% pass rate)",
+    "[2025-11-09T16:49:46.511Z] ℹ️ [Rating] futureUpgrade: 0.0/5.0 (0% pass rate)",
+    "[2025-11-09T16:49:46.511Z] ℹ️ [Rating] aiQuality: 0.0/5.0 (0% pass rate)",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] performance: 5.0/5.0 (100% pass rate)",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] errorHandling: 5.0/5.0 (100% pass rate)",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] ",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.512Z] ❌ [Rating] OVERALL RATING: 2.25/5.0",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] AVERAGE - Significant improvements required",
+    "[2025-11-09T16:49:46.512Z] ℹ️ [Rating] ",
+    "[2025-11-09T16:49:46.513Z] 🧪 [Recommendations] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.513Z] 🧪 [Recommendations] IMPROVEMENT RECOMMENDATIONS",
+    "[2025-11-09T16:49:46.513Z] 🧪 [Recommendations] ═══════════════════════════════════════════════",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations] \nTop Priority Improvements:",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations] 1. 🟠 [compatibilityFilter] Very slow response for PC-Parts Product Page - Compatible With",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations]    → Implement aggressive caching and query optimization",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations] 2. 🟠 [compatibilityFilter] PC Customized with AI - Component Selection failed with error",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations]    → Check backend logs and endpoint implementation",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.513Z] ℹ️ [Recommendations] 3. 🟠 [compatibilityFilter] PC Customized Manually - Component Selection failed with error",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations]    → Check backend logs and endpoint implementation",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] 4. 🟠 [compatibilityFilter] PC Upgrade - Component Replacement failed with error",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations]    → Check backend logs and endpoint implementation",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] 5. 🟠 [futureUpgrade] Future upgrade endpoint failed",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations]    → Check AI service availability and external market service",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] 6. 🟠 [futureUpgrade] Future upgrade endpoint failed",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations]    → Check AI service availability and external market service",
+    "[2025-11-09T16:49:46.514Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] 7. 🟠 [futureUpgrade] Future upgrade endpoint failed",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations]    → Check AI service availability and external market service",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] 8. 🟠 [futureUpgrade] Future upgrade endpoint failed",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations]    → Check AI service availability and external market service",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] 9. 🟠 [futureUpgrade] Future upgrade endpoint failed",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations]    → Check AI service availability and external market service",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] ",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] 10. 🟠 [futureUpgrade] Future upgrade endpoint failed",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations]    → Check AI service availability and external market service",
+    "[2025-11-09T16:49:46.515Z] ℹ️ [Recommendations] "
+  ]
+}

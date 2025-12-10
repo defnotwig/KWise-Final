@@ -1,0 +1,555 @@
+{
+  "metadata": {
+    "startTime": "2025-11-19T19:40:05.337Z",
+    "config": {
+      "ai": {
+        "model": "deepseek-r1:1.5b",
+        "ollamaUrl": "http://localhost:11434/api/generate",
+        "temperature": 0.1,
+        "max_tokens": 4000,
+        "timeout": 30000,
+        "retries": 3
+      },
+      "performance": {
+        "singleComponentFilter": {
+          "target": 50,
+          "max": 100,
+          "description": "Single component filter response"
+        },
+        "twoComponentChained": {
+          "target": 100,
+          "max": 150,
+          "description": "2-component chained filter"
+        },
+        "fourComponentChained": {
+          "target": 200,
+          "max": 300,
+          "description": "4-component chained filter"
+        },
+        "fullValidation": {
+          "target": 700,
+          "max": 1000,
+          "description": "Full 8-component validation"
+        },
+        "productPageCompatibility": {
+          "target": 250,
+          "max": 400,
+          "description": "Product page compatibility (50 items)"
+        },
+        "orderSummary": {
+          "target": 800,
+          "max": 1000,
+          "description": "Order summary generation"
+        },
+        "aiBuildGeneration": {
+          "target": 2000,
+          "max": 3000,
+          "description": "AI build generation"
+        },
+        "futureUpgradeSuggestions": {
+          "target": 1800,
+          "max": 2500,
+          "description": "Future upgrade suggestions (3 items)"
+        }
+      },
+      "load": {
+        "concurrentUsers": 50,
+        "testDuration": 60000,
+        "rampUpTime": 10000,
+        "acceptableDegradation": 0.2,
+        "targetErrorRate": 0.001
+      },
+      "scoring": {
+        "perfect": {
+          "min": 95,
+          "max": 100
+        },
+        "excellent": {
+          "min": 90,
+          "max": 94
+        },
+        "good": {
+          "min": 80,
+          "max": 89
+        },
+        "acceptable": {
+          "min": 70,
+          "max": 79
+        },
+        "poor": {
+          "min": 0,
+          "max": 69
+        }
+      },
+      "budget": {
+        "tolerance": 0.03,
+        "tiers": {
+          "bronze": {
+            "min": 10000,
+            "max": 25000
+          },
+          "silver": {
+            "min": 25001,
+            "max": 50000
+          },
+          "gold": {
+            "min": 51000,
+            "max": 75000
+          },
+          "platinum": {
+            "min": 75001,
+            "max": 100000
+          },
+          "diamond": {
+            "min": 100001,
+            "max": 999999
+          }
+        }
+      },
+      "trapComponents": {
+        "amdMotherboard": {
+          "id": "TRAP_001",
+          "name": "ASUS ROG STRIX B550-F",
+          "category": "Motherboard",
+          "socket": "AM4",
+          "chipset": "B550",
+          "memory_type": "DDR4",
+          "form_factor": "ATX"
+        },
+        "oldIntelBoard": {
+          "id": "TRAP_002",
+          "name": "MSI MAG Z490 TOMAHAWK",
+          "category": "Motherboard",
+          "socket": "LGA1200",
+          "chipset": "Z490",
+          "memory_type": "DDR4",
+          "form_factor": "ATX"
+        },
+        "ddr4OnlyBoard": {
+          "id": "TRAP_003",
+          "name": "GIGABYTE B660M DS3H",
+          "category": "Motherboard",
+          "socket": "LGA1700",
+          "chipset": "B660",
+          "memory_type": "DDR4",
+          "form_factor": "Micro-ATX"
+        },
+        "lowWattPsu": {
+          "id": "TRAP_004",
+          "name": "Corsair CV500",
+          "category": "PSU",
+          "wattage": 500,
+          "efficiency": "80+ Bronze"
+        },
+        "lowProfileCooler": {
+          "id": "TRAP_005",
+          "name": "Intel Stock Cooler",
+          "category": "Cooler",
+          "tdp_rating": 65,
+          "compatible_sockets": "LGA1700",
+          "height": 45
+        }
+      },
+      "testCPUs": {
+        "intelI9_14900K": {
+          "id": "TEST_CPU_001",
+          "name": "Intel Core i9-14900K",
+          "category": "CPU",
+          "socket": "LGA1700",
+          "tdp": 253,
+          "memory_controller": "DDR5",
+          "tier": "elite"
+        },
+        "amdRyzen9_7950X": {
+          "id": "TEST_CPU_002",
+          "name": "AMD Ryzen 9 7950X",
+          "category": "CPU",
+          "socket": "AM5",
+          "tdp": 170,
+          "boost_tdp": 230,
+          "memory_controller": "DDR5",
+          "tier": "elite"
+        },
+        "amdRyzen5_3600": {
+          "id": "TEST_CPU_003",
+          "name": "AMD Ryzen 5 3600",
+          "category": "CPU",
+          "socket": "AM4",
+          "tdp": 95,
+          "memory_controller": "DDR4",
+          "tier": "mid-tier"
+        }
+      },
+      "testGPUs": {
+        "rtx4090": {
+          "id": "TEST_GPU_001",
+          "name": "NVIDIA RTX 4090",
+          "category": "GPU",
+          "length": 336,
+          "width": 61,
+          "height": 137,
+          "tdp": 450,
+          "power_connector": "12VHPWR",
+          "tier": "elite"
+        },
+        "rtx4070": {
+          "id": "TEST_GPU_002",
+          "name": "NVIDIA RTX 4070",
+          "category": "GPU",
+          "length": 304,
+          "width": 61,
+          "height": 137,
+          "tdp": 200,
+          "power_connector": "8pin",
+          "tier": "high-tier"
+        }
+      },
+      "severity": {
+        "CATASTROPHIC": {
+          "level": 0,
+          "description": "Immediate test failure - incompatible shown as compatible",
+          "action": "ABORT_ALL_TESTS"
+        },
+        "CRITICAL": {
+          "level": 1,
+          "description": "Major issue - missing validation or wrong calculation",
+          "action": "MARK_FAILED"
+        },
+        "STANDARD": {
+          "level": 2,
+          "description": "Standard failure - must fix but not blocking",
+          "action": "MARK_WARNING"
+        },
+        "MINOR": {
+          "level": 3,
+          "description": "Minor issue - should fix for best experience",
+          "action": "MARK_NOTICE"
+        }
+      },
+      "reporting": {
+        "outputDir": "./tests/brutal-stress-test/results",
+        "generateMarkdown": true,
+        "generateJson": true,
+        "generateSummary": true,
+        "includeAILogs": true,
+        "screenshotFailures": false,
+        "verboseMode": true
+      },
+      "database": {
+        "rulesCount": 3200,
+        "minRulesRequired": 3000,
+        "componentPairs": 28
+      }
+    },
+    "options": {
+      "sections": "all",
+      "verbose": false,
+      "aiDebug": false,
+      "stopOnCatastrophic": true,
+      "generateReport": true
+    }
+  },
+  "sections": [
+    {
+      "section": 1,
+      "name": "PC-Parts Page (Filtered Selection)",
+      "results": [
+        {
+          "passed": false,
+          "details": "API request failed"
+        },
+        {
+          "testSection": "1.2",
+          "traps": [
+            {
+              "trapNumber": 6,
+              "description": "DDR4 RAM still showing for DDR5 motherboard - CRITICAL FAIL",
+              "passed": false,
+              "severity": {
+                "level": 0,
+                "description": "Immediate test failure - incompatible shown as compatible",
+                "action": "ABORT_ALL_TESTS"
+              },
+              "details": "AI validation failed",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.477Z"
+            },
+            {
+              "trapNumber": 7,
+              "description": "Micro-ATX case highlighted for ATX motherboard - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "Micro-ATX case should not be compatible with ATX motherboard",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.477Z"
+            },
+            {
+              "trapNumber": 8,
+              "description": "SATA-only SSD prioritized over NVMe - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Motherboard has 4 M.2 slots, NVMe should be prioritized",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.477Z"
+            },
+            {
+              "trapNumber": 9,
+              "description": "AM5 cooler mounting kit should NEVER show for LGA1700",
+              "passed": true,
+              "severity": {
+                "level": 0,
+                "description": "Immediate test failure - incompatible shown as compatible",
+                "action": "ABORT_ALL_TESTS"
+              },
+              "details": "AM5 cooler incompatible with LGA1700 socket",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.477Z"
+            }
+          ],
+          "aiResponseTime": 30018,
+          "performance": {
+            "name": "2-Component Chained Filter",
+            "duration": 0,
+            "target": 100,
+            "max": 150,
+            "meetsTarget": true,
+            "meetsMax": true,
+            "status": "EXCELLENT",
+            "timestamp": "2025-11-19T19:40:35.477Z"
+          },
+          "passed": false
+        },
+        {
+          "testSection": "1.3",
+          "traps": [
+            {
+              "trapNumber": 10,
+              "description": "NZXT H510 (315mm clearance) showing for 336mm GPU - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 0,
+                "description": "Immediate test failure - incompatible shown as compatible",
+                "action": "ABORT_ALL_TESTS"
+              },
+              "details": "GPU 336mm exceeds case 315mm - correctly excluded",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.478Z"
+            },
+            {
+              "trapNumber": 11,
+              "description": "750W PSU highlighted without warning - should show YELLOW",
+              "passed": true,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "PSU load: 113.7% (853W / 750W) - warning required",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.478Z"
+            },
+            {
+              "trapNumber": 12,
+              "description": "PCIe 3.0 x16 board slips through for PCIe 4.0 GPU - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "PCIe 4.0 required for optimal GPU performance",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.478Z"
+            },
+            {
+              "trapNumber": 13,
+              "description": "Pairing RTX 4090 with i3-12100F (severe bottleneck) - should WARN",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "CPU-GPU tier match: Tier difference = 0 (0 = optimal)",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.478Z"
+            }
+          ],
+          "performance": {
+            "name": "4-Component Chained Filter",
+            "duration": 0,
+            "target": 200,
+            "max": 300,
+            "meetsTarget": true,
+            "meetsMax": true,
+            "status": "EXCELLENT",
+            "timestamp": "2025-11-19T19:40:35.478Z"
+          },
+          "passed": true
+        },
+        {
+          "testSection": "1.4",
+          "traps": [
+            {
+              "trapNumber": 14,
+              "description": "DDR5-7200 showing on H770 board (limited OC) - should WARN",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "DDR5-7200 requires OC on H770 (max 5600) - warning correct",
+              "duration": 1,
+              "timestamp": "2025-11-19T19:40:35.479Z"
+            },
+            {
+              "trapNumber": 15,
+              "description": "4x32GB (128GB) on board with 64GB maximum - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 0,
+                "description": "Immediate test failure - incompatible shown as compatible",
+                "action": "ABORT_ALL_TESTS"
+              },
+              "details": "128GB exceeds 64GB max - correctly excluded",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.479Z"
+            },
+            {
+              "trapNumber": 16,
+              "description": "52mm tall RAM with NH-D15 air cooler (clearance issue) - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "52mm RAM exceeds 40mm cooler clearance - correctly flagged",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:40:35.479Z"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "testSection": "1.5",
+          "traps": [
+            {
+              "trapNumber": 17,
+              "description": "Inject incompatible component after validation - should re-check",
+              "passed": true,
+              "severity": {
+                "level": 0,
+                "description": "Immediate test failure - incompatible shown as compatible",
+                "action": "ABORT_ALL_TESTS"
+              },
+              "details": "System must re-validate on any component change",
+              "duration": 1,
+              "timestamp": "2025-11-19T19:41:05.518Z"
+            },
+            {
+              "trapNumber": 18,
+              "description": "Component at exact edge of compatibility - should WARN",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "GPU clearance: 24mm buffer (20mm recommended minimum)",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:41:05.518Z"
+            },
+            {
+              "trapNumber": 19,
+              "description": "Front-mounted AIO with limited radiator clearance - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "Top mount required - front mount conflicts with GPU",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:41:05.519Z"
+            },
+            {
+              "trapNumber": 20,
+              "description": "Modular PSU missing required GPU cables - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "PSU must include 12VHPWR or 4x 8-pin for RTX 4090",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:41:05.519Z"
+            }
+          ],
+          "aiResponseTime": 30035,
+          "performance": {
+            "name": "Full 8-Component Validation (28 pairs)",
+            "duration": 0,
+            "target": 700,
+            "max": 1000,
+            "meetsTarget": true,
+            "meetsMax": true,
+            "status": "EXCELLENT",
+            "timestamp": "2025-11-19T19:41:05.519Z"
+          },
+          "compatibilityScore": 0,
+          "scoreCheck": {
+            "passed": false,
+            "details": "Compatibility score 0 outside expected range 95-100",
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            }
+          },
+          "passed": false
+        }
+      ],
+      "summary": {
+        "totalTraps": 15,
+        "passedTraps": 14,
+        "failedTraps": 1,
+        "passRate": "93.3"
+      }
+    }
+  ],
+  "summary": {
+    "totalTraps": 15,
+    "passedTraps": 14,
+    "failedTraps": 1,
+    "passRate": 93.3,
+    "severityCounts": {
+      "catastrophic": 1,
+      "critical": 0,
+      "standard": 0,
+      "minor": 0
+    },
+    "performance": {
+      "total": 3,
+      "meetsTarget": 3,
+      "meetsMax": 3,
+      "avgDuration": 0
+    },
+    "rating": 0,
+    "status": "🔴 CATASTROPHIC_FAILURE",
+    "sectionsRun": 1,
+    "duration": 60185
+  },
+  "endTime": "2025-11-19T19:41:05.520Z",
+  "duration": 60182
+}

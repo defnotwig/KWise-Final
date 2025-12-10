@@ -1,0 +1,330 @@
+﻿/* ========================================
+   KIOSK TRANSAC-COMPONENTS RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.background {
+  background: #002024;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  column-gap: 100px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.main-title {
+  color: #fff !important;
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  margin-bottom: 1000px;
+  text-align: center;
+}
+
+.component {
+  margin-top: 100px;
+}
+
+.carousel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 90%;
+  max-width: 1200px;
+  height: 600px; /* 🔥 Set fixed height */
+  position: fixed;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.arrow {
+  font-size: 48px;
+  color: #00e083;
+  background: none;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  z-index: 2;
+  padding: 20px;
+}
+
+.main-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  padding: 0 40px;
+}
+
+
+.navigation {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center ;
+  gap: 50px;
+
+}
+
+.start-btn {
+  background-color: transparent;
+  border: 2px solid #00e083;
+  color: white;
+  width: 360px;
+  height: 64px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.start-btn:hover {
+  background-color: #00e083;
+  color: #012a22;
+}
+
+.subtext {
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  color: #807F7F;
+
+}
+
+/* Ensure all h1 elements have white text */
+.background h1 {
+  color: #fff !important;
+}
+
+/* ========================================
+   RESPONSIVE MEDIA QUERIES
+   Default: Optimized for 1080x1920 (Portrait Kiosk)
+   ======================================== */
+
+/* Mobile Devices (Portrait and Landscape) */
+@media only screen and (max-width: 767px) {
+  .main-title {
+    font-size: clamp(28px, 8vw, 48px);
+    margin-bottom: 40vh;
+  }
+
+  .carousel {
+    height: 400px;
+    width: 95%;
+    padding: 0 10px;
+  }
+
+  .arrow {
+    font-size: 32px;
+    padding: 10px;
+  }
+
+  .main-box {
+    padding: 0 15px;
+  }
+
+  .component {
+    margin-top: 50px;
+    max-width: 90vw;
+    max-height: 350px;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain;
+  }
+
+  .navigation {
+    gap: 25px;
+    margin-top: 20px;
+  }
+
+  .start-btn {
+    width: clamp(250px, 80vw, 320px);
+    height: 50px;
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+
+  .subtext {
+    font-size: clamp(16px, 4vw, 24px);
+    padding: 0 20px;
+    text-align: center;
+  }
+}
+
+/* Tablet Devices (Portrait and Landscape) */
+@media only screen and (min-width: 768px) and (max-width: 1023px) {
+  .main-title {
+    font-size: 52px;
+    margin-bottom: 60vh;
+  }
+
+  .carousel {
+    height: 500px;
+    width: 92%;
+  }
+
+  .arrow {
+    font-size: 42px;
+    padding: 15px;
+  }
+
+  .main-box {
+    padding: 0 30px;
+  }
+
+  .component {
+    margin-top: 70px;
+    max-width: 85vw;
+    max-height: 450px;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain;
+  }
+
+  .navigation {
+    gap: 35px;
+  }
+
+  .start-btn {
+    width: 340px;
+    height: 58px;
+    font-size: 15px;
+  }
+
+  .subtext {
+    font-size: 28px;
+  }
+}
+
+/* Laptop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1024px) and (max-width: 1439px) {
+  .main-title {
+    font-size: 58px;
+  }
+
+  .carousel {
+    height: 550px;
+    width: 90%;
+  }
+
+  .arrow {
+    font-size: 46px;
+    padding: 18px;
+  }
+
+  .main-box {
+    padding: 0 35px;
+  }
+
+  .component {
+    margin-top: 85px;
+    max-width: 750px;
+    max-height: 650px;
+  }
+
+  .navigation {
+    gap: 45px;
+  }
+
+  .start-btn {
+    width: 350px;
+    height: 62px;
+    font-size: 15.5px;
+  }
+
+  .subtext {
+    font-size: 30px;
+  }
+}
+
+/* Desktop Devices (Portrait and Landscape) - Default 1080x1920 */
+@media only screen and (min-width: 1440px) {
+  .main-title {
+    font-size: 64px;
+    margin-bottom: 100vh;
+  }
+
+  .carousel {
+    height: 600px;
+    width: 90%;
+    max-width: 1200px;
+  }
+
+  .arrow {
+    font-size: 48px;
+    padding: 20px;
+  }
+
+  .main-box {
+    padding: 0 40px;
+  }
+
+  .component {
+    margin-top: 100px;
+  }
+
+  .navigation {
+    gap: 50px;
+  }
+
+  .start-btn {
+    width: 360px;
+    height: 64px;
+    font-size: 16px;
+    padding: 12px 24px;
+  }
+
+  .subtext {
+    font-size: 32px;
+  }
+}
+
+/* Desktop Devices (Portrait and Landscape) - Default 1080x1920 */
+@media only screen and (min-width: 1440px) {
+  .main-title {
+    font-size: 64px;
+    margin-bottom: 100vh;
+  }
+
+  .carousel {
+    height: 600px;
+    width: 90%;
+    max-width: 1200px;
+  }
+
+  .arrow {
+    font-size: 48px;
+    padding: 20px;
+  }
+
+  .main-box {
+    padding: 0 40px;
+  }
+
+  .component {
+    margin-top: 100px;
+  }
+
+  .navigation {
+    gap: 50px;
+  }
+
+  .start-btn {
+    width: 360px;
+    height: 64px;
+    font-size: 16px;
+    padding: 12px 24px;
+  }
+
+  .subtext {
+    font-size: 32px;
+  }
+}

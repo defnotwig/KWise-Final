@@ -1,0 +1,137 @@
+{
+  "controllers": {
+    "passed": 26,
+    "failed": 0,
+    "warnings": 1,
+    "details": [
+      {
+        "test": "getHealthStatus",
+        "status": "PASS"
+      },
+      {
+        "test": "getSystemStatus",
+        "status": "PASS"
+      },
+      {
+        "test": "getCacheStatistics",
+        "status": "PASS"
+      },
+      {
+        "test": "estimateCurrentBuild",
+        "status": "PASS"
+      },
+      {
+        "test": "recommendUpgrade",
+        "status": "PASS"
+      },
+      {
+        "test": "recommendCleaningTier",
+        "status": "PASS"
+      },
+      {
+        "test": "getHotPicks",
+        "status": "PASS"
+      },
+      {
+        "test": "getValueForMoney",
+        "status": "PASS"
+      },
+      {
+        "test": "analyzeMarketTrends",
+        "status": "PASS"
+      },
+      {
+        "test": "analyzeCompatibility",
+        "status": "PASS"
+      },
+      {
+        "test": "findCompatibleComponents",
+        "status": "PASS"
+      },
+      {
+        "test": "optimizeBuild",
+        "status": "PASS"
+      },
+      {
+        "test": "validateBuildCompatibility",
+        "status": "PASS"
+      },
+      {
+        "test": "validateBuildComprehensive",
+        "status": "PASS"
+      },
+      {
+        "test": "recommendPreBuilds",
+        "status": "PASS"
+      },
+      {
+        "test": "optimizeForBudget",
+        "status": "PASS"
+      },
+      {
+        "test": "performPCCheckup",
+        "status": "PASS"
+      },
+      {
+        "test": "analyzeUpgradeOptions",
+        "status": "PASS"
+      },
+      {
+        "test": "recommendServices",
+        "status": "PASS"
+      },
+      {
+        "test": "analyzeBottlenecks",
+        "status": "PASS"
+      },
+      {
+        "test": "compareProducts",
+        "status": "PASS"
+      },
+      {
+        "test": "generateTrainingDataset",
+        "status": "PASS"
+      },
+      {
+        "test": "getAIMetrics",
+        "status": "PASS"
+      },
+      {
+        "test": "getTopUpgradePaths",
+        "status": "PASS"
+      },
+      {
+        "test": "getPopularComponents",
+        "status": "PASS"
+      }
+    ]
+  },
+  "routes": {
+    "passed": 9,
+    "failed": 0,
+    "warnings": 0,
+    "details": []
+  },
+  "database": {
+    "passed": 25,
+    "failed": 0,
+    "warnings": 0,
+    "details": []
+  },
+  "environment": {
+    "passed": 16,
+    "failed": 0,
+    "warnings": 0,
+    "details": []
+  },
+  "security": {
+    "passed": 2,
+    "failed": 2,
+    "warnings": 1,
+    "details": []
+  },
+  "overall": {
+    "score": 96,
+    "status": "⚠️  ALMOST READY (minor fixes needed)"
+  }
+}

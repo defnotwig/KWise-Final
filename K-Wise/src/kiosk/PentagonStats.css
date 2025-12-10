@@ -1,0 +1,14 @@
+﻿/* ========================================
+   KIOSK PENTAGON-STATS RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.pentagon-stats-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #012b22;
+  }
+  

@@ -1,0 +1,1278 @@
+/**
+ * AI Compatibility Service
+ * Uses Ollama Deepseek R1 for intelligent hardware compatibility analysis
+ * Prevents bottlenecks, slot mismatches, and optimization issues
+ * 
+ * PHASE 1 ENHANCEMENT: Integrated with enhancedAIService for:
+ * - Intelligent 3-tier caching (60%+ hit rate expected)
+ * - Circuit breaker pattern (99.5%+ uptime)
+ * - Automatic fallback responses
+ */
+
+const axios = require('axios');
+const logger = require('../utils/logger');
+const compatibilityRules = require('./compatibilityRules'); // PHASE 2: Deterministic rules integration
+const enhancedAIService = require('./enhancedAIService'); // PHASE 1: Enhanced AI with caching & circuit breaker
+const db = require('../config/db'); // PHASE 2: Database for compatibility logging
+const crypto = require('crypto'); // PHASE 2: For build hash generation
+
+class CompatibilityService {
+    constructor() {
+        this.ollamaUrl = 'http://localhost:11434/api/generate';
+        this.model = 'deepseek-r1:7b'; // Using available DeepSeek R1 7B model
+        this.fallbackModel = 'deepseek-r1:1.5b'; // Fallback to smaller model if needed
+        this.isAvailable = false;
+        this.loggingEnabled = true; // PHASE 2: Enable compatibility logging
+        // Skip availability check during tests to avoid open handles
+        if (process.env.NODE_ENV !== 'test') {
+            this.checkAvailability();
+        }
+    }
+
+    /**
+     * PHASE 2: Generate hash for build configuration
+     * @param {Object} parts - Build parts object
+     * @returns {string} - Hash string
+     */
+    generateBuildHash(parts) {
+        try {
+            // Sort parts by category for consistent hashing
+            const sortedParts = Object.keys(parts).sort().reduce((obj, key) => {
+                obj[key] = parts[key]?.id || parts[key];
+                return obj;
+            }, {});
+            
+            return crypto.createHash('md5').update(JSON.stringify(sortedParts)).digest('hex');
+        } catch (error) {
+            logger.error('Error generating build hash:', error);
+            return 'hash_error_' + Date.now();
+        }
+    }
+
+    /**
+     * PHASE 2: Log compatibility check to database
+     * @param {Object} logData - Compatibility check data
+     */
+    async logCompatibilityCheck(logData) {
+        if (!this.loggingEnabled) return;
+
+        try {
+            const {
+                build_hash,
+                parts_json,
+                rules_verdict,
+                ai_verdict,
+                user_context,
+                session_id,
+                user_decision,
+                outcome_quality
+            } = logData;
+
+            await db.query(`
+                INSERT INTO compatibility_logs (
+                    build_hash, parts_json, rules_verdict, ai_verdict,
+                    user_context, session_id, user_decision, outcome_quality,
+                    created_at
+                ) VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8, NOW())
+            `, [
+                build_hash,
+                JSON.stringify(parts_json),
+                JSON.stringify(rules_verdict),
+                JSON.stringify(ai_verdict),
+                JSON.stringify(user_context),
+                session_id || 'unknown',
+                user_decision || 'pending',
+                outcome_quality || 'unknown'
+            ]);
+
+            logger.info(`📊 [PHASE 2 LOGGING] Compatibility check logged: ${build_hash.substring(0, 8)}...`);
+        } catch (error) {
+            logger.error('Failed to log compatibility check:', error.message);
+            // Don't throw - logging failure shouldn't break compatibility checks
+        }
+    }
+
+    /**
+     * Check if Ollama with Deepseek R1 is available
+     */
+    async checkAvailability() {
+        try {
+            const response = await axios.get('http://localhost:11434/api/version', {
+                timeout: 3000
+            });
+            this.isAvailable = response.status === 200;
+            // Only log if available (reduce noise)
+            if (this.isAvailable) {
+                logger.info(`🤖 Ollama Deepseek R1 availability: Available`);
+            }
+        } catch (error) {
+            this.isAvailable = false;
+            // Silently fail for Ollama - it's optional AI feature
+            // Only log at debug level to reduce startup noise
+        }
+    }
+
+    /**
+     * Analyze hardware compatibility using AI
+     * PHASE 2: Now runs DETERMINISTIC RULES first, then AI analysis for refinement
+     * @param {Object} currentProduct - The current product being viewed
+     * @param {Array} candidateProducts - Array of potential compatible products
+     * @returns {Array} - Filtered array of truly compatible products with compatibility scores
+     */
+    async analyzeCompatibility(currentProduct, candidateProducts) {
+        if (!candidateProducts || candidateProducts.length === 0) {
+            return this.getFallbackCompatibility(currentProduct, candidateProducts);
+        }
+
+        try {
+            logger.info(`🔍 [PHASE 2] Analyzing compatibility for ${currentProduct.name} with ${candidateProducts.length} candidates`);
+
+            // PHASE 2: RUN DETERMINISTIC RULES FIRST (HARD CHECKS)
+            const deterministicResults = await this.runDeterministicRules(currentProduct, candidateProducts);
+            
+            // Filter out incompatible products (failed hard checks)
+            const compatibleCandidates = candidateProducts.filter(product => {
+                const result = deterministicResults[product.id];
+                return result && result.compatible;
+            });
+
+            logger.info(`✅ [PHASE 2] Deterministic rules: ${compatibleCandidates.length}/${candidateProducts.length} passed hard checks`);
+
+            // If no candidates passed deterministic checks, return with reasons
+            if (compatibleCandidates.length === 0) {
+                return candidateProducts.map(product => ({
+                    ...product,
+                    compatibility_score: 0,
+                    compatible: false,
+                    compatibility_reason: deterministicResults[product.id]?.issues?.[0]?.message || 'Failed compatibility check',
+                    deterministic_issues: deterministicResults[product.id]?.issues || []
+                }));
+            }
+
+            // PHASE 2: AI ANALYSIS for refinement (soft checks + reasoning)
+            // PHASE 1 ENHANCEMENT: Using enhancedAIService with caching & circuit breaker
+            if (!this.isAvailable) {
+                logger.warn('⚠️ AI unavailable, using deterministic scores only');
+                return this.mapDeterministicToProducts(compatibleCandidates, deterministicResults, currentProduct);
+            }
+
+            // Use enhanced AI service for compatibility analysis with caching
+            const aiAnalysis = await enhancedAIService.analyzeCompatibility(
+                {
+                    current: currentProduct,
+                    candidates: compatibleCandidates
+                },
+                {}, // userContext (can be expanded later)
+                deterministicResults
+            );
+
+            // Check if we got a cached or AI response
+            if (aiAnalysis.source === 'cache') {
+                logger.info('✅ [CACHE HIT] Retrieved compatibility from cache');
+            } else if (aiAnalysis.source === 'fallback') {
+                logger.warn('⚠️ [FALLBACK] Circuit breaker open, using fallback');
+            } else {
+                logger.info(`✅ [AI] Fresh compatibility analysis (${aiAnalysis.latency}ms)`);
+            }
+
+            const aiResponse = aiAnalysis.overall_assessment?.parsedData || aiAnalysis.overall_assessment;
+
+            if (aiResponse && aiResponse.compatible_products) {
+                const compatibleIds = aiResponse.compatible_products;
+                const compatibleProducts = compatibleCandidates
+                    .filter(p => compatibleIds.includes(p.id))
+                    .map(product => {
+                        const detResult = deterministicResults[product.id];
+                        const aiScore = aiResponse.scores?.[product.id] || 85;
+                        const detScore = detResult?.percentageScore || 0;
+                        
+                        // TASK 3: Check tier compatibility
+                        const tierCheck = this.checkTierCompatibility(currentProduct, product);
+                        
+                        // Combine deterministic, AI, and tier scores
+                        // Weights: 60% deterministic, 25% AI, 15% tier
+                        const finalScore = Math.round(detScore * 0.6 + aiScore * 0.25 + tierCheck.score * 0.15);
+
+                        // Combine issues and recommendations
+                        const allIssues = [...(detResult?.issues || [])];
+                        const allRecommendations = [...(detResult?.recommendations || [])];
+                        
+                        // Add tier warnings/recommendations if applicable
+                        if (tierCheck.warning) {
+                            allIssues.push({
+                                severity: tierCheck.tierDifference >= 2 ? 'warning' : 'info',
+                                category: 'tier',
+                                message: tierCheck.warning
+                            });
+                        }
+                        
+                        if (tierCheck.recommendation) {
+                            allRecommendations.push({
+                                category: 'tier',
+                                message: tierCheck.recommendation
+                            });
+                        }
+
+                        return {
+                            ...product,
+                            compatibility_score: finalScore,
+                            deterministic_score: detScore,
+                            ai_score: aiScore,
+                            tier_score: tierCheck.score,
+                            tier_compatible: tierCheck.compatible,
+                            tier_difference: tierCheck.tierDifference,
+                            compatible: detResult?.compatible || false,
+                            compatibility_reason: aiResponse.reasons?.[product.id] || 'AI verified compatibility',
+                            deterministic_issues: allIssues,
+                            recommendations: allRecommendations,
+                            tier_details: tierCheck
+                        };
+                    })
+                    .sort((a, b) => b.compatibility_score - a.compatibility_score);
+
+                logger.info(`✅ [PHASE 2 + TASK 3] Final: ${compatibleProducts.length} products with tier-aware scores`);
+                
+                // PHASE 2: Log this compatibility check
+                const buildHash = this.generateBuildHash({ current: currentProduct, candidates: candidateProducts });
+                await this.logCompatibilityCheck({
+                    build_hash: buildHash,
+                    parts_json: { current: { id: currentProduct.id, category: currentProduct.category }, candidates: candidateProducts.map(p => ({ id: p.id, category: p.category })) },
+                    rules_verdict: { compatible_count: compatibleCandidates.length, total: candidateProducts.length, deterministic: true },
+                    ai_verdict: { source: aiAnalysis.source, confidence: aiAnalysis.confidence || 85, compatible_products: aiResponse.compatible_products },
+                    user_context: { analysis_type: 'compatibility', current_category: currentProduct.category },
+                    session_id: 'system_analysis',
+                    user_decision: 'accepted',
+                    outcome_quality: 'success'
+                }).catch(err => logger.warn('Logging failed:', err.message));
+                
+                return compatibleProducts;
+            }
+
+            logger.warn('⚠️ AI response invalid, using deterministic scores only');
+            return this.mapDeterministicToProducts(compatibleCandidates, deterministicResults, currentProduct);
+
+        } catch (error) {
+            const errorMessage = error.message || error.toString() || 'Unknown error';
+            logger.error(`❌ Compatibility analysis failed: ${errorMessage}`);
+            return this.getFallbackCompatibility(currentProduct, candidateProducts);
+        }
+    }
+
+    /**
+     * PHASE 2: Run deterministic compatibility rules
+     * Returns map of product_id -> compatibility result
+     */
+    async runDeterministicRules(currentProduct, candidateProducts) {
+        const results = {};
+
+        // Build current product context (normalized specs)
+        const currentSpecs = await this.getNormalizedSpecs(currentProduct);
+        const buildContext = {
+            [currentProduct.category.toLowerCase()]: {
+                id: currentProduct.id,
+                specs: currentSpecs
+            }
+        };
+
+        // Analyze each candidate
+        for (const candidate of candidateProducts) {
+            try {
+                const candidateSpecs = await this.getNormalizedSpecs(candidate);
+                const candidateContext = {
+                    id: candidate.id,
+                    category: candidate.category,
+                    specs: candidateSpecs
+                };
+
+                // Run master compatibility function
+                const result = await compatibilityRules.computeCompatibilityScore(buildContext, candidateContext);
+                results[candidate.id] = result;
+            } catch (error) {
+                logger.error(`Error running rules for product ${candidate.id}: ${error.message}`);
+                results[candidate.id] = {
+                    compatible: false,
+                    score: 0,
+                    percentageScore: 0,
+                    issues: [{ severity: 'critical', message: 'Failed to analyze compatibility' }],
+                    recommendations: []
+                };
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * PHASE 2: Get normalized specs (tries product_specs table first, falls back to raw specs)
+     */
+    async getNormalizedSpecs(product) {
+        try {
+            // Try to load from product_specs table (if Phase 1 migrations completed)
+            const normalizedSpecs = await compatibilityRules.loadNormalizedSpecs(product.id);
+            
+            if (Object.keys(normalizedSpecs).length > 0) {
+                return normalizedSpecs;
+            }
+
+            // Fallback: extract from raw specifications
+            return this.extractSpecifications(product);
+        } catch (error) {
+            logger.warn(`Failed to get normalized specs for ${product.id}, using raw: ${error.message}`);
+            return this.extractSpecifications(product);
+        }
+    }
+
+    /**
+     * TASK 3: Check tier compatibility between products
+     * Prevents bottlenecks by ensuring balanced component tiers
+     * 
+     * Tier Hierarchy: entry < mid-tier < high-tier < elite
+     * 
+     * Compatibility Rules:
+     * - Same tier: 100% compatible (ideal)
+     * - 1 tier difference: 75% compatible (acceptable with warning)
+     * - 2+ tier difference: 40% compatible (not recommended - bottleneck risk)
+     * 
+     * @param {Object} product1 - First product to compare
+     * @param {Object} product2 - Second product to compare
+     * @returns {Object} - Tier compatibility result with score and warnings
+     */
+    checkTierCompatibility(product1, product2) {
+        const tierLevels = {
+            'entry': 1,
+            'mid-tier': 2,
+            'high-tier': 3,
+            'elite': 4
+        };
+
+        const tier1 = product1?.tier?.toLowerCase();
+        const tier2 = product2?.tier?.toLowerCase();
+
+        // If either product doesn't have a tier, skip tier checking
+        if (!tier1 || !tier2 || !tierLevels[tier1] || !tierLevels[tier2]) {
+            return {
+                compatible: true,
+                score: 100,
+                tierDifference: 0,
+                warning: null,
+                recommendation: null
+            };
+        }
+
+        const level1 = tierLevels[tier1];
+        const level2 = tierLevels[tier2];
+        const difference = Math.abs(level1 - level2);
+
+        let score, warning, recommendation, compatible;
+
+        if (difference === 0) {
+            // Perfect match - same tier
+            score = 100;
+            compatible = true;
+            warning = null;
+            recommendation = `✅ Perfect tier match (${tier1}) - balanced performance`;
+        } else if (difference === 1) {
+            // Acceptable - 1 tier difference
+            score = 75;
+            compatible = true;
+            const higherTier = level1 > level2 ? `${product1.category} (${tier1})` : `${product2.category} (${tier2})`;
+            const lowerTier = level1 < level2 ? `${product1.category} (${tier1})` : `${product2.category} (${tier2})`;
+            warning = `⚠️ Tier mismatch detected: ${higherTier} is more powerful than ${lowerTier}`;
+            recommendation = `Consider upgrading ${lowerTier} to match the ${higherTier} for balanced performance.`;
+        } else if (difference >= 2) {
+            // Not recommended - significant tier gap
+            score = 40;
+            compatible = false;
+            const higherTier = level1 > level2 ? `${product1.category} (${tier1})` : `${product2.category} (${tier2})`;
+            const lowerTier = level1 < level2 ? `${product1.category} (${tier1})` : `${product2.category} (${tier2})`;
+            warning = `❌ BOTTLENECK RISK: ${higherTier} will be severely limited by ${lowerTier}`;
+            recommendation = `STRONGLY RECOMMENDED: Upgrade ${lowerTier} to reduce bottleneck and match ${higherTier}'s performance potential.`;
+        }
+
+        return {
+            compatible,
+            score,
+            tierDifference: difference,
+            tier1: { category: product1.category, tier: tier1, level: level1 },
+            tier2: { category: product2.category, tier: tier2, level: level2 },
+            warning,
+            recommendation
+        };
+    }
+
+    /**
+     * PHASE 2 + TASK 3: Map deterministic results to product array (fallback when AI unavailable)
+     * Now includes tier compatibility checking
+     */
+    mapDeterministicToProducts(products, deterministicResults, currentProduct = null) {
+        return products
+            .map(product => {
+                const result = deterministicResults[product.id];
+                
+                // TASK 3: Check tier compatibility if currentProduct provided
+                let tierCheck = { compatible: true, score: 100, tierDifference: 0 };
+                const allIssues = [...(result?.issues || [])];
+                const allRecommendations = [...(result?.recommendations || [])];
+                
+                if (currentProduct) {
+                    tierCheck = this.checkTierCompatibility(currentProduct, product);
+                    
+                    if (tierCheck.warning) {
+                        allIssues.push({
+                            severity: tierCheck.tierDifference >= 2 ? 'warning' : 'info',
+                            category: 'tier',
+                            message: tierCheck.warning
+                        });
+                    }
+                    
+                    if (tierCheck.recommendation) {
+                        allRecommendations.push({
+                            category: 'tier',
+                            message: tierCheck.recommendation
+                        });
+                    }
+                }
+                
+                // Combine scores: 85% deterministic, 15% tier
+                const finalScore = currentProduct 
+                    ? Math.round((result?.percentageScore || 0) * 0.85 + tierCheck.score * 0.15)
+                    : (result?.percentageScore || 0);
+                
+                return {
+                    ...product,
+                    compatibility_score: finalScore,
+                    deterministic_score: result?.percentageScore || 0,
+                    tier_score: tierCheck.score,
+                    tier_compatible: tierCheck.compatible,
+                    tier_difference: tierCheck.tierDifference,
+                    compatible: result?.compatible || false,
+                    compatibility_reason: result?.badge || 'Deterministic check',
+                    deterministic_issues: allIssues,
+                    recommendations: allRecommendations,
+                    tier_details: tierCheck
+                };
+            })
+            .sort((a, b) => b.compatibility_score - a.compatibility_score);
+    }
+
+    /**
+     * Create AI prompt for compatibility analysis
+     * PHASE 2: Now includes deterministic results for context
+     */
+    createCompatibilityPrompt(currentProduct, candidateProducts, deterministicResults = null) {
+        const currentSpecs = this.extractSpecifications(currentProduct);
+        const candidateList = candidateProducts.map(p => {
+            const detResult = deterministicResults ? deterministicResults[p.id] : null;
+            return {
+                id: p.id,
+                name: p.name,
+                category: p.category,
+                brand: p.brand,
+                price: p.price,
+                tier: p.tier || 'unspecified', // TASK 3: Include tier
+                specs: this.extractSpecifications(p),
+                deterministic_score: detResult?.percentageScore || null,
+                deterministic_issues: detResult?.issues || [],
+                deterministic_recommendations: detResult?.recommendations || []
+            };
+        });
+
+        // PHASE 2: Include deterministic results in prompt
+        const deterministicContext = deterministicResults 
+            ? `\n\nDETERMINISTIC COMPATIBILITY RESULTS (Pre-computed):
+${candidateList.map(p => `
+Product ID ${p.id}: Score ${p.deterministic_score}/100
+${p.deterministic_issues.length > 0 ? `Issues: ${p.deterministic_issues.map(i => i.message).join(', ')}` : 'No hard issues'}
+${p.deterministic_recommendations.length > 0 ? `Recommendations: ${p.deterministic_recommendations.map(r => r.message).join(', ')}` : ''}
+`).join('\n')}`
+            : '';
+
+        // TASK 3: Add tier context
+        const tierContext = `\n\nTIER-BASED COMPATIBILITY CONTEXT:
+Current Product Tier: ${currentProduct.tier || 'unspecified'}
+
+TIER HIERARCHY: entry < mid-tier < high-tier < elite
+
+TIER COMPATIBILITY RULES:
+- Same tier = Optimal (100%) - Components balanced for cohesive performance
+- 1 tier difference = Acceptable (75%) - Slight performance imbalance, minor bottleneck risk
+- 2+ tier difference = Not Recommended (40%) - Severe bottleneck - high-tier component wasted on low-tier pair
+
+EXAMPLES OF TIER MISMATCHES TO AVOID:
+- Elite GPU + Entry CPU = CPU bottleneck, GPU underutilized
+- High-tier CPU + Entry RAM = Memory bandwidth bottleneck
+- Elite motherboard + Entry PSU = Unstable power delivery risk
+
+When analyzing compatibility, consider tier balance as a critical factor for overall system performance.`;
+
+        return `
+You are an expert PC hardware compatibility analyst. The deterministic rules engine has already performed hard compatibility checks (socket matching, physical dimensions, power requirements). Your role is to provide additional insights, detect edge cases, and suggest optimization opportunities.
+
+CURRENT PRODUCT:
+Category: ${currentProduct.category}
+Name: ${currentProduct.name}
+Brand: ${currentProduct.brand}
+Tier: ${currentProduct.tier || 'unspecified'}
+Specifications: ${JSON.stringify(currentSpecs, null, 2)}
+${deterministicContext}
+${tierContext}
+
+CANDIDATE PRODUCTS TO ANALYZE:
+${candidateList.map(p => `
+ID: ${p.id}
+Category: ${p.category}
+Name: ${p.name}
+Brand: ${p.brand}
+Price: ${p.price}
+Tier: ${p.tier}
+Specs: ${JSON.stringify(p.specs, null, 2)}
+Deterministic Score: ${p.deterministic_score !== null ? p.deterministic_score + '/100' : 'Not computed'}
+`).join('\n')}
+
+COMPATIBILITY ANALYSIS RULES - DEEP SPECIFICATION MATCHING:
+
+MOTHERBOARD COMPATIBILITY:
+- CPU Socket: Must physically match (LGA 1700, AM5, AM4, etc.)
+- Chipset: Must support specific CPU generation and features
+- RAM Support: Check DDR generation (DDR4/DDR5), max speed (MHz), max capacity (GB)
+- Form Factor: ATX, Micro-ATX, Mini-ITX must fit in case
+- PCIe Slots: Verify x16 slots for GPU, x1/x4 for expansion cards
+- Storage: Count SATA ports, M.2 slots (NVMe/SATA), check M.2 key types (B/M/B+M)
+- Power Delivery: VRM quality for CPU power phases
+- BIOS Support: Check if BIOS update needed for CPU compatibility
+
+CPU COMPATIBILITY:
+- Socket Type: Must exactly match motherboard socket
+- Chipset Support: Verify motherboard chipset officially supports CPU
+- TDP: Thermal Design Power must be within motherboard VRM limits
+- RAM Speed: Check maximum supported RAM frequency
+- PCIe Lanes: Verify PCIe lane support for GPU and expansion cards
+- Integrated Graphics: Note if CPU has integrated GPU
+- Power Consumption: Calculate total system power draw
+
+RAM COMPATIBILITY:
+- Generation: DDR4/DDR5 must match motherboard support exactly
+- Speed (MHz): Must be supported by both CPU and motherboard (use lowest common)
+- Capacity: Total must not exceed motherboard maximum
+- Form Factor: DIMM for desktop, SO-DIMM for laptop (not interchangeable)
+- Voltage: Standard vs low voltage compatibility
+- Timing: Check CAS latency compatibility
+- Dual Channel: Verify motherboard supports dual/quad channel configuration
+
+GPU COMPATIBILITY:
+- PCIe Slot: Requires x16 slot, check PCIe generation (3.0/4.0/5.0)
+- Physical Size: Length, height, slot width must fit in case
+- Power Connectors: 6-pin, 8-pin, 12-pin power requirements
+- PSU Wattage: Total power + 20% overhead for entire system
+- CPU Bottleneck: Match GPU performance tier with CPU performance
+- Case Clearance: Check maximum GPU length supported by case
+- Display Outputs: Verify required display connectors available
+
+PSU COMPATIBILITY:
+- Total Wattage: Sum all component power + 20% overhead minimum
+- Connectors: 24-pin motherboard, 8-pin CPU, GPU power, SATA, Molex
+- Form Factor: ATX, SFX, SFX-L must fit case PSU mount
+- Efficiency Rating: 80+ Bronze/Gold/Platinum for energy efficiency
+- Modular vs Non-modular: Cable management considerations
+- Rail Design: Single vs multi-rail for high-power systems
+
+CASE COMPATIBILITY:
+- Motherboard Support: ATX, Micro-ATX, Mini-ITX form factor clearance
+- GPU Clearance: Maximum graphics card length and height
+- CPU Cooler Height: Maximum cooler height clearance
+- PSU Length: Maximum power supply length
+- Drive Bays: 2.5", 3.5", 5.25" bay counts and positions
+- Fan/Radiator Support: Front, top, rear fan/radiator mounting
+- Cable Management: Space behind motherboard tray
+
+STORAGE COMPATIBILITY:
+- Interface Types: SATA III, NVMe PCIe 3.0/4.0/5.0
+- M.2 Keying: B key (SATA), M key (NVMe), B+M key (both)
+- Form Factors: 2280, 2260, 2242 M.2 sizes
+- Motherboard Slots: Available SATA ports and M.2 slots
+- Power: SATA power connectors from PSU
+- Performance: Check if NVMe speed matches PCIe lane support
+
+CPU COOLER COMPATIBILITY:
+- Socket Mount: Must support motherboard CPU socket
+- TDP Rating: Must equal or exceed CPU TDP rating
+- Height Clearance: Must fit within case height limits
+- RAM Clearance: Must not interfere with memory modules
+- Mounting Pressure: Appropriate for CPU socket type
+- Ensure adequate cooling
+
+RESPOND ONLY with this JSON format:
+{
+  "compatible_products": [1, 5, 12, 8],
+  "scores": {
+    "1": 95,
+    "5": 88,
+    "12": 92,
+    "8": 87
+  },
+  "reasons": {
+    "1": "Perfect socket match, optimal power delivery",
+    "5": "Compatible but may need BIOS update",
+    "12": "Excellent price-performance balance",
+    "8": "Good compatibility, adequate cooling"
+  }
+}
+
+Only include IDs of truly compatible products. Scores: 90-100 = Excellent, 80-89 = Good, 70-79 = Acceptable, <70 = Not recommended.
+`;
+    }
+
+    /**
+     * Extract and normalize specifications from product with intelligent parsing
+     */
+    extractSpecifications(product) {
+        if (!product.specifications) return {};
+
+        try {
+            let specs = {};
+            
+            if (typeof product.specifications === 'string') {
+                // Try to parse JSON string first
+                try {
+                    specs = JSON.parse(product.specifications);
+                } catch {
+                    // Parse text specifications with intelligent extraction
+                    specs = this.parseTextSpecificationsIntelligent(product.specifications);
+                }
+            } else if (typeof product.specifications === 'object') {
+                specs = product.specifications;
+            }
+            
+            // Normalize and enrich specifications based on category
+            return this.normalizeSpecifications(specs, product.category, product.name);
+            
+        } catch (error) {
+            const errorMessage = error.message || error.toString() || 'Unknown error';
+            logger.warn(`Failed to extract specifications: ${errorMessage}`);
+        }
+
+        return {};
+    }
+
+    /**
+     * Parse text-based specifications with intelligent pattern matching
+     */
+    parseTextSpecificationsIntelligent(specText) {
+        const specs = {};
+        const lines = specText.split(/[|\n,]/).map(s => s.trim()).filter(s => s.length > 0);
+
+        for (const line of lines) {
+            // Extract key-value pairs
+            const colonIndex = line.indexOf(':');
+            if (colonIndex > 0) {
+                let key = line.substring(0, colonIndex).trim().toLowerCase();
+                let value = line.substring(colonIndex + 1).trim();
+                
+                // Normalize common specification keys
+                key = this.normalizeSpecKey(key);
+                value = this.normalizeSpecValue(value, key);
+                
+                specs[key] = value;
+            } else {
+                // Try to extract specifications from free text
+                this.extractSpecsFromFreeText(line, specs);
+            }
+        }
+
+        return specs;
+    }
+
+    /**
+     * Normalize specification keys to standard format
+     */
+    normalizeSpecKey(key) {
+        const keyMappings = {
+            'socket': 'socket',
+            'cpu socket': 'socket',
+            'processor socket': 'socket',
+            'chipset': 'chipset',
+            'form factor': 'form_factor',
+            'memory type': 'memory_type',
+            'memory support': 'memory_type',
+            'ram type': 'memory_type',
+            'max memory': 'max_memory',
+            'maximum memory': 'max_memory',
+            'memory slots': 'memory_slots',
+            'ram slots': 'memory_slots',
+            'pcie slots': 'pcie_slots',
+            'expansion slots': 'pcie_slots',
+            'sata ports': 'sata_ports',
+            'm.2 slots': 'm2_slots',
+            'nvme slots': 'm2_slots',
+            'tdp': 'tdp',
+            'thermal design power': 'tdp',
+            'power consumption': 'power_consumption',
+            'base clock': 'base_clock',
+            'boost clock': 'boost_clock',
+            'cores': 'cores',
+            'threads': 'threads',
+            'memory speed': 'memory_speed',
+            'ram speed': 'memory_speed',
+            'gpu length': 'gpu_length',
+            'card length': 'gpu_length',
+            'power connectors': 'power_connectors',
+            'wattage': 'wattage',
+            'efficiency': 'efficiency'
+        };
+        
+        return keyMappings[key] || key.replace(/[\s-]/g, '_');
+    }
+
+    /**
+     * Normalize specification values with unit extraction
+     */
+    normalizeSpecValue(value, key) {
+        // Remove common prefixes and clean up
+        value = value.replace(/^(up to|max|maximum|supports?)\s*/i, '');
+        
+        // Extract numeric values with units
+        if (key.includes('memory') || key.includes('ram')) {
+            // Extract memory specifications
+            const memoryMatch = value.match(/(DDR[45]|GDDR[56X])/i);
+            if (memoryMatch) return memoryMatch[0].toUpperCase();
+            
+            const speedMatch = value.match(/(\d+)\s*MHz/i);
+            if (speedMatch) return speedMatch[1] + 'MHz';
+            
+            const capacityMatch = value.match(/(\d+)\s*(GB|TB)/i);
+            if (capacityMatch) return capacityMatch[1] + capacityMatch[2].toUpperCase();
+        }
+        
+        if (key.includes('tdp') || key.includes('power')) {
+            const powerMatch = value.match(/(\d+)\s*W/i);
+            if (powerMatch) return powerMatch[1] + 'W';
+        }
+        
+        if (key.includes('clock') || key.includes('frequency')) {
+            const freqMatch = value.match(/([\d.]+)\s*(GHz|MHz)/i);
+            if (freqMatch) return freqMatch[1] + freqMatch[2];
+        }
+        
+        // Extract socket types
+        if (key === 'socket') {
+            const socketMatch = value.match(/(LGA\s*\d+|AM[45]|sTRX4|sWRX8)/i);
+            if (socketMatch) return socketMatch[0].replace(/\s/g, '').toUpperCase();
+        }
+        
+        return value;
+    }
+
+    /**
+     * Extract specifications from free text using pattern matching
+     */
+    extractSpecsFromFreeText(text, specs) {
+        // Socket detection
+        const socketMatch = text.match(/(LGA\s*\d+|AM[45]|sTRX4|sWRX8)/i);
+        if (socketMatch) specs.socket = socketMatch[0].replace(/\s/g, '').toUpperCase();
+        
+        // Memory type detection
+        const memoryMatch = text.match(/(DDR[45])/i);
+        if (memoryMatch) specs.memory_type = memoryMatch[0].toUpperCase();
+        
+        // TDP detection
+        const tdpMatch = text.match(/(\d+)\s*W(?:\s+TDP)?/i);
+        if (tdpMatch) specs.tdp = tdpMatch[1] + 'W';
+        
+        // Form factor detection
+        const formFactorMatch = text.match(/(ATX|Micro-ATX|Mini-ITX|E-ATX)/i);
+        if (formFactorMatch) specs.form_factor = formFactorMatch[0];
+    }
+
+    /**
+     * Normalize and enrich specifications based on product category
+     */
+    normalizeSpecifications(specs, category, productName) {
+        const normalized = { ...specs };
+        
+        // Add category-specific intelligent inference
+        switch (category?.toUpperCase()) {
+            case 'CPU':
+                // Infer socket from product name if not specified
+                if (!normalized.socket) {
+                    if (productName.includes('Intel')) {
+                        if (productName.includes('13th') || productName.includes('12th')) {
+                            normalized.socket = 'LGA1700';
+                        } else if (productName.includes('11th') || productName.includes('10th')) {
+                            normalized.socket = 'LGA1200';
+                        }
+                    } else if (productName.includes('AMD')) {
+                        if (productName.includes('7000') || productName.includes('Ryzen 7')) {
+                            normalized.socket = 'AM5';
+                        } else if (productName.includes('5000') || productName.includes('3000')) {
+                            normalized.socket = 'AM4';
+                        }
+                    }
+                }
+                break;
+                
+            case 'MOTHERBOARD':
+                // Infer chipset and features from product name
+                if (productName.includes('Z790') || productName.includes('H770')) {
+                    normalized.socket = 'LGA1700';
+                    normalized.memory_type = 'DDR5';
+                } else if (productName.includes('B550') || productName.includes('X570')) {
+                    normalized.socket = 'AM4';
+                    normalized.memory_type = 'DDR4';
+                }
+                break;
+                
+            case 'RAM':
+                // Infer memory type from product name
+                if (!normalized.memory_type) {
+                    if (productName.includes('DDR5')) {
+                        normalized.memory_type = 'DDR5';
+                    } else if (productName.includes('DDR4')) {
+                        normalized.memory_type = 'DDR4';
+                    }
+                }
+                break;
+        }
+        
+        return normalized;
+    }
+
+    /**
+     * Call Ollama API with Deepseek R1
+     */
+    async callOllama(prompt) {
+        try {
+            const response = await axios.post(this.ollamaUrl, {
+                model: this.model,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: 0.3, // Lower temperature for more consistent technical analysis
+                    top_p: 0.9,
+                    num_predict: 2048
+                }
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000 // 30 second timeout for complex analysis
+            });
+
+            if (response.status !== 200) {
+                // Try fallback model
+                logger.warn(`Deepseek R1 failed, trying fallback model: ${this.fallbackModel}`);
+                return await this.callOllamaFallback(prompt);
+            }
+
+            const data = response.data;
+
+            if (data.response) {
+                try {
+                    const cleanResponse = data.response.trim();
+                    const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    }
+                } catch (parseError) {
+                    const errorMessage = parseError.message || parseError.toString() || 'Unknown parse error';
+                    logger.error(`Failed to parse AI response: ${errorMessage}`);
+                }
+            }
+
+            return null;
+        } catch (error) {
+            let errorMessage = 'Unknown error';
+            if (error.code === 'ECONNREFUSED') {
+                errorMessage = 'Connection refused - Ollama service is not running';
+            } else if (error.code === 'ENOTFOUND') {
+                errorMessage = 'Service not found - Ollama is not available';
+            } else if (error.code === 'ETIMEDOUT') {
+                errorMessage = 'Connection timeout - Ollama service is not responding';
+            } else if (error.message && error.message !== 'Error') {
+                errorMessage = error.message;
+            } else {
+                errorMessage = `API call failed (${error.code || 'unknown error'})`;
+            }
+            
+            logger.error(`Ollama API call failed: ${errorMessage}`);
+            return await this.callOllamaFallback(prompt);
+        }
+    }
+
+    /**
+     * Fallback to alternative model if Deepseek R1 fails
+     */
+    async callOllamaFallback(prompt) {
+        try {
+            const response = await axios.post(this.ollamaUrl, {
+                model: this.fallbackModel,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: 0.3,
+                    top_p: 0.9
+                }
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.status !== 200) {
+                throw new Error(`Fallback model API error: ${response.status}`);
+            }
+
+            const data = response.data;
+            if (data.response) {
+                try {
+                    const cleanResponse = data.response.trim();
+                    const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    }
+                } catch (parseError) {
+                    const errorMessage = parseError.message || parseError.toString() || 'Unknown parse error';
+                    logger.error(`Failed to parse fallback AI response: ${errorMessage}`);
+                }
+            }
+
+            return null;
+        } catch (error) {
+            let errorMessage = 'Unknown error';
+            if (error.code === 'ECONNREFUSED') {
+                errorMessage = 'Connection refused - Ollama fallback service is not running';
+            } else if (error.code === 'ENOTFOUND') {
+                errorMessage = 'Service not found - Ollama fallback is not available';
+            } else if (error.code === 'ETIMEDOUT') {
+                errorMessage = 'Connection timeout - Ollama fallback service is not responding';
+            } else if (error.message && error.message !== 'Error') {
+                errorMessage = error.message;
+            } else {
+                errorMessage = `Fallback API call failed (${error.code || 'unknown error'})`;
+            }
+            
+            logger.error(`Fallback Ollama API call failed: ${errorMessage}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Fallback compatibility analysis with specification-based rules
+     */
+    getFallbackCompatibility(currentProduct, candidateProducts) {
+        if (!candidateProducts || candidateProducts.length === 0) return [];
+
+        logger.info('🔄 Using specification-based fallback compatibility algorithm');
+
+        const currentSpecs = this.extractSpecifications(currentProduct);
+        console.log('Current product specs:', currentSpecs);
+
+        return candidateProducts
+            .map(product => {
+                const candidateSpecs = this.extractSpecifications(product);
+                const compatibility = this.calculateSpecificationCompatibility(currentProduct, currentSpecs, product, candidateSpecs);
+                
+                return {
+                    ...product,
+                    compatibility_score: compatibility.score,
+                    compatibility_reason: compatibility.reason,
+                    compatibility_details: compatibility.details
+                };
+            })
+            .filter(product => product.compatibility_score >= 70) // Only show reasonably compatible items
+            .sort((a, b) => b.compatibility_score - a.compatibility_score)
+            .slice(0, 7); // Limit to top 7 (all compatibility categories)
+    }
+
+    /**
+     * Calculate specification-based compatibility between two products
+     */
+    calculateSpecificationCompatibility(currentProduct, currentSpecs, candidateProduct, candidateSpecs) {
+        let score = 50; // Base compatibility score
+        let reasons = [];
+        let details = {};
+
+        const currentCategory = currentProduct.category?.toUpperCase();
+        const candidateCategory = candidateProduct.category?.toUpperCase();
+
+        // Same category products are not compatible
+        // Filter out products from the same category as current product
+        if (currentCategory === candidateCategory) {
+            return {
+                score: 0,
+                reason: 'Same component category - excluded from compatibility analysis',
+                details: { incompatible: true, exclude: true }
+            };
+        }
+
+        // Specific compatibility rules based on component combinations
+        switch (`${currentCategory}-${candidateCategory}`) {
+            case 'CPU-MOTHERBOARD':
+            case 'MOTHERBOARD-CPU':
+                return this.checkCpuMotherboardCompatibility(currentSpecs, candidateSpecs, currentProduct, candidateProduct);
+                
+            case 'CPU-RAM':
+            case 'RAM-CPU':
+                return this.checkCpuRamCompatibility(currentSpecs, candidateSpecs, currentProduct, candidateProduct);
+                
+            case 'MOTHERBOARD-RAM':
+            case 'RAM-MOTHERBOARD':
+                return this.checkMotherboardRamCompatibility(currentSpecs, candidateSpecs, currentProduct, candidateProduct);
+                
+            case 'GPU-PSU':
+            case 'PSU-GPU':
+                return this.checkGpuPsuCompatibility(currentSpecs, candidateSpecs, currentProduct, candidateProduct);
+                
+            case 'MOTHERBOARD-CASE':
+            case 'CASE-MOTHERBOARD':
+                return this.checkMotherboardCaseCompatibility(currentSpecs, candidateSpecs, currentProduct, candidateProduct);
+                
+            default:
+                // General compatibility for other combinations
+                score = 75;
+                reasons.push('General component compatibility');
+        }
+
+        // Price tier matching bonus
+        const currentPrice = parseFloat(currentProduct.price) || 0;
+        const candidatePrice = parseFloat(candidateProduct.price) || 0;
+        
+        if (currentPrice > 0 && candidatePrice > 0) {
+            const priceDifference = Math.abs(currentPrice - candidatePrice) / Math.max(currentPrice, candidatePrice);
+            if (priceDifference < 0.3) {
+                score += 10;
+                reasons.push('Similar price tier');
+            } else if (priceDifference > 0.8) {
+                score -= 10;
+                reasons.push('Different price tier');
+            }
+        }
+
+        // Stock availability bonus
+        if (candidateProduct.stock > 10) {
+            score += 5;
+            reasons.push('Good stock availability');
+        } else if (candidateProduct.stock < 3) {
+            score -= 10;
+            reasons.push('Low stock');
+        }
+
+        return {
+            score: Math.min(100, Math.max(0, Math.round(score))),
+            reason: reasons.join(', ') || 'Basic compatibility',
+            details: details
+        };
+    }
+
+    /**
+     * Check CPU-Motherboard compatibility
+     */
+    checkCpuMotherboardCompatibility(cpuSpecs, mbSpecs, cpuProduct, mbProduct) {
+        let score = 90;
+        let reasons = [];
+        let details = {};
+
+        // Socket compatibility (critical)
+        if (cpuSpecs.socket && mbSpecs.socket) {
+            if (cpuSpecs.socket === mbSpecs.socket) {
+                score += 10;
+                reasons.push('Socket match');
+                details.socket_compatible = true;
+            } else {
+                score -= 40;
+                reasons.push('Socket mismatch');
+                details.socket_compatible = false;
+                details.cpu_socket = cpuSpecs.socket;
+                details.mb_socket = mbSpecs.socket;
+            }
+        }
+
+        // Memory type compatibility
+        if (cpuSpecs.memory_type && mbSpecs.memory_type) {
+            if (cpuSpecs.memory_type === mbSpecs.memory_type) {
+                score += 5;
+                reasons.push('Memory type match');
+            } else {
+                score -= 20;
+                reasons.push('Memory type mismatch');
+            }
+        }
+
+        // TDP compatibility
+        if (cpuSpecs.tdp && mbSpecs.max_cpu_tdp) {
+            const cpuTdp = parseInt(cpuSpecs.tdp);
+            const mbMaxTdp = parseInt(mbSpecs.max_cpu_tdp);
+            if (cpuTdp <= mbMaxTdp) {
+                score += 5;
+                reasons.push('TDP compatible');
+            } else {
+                score -= 15;
+                reasons.push('TDP too high for motherboard');
+            }
+        }
+
+        return {
+            score: Math.max(0, Math.min(100, score)),
+            reason: reasons.join(', ') || 'CPU-Motherboard compatibility',
+            details: details
+        };
+    }
+
+    /**
+     * Check CPU-RAM compatibility
+     */
+    checkCpuRamCompatibility(cpuSpecs, ramSpecs, cpuProduct, ramProduct) {
+        let score = 85;
+        let reasons = [];
+        let details = {};
+
+        // Memory type compatibility
+        if (cpuSpecs.memory_type && ramSpecs.memory_type) {
+            if (cpuSpecs.memory_type === ramSpecs.memory_type) {
+                score += 10;
+                reasons.push('Memory type match');
+            } else {
+                score -= 30;
+                reasons.push('Memory type incompatible');
+                details.memory_type_mismatch = true;
+            }
+        }
+
+        // Memory speed compatibility
+        if (cpuSpecs.max_memory_speed && ramSpecs.memory_speed) {
+            const cpuMaxSpeed = parseInt(cpuSpecs.max_memory_speed);
+            const ramSpeed = parseInt(ramSpecs.memory_speed);
+            if (ramSpeed <= cpuMaxSpeed) {
+                score += 5;
+                reasons.push('Memory speed supported');
+            } else {
+                score -= 10;
+                reasons.push('Memory speed may be limited');
+            }
+        }
+
+        return {
+            score: Math.max(0, Math.min(100, score)),
+            reason: reasons.join(', ') || 'CPU-RAM compatibility',
+            details: details
+        };
+    }
+
+    /**
+     * Check Motherboard-RAM compatibility
+     */
+    checkMotherboardRamCompatibility(mbSpecs, ramSpecs, mbProduct, ramProduct) {
+        let score = 90;
+        let reasons = [];
+
+        // Memory type compatibility (critical)
+        if (mbSpecs.memory_type && ramSpecs.memory_type) {
+            if (mbSpecs.memory_type === ramSpecs.memory_type) {
+                score += 10;
+                reasons.push('Memory type supported');
+            } else {
+                score -= 40;
+                reasons.push('Memory type not supported');
+            }
+        }
+
+        // Memory slots availability
+        if (mbSpecs.memory_slots) {
+            const slots = parseInt(mbSpecs.memory_slots);
+            if (slots >= 2) {
+                score += 5;
+                reasons.push('Adequate memory slots');
+            }
+        }
+
+        return {
+            score: Math.max(0, Math.min(100, score)),
+            reason: reasons.join(', ') || 'Motherboard-RAM compatibility',
+            details: {}
+        };
+    }
+
+    /**
+     * Check GPU-PSU compatibility
+     */
+    checkGpuPsuCompatibility(gpuSpecs, psuSpecs, gpuProduct, psuProduct) {
+        let score = 80;
+        let reasons = [];
+
+        // Power requirement check
+        if (gpuSpecs.power_consumption && psuSpecs.wattage) {
+            const gpuPower = parseInt(gpuSpecs.power_consumption);
+            const psuWattage = parseInt(psuSpecs.wattage);
+            const recommendedPsu = gpuPower * 2; // 2x GPU power for system overhead
+            
+            if (psuWattage >= recommendedPsu) {
+                score += 15;
+                reasons.push('Adequate PSU wattage');
+            } else if (psuWattage >= gpuPower * 1.5) {
+                score += 5;
+                reasons.push('Minimum PSU wattage');
+            } else {
+                score -= 25;
+                reasons.push('Insufficient PSU wattage');
+            }
+        }
+
+        // Power connector compatibility
+        if (gpuSpecs.power_connectors && psuSpecs.gpu_connectors) {
+            // Simplified check - would need more detailed parsing
+            score += 5;
+            reasons.push('Power connectors available');
+        }
+
+        return {
+            score: Math.max(0, Math.min(100, score)),
+            reason: reasons.join(', ') || 'GPU-PSU compatibility',
+            details: {}
+        };
+    }
+
+    /**
+     * Check Motherboard-Case compatibility
+     */
+    checkMotherboardCaseCompatibility(mbSpecs, caseSpecs, mbProduct, caseProduct) {
+        let score = 90;
+        let reasons = [];
+
+        // Form factor compatibility
+        if (mbSpecs.form_factor && caseSpecs.supported_form_factors) {
+            const mbFormFactor = mbSpecs.form_factor.toUpperCase();
+            const supportedFormFactors = caseSpecs.supported_form_factors.toUpperCase();
+            
+            if (supportedFormFactors.includes(mbFormFactor)) {
+                score += 10;
+                reasons.push('Form factor supported');
+            } else {
+                score -= 30;
+                reasons.push('Form factor not supported');
+            }
+        }
+
+        return {
+            score: Math.max(0, Math.min(100, score)),
+            reason: reasons.join(', ') || 'Motherboard-Case compatibility',
+            details: {}
+        };
+    }
+
+    /**
+     * Get service status for debugging
+     */
+    getStatus() {
+        return {
+            isAvailable: this.isAvailable,
+            model: this.model,
+            fallbackModel: this.fallbackModel,
+            ollamaUrl: this.ollamaUrl
+        };
+    }
+}
+
+// Export both the class and a singleton instance
+module.exports = {
+    CompatibilityService,
+    compatibilityService: new CompatibilityService()
+};

@@ -1,0 +1,655 @@
+/**
+ * PCPartPicker-Style Compatibility Notification Badge
+ * Collapsible notification at BOTTOM that expands UPWARDS to show details
+ */
+
+/* Main Container */
+.pcpartpicker-compatibility-container {
+  width: 100%;
+  margin: 20px 0 120px 0; /* Add bottom margin to clear footer */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  z-index: 100; /* Above footer */
+}
+
+/* ===========================
+   EXPANDED DETAILS (Shows ABOVE button)
+   =========================== */
+
+.compatibility-details-expanded {
+  background: #FF9114;
+  border-radius: 8px 8px 0 0; /* Round top corners only */
+  padding: 20px;
+  margin-bottom: 0;
+  animation: slideUp 0.3s ease;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  order: 1; /* Show first (above button) */
+  position: relative;
+  z-index: 101; /* Above container and footer */
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    max-height: 0;
+    padding: 0 20px;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+    padding: 20px;
+  }
+}
+
+/* Compatibility Score Header */
+.compatibility-score-header {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-left: 4px solid #2196f3;
+}
+
+.score-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.score-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.score-value {
+  font-size: 24px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: #fff;
+  border: 2px solid;
+}
+
+.score-value.high {
+  color: #28a745;
+  border-color: #28a745;
+}
+
+.score-value.medium {
+  color: #ffc107;
+  border-color: #ffc107;
+}
+
+.score-value.low {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+/* ===========================
+   BOTTOM COMPATIBILITY BUTTON (Always Visible)
+   =========================== */
+
+.compatibility-button {
+  background: #FF9114;
+  
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+  order: 2; /* Show second (below details) */
+  margin-top: 0;
+  position: relative;
+  z-index: 102; /* Above everything including footer */
+
+  color: #002024;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+}
+
+.compatibility-button.collapsed {
+  border-radius: 6px 6px 6px 0;
+  height: 60px;
+  width: 251px;
+}
+
+.compatibility-button.expanded {
+  border-top: none; /* Connect to details above */
+}
+
+.compatibility-button:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(1px);
+}
+
+.compatibility-button:active {
+  transform: translateY(0);
+}
+
+.compatibility-button.warning {
+  border-color: #ffc107;
+  background: linear-gradient(135deg, #fffbf0 0%, #fff9e6 100%);
+}
+
+.compatibility-button.incompatible {
+  border-color: #dc3545;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffebee 100%);
+}
+
+/* Button Content Layout */
+.button-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.button-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.button-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.button-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
+}
+
+.button-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.issue-count {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.expand-icon {
+  font-size: 16px;
+  color: #999;
+  transition: transform 0.3s ease;
+  line-height: 1;
+}
+
+.compatibility-button.expanded .expand-icon {
+  transform: rotate(0deg); /* Point down when expanded */
+}
+
+.compatibility-button.collapsed .expand-icon {
+  transform: rotate(180deg); /* Point up when collapsed */
+}
+
+/* ===========================
+   COMPATIBILITY ITEMS (A, B, C...)
+   =========================== */
+
+.compatibility-section {
+  margin-bottom: 20px;
+}
+
+.compatibility-section:last-child {
+  margin-bottom: 0;
+}
+
+.compatibility-item {
+  background: #f9f9f9;
+  border-left: 4px solid #ccc;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.compatibility-item:hover {
+  background: #f5f5f5;
+  transform: translateX(2px);
+}
+
+.compatibility-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Problem Items - Red */
+.problem-item {
+  border-left-color: #dc3545;
+  background: #fff5f5;
+}
+
+.problem-badge {
+  background: #dc3545;
+  color: white;
+}
+
+/* Warning Items - Yellow */
+.warning-item {
+  border-left-color: #ffc107;
+  background: #fffbf0;
+}
+
+.warning-badge {
+  background: #ffc107;
+  color: #333;
+}
+
+/* Note Items - Blue */
+.note-item {
+  border-left-color: #17a2b8;
+  background: #f0f8ff;
+}
+
+.note-badge {
+  background: #17a2b8;
+  color: white;
+}
+
+/* Disclaimer Items - Gray/Blue */
+.disclaimer-item {
+  border-left-color: #6c757d;
+  background: #f8f9fa;
+}
+
+.disclaimer-badge {
+  background: #6c757d;
+  color: white;
+}
+
+/* ===========================
+   ITEM STRUCTURE
+   =========================== */
+
+.item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.item-label-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.item-type {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+}
+
+.item-content {
+  margin-left: 42px;
+}
+
+.item-message {
+  display: block;
+  color: #444;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.item-details {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+  font-family: 'Courier New', monospace;
+}
+
+.item-details strong,
+.item-solution strong {
+  color: #333;
+  margin-right: 5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.item-solution {
+  background: rgba(40, 167, 69, 0.1);
+  border-left: 3px solid #28a745;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #155724;
+  line-height: 1.5;
+}
+
+/* ===========================
+   NO ISSUES MESSAGE
+   =========================== */
+
+.no-issues-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 30px 20px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-radius: 8px;
+  border: 2px solid #4caf50;
+}
+
+.success-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.success-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+/* ===========================
+   RESPONSIVE DESIGN
+   =========================== */
+
+@media (max-width: 768px) {
+  .compatibility-badge {
+    padding: 12px 16px;
+  }
+
+  .badge-title {
+    font-size: 16px;
+  }
+
+  .badge-icon {
+    font-size: 20px;
+  }
+
+  .issue-count {
+    font-size: 13px;
+  }
+
+  .badge-right {
+    gap: 10px;
+  }
+
+  .compatibility-details-expanded {
+    padding: 15px;
+  }
+
+  .compatibility-item {
+    padding: 12px;
+  }
+
+  .item-content {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .item-label-badge {
+    min-width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .item-type {
+    font-size: 15px;
+  }
+
+  .item-message {
+    font-size: 14px;
+  }
+
+  .item-details,
+  .item-solution {
+    font-size: 13px;
+  }
+}
+
+/* ===========================
+   DARK MODE SUPPORT
+   =========================== */
+
+@media (prefers-color-scheme: dark) {
+  .compatibility-badge {
+    background: #2d2d2d;
+    border-color: #444;
+  }
+
+  .compatibility-badge.compatible {
+    background: linear-gradient(135deg, #1a3a1a 0%, #254d25 100%);
+    border-color: #28a745;
+  }
+
+  .compatibility-badge.warning {
+    background: linear-gradient(135deg, #3a3a1a 0%, #4d4d25 100%);
+    border-color: #ffc107;
+  }
+
+  .compatibility-badge.incompatible {
+    background: linear-gradient(135deg, #3a1a1a 0%, #4d2525 100%);
+    border-color: #dc3545;
+  }
+
+  .badge-title {
+    color: #e0e0e0;
+  }
+
+  .issue-count {
+    color: #bbb;
+  }
+
+  .expand-icon {
+    color: #888;
+  }
+
+  .compatibility-details-expanded {
+    background: #2d2d2d;
+    border-color: #444;
+  }
+
+  .compatibility-item {
+    background: #333;
+  }
+
+  .problem-item {
+    background: #3a1a1a;
+  }
+
+  .warning-item {
+    background: #3a3a1a;
+  }
+
+  .note-item {
+    background: #1a2a3a;
+  }
+
+  .disclaimer-item {
+    background: #2a2a2a;
+  }
+
+  .item-type,
+  .item-message {
+    color: #e0e0e0;
+  }
+
+  .item-details {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+  }
+
+  .item-solution {
+    background: rgba(40, 167, 69, 0.2);
+    color: #90ee90;
+  }
+
+  .no-issues-message {
+    background: linear-gradient(135deg, #1a4d1a 0%, #2e7d32 100%);
+    border-color: #4caf50;
+  }
+
+  .success-text {
+    color: #a5d6a7;
+  }
+}
+
+/* ===========================
+   PRINT STYLES
+   =========================== */
+
+@media print {
+  .compatibility-badge {
+    border: 2px solid #000;
+    page-break-inside: avoid;
+  }
+
+  .expand-icon {
+    display: none;
+  }
+
+  .compatibility-details-expanded {
+    display: block !important;
+    border: 1px solid #000;
+  }
+
+  .compatibility-item {
+    page-break-inside: avoid;
+  }
+}
+
+/* ===========================
+   PHASE 2.4: ENHANCED COMPONENT ANALYSIS GRID
+   =========================== */
+
+.component-compatibility-grid {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.component-compatibility-grid .grid-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #2196f3;
+}
+
+.components-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.component-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.component-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.component-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.component-category {
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.component-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+  line-height: 1.4;
+  min-height: 36px;
+}
+
+.component-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+
+
+.component-details {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.detail-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #333;
+  font-weight: 600;
+}
+
+/* Mobile responsiveness for component grid */
+@media (max-width: 768px) {
+  .components-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .component-card {
+    padding: 10px;
+  }
+  
+  .component-name {
+    font-size: 12px;
+    min-height: auto;
+  }
+}
+

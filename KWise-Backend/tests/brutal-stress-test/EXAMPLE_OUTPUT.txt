@@ -1,0 +1,269 @@
+╔═════════════════════════════════════════════════════════╗
+║                                                         ║
+║      K-WISE BRUTAL COMPATIBILITY STRESS TEST            ║
+║                                                         ║
+║      🎯 ZERO TOLERANCE POLICY                          ║
+║      No incompatible parts shown as compatible          ║
+║                                                         ║
+║      🤖 AI-Enhanced Validation                         ║
+║      DeepSeek-R1 Model                                  ║
+║                                                         ║
+║      📊 168 Trap Tests | 13 Sections                   ║
+║      ⚡ Target: 5.0/5.0 Rating                         ║
+║                                                         ║
+╚═════════════════════════════════════════════════════════╝
+
+🔍 Checking prerequisites...
+
+✅ Ollama service: RUNNING
+   Model: deepseek-r1:1.5b
+✅ K-Wise backend: RUNNING
+   API URL: http://localhost:5000/api
+✅ Compatibility rules: 3200 loaded
+
+✅ All prerequisites met. Starting tests...
+
+============================================================
+STARTING SECTION 1
+============================================================
+
+╔═══════════════════════════════════════════╗
+║    SECTION 1: PC-PARTS PAGE TESTING       ║
+║    20 Trap Tests | 5 Scenarios            ║
+╚═══════════════════════════════════════════╝
+
+═══════════════════════════════════════════
+TEST 1.1: Initial Selection - CPU First
+═══════════════════════════════════════════
+
+🔍 TRAP 1: AMD motherboard for Intel CPU should NEVER show
+✅ TRAP 1 PASSED: AMD motherboard correctly excluded
+
+🔍 TRAP 2: LGA1200 board for LGA1700 CPU should NEVER show
+✅ TRAP 2 PASSED: Wrong socket board correctly excluded
+
+🔍 TRAP 3: DDR4-only motherboard should NOT appear for DDR5 CPU
+✅ TRAP 3 PASSED: DDR4 motherboard correctly filtered
+
+🔍 TRAP 4: 500W PSU should NOT highlight for 253W TDP CPU
+✅ TRAP 4 PASSED: Undersized PSU correctly not highlighted
+
+🔍 TRAP 5: Low-profile cooler (65W TDP) should NOT highlight for 253W CPU
+✅ TRAP 5 PASSED: Inadequate cooler correctly excluded
+
+⏱️  Initial CPU Selection Filter: 78ms (Target: 50ms, Max: 100ms) - ACCEPTABLE
+
+═══════════════════════════════════════════
+TEST 1.2: Secondary Selection - Add Motherboard
+═══════════════════════════════════════════
+
+🔍 TRAP 6: DDR4 RAM still showing for DDR5 motherboard - CRITICAL FAIL
+✅ TRAP 6 PASSED: DDR4 RAM correctly filtered out
+
+🔍 TRAP 7: Micro-ATX case highlighted for ATX motherboard - FAIL
+✅ TRAP 7 PASSED: Form factor mismatch detected
+
+🔍 TRAP 8: SATA-only SSD prioritized over NVMe - FAIL
+✅ TRAP 8 PASSED: NVMe properly prioritized (4 M.2 slots available)
+
+🔍 TRAP 9: AM5 cooler mounting kit should NEVER show for LGA1700
+✅ TRAP 9 PASSED: Socket mismatch detected
+
+⏱️  2-Component Chained Filter: 124ms (Target: 100ms, Max: 150ms) - ACCEPTABLE
+
+═══════════════════════════════════════════
+TEST 1.3: Tertiary Selection - Add GPU
+═══════════════════════════════════════════
+
+🔍 TRAP 10: NZXT H510 (315mm clearance) showing for 336mm GPU - FAIL
+✅ TRAP 10 PASSED: Insufficient clearance case correctly excluded
+
+🔍 TRAP 11: 750W PSU highlighted without warning - should show YELLOW
+✅ TRAP 11 PASSED: Warning displayed (PSU load: 85.7%)
+
+🔍 TRAP 12: PCIe 3.0 x16 board slips through for PCIe 4.0 GPU - FAIL
+✅ TRAP 12 PASSED: PCIe version validated
+
+🔍 TRAP 13: Pairing RTX 4090 with low-tier CPU (severe bottleneck) - should WARN
+✅ TRAP 13 PASSED: Tier matching verified (both elite tier)
+
+⏱️  4-Component Chained Filter: 247ms (Target: 200ms, Max: 300ms) - ACCEPTABLE
+
+═══════════════════════════════════════════
+TEST 1.4: Quaternary Selection - Add RAM
+═══════════════════════════════════════════
+
+🔍 TRAP 14: DDR5-7200 showing on H770 board (limited OC) - should WARN
+✅ TRAP 14 PASSED: Overclocking warning displayed
+
+🔍 TRAP 15: 4x32GB (128GB) on board with 64GB maximum - FAIL
+✅ TRAP 15 PASSED: Over-capacity RAM correctly excluded
+
+🔍 TRAP 16: 52mm tall RAM with NH-D15 air cooler (clearance issue) - FAIL
+✅ TRAP 16 PASSED: RAM clearance conflict detected
+
+═══════════════════════════════════════════
+TEST 1.5: Final Selection - Complete Build
+═══════════════════════════════════════════
+
+🔍 TRAP 17: Inject incompatible component after validation - should re-check
+✅ TRAP 17 PASSED: Re-validation triggered on component change
+
+🔍 TRAP 18: Component at exact edge of compatibility - should WARN
+✅ TRAP 18 PASSED: Edge case warning displayed (24mm buffer)
+
+🔍 TRAP 19: Front-mounted AIO with limited radiator clearance - FAIL
+✅ TRAP 19 PASSED: Radiator placement conflict detected
+
+🔍 TRAP 20: Modular PSU missing required GPU cables - FAIL
+✅ TRAP 20 PASSED: Power connector validation confirmed
+
+⏱️  Full 8-Component Validation (28 pairs): 856ms (Target: 700ms, Max: 1000ms) - ACCEPTABLE
+
+Compatibility Score: 98/100 ✓
+
+═══════════════════════════════════════════
+SECTION 1 SUMMARY: 20/20 traps passed
+═══════════════════════════════════════════
+
+
+============================================================
+STARTING SECTION 2
+============================================================
+
+╔═══════════════════════════════════════════╗
+║    SECTION 2: PRODUCT PAGE TESTING        ║
+║    8 Trap Tests | 2 Scenarios             ║
+╚═══════════════════════════════════════════╝
+
+═══════════════════════════════════════════
+TEST 2.1: CPU Product Page - Compatible With
+═══════════════════════════════════════════
+
+🔍 TRAP 21: AM5 motherboard in compatible list - CATASTROPHIC FAIL
+✅ TRAP 21 PASSED: Socket filtering working correctly
+
+🔍 TRAP 22: H610 board shows 95% score for i7-13700K (inadequate VRM) - FAIL
+✅ TRAP 22 PASSED: Compatibility scoring accurate (H610 scored 78%)
+
+🔍 TRAP 23: 120mm AIO shows 85% score for 253W CPU (insufficient) - FAIL
+✅ TRAP 23 PASSED: Cooler TDP ratings correctly scored
+
+🔍 TRAP 24: DDR3 RAM appears in compatible list - CATASTROPHIC FAIL
+✅ TRAP 24 PASSED: RAM filtering working correctly
+
+⏱️  Product Page Compatibility Matrix (50+ items): 312ms (Target: 250ms, Max: 400ms) - ACCEPTABLE
+
+═══════════════════════════════════════════
+TEST 2.2: GPU Product Page - Compatible With
+═══════════════════════════════════════════
+
+🔍 TRAP 25: i3-10100F shows as compatible for RTX 4070 Ti (severe bottleneck) - FAIL
+✅ TRAP 25 PASSED: CPU tier matching correct
+
+🔍 TRAP 26: 550W PSU shows 90% score for 285W GPU - should be <80%
+✅ TRAP 26 PASSED: PSU wattage scoring correct (scored 72%)
+
+🔍 TRAP 27: NZXT H210 (280mm clearance) shows for 285mm GPU - FAIL
+✅ TRAP 27 PASSED: Case GPU clearance filtering correct
+
+🔍 TRAP 28: PCIe 3.0 x8 slot motherboard appears - FAIL
+✅ TRAP 28 PASSED: PCIe lane validation correct
+
+⏱️  GPU Product Page Compatibility Analysis: 289ms (Target: 250ms, Max: 400ms) - ACCEPTABLE
+
+═══════════════════════════════════════════
+SECTION 2 SUMMARY: 8/8 traps passed
+═══════════════════════════════════════════
+
+
+
+╔═════════════════════════════════════════════════════════╗
+║                  TEST RESULTS SUMMARY                   ║
+╚═════════════════════════════════════════════════════════╝
+
+📊 Overall Rating: 4.8/5.0
+   Status: 🟢 EXCELLENT
+   Duration: 12.4s
+
+🎯 Trap Tests:
+   Total: 28
+   ✅ Passed: 28 (100.0%)
+   ❌ Failed: 0
+
+🔥 Failure Severity:
+   🔴 Catastrophic: 0
+   🟠 Critical: 0
+   🟡 Standard: 0
+   ⚪ Minor: 0
+
+⏱️  Performance:
+   Tests Run: 8
+   Meets Target: 5 (62.5%)
+   Meets Max: 8 (100.0%)
+   Avg Duration: 281ms
+
+📁 Sections Run: 2
+
+✅ ✅ ✅ ALL TESTS PASSED ✅ ✅ ✅
+System meets 5.0/5.0 standard
+
+📄 JSON report saved: ./results/brutal-test-results-2025-01-28T10-30-45-123Z.json
+📄 Markdown report saved: ./results/brutal-test-report-2025-01-28T10-30-45-123Z.md
+📄 Summary saved: ./results/brutal-test-summary-2025-01-28T10-30-45-123Z.txt
+
+
+═════════════════════════════════════════════════════════
+Example of FAILED test run:
+═════════════════════════════════════════════════════════
+
+🔍 TRAP 6: DDR4 RAM still showing for DDR5 motherboard - CRITICAL FAIL
+❌ TRAP 6 FAILED [CATASTROPHIC]: DDR4 RAM still showing for DDR5 motherboard - CRITICAL FAIL
+   Details: CATASTROPHIC: DDR4 RAM shown for DDR5 motherboard
+
+🔍 TRAP 11: 750W PSU highlighted without warning - should show YELLOW
+❌ TRAP 11 FAILED [CRITICAL]: 750W PSU highlighted without warning - should show YELLOW
+   Details: CRITICAL: PSU at 85% load without warning
+
+═══════════════════════════════════════════
+SECTION 1 SUMMARY: 18/20 traps passed
+═══════════════════════════════════════════
+
+🔴 CATASTROPHIC FAILURE DETECTED - STOPPING ALL TESTS
+   Section 1: DDR4 RAM still showing for DDR5 motherboard - CRITICAL FAIL
+
+
+╔═════════════════════════════════════════════════════════╗
+║                  TEST RESULTS SUMMARY                   ║
+╚═════════════════════════════════════════════════════════╝
+
+📊 Overall Rating: 0.0/5.0
+   Status: 🔴 CATASTROPHIC_FAILURE
+   Duration: 3.2s
+
+🎯 Trap Tests:
+   Total: 20
+   ✅ Passed: 18 (90.0%)
+   ❌ Failed: 2
+
+🔥 Failure Severity:
+   🔴 Catastrophic: 1
+   🟠 Critical: 1
+   🟡 Standard: 0
+   ⚪ Minor: 0
+
+⏱️  Performance:
+   Tests Run: 5
+   Meets Target: 3 (60.0%)
+   Meets Max: 5 (100.0%)
+   Avg Duration: 234ms
+
+📁 Sections Run: 1
+
+❌ ❌ ❌ TESTS FAILED ❌ ❌ ❌
+⚠️  CATASTROPHIC FAILURES DETECTED - IMMEDIATE FIX REQUIRED
+
+📄 Reports saved to: ./results/
+
+Exit code: 1
+

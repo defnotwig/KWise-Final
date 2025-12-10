@@ -1,0 +1,52 @@
+{
+  "timestamp": "2025-09-05T14:39:57.708Z",
+  "testSummary": {
+    "total": 26,
+    "passed": 0,
+    "failed": 26,
+    "successRate": 0
+  },
+  "adminSystemStatus": {
+    "dashboard": "NEEDS_ATTENTION",
+    "stock": "NEEDS_ATTENTION",
+    "transactions": "NEEDS_ATTENTION",
+    "logs": "NEEDS_ATTENTION",
+    "accounts": "NEEDS_ATTENTION",
+    "settings": "NEEDS_ATTENTION",
+    "devTools": "NEEDS_ATTENTION",
+    "authentication": "NEEDS_ATTENTION"
+  },
+  "issues": [
+    "Dashboard Stats: ",
+    "Online Users Count: ",
+    "Dashboard Summary: ",
+    "Stock List: ",
+    "Stock Categories: ",
+    "Stock Search: ",
+    "Transaction List: ",
+    "Transaction History: ",
+    "Order Details: ",
+    "Activity Logs: ",
+    "Recent Logs: ",
+    "Audit Logs: ",
+    "User List: ",
+    "Online Users: ",
+    "Recent Logins: ",
+    "App Settings: ",
+    "System Stats: ",
+    "System Settings: ",
+    "Dev Status: ",
+    "Database Info: ",
+    "API Health: ",
+    "Login Endpoint: ",
+    "Auth Status: ",
+    "Admin Users: ",
+    "Admin Stats: ",
+    "Health Check: "
+  ],
+  "recommendations": [
+    "Check authentication for protected routes",
+    "Verify database connections",
+    "Test with valid admin credentials"
+  ]
+}

@@ -1,0 +1,469 @@
+.user-profile-modal-overlay {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9) !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10001 !important;
+    backdrop-filter: blur(4px);
+}
+
+/* Dark Mode: User Profile Modal Overlay */
+[data-theme="dark"] .user-profile-modal-overlay {
+    background: rgba(15, 23, 42, 0.9) !important;
+}
+
+.user-profile-modal {
+    background: white !important;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Dark Mode: User Profile Modal */
+[data-theme="dark"] .user-profile-modal {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border: 1px solid rgba(71, 85, 105, 0.5) !important;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.8) !important;
+    color: #ffffff !important;
+}
+
+/* Dark Mode: All text elements in profile modal */
+[data-theme="dark"] .user-profile-modal * {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .user-profile-modal h2,
+[data-theme="dark"] .user-profile-modal h3,
+[data-theme="dark"] .user-profile-modal label {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .user-profile-modal .text-muted {
+    color: #cbd5e1 !important;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.user-profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+    color: white;
+    border-radius: 12px 12px 0 0;
+}
+
+/* Dark Mode: User Profile Header */
+[data-theme="dark"] .user-profile-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+.user-profile-header h2 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Dark Mode: Close Button */
+[data-theme="dark"] .close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.user-profile-form {
+    padding: 24px;
+    background: white !important;
+    color: #333 !important;
+}
+
+/* Dark Mode: User Profile Form */
+[data-theme="dark"] .user-profile-form {
+    background: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+.profile-image-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 2px dashed #d1d5db;
+}
+
+/* Dark Mode: Profile Image Section */
+[data-theme="dark"] .profile-image-section {
+    background: var(--bg-tertiary);
+    border: 2px dashed var(--border-medium);
+}
+
+.profile-image-container {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.profile-image-preview {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #667eea;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.profile-image-placeholder {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    border: 4px solid #d1d5db;
+}
+
+.remove-image-btn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s;
+}
+
+.remove-image-btn:hover {
+    background: #dc2626;
+}
+
+.image-upload-section {
+    text-align: center;
+}
+
+.image-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    text-decoration: none;
+}
+
+.image-upload-btn:hover {
+    background: #5a67d8;
+}
+
+/* Dark Mode: Image Upload Button */
+[data-theme="dark"] .image-upload-btn {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+}
+
+[data-theme="dark"] .image-upload-btn:hover {
+    background: var(--primary-dark);
+}
+
+.image-upload-section small {
+    display: block;
+    margin-top: 8px;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+    font-size: 0.875rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+
+
+[data-theme="dark"] .form-group input::placeholder,
+[data-theme="dark"] .form-group textarea::placeholder {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .form-group label {
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+.disabled-input {
+    background: #f3f4f6 !important;
+    cursor: not-allowed !important;
+    color: #6b7280 !important;
+}
+
+/* Dark Mode: Disabled Input */
+[data-theme="dark"] .disabled-input {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-muted) !important;
+    border-color: var(--border-light) !important;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+/* Dark Mode: Form Group Small Text */
+[data-theme="dark"] .form-group small {
+    color: var(--text-tertiary);
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Dark Mode: Form Actions */
+[data-theme="dark"] .form-actions {
+    border-top: 1px solid var(--border-light);
+}
+
+.cancel-btn,
+.save-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cancel-btn {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* Dark Mode: Cancel Button */
+[data-theme="dark"] .cancel-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.cancel-btn:hover:not(:disabled) {
+    background: #e5e7eb;
+}
+
+/* Dark Mode: Cancel Button Hover */
+[data-theme="dark"] .cancel-btn:hover:not(:disabled) {
+    background: var(--bg-quaternary);
+}
+
+.save-btn {
+    background: #10b981;
+    color: white;
+}
+
+/* Dark Mode: Save Button */
+[data-theme="dark"] .save-btn {
+    background: var(--success-color);
+    color: var(--text-inverse);
+}
+
+.save-btn:hover:not(:disabled) {
+    background: #059669;
+}
+
+/* Dark Mode: Save Button Hover */
+[data-theme="dark"] .save-btn:hover:not(:disabled) {
+    background: #0891b2;
+}
+
+.cancel-btn:disabled,
+.save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.error-message {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 0.875rem;
+}
+
+/* Dark Mode: Error Message */
+[data-theme="dark"] .error-message {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    color: #fca5a5 !important;
+}
+
+.success-message {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #059669;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 0.875rem;
+}
+
+/* Dark Mode: Success Message */
+[data-theme="dark"] .success-message {
+    background: rgba(16, 185, 129, 0.1) !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    color: #ffffff !important;
+}
+
+/* Dark Mode: Button Fixes */
+[data-theme="dark"] .cancel-btn,
+[data-theme="dark"] .save-btn,
+[data-theme="dark"] .image-upload-btn {
+    background: rgba(51, 65, 85, 0.8) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(71, 85, 105, 0.5) !important;
+}
+
+[data-theme="dark"] .cancel-btn:hover,
+[data-theme="dark"] .save-btn:hover,
+[data-theme="dark"] .image-upload-btn:hover {
+    background: rgba(71, 85, 105, 0.9) !important;
+    color: #ffffff !important;
+    transform: translateY(-1px) !important;
+}
+
+[data-theme="dark"] .save-btn {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+[data-theme="dark"] .save-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+}
+
+/* Dark Mode: Profile Image Section */
+[data-theme="dark"] .profile-image-placeholder {
+    background: rgba(51, 65, 85, 0.8) !important;
+    color: #cbd5e1 !important;
+    border: 4px solid rgba(71, 85, 105, 0.5) !important;
+}
+
+[data-theme="dark"] .profile-image {
+    border: 4px solid #3b82f6 !important;
+}
+
+/* Dark Mode: Close Button */
+[data-theme="dark"] .close-btn {
+    color: #ffffff !important;
+    background: rgba(51, 65, 85, 0.8) !important;
+    border: 1px solid rgba(71, 85, 105, 0.5) !important;
+}
+
+[data-theme="dark"] .close-btn:hover {
+    background: rgba(71, 85, 105, 0.9) !important;
+    color: #ffffff !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .user-profile-modal {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .user-profile-form {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .cancel-btn,
+    .save-btn {
+        justify-content: center;
+    }
+}
+
+

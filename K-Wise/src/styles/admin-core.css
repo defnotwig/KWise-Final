@@ -1,0 +1,637 @@
+/* =====================================================
+   K-WISE ADMIN CORE - COMPREHENSIVE THEME SYSTEM FIXED
+   ===================================================== */
+
+/* CRITICAL FIX: Remove overly aggressive color inheritance that causes text visibility issues */
+.admin-layout {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #333333) !important;
+  min-height: 100vh;
+  display: flex;
+}
+
+/* FIXED: Text readability overrides - Remove inheritance that causes blur/invisible text */
+.admin-layout h1, .admin-layout h2, .admin-layout h3, 
+.admin-layout h4, .admin-layout h5, .admin-layout h6 {
+  color: var(--text-primary, #1f2937) !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  margin-bottom: 0.5rem !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+.admin-layout p, .admin-layout span:not(.icon):not(.material-icons), 
+.admin-layout div:not(.alert):not(.notification):not(.icon-container),
+.admin-layout label, .admin-layout li, .admin-layout td, .admin-layout th {
+  color: var(--text-primary, #374151) !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* FIXED: Card and container styling - Prevent background conflicts and set full opacity */
+.admin-layout .card, .admin-layout .container, 
+.admin-layout .box, .admin-layout .panel,
+.admin-layout .content, .admin-layout .section {
+  background-color: var(--bg-secondary, #f8fafc) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+  opacity: 1 !important; /* Ensure 100% opacity */
+}
+
+/* FIXED: Messages and Notifications - Solid backgrounds, improved visibility, 100% opacity */
+.admin-layout .message, .admin-layout .notification,
+.admin-layout .modal, .admin-layout .popup,
+.admin-layout .dropdown-menu, .admin-layout .tooltip {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  opacity: 1 !important; /* 100% opacity - no transparency */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* FIXED: All containers must be fully opaque */
+.admin-layout .table-container, .admin-layout .form-container,
+.admin-layout .stats-grid, .admin-layout .dashboard,
+.admin-layout .history-page, .admin-layout .stock-page {
+  background-color: var(--bg-primary, #ffffff) !important;
+  opacity: 1 !important; /* Force 100% opacity */
+}
+
+/* CRITICAL FIX: Search bars, input fields, and form elements - 100% opacity */
+.admin-layout input[type="search"],
+.admin-layout input[type="text"], 
+.admin-layout input[type="email"],
+.admin-layout input[type="password"],
+.admin-layout select,
+.admin-layout textarea,
+.admin-layout .search-input,
+.admin-layout .search-box {
+  background-color: var(--bg-primary, #ffffff) ;
+  color: var(--text-primary, #374151) t;
+  border: 1px solid var(--border-color, #d1d5db) ;
+  border-radius: 6px ;
+  opacity: 1; /* 100% opacity - no transparency */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* CRITICAL FIX: Notification components - remove any transparency */
+.admin-layout .notifications-container,
+.admin-layout .notification-item,
+.admin-layout .notification-panel,
+.admin-layout .alert,
+.admin-layout .toast {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* CRITICAL FIX: Profile components - ensure solid backgrounds */
+.admin-layout .profile-container,
+.admin-layout .profile-modal,
+.admin-layout .profile-dropdown,
+.admin-layout .user-menu {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* CRITICAL FIX: Modal overlays - prevent transparency issues */
+.admin-layout .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5) !important; /* Semi-transparent overlay is OK */
+  opacity: 1 !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.admin-layout .modal-container,
+.admin-layout .modal-content {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Preserve alert and button colors */
+.admin-layout .alert-danger, .admin-layout .btn-danger,
+.admin-layout .error, .admin-layout .text-danger {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+}
+
+.admin-layout .alert-warning, .admin-layout .btn-warning,
+.admin-layout .warning, .admin-layout .text-warning {
+  background-color: #fffbeb !important;
+  color: #d97706 !important;
+  border-color: #fed7aa !important;
+}
+
+.admin-layout .alert-success, .admin-layout .btn-success,
+.admin-layout .success, .admin-layout .text-success {
+  background-color: #f0fdf4 !important;
+  color: #16a34a !important;
+  border-color: #bbf7d0 !important;
+}
+
+/* =====================================================
+   LIGHT THEME - Default with Light Green Accent
+   ===================================================== */
+[data-theme="light"] .admin-layout {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-light: #94a3b8;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  --accent-color: #00E083;
+  --accent-hover: #00c571;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --shadow-color: rgba(0, 224, 131, 0.15);
+}
+
+/* =====================================================
+   DARK THEME - Well-balanced with Light Green Accent
+   ===================================================== */
+[data-theme="dark"] .admin-layout {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-light: #94a3b8;
+  --border-color: #334155;
+  --border-light: #475569;
+  --accent-color: #00E083;
+  --accent-hover: #00c571;
+  --success-color: #34d399;
+  --warning-color: #fbbf24;
+  --error-color: #f87171;
+  --shadow-color: rgba(0, 224, 131, 0.3);
+}
+
+/* Dark theme specific overrides */
+[data-theme="dark"] .admin-layout .card,
+[data-theme="dark"] .admin-layout .container,
+[data-theme="dark"] .admin-layout .box {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* =====================================================
+   BLUE THEME - REBALANCED AND SUBTLE
+   ===================================================== */
+[data-theme="blue"] .admin-layout {
+  --bg-primary: #fdfdfe;
+  --bg-secondary: #f7f9fc;
+  --bg-tertiary: #eef4f9;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-light: #64748b;
+  --border-color: #cbd5e1;
+  --border-light: #e2e8f0;
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+  --success-color: #059669;
+  --warning-color: #d97706;
+  --error-color: #dc2626;
+  --shadow-color: rgba(59, 130, 246, 0.08);
+}
+
+/* Blue theme specific text adjustments */
+[data-theme="blue"] .admin-layout h1,
+[data-theme="blue"] .admin-layout h2,
+[data-theme="blue"] .admin-layout h3 {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+/* =====================================================
+   GREEN THEME - REBALANCED AND SUBTLE
+   ===================================================== */
+[data-theme="green"] .admin-layout {
+  --bg-primary: #fdfefd;
+  --bg-secondary: #f7fcf7;
+  --bg-tertiary: #ecf7ec;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-light: #64748b;
+  --border-color: #cbd5e1;
+  --border-light: #e2e8f0;
+  --accent-color: #00E083;
+  --accent-hover: #00c571;
+  --success-color: #059669;
+  --warning-color: #ca8a04;
+  --error-color: #dc2626;
+  --shadow-color: rgba(0, 224, 131, 0.08);
+}
+
+/* Green theme specific styling */
+[data-theme="green"] .admin-layout .nav-item.active,
+[data-theme="green"] .admin-layout .nav-item:hover {
+  background-color: var(--accent-color) !important;
+  color: white !important;
+}
+
+/* =====================================================
+   GLOBAL ADMIN COMPONENT STYLING
+   ===================================================== */
+
+/* Button styling for all themes - Apply theme colors but preserve alert colors */
+.admin-layout button:not(.btn-danger):not(.btn-warning):not(.btn-success):not(.alert):not(.error):not(.warning):not(.success) {
+  background-color: var(--accent-color) !important;
+  color: white !important;
+  border: 1px solid var(--accent-color) !important;
+  transition: all 0.3s ease;
+  opacity: 1 !important; /* No transparency */
+}
+
+.admin-layout button:not(.btn-danger):not(.btn-warning):not(.btn-success):not(.alert):not(.error):not(.warning):not(.success):hover {
+  background-color: var(--accent-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--shadow-color) !important;
+}
+
+/* Preserve danger/error button colors */
+.admin-layout .btn-danger, .admin-layout button.btn-danger,
+.admin-layout .error-btn, .admin-layout button.error {
+  background-color: #dc2626 !important;
+  color: white !important;
+  border-color: #dc2626 !important;
+}
+
+.admin-layout .btn-danger:hover, .admin-layout button.btn-danger:hover,
+.admin-layout .error-btn:hover, .admin-layout button.error:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+}
+
+/* Preserve warning button colors */
+.admin-layout .btn-warning, .admin-layout button.btn-warning,
+.admin-layout .warning-btn, .admin-layout button.warning {
+  background-color: #d97706 !important;
+  color: white !important;
+  border-color: #d97706 !important;
+}
+
+.admin-layout .btn-warning:hover, .admin-layout button.btn-warning:hover,
+.admin-layout .warning-btn:hover, .admin-layout button.warning:hover {
+  background-color: #c2410c !important;
+  border-color: #c2410c !important;
+}
+
+/* Preserve success button colors */
+.admin-layout .btn-success, .admin-layout button.btn-success,
+.admin-layout .success-btn, .admin-layout button.success {
+  background-color: #16a34a !important;
+  color: white !important;
+  border-color: #16a34a !important;
+}
+
+.admin-layout .btn-success:hover, .admin-layout button.btn-success:hover,
+.admin-layout .success-btn:hover, .admin-layout button.success:hover {
+  background-color: #15803d !important;
+  border-color: #15803d !important;
+}
+
+/* Input field styling */
+.admin-layout input,
+.admin-layout select,
+.admin-layout textarea {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.admin-layout input:focus,
+.admin-layout select:focus,
+.admin-layout textarea:focus {
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* FIXED: Table styling - Ensure complete visibility */
+.admin-layout table {
+  background-color: var(--bg-primary, #ffffff) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  width: 100% !important;
+}
+
+.admin-layout th {
+  background-color: var(--bg-secondary, #f8fafc) !important;
+  color: var(--text-primary, #1f2937) !important;
+  border-bottom: 2px solid var(--border-color, #e2e8f0) !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  padding: 12px 16px !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout td {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border-bottom: 1px solid var(--border-light, #f1f5f9) !important;
+  padding: 12px 16px !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout tbody tr:hover {
+  background-color: var(--bg-tertiary, #f1f5f9) !important;
+}
+
+/* FIXED: Form elements visibility */
+.admin-layout input, .admin-layout select, .admin-layout textarea {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #d1d5db) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout input:focus, .admin-layout select:focus, .admin-layout textarea:focus {
+  outline: none !important;
+  border-color: var(--accent-color, #3b82f6) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* FIXED: Button visibility and contrast */
+.admin-layout button:not(.btn-danger):not(.btn-warning):not(.btn-success) {
+  background-color: var(--accent-color, #3b82f6) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--accent-color, #3b82f6) !important;
+  border-radius: 6px !important;
+  padding: 8px 16px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout button:not(.btn-danger):not(.btn-warning):not(.btn-success):hover {
+  background-color: var(--accent-hover, #2563eb) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.admin-layout button:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* FIXED: Modal and overlay styling - Prevent cut-off and ensure visibility */
+.admin-layout .modal,
+.admin-layout .overlay {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  z-index: 9999 !important;
+}
+
+/* FIXED: Navigation and sidebar text visibility */
+.admin-layout .sidebar {
+  background-color: var(--bg-secondary, #f8fafc) !important;
+  border-right: 1px solid var(--border-color, #e2e8f0) !important;
+}
+
+.admin-layout .sidebar .nav-item {
+  color: var(--text-primary, #374151) !important;
+  padding: 12px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  text-decoration: none !important;
+  border-radius: 6px !important;
+  margin: 2px 8px !important;
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout .sidebar .nav-item:hover {
+  background-color: var(--bg-tertiary, #f1f5f9) !important;
+  color: var(--accent-color, #3b82f6) !important;
+}
+
+.admin-layout .sidebar .nav-item.active {
+  background-color: var(--accent-color, #3b82f6) !important;
+  color: #ffffff !important;
+}
+
+.admin-layout .sidebar .logo {
+  padding: 20px 16px !important;
+  border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
+  display: flex !important;
+  align-items: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.admin-layout .sidebar .logo img,
+.admin-layout .sidebar .logo span {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* =====================================================
+   ANTI-KIOSK PROTECTION & DASHBOARD FIXES
+   ===================================================== */
+
+/* CRITICAL FIX: Ensure all admin page titles and headings are visible */
+.admin-layout .page-title,
+.admin-layout .page-header h1,
+.admin-layout .page-header h2,
+.admin-layout .dashboard-title,
+.admin-layout .section-title {
+  color: var(--text-primary, #1f2937) !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 1rem !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL FIX: Dashboard-specific text visibility */
+.admin-layout .dashboard-stats,
+.admin-layout .stat-card,
+.admin-layout .metric-card {
+  background-color: var(--bg-primary, #ffffff) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  border-radius: 8px !important;
+  padding: 1.5rem !important;
+  color: var(--text-primary, #374151) !important;
+}
+
+.admin-layout .stat-card h3,
+.admin-layout .metric-card h3,
+.admin-layout .stat-title {
+  color: var(--text-primary, #1f2937) !important;
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.5rem !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout .stat-value,
+.admin-layout .metric-value {
+  color: var(--accent-color, #3b82f6) !important;
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+/* CRITICAL FIX: Transaction history and order queue specific fixes */
+.admin-layout .history-page h1,
+.admin-layout .queue-page h1 {
+  color: var(--text-primary, #1f2937) !important;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.5rem !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout .history-header p,
+.admin-layout .queue-header p {
+  color: var(--text-secondary, #6b7280) !important;
+  font-size: 0.95rem !important;
+  margin-bottom: 1.5rem !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+/* CRITICAL FIX: Table headers in all admin pages */
+.admin-layout .table-header,
+.admin-layout table thead th {
+  background-color: var(--bg-secondary, #f8fafc) !important;
+  color: var(--text-primary, #1f2937) !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+/* CRITICAL FIX: Search and filter inputs */
+.admin-layout .search-box input,
+.admin-layout .filter-group select,
+.admin-layout .form-control {
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #374151) !important;
+  border: 1px solid var(--border-color, #d1d5db) !important;
+  font-size: 14px !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+
+}
+
+.filter-group select:hover{
+  background-color: none !important;
+}
+
+.admin-layout .search-box input::placeholder,
+.admin-layout .form-control::placeholder {
+  color: var(--text-light, #9ca3af) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure admin components never inherit kiosk green colors */
+.admin-layout *:not(.pc-parts-container *):not(.kiosk-*) {
+  background-image: none !important;
+}
+
+/* Force override any green backgrounds in admin */
+.admin-layout .sidebar,
+.admin-layout .main-content,
+.admin-layout .content-container {
+  background-color: var(--bg-primary, #ffffff) !important;
+}
+
+/* CRITICAL FIX: Ensure admin sidebar logo is always visible */
+.admin-layout .sidebar .logo,
+.admin-layout .sidebar .logo img,
+.admin-layout .sidebar .logo span {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: var(--text-primary, #1f2937) !important;
+  font-weight: 600 !important;
+  font-size: 1.25rem !important;
+}
+
+/* =====================================================
+   RESPONSIVE DESIGN FOR ALL THEMES
+   ===================================================== */
+@media (max-width: 768px) {
+  .admin-layout .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .admin-layout.mobile-menu-open .sidebar {
+    transform: translateX(0);
+  }
+  
+  .admin-layout .admin-main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* =====================================================
+   SCROLLBAR STYLING FOR ALL THEMES
+   ===================================================== */
+.admin-layout *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.admin-layout *::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+.admin-layout *::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.admin-layout *::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-color);
+}

@@ -1,0 +1,608 @@
+﻿/* ========================================
+   KIOSK PC-CUSTOMIZED RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* PCCustomized.css */
+  /* General Container */
+  .pc-customizer-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    background: #002024;
+    color: white;
+    text-align: center;
+  }
+  
+  /* Header */
+  .pc-customizer-header {
+  padding: 64px 0px 32px 0px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 32px;
+  width: 1080px;
+  max-height: 298px;
+  border-bottom: 0.5px solid #034C3B;
+  background: #002024;
+  }
+
+  .pc-customizer-header-content{
+      display: flex;
+      align-items: center;
+      background: #002024;
+      padding-left: 0px;
+      padding-bottom: 20px;
+      max-height: 126px;
+  }
+
+  .logo{
+    margin: 0;
+  }
+  
+  .pc-customizer-logo {
+    width: 200px;
+    height: 160px;
+    margin-bottom: 20px;
+  }
+
+  .pc-customizer-title-container{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  }
+
+  .pc-customizer-title {
+  font-size: 70px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  color: #fff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  text-transform: uppercase;
+  }
+  
+  .pc-customizer-subtitle {
+    text-align: left;
+    margin: 0;
+    color: white;
+    font-size: 30px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: normal;
+    margin-bottom: 30px;
+  }
+  
+  /* Steps */
+  .pc-customizer-steps {
+    width: 100vw;
+    max-height: 1480px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+      scrollbar-color: #03644D rgba(0, 26, 20, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 32px;
+  }
+
+
+  .pc-customizer-steps::-webkit-scrollbar {
+    width: 20px; /* Width of the scrollbar */
+  }
+  
+  .pc-customizer-steps::-webkit-scrollbar-track {
+    background: #1a2e3b; /* Track color */
+  }
+  
+  .pc-customizer-steps::-webkit-scrollbar-thumb {
+    background-color: #00ffcc; /* Scrollbar thumb color */
+    border-radius: 4px; /* Rounded corners */
+  }
+  
+  .pc-customizer-step {
+    width: 952px;
+    height: 129px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    align-items: left;
+    background: #00E083;
+    border: 1px solid #00ffcc;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  /* Selected step (currently viewing products for this category) - Normal size, Light Green */
+  .pc-customizer-step.selected-step {
+    background: #00E083; /* Light green to show it's active */
+    color: #fff;
+    height: 206px; /* Normal size when viewing */
+    border: 2px solid #00ffcc; /* Thicker border to show selection */
+  }
+
+  .pc-customizer-step.selected-step .step-icon img {
+  width: 142px;
+  height: 142px;
+  filter: drop-shadow(1px 1px 20px #002024);
+  }
+
+  .pc-customizer-step.selected-step .step-title {
+    font-size: 40px;
+  }
+
+  .pc-customizer-step.selected-step .step-price {
+    font-size: 34px;
+  }
+
+  /* FIX ISSUE #2A: Steps that have components (completed) - Normal size, Light Green */
+  .pc-customizer-step.has-component-step {
+    background: #00E083; /* Light green - same as selected */
+    color: #fff;
+    height: 129px; /* Normal size */
+  }
+
+  .pc-customizer-step.has-component-step .step-icon img {
+    width: 71px;
+    height: 48px;
+  }
+
+  .pc-customizer-step.has-component-step .step-title {
+    font-size: 30px;
+  }
+
+  .pc-customizer-step.has-component-step .step-price {
+    font-size: 30px;
+  }
+
+  /* FIX ISSUE #2B: Next priority (first empty unlocked) - ENLARGED, Light Green */
+  .pc-customizer-step.next-priority-step.enlarged-step {
+    background: #00E083; /* Light green for next available step */
+    color: #fff;
+    height: 200px; /* LARGER to emphasize it's ready to select */
+    transform: scale(1.02); /* Slight scale for emphasis */
+  }
+
+  .pc-customizer-step.next-priority-step.enlarged-step .step-icon img {
+    width: 142px;
+    height: 96px;
+  }
+
+  .pc-customizer-step.next-priority-step.enlarged-step .step-title {
+    font-size: 40px;
+    width: 600px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pc-customizer-step.next-priority-step.enlarged-step .step-price {
+    font-size: 30px;
+  }
+
+  /* FIX ISSUE #2C: Unlocked but not priority - Normal size, DARK Green */
+  .pc-customizer-step.unlocked-not-priority-step {
+    background: #00a67d; /* Dark green - distinct from light green */
+    color: #fff;
+    height: 129px; /* Normal size */
+  }
+
+  .pc-customizer-step.unlocked-not-priority-step .step-icon img {
+    width: 71px;
+    height: 48px;
+  }
+
+  .pc-customizer-step.unlocked-not-priority-step .step-title {
+    font-size: 30px;
+  }
+
+  .pc-customizer-step.unlocked-not-priority-step .step-price {
+    font-size: 30px;
+  }
+
+  /* Locked steps (not yet ready) - Normal size, Dark Green, Faded */
+  .pc-customizer-step.locked-step {
+    background: #00a67d; /* Dark green for locked steps */
+    color: #fff;
+    opacity: 0.7; /* Slightly faded */
+    cursor: not-allowed;
+    height: 129px; /* Normal size */
+  }
+
+  .pc-customizer-step.locked-step .step-icon img {
+    width: 71px;
+    height: 48px;
+  }
+
+  .pc-customizer-step.inactive-step.locked-step .step-title {
+    font-size: 30px;
+  }
+
+  .pc-customizer-step.inactive-step.locked-step .step-price {
+    font-size: 24px;
+  }
+  
+  .step-icon img {
+    width: 71px;
+    height: 48px;
+    flex-shrink: 0;
+    margin-left: 32px;
+  }
+
+  .pc-customizer-step-container .step-subtitle {
+    font-size: 30px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    text-align: left;
+    color: #fff;
+    opacity: 0.5;
+    margin-top: 25px;
+    margin-bottom: 25px;
+  }
+  
+  .step-details{
+    display: flex;
+    justify-content: left;
+    text-align: left;
+    flex-direction: column;
+    margin-left: 60px;
+    flex-grow: 1;
+    font-style: normal;
+    font-weight: 800;
+    line-height: normal;
+  }
+
+  .step-title{
+    font-size: 30px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: normal;
+    color: #002024; /* Default white text */
+    margin: 0;  
+  }
+
+  .step-price{
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: normal;
+    color: #002024; /* Default white text */
+    opacity: 0.5;
+  }
+
+  /* FIXED ISSUE #3: Font colors for different step states */
+  /* Inactive unlocked steps (not next priority) - dark green font */
+  .pc-customizer-step.inactive-step.unlocked-step:not(.enlarged-step) .step-title,
+  .pc-customizer-step.inactive-step.unlocked-step:not(.enlarged-step) .step-price {
+    color: #00a67d; /* Dark green font for inactive but available steps */
+  }
+
+
+
+
+
+
+  .step-add-minus-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #002024; /* Light gray background */ /* Makes it circular */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    margin-right: 30px;
+  }
+  
+  .step-add-minus-icon.minus-active {
+    background: #E84536;
+  }
+  
+  /* 🔥 FIX ISSUE #1: Button container for add/minus buttons */
+  .step-button-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  /* 🔥 FIX ISSUE #1: Optional badge styling */
+  .optional-badge {
+    color: #FFB800;
+    font-size: 24px;
+    font-weight: 600;
+    font-style: italic;
+  }
+  
+  /* 🔥 FIX ISSUE #1: Optional step highlighting */
+  .pc-customizer-step.optional-step {
+    border: 2px dashed #FFB800 !important;
+  }
+  
+  
+  .step-add-icon {
+    font-size: 40px;
+    cursor: pointer;
+  }
+
+  .step-minus-icon {
+    font-size: 40px;
+    cursor: pointer;
+  }
+  
+  /* FIX ISSUE #2: Placeholder for empty button state */
+  .step-add-icon-placeholder {
+    font-size: 40px;
+    visibility: hidden;
+    /* Takes up space but is not visible */
+  }
+  
+/* Bottom Section */
+.pc-customized-bottom-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #002024;
+  width: 100vw;
+  position: fixed;
+  bottom: 0;
+  height: 230px;
+}
+
+.pc-customized-process-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  gap: 50px;
+}
+
+.pc-customized-order-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 30px;
+}
+
+.pc-customized-cart-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-customized-cart-icon img {
+  width: 87px;
+  height: 82px;
+}
+
+.pc-customized-notification {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: red;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pc-customized-total-label {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.pc-customized-total {
+  color: #fff;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.pc-customized-price {
+  width: 192px;
+  height: 60px;
+  display: inline-block;
+  font-size: 35px;
+  font-style: normal;
+  font-weight: 800;
+  color: white;
+  text-align: left;
+}
+
+.pc-customized-right-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.pc-customized-order-summary {
+  background-color: #00E083;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  width: 599px;
+  height: 60px;
+  padding: 12px 24px;
+  font-size: 18px;
+  border: none;
+  transition: background-color 0.3s ease;
+}
+
+.pc-customized-order-summary:disabled {
+  background-color: #00a67d;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.pc-customized-order-summary:hover:not(:disabled) {
+  background-color: #00ff99;
+}
+
+.pc-customized-action-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.pc-customized-cancel-order,
+.pc-customized-start-over {
+  background: transparent;
+  color: #fff;
+  font-weight: bold;
+  border: 2px solid #00ff99;
+  width: 288px;
+  height: 46px;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+
+/* Modal Overlay */
+.pc-customized-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 32, 36, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pc-customized-modal-background {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 825px;
+  height: 411px;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 224, 131, 0.60);
+  filter: blur(100px);
+  z-index: 1;
+  pointer-events: none;
+}
+/* Modal Box */
+.pc-customized-modal {
+  z-index: 1010;
+  background: #07343a;
+  padding: 40px 32px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  justify-content: center;
+  width: 727px;
+  height: auto;
+  position: relative;
+}
+
+
+.pc-customized-modal-title {
+  color: #fff;
+  font-size: 25px;
+  font-style: normal;
+  font-weight: 800; 
+  line-height: normal;
+  margin-bottom: 32px;
+}
+
+.pc-customized-modal-title span {
+  font-size: 50px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  color: #fff;
+}
+
+.pc-customized-modal-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pc-customized-modal-btn {
+  flex: 1;
+  background: transparent;
+  border: 2px solid #00E083;
+  color: #fff;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  width: 279px;
+  height: 46px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.pc-customized-modal-btn.yes {
+  background: #00E083;
+  color: #002024;
+  border: 2px solid #00E083;
+  width: 288px;
+  height: 46px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.pc-customized-modal-btn:not(.yes):hover {
+  background: #00E083;
+  color: #002024;
+}
+
+
+/* ========================================
+   🆕 MULTI-SLOT STEP STYLES (Dynamic RAM/Storage Slots)
+======================================== */
+.multi-slot-step {
+  border-left: 3px solid #00E083;
+  position: relative;
+}
+
+.multi-slot-step::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #00E083 0%, rgba(0, 224, 131, 0.3) 100%);
+}
+
+.multi-slot-step .step-subtitle {
+  color: #00E083;
+  font-weight: 600;
+}
+
+/* Optional category badge */
+.optional-badge {
+  font-size: 12px;
+  color: #FFB800;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+

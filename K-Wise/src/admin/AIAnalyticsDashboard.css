@@ -1,0 +1,732 @@
+/**
+ * AI Analytics Dashboard Styles
+ * TASK 14 - PHASE 4: Professional styling for AI insights
+ */
+
+.ai-analytics-dashboard {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  padding: 2rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ==================== HEADER ==================== */
+
+.ai-analytics-header {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-content h1 {
+  margin: 0;
+  font-size: 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-content .subtitle {
+  margin: 0.5rem 0 0 0;
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.header-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.auto-refresh-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-refresh-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.refresh-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.refresh-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* ==================== TAB NAVIGATION ==================== */
+
+.ai-tab-navigation {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  background: white;
+  border: 2px solid #e2e8f0;
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  color: #64748b;
+}
+
+.tab-button:hover {
+  border-color: #667eea;
+  color: #667eea;
+  transform: translateY(-2px);
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* ==================== TAB CONTENT ==================== */
+
+.ai-tab-content {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== INSIGHT CARDS ==================== */
+
+.insight-card,
+.prediction-card,
+.behavior-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.insight-card:hover,
+.prediction-card:hover,
+.behavior-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #1e293b;
+}
+
+.ai-badge {
+  background: linear-gradient(135deg, #00E083 0%, #4fa24b 100%);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.count-badge {
+  background: #10b981;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.count-badge.warning {
+  background: #ef4444;
+}
+
+/* ==================== BUSINESS INSIGHTS TAB ==================== */
+
+.insights-tab {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.trend-content {
+  text-align: center;
+}
+
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.trend-icon {
+  font-size: 3rem;
+}
+
+.trend-description {
+  font-size: 1.125rem;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.category-content {
+  text-align: center;
+}
+
+.category-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.category-note {
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.recommendations-list,
+.alerts-list,
+.opportunities-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recommendation-item,
+.alert-item,
+.opportunity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: #f8fafc;
+  border-left: 4px solid #667eea;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.recommendation-item:hover {
+  background: #f1f5f9;
+}
+
+.rec-number {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.rec-text {
+  flex: 1;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.alert-item {
+  border-left-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.opportunity-item {
+  border-left-color: #10b981;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+/* ==================== INVENTORY PREDICTIONS TAB ==================== */
+
+.inventory-tab {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.items-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.critical-item {
+  background: #fef2f2;
+  border: 2px solid #fecaca;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.item-header h4 {
+  margin: 0;
+  color: #991b1b;
+  font-size: 1.125rem;
+}
+
+.priority-badge {
+  background: #ef4444;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.item-reason {
+  color: #7f1d1d;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.item-stats {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.trending-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.trending-category {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff7ed;
+  border: 2px solid #fed7aa;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #9a3412;
+}
+
+.category-icon {
+  font-size: 1.5rem;
+}
+
+.restock-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.restock-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.restock-item:hover {
+  background: #f1f5f9;
+}
+
+.priority-number {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.product-name {
+  flex: 1;
+  color: #334155;
+  font-weight: 500;
+}
+
+.sales-summary {
+  text-align: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  color: #64748b;
+}
+
+/* ==================== CUSTOMER BEHAVIOR TAB ==================== */
+
+.customer-tab {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.customer-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.customer-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+
+.customer-item:hover {
+  transform: translateX(8px);
+}
+
+.customer-item.loyal {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+}
+
+.customer-item.at-risk {
+  background: #fee2e2;
+  border-left: 4px solid #ef4444;
+}
+
+.customer-icon {
+  font-size: 1.5rem;
+}
+
+.customer-name {
+  flex: 1;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.segment-content {
+  background: #f0f9ff;
+  padding: 1.5rem;
+  border-radius: 10px;
+  border-left: 4px solid #0ea5e9;
+}
+
+.segment-description {
+  color: #075985;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.ltv-estimate {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.ltv-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ltv-value {
+  color: #0ea5e9;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.strategies-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.strategy-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: #f0fdf4;
+  border-left: 4px solid #10b981;
+  border-radius: 8px;
+}
+
+.strategy-number {
+  background: #10b981;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.strategy-text {
+  flex: 1;
+  color: #065f46;
+  line-height: 1.6;
+}
+
+.summary-stats {
+  display: grid;
+  gap: 1rem;
+}
+
+.summary-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.stat-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.stat-value {
+  color: #667eea;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* ==================== METADATA ==================== */
+
+.insight-metadata,
+.prediction-metadata,
+.behavior-metadata {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.insight-metadata p,
+.prediction-metadata p,
+.behavior-metadata p {
+  margin: 0.25rem 0;
+}
+
+/* ==================== LOADING & ERROR STATES ==================== */
+
+.ai-analytics-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: white;
+  border-radius: 12px;
+  margin: 2rem;
+  padding: 3rem;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-analytics-loading p {
+  color: #64748b;
+  font-size: 1.125rem;
+  margin-top: 1rem;
+}
+
+.ai-analytics-error {
+  background: #fee2e2;
+  border: 2px solid #fca5a5;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem;
+  text-align: center;
+}
+
+.ai-analytics-error h3 {
+  color: #dc2626;
+  margin-top: 0;
+}
+
+.ai-analytics-error p {
+  color: #991b1b;
+  margin: 1rem 0;
+}
+
+.retry-button {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.retry-button:hover {
+  background: #dc2626;
+}
+
+.no-items {
+  text-align: center;
+  color: #64748b;
+  padding: 2rem;
+  font-style: italic;
+}
+
+/* ==================== RESPONSIVE DESIGN ==================== */
+
+@media (max-width: 768px) {
+  .ai-analytics-dashboard {
+    padding: 1rem;
+  }
+
+  .ai-analytics-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .ai-tab-navigation {
+    flex-direction: column;
+  }
+
+  .tab-button {
+    width: 100%;
+  }
+
+  .header-controls {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .refresh-button {
+    width: 100%;
+  }
+}
+
+/* ==================== DARK MODE SUPPORT ==================== */
+
+@media (prefers-color-scheme: dark) {
+  .ai-analytics-dashboard {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  }
+
+  .ai-analytics-header,
+  .insight-card,
+  .prediction-card,
+  .behavior-card {
+    background: #2d3748;
+    color: white;
+  }
+
+  .card-header {
+    border-bottom-color: #4a5568;
+  }
+
+  .card-header h3 {
+    color: white;
+  }
+
+  .tab-button {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #cbd5e0;
+  }
+
+  .tab-button:hover {
+    border-color: #667eea;
+    color: #667eea;
+  }
+
+  .recommendation-item,
+  .restock-item,
+  .customer-item {
+    background: #1a202c;
+    color: white;
+  }
+
+  .rec-text,
+  .product-name,
+  .customer-name {
+    color: #e2e8f0;
+  }
+
+  .insight-metadata,
+  .prediction-metadata,
+  .behavior-metadata {
+    background: #1a202c;
+  }
+}

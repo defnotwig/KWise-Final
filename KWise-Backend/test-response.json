@@ -1,0 +1,988 @@
+{
+  "compatible": false,
+  "overall_status": "incompatible",
+  "overall_severity": "critical",
+  "overall_message": "❌ 8 critical issue(s) found - build not compatible",
+  "compatibility_score": 0,
+  "layers": {
+    "power": {
+      "status": "no_psu",
+      "message": "⚠️ No PSU selected. Estimated power need: 158W peak. Recommended: 200W PSU with 80+ efficiency.",
+      "severity": "warning",
+      "compatible": true,
+      "recommendations": [
+        "Select a 200W or higher 80+ certified PSU",
+        "Ensure PSU has required connectors for your components",
+        "Consider modular PSU for cleaner cable management"
+      ],
+      "estimatedPowerDraw": {
+        "peak": 158,
+        "recommended": 200
+      }
+    },
+    "clearance": {
+      "compatible": true,
+      "status": "error",
+      "severity": "error",
+      "message": "Clearance analysis failed",
+      "error": "gpuDims is not defined"
+    },
+    "pairwise": {
+      "compatible": true,
+      "status": "all_pairs_compatible",
+      "severity": "success",
+      "message": "✅ All 8 component pairs compatible",
+      "pairs": [
+        {
+          "pair": "cpu ↔ motherboard",
+          "component_a": {
+            "type": "cpu",
+            "name": "AMD Ryzen 3 3200G"
+          },
+          "component_b": {
+            "type": "motherboard",
+            "name": "AORUS B650 ELITE AX ICE"
+          },
+          "compatible": true,
+          "checks": {
+            "socket": {
+              "compatible": true,
+              "check": "socket",
+              "message": "Socket info not available"
+            },
+            "chipset": {
+              "compatible": true,
+              "check": "chipset",
+              "message": "Chipset check OK"
+            },
+            "bios": {
+              "compatible": true,
+              "check": "bios",
+              "message": "Check not implemented"
+            },
+            "vrm": {
+              "compatible": true,
+              "check": "vrm",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "cpu ↔ ram",
+          "component_a": {
+            "type": "cpu",
+            "name": "AMD Ryzen 3 3200G"
+          },
+          "component_b": {
+            "type": "ram",
+            "name": "16GB DDR4 3200"
+          },
+          "compatible": true,
+          "checks": {
+            "type": {
+              "compatible": true,
+              "check": "type",
+              "message": "Memory type info not available"
+            },
+            "speed": {
+              "compatible": true,
+              "check": "speed",
+              "message": "Check not implemented"
+            },
+            "channels": {
+              "compatible": true,
+              "check": "channels",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "motherboard ↔ ram",
+          "component_a": {
+            "type": "motherboard",
+            "name": "AORUS B650 ELITE AX ICE"
+          },
+          "component_b": {
+            "type": "ram",
+            "name": "16GB DDR4 3200"
+          },
+          "compatible": true,
+          "checks": {
+            "slots": {
+              "compatible": true,
+              "check": "slots",
+              "message": "Check not implemented"
+            },
+            "speed": {
+              "compatible": true,
+              "check": "speed",
+              "message": "Check not implemented"
+            },
+            "capacity": {
+              "compatible": true,
+              "check": "capacity",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "motherboard ↔ gpu",
+          "component_a": {
+            "type": "motherboard",
+            "name": "AORUS B650 ELITE AX ICE"
+          },
+          "component_b": {
+            "type": "gpu",
+            "name": "INTEL ARC B580"
+          },
+          "compatible": true,
+          "checks": {
+            "pcie_version": {
+              "compatible": true,
+              "check": "pcie_version",
+              "message": "Check not implemented"
+            },
+            "lanes": {
+              "compatible": true,
+              "check": "lanes",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "motherboard ↔ storage",
+          "component_a": {
+            "type": "motherboard",
+            "name": "AORUS B650 ELITE AX ICE"
+          },
+          "component_b": {
+            "type": "storage",
+            "name": "1TB ADATA LEGEND 710"
+          },
+          "compatible": true,
+          "checks": {
+            "m2_slots": {
+              "compatible": true,
+              "check": "m2_slots",
+              "message": "Check not implemented"
+            },
+            "sata_ports": {
+              "compatible": true,
+              "check": "sata_ports",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "motherboard ↔ case",
+          "component_a": {
+            "type": "motherboard",
+            "name": "AORUS B650 ELITE AX ICE"
+          },
+          "component_b": {
+            "type": "case",
+            "name": "POWERLOGIC SLIM"
+          },
+          "compatible": true,
+          "checks": {
+            "form_factor": {
+              "compatible": true,
+              "check": "form_factor",
+              "message": "Form factor info not available"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "gpu ↔ case",
+          "component_a": {
+            "type": "gpu",
+            "name": "INTEL ARC B580"
+          },
+          "component_b": {
+            "type": "case",
+            "name": "POWERLOGIC SLIM"
+          },
+          "compatible": true,
+          "checks": {
+            "length": {
+              "compatible": true,
+              "check": "length",
+              "message": "Check not implemented"
+            },
+            "slots": {
+              "compatible": true,
+              "check": "slots",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        },
+        {
+          "pair": "storage ↔ case",
+          "component_a": {
+            "type": "storage",
+            "name": "1TB ADATA LEGEND 710"
+          },
+          "component_b": {
+            "type": "case",
+            "name": "POWERLOGIC SLIM"
+          },
+          "compatible": true,
+          "checks": {
+            "bays": {
+              "compatible": true,
+              "check": "bays",
+              "message": "Check not implemented"
+            }
+          },
+          "critical_issues": [],
+          "warnings": []
+        }
+      ],
+      "critical_issues": [],
+      "warnings": [],
+      "summary": {
+        "total_pairs_checked": 8,
+        "compatible_pairs": 8,
+        "critical_issues": 0,
+        "warnings": 0
+      }
+    },
+    "bottleneck": {
+      "balanced": true,
+      "status": "balanced",
+      "severity": "info",
+      "message": "✅ Build is balanced - no major bottlenecks",
+      "bottlenecks": [],
+      "warnings": [
+        {
+          "type": "minor_mismatch",
+          "severity": "info",
+          "message": "ℹ️ Minor tier mismatch: AMD Ryzen 3 3200G (entry) + INTEL ARC B580 (mid-tier)",
+          "impact": "Minimal (~5-10%) performance impact",
+          "recommendation": "Acceptable for most users"
+        },
+        {
+          "type": "storage_interface",
+          "severity": "info",
+          "message": "ℹ️ 1TB ADATA LEGEND 710 uses SATA (limited to ~550MB/s)",
+          "impact": "Consider NVMe for 3-7x faster speeds",
+          "recommendation": "Upgrade to NVMe M.2 SSD for better performance"
+        }
+      ],
+      "summary": {
+        "critical_bottlenecks": 0,
+        "total_bottlenecks": 0,
+        "total_warnings": 2
+      }
+    },
+    "thermal": {
+      "thermal_status": "optimal",
+      "severity": "success",
+      "message": "✅ Thermal performance adequate",
+      "warnings": [],
+      "recommendations": [
+        {
+          "type": "good_cooling",
+          "severity": "success",
+          "message": "✅ CPU cooling adequate: 100W cooler for 65W CPU (+35W headroom)"
+        }
+      ],
+      "summary": {
+        "critical_warnings": 0,
+        "total_warnings": 0,
+        "total_recommendations": 1
+      }
+    },
+    "comprehensive_rules": {
+      "status": "incompatible",
+      "severity": "critical",
+      "compatible": false,
+      "message": "8 critical compatibility issues detected",
+      "compatibility_score": 252,
+      "max_possible_score": 435,
+      "rules_checked": 7,
+      "critical_issues": [
+        {
+          "component": "cpu",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "Missing socket information",
+          "details": "CPU socket: unknown, MB socket: unknown",
+          "penalty": 0
+        },
+        {
+          "component": "cpu",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "CPU socket specification missing - Please check CPU specifications",
+          "details": "Unable to validate cooler socket compatibility due to missing CPU socket data. Verify CPU socket type matches cooler support before purchasing.",
+          "penalty": 0
+        },
+        {
+          "component": "motherboard",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "Missing socket information",
+          "details": "CPU socket: unknown, MB socket: unknown",
+          "penalty": 0
+        },
+        {
+          "component": "motherboard",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "Memory type information missing",
+          "details": "MB: unknown, RAM: unknown",
+          "penalty": 0
+        },
+        {
+          "component": "ram",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "Memory type information missing",
+          "details": "MB: unknown, RAM: unknown",
+          "penalty": 0
+        },
+        {
+          "component": "gpu",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "Insufficient PCIe x16 ELECTRICAL lanes for multi-GPU",
+          "details": "2 GPUs require 2 electrical x16 slots. Motherboard has 1 physical slot(s) but only 1 electrical x16 slot(s). 0 slot(s) are x4/x8 electrically (SEVERE performance loss for multi-GPU).",
+          "penalty": 0
+        },
+        {
+          "component": "gpu",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "Insufficient PCIe x16 Slots for Multi-GPU",
+          "details": "2 GPUs require 2× PCIe x16 slots. Motherboard has 1 slot(s).",
+          "penalty": 0
+        },
+        {
+          "component": "cooling",
+          "severity": "critical",
+          "rule": "compatibility_check",
+          "message": "CPU socket specification missing - Please check CPU specifications",
+          "details": "Unable to validate cooler socket compatibility due to missing CPU socket data. Verify CPU socket type matches cooler support before purchasing.",
+          "penalty": 0
+        }
+      ],
+      "warnings": [
+        {
+          "component": "cpu",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        },
+        {
+          "component": "motherboard",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Motherboard form factor specification missing (ATX/Micro-ATX/Mini-ITX) - Check motherboard specs",
+          "penalty": 0
+        },
+        {
+          "component": "motherboard",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Storage interface type not specified",
+          "penalty": 0
+        },
+        {
+          "component": "motherboard",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "GPU supports newer PCIe generation",
+          "penalty": 0
+        },
+        {
+          "component": "motherboard",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        },
+        {
+          "component": "ram",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        },
+        {
+          "component": "case",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Motherboard form factor specification missing (ATX/Micro-ATX/Mini-ITX) - Check motherboard specs",
+          "penalty": 0
+        },
+        {
+          "component": "case",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "GPU length not specified",
+          "penalty": 0
+        },
+        {
+          "component": "case",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Cooler height compatibility unknown",
+          "penalty": 0
+        },
+        {
+          "component": "case",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        },
+        {
+          "component": "gpu",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "GPU length not specified",
+          "penalty": 0
+        },
+        {
+          "component": "gpu",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        },
+        {
+          "component": "cooling",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Cooler height compatibility unknown",
+          "penalty": 0
+        },
+        {
+          "component": "cooling",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        },
+        {
+          "component": "storage",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Storage interface type not specified",
+          "penalty": 0
+        },
+        {
+          "component": "storage",
+          "severity": "warning",
+          "rule": "compatibility_check",
+          "message": "Case GPU Clearance Unknown",
+          "penalty": 0
+        }
+      ],
+      "details": {
+        "total_rules": 23,
+        "components_checked": 7,
+        "raw_score": 567,
+        "raw_max_score": 980,
+        "phase_3_enhancements": [
+          "RAM per-slot capacity",
+          "Case form factor hierarchy"
+        ],
+        "phase_4_enhancements": [
+          "GPU-case clearance",
+          "Critical trap detection"
+        ]
+      }
+    },
+    "real_world": {
+      "status": "medium_confidence",
+      "severity": "success",
+      "message": "Real-world confidence: 50.00% (0 similar builds)",
+      "compatible": true,
+      "confidence": 50,
+      "known_issues": 0,
+      "critical_issues": 0,
+      "major_issues": 0,
+      "similar_builds": 0,
+      "avg_build_satisfaction": null,
+      "warnings": [],
+      "recommendations": []
+    }
+  },
+  "summary": {
+    "total_critical_issues": 8,
+    "total_warnings": 19,
+    "power_status": "no_psu",
+    "clearance_status": "error",
+    "pairwise_status": "all_pairs_compatible",
+    "bottleneck_status": "balanced",
+    "thermal_status": "optimal",
+    "comprehensive_rules_status": "incompatible",
+    "real_world_confidence": 50
+  },
+  "critical_issues": [
+    {
+      "layer": "comprehensive_rules",
+      "component": "cpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Missing socket information",
+      "details": "CPU socket: unknown, MB socket: unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "CPU socket specification missing - Please check CPU specifications",
+      "details": "Unable to validate cooler socket compatibility due to missing CPU socket data. Verify CPU socket type matches cooler support before purchasing.",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Missing socket information",
+      "details": "CPU socket: unknown, MB socket: unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Memory type information missing",
+      "details": "MB: unknown, RAM: unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "ram",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Memory type information missing",
+      "details": "MB: unknown, RAM: unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "gpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Insufficient PCIe x16 ELECTRICAL lanes for multi-GPU",
+      "details": "2 GPUs require 2 electrical x16 slots. Motherboard has 1 physical slot(s) but only 1 electrical x16 slot(s). 0 slot(s) are x4/x8 electrically (SEVERE performance loss for multi-GPU).",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "gpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Insufficient PCIe x16 Slots for Multi-GPU",
+      "details": "2 GPUs require 2× PCIe x16 slots. Motherboard has 1 slot(s).",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cooling",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "CPU socket specification missing - Please check CPU specifications",
+      "details": "Unable to validate cooler socket compatibility due to missing CPU socket data. Verify CPU socket type matches cooler support before purchasing.",
+      "penalty": 0
+    }
+  ],
+  "warnings": [
+    {
+      "layer": "power",
+      "status": "no_psu",
+      "message": "⚠️ No PSU selected. Estimated power need: 158W peak. Recommended: 200W PSU with 80+ efficiency.",
+      "severity": "warning",
+      "compatible": true,
+      "recommendations": [
+        "Select a 200W or higher 80+ certified PSU",
+        "Ensure PSU has required connectors for your components",
+        "Consider modular PSU for cleaner cable management"
+      ],
+      "estimatedPowerDraw": {
+        "peak": 158,
+        "recommended": 200
+      }
+    },
+    {
+      "layer": "bottleneck",
+      "type": "minor_mismatch",
+      "severity": "info",
+      "message": "ℹ️ Minor tier mismatch: AMD Ryzen 3 3200G (entry) + INTEL ARC B580 (mid-tier)",
+      "impact": "Minimal (~5-10%) performance impact",
+      "recommendation": "Acceptable for most users"
+    },
+    {
+      "layer": "bottleneck",
+      "type": "storage_interface",
+      "severity": "info",
+      "message": "ℹ️ 1TB ADATA LEGEND 710 uses SATA (limited to ~550MB/s)",
+      "impact": "Consider NVMe for 3-7x faster speeds",
+      "recommendation": "Upgrade to NVMe M.2 SSD for better performance"
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cpu",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Motherboard form factor specification missing (ATX/Micro-ATX/Mini-ITX) - Check motherboard specs",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Storage interface type not specified",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "GPU supports newer PCIe generation",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "ram",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "case",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Motherboard form factor specification missing (ATX/Micro-ATX/Mini-ITX) - Check motherboard specs",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "case",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "GPU length not specified",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "case",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Cooler height compatibility unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "case",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "gpu",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "GPU length not specified",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "gpu",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cooling",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Cooler height compatibility unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cooling",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "storage",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Storage interface type not specified",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "storage",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    }
+  ],
+  "timestamp": "2025-11-25T10:39:29.207Z",
+  "detailed_compatibility": {
+    "compatible": false,
+    "criticalIssues": [
+      {
+        "severity": "critical",
+        "type": "socket_missing",
+        "message": "Socket information missing - cannot verify compatibility",
+        "component_a": "AORUS B650 ELITE AX ICE",
+        "component_b": "AMD Ryzen 3 3200G"
+      },
+      {
+        "severity": "critical",
+        "type": "memory_type_missing",
+        "message": "Memory type information missing",
+        "component": "16GB DDR4 3200"
+      }
+    ],
+    "warnings": [],
+    "notes": [
+      "✅ Storage Compatible: 0/2 M.2 slots used, 1/4 SATA ports used"
+    ],
+    "detailedResults": {
+      "motherboard_cpu": {
+        "compatible": false,
+        "issues": [
+          {
+            "severity": "critical",
+            "type": "socket_missing",
+            "message": "Socket information missing - cannot verify compatibility",
+            "component_a": "AORUS B650 ELITE AX ICE",
+            "component_b": "AMD Ryzen 3 3200G"
+          }
+        ],
+        "warnings": [],
+        "notes": []
+      },
+      "motherboard_ram": {
+        "compatible": false,
+        "issues": [
+          {
+            "severity": "critical",
+            "type": "memory_type_missing",
+            "message": "Memory type information missing",
+            "component": "16GB DDR4 3200"
+          }
+        ],
+        "warnings": [],
+        "notes": []
+      },
+      "storage_motherboard": {
+        "compatible": true,
+        "issues": [],
+        "warnings": [],
+        "notes": [
+          "✅ Storage Compatible: 0/2 M.2 slots used, 1/4 SATA ports used"
+        ]
+      }
+    }
+  },
+  "all_issues": [
+    {
+      "layer": "comprehensive_rules",
+      "component": "cpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Socket mismatch: AMD Ryzen 3 3200G (Unknown) incompatible with AORUS B650 ELITE AX ICE (Unknown)",
+      "details": "CPU socket Unknown does not match motherboard socket Unknown. These sockets are physically incompatible.",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Socket mismatch: AMD Ryzen 3 3200G (Unknown) incompatible with AORUS B650 ELITE AX ICE (Unknown)",
+      "details": "CPU socket Unknown does not match motherboard socket Unknown. These sockets are physically incompatible.",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Memory type information missing",
+      "details": "MB: unknown, RAM: unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "gpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Insufficient PCIe x16 ELECTRICAL lanes for multi-GPU",
+      "details": "2 GPUs require 2 electrical x16 slots. Motherboard has 1 physical slot(s) but only 1 electrical x16 slot(s). 0 slot(s) are x4/x8 electrically (SEVERE performance loss for multi-GPU).",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "gpu",
+      "severity": "critical",
+      "rule": "compatibility_check",
+      "message": "Insufficient PCIe x16 Slots for Multi-GPU",
+      "details": "2 GPUs require 2× PCIe x16 slots. Motherboard has 1 slot(s).",
+      "penalty": 0
+    },
+    {
+      "severity": "critical",
+      "type": "socket_missing",
+      "message": "Socket mismatch: AMD Ryzen 3 3200G (Unknown) incompatible with AORUS B650 ELITE AX ICE (Unknown)",
+      "component_a": "AORUS B650 ELITE AX ICE",
+      "component_b": "AMD Ryzen 3 3200G",
+      "details": "CPU socket Unknown does not match motherboard socket Unknown. These sockets are physically incompatible."
+    }
+  ],
+  "all_warnings": [
+    {
+      "layer": "power",
+      "status": "no_psu",
+      "message": "⚠️ No PSU selected. Estimated power need: 158W peak. Recommended: 200W PSU with 80+ efficiency.",
+      "severity": "warning",
+      "compatible": true,
+      "recommendations": [
+        "Select a 200W or higher 80+ certified PSU",
+        "Ensure PSU has required connectors for your components",
+        "Consider modular PSU for cleaner cable management"
+      ],
+      "estimatedPowerDraw": {
+        "peak": 158,
+        "recommended": 200
+      }
+    },
+    {
+      "layer": "bottleneck",
+      "type": "minor_mismatch",
+      "severity": "info",
+      "message": "ℹ️ Minor tier mismatch: AMD Ryzen 3 3200G (entry) + INTEL ARC B580 (mid-tier)",
+      "impact": "Minimal (~5-10%) performance impact",
+      "recommendation": "Acceptable for most users"
+    },
+    {
+      "layer": "bottleneck",
+      "type": "storage_interface",
+      "severity": "info",
+      "message": "ℹ️ 1TB ADATA LEGEND 710 uses SATA (limited to ~550MB/s)",
+      "impact": "Consider NVMe for 3-7x faster speeds",
+      "recommendation": "Upgrade to NVMe M.2 SSD for better performance"
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "cpu",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Case GPU Clearance Unknown",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Form factor incompatible: AORUS B650 ELITE AX ICE (Unknown) not supported by POWERLOGIC SLIM ()",
+      "penalty": 0,
+      "details": "Motherboard form factor Unknown does not fit in case that supports ."
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "motherboard",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Storage interface type not specified",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "case",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "GPU length not specified",
+      "penalty": 0
+    },
+    {
+      "layer": "comprehensive_rules",
+      "component": "case",
+      "severity": "warning",
+      "rule": "compatibility_check",
+      "message": "Cooler height compatibility unknown",
+      "penalty": 0
+    }
+  ],
+  "all_notes": [
+    "✅ Storage Compatible: 0/2 M.2 slots used, 1/4 SATA ports used",
+    {
+      "message": "✅ GPU occupies 2 expansion slots",
+      "details": "INTEL ARC B580 is 2-slot width GPU (40mm vertical space)",
+      "category": "GPU Slot Width"
+    }
+  ],
+  "compatible_notes": [
+    {
+      "message": "✅ GPU occupies 2 expansion slots",
+      "details": "INTEL ARC B580 is 2-slot width GPU (40mm vertical space)",
+      "category": "GPU Slot Width"
+    }
+  ],
+  "compatible_notes_raw": [
+    {
+      "message": "✅ GPU occupies 2 expansion slots",
+      "details": "INTEL ARC B580 is 2-slot width GPU (40mm vertical space)",
+      "category": "GPU Slot Width"
+    }
+  ],
+  "overall_compatible": false
+}

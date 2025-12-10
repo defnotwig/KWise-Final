@@ -1,0 +1,8 @@
+/* K-Wise Admin Styles - Main Import File */
+
+/* Import all admin-specific styles */
+@import './admin-core.css';
+@import './admin-layout.css';
+@import './admin-dashboard.css';
+
+/* Additional admin-specific imports can be added here */

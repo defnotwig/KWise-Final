@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "generated_at": null,
+    "total_builds": 0,
+    "parameters": {
+      "usage_types": 6,
+      "year_ranges": 3,
+      "budget_ranges": 4,
+      "expected_combinations": 72
+    }
+  },
+  "builds": {}
+}

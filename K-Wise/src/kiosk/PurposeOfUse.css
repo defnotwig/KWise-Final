@@ -1,0 +1,119 @@
+﻿/* ========================================
+   KIOSK PURPOSE-OF-USE RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* Main container styling */
+.purpose-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: #002024;; /* Default background */
+  color: white;
+  text-align: center;
+  margin: 0;
+  transition: background 0.5s ease;
+}
+
+/* Logo styling */
+.logo-image {
+  width: 128px;
+  height: 128px; /* Adjust for your logo */
+}
+
+/* Title styling */
+.purpose-title {
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  margin: 0;
+  margin-bottom: 16px;
+  margin-top: 64px;
+}
+
+.purpose-image {
+width: 673px;
+height: 516.781px;
+}
+
+/* Subtitle styling */
+.purpose-subtitle {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 30px;
+  opacity: 0.5;
+}
+
+/* Purpose options container */
+.purpose-options {
+  display: flex;
+  gap: 32px;
+}
+
+/* Individual option styling */
+.purpose-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #fff;
+  background-color: #00e083; /* Default green */
+  color: #fff;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 800;
+  padding: 15px;
+  width: 296px;
+  height: 296px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.3s ease, background-color 0.5s ease;
+}
+
+/* Hide default checkbox */
+.purpose-option input {
+  display: none;
+}
+
+.back-continue {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  margin-top: 64px;
+}
+
+.back-button-purpose {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  background: transparent;
+  width: 416.02px;
+  height: 71.346px;
+  padding: 12px 24px;
+  border: 4px solid #00E083;
+  cursor: pointer;
+  color: #fff;
+}
+
+/* Continue button styling */
+.continue-button {
+  background-color: #00E083; /* Button color */
+  color: white;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  width: 379.844px;
+  height: 71.346px;
+  padding: 12px 24px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+

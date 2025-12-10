@@ -1,0 +1,96 @@
+/* ADMIN LAYOUT - Shadcn-inspired Design */
+/* High specificity to prevent kiosk conflicts */
+
+.admin-layout.layout {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    background: var(--bg-primary, #ffffff) !important;
+}
+
+.admin-main-content.main-content {
+    flex: 1;
+    padding: 0;
+    margin-left: 250px; /* Matches sidebar width */
+    width: calc(100% - 250px);
+    max-width: 100%;
+    height: 100vh;
+    overflow: hidden; /* Let content container handle scroll */
+    position: relative;
+    background: var(--bg-primary, #ffffff) !important;
+    color: var(--text-primary, #0f172a) !important;
+}
+
+.admin-content-container.content-container {
+    padding: 2rem; /* Add padding for content */
+    width: 100%;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 1;
+    background: var(--bg-primary, #ffffff) !important;
+    color: var(--text-primary, #0f172a) !important;
+}
+
+/* =====================================================
+   COMPREHENSIVE THEME SYSTEM - ALL THEMES
+   ===================================================== */
+
+/* LIGHT THEME - Default */
+[data-theme="light"] .admin-layout.layout,
+[data-theme="light"] .admin-main-content.main-content,
+[data-theme="light"] .admin-content-container.content-container {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f1f5f9; /* Slate-100 */
+    --text-primary: #0f172a; /* Slate-950 */
+    --text-secondary: #64748b; /* Slate-500 */
+    --border-color: #e2e8f0; /* Slate-200 */
+    --accent-color: #00e083; /* Green */
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* DARK THEME */
+[data-theme="dark"] .admin-layout.layout,
+[data-theme="dark"] .admin-main-content.main-content,
+[data-theme="dark"] .admin-content-container.content-container {
+    --bg-primary: #020817; /* Slate-950 */
+    --bg-secondary: #1e293b; /* Slate-800 */
+    --text-primary: #f8fafc; /* Slate-50 */
+    --text-secondary: #94a3b8; /* Slate-400 */
+    --border-color: #1e293b; /* Slate-800 */
+    --accent-color: #f8fafc; /* Slate-50 */
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* BLUE THEME */
+[data-theme="blue"] .admin-layout.layout,
+[data-theme="blue"] .admin-main-content.main-content,
+[data-theme="blue"] .admin-content-container.content-container {
+    --bg-primary: #eff6ff;
+    --bg-secondary: #dbeafe;
+    --text-primary: #1e40af;
+    --text-secondary: #3730a3;
+    --border-color: #93c5fd;
+    --accent-color: #2563eb;
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* GREEN THEME */
+[data-theme="green"] .admin-layout.layout,
+[data-theme="green"] .admin-main-content.main-content,
+[data-theme="green"] .admin-content-container.content-container {
+    --bg-primary: #f0fdf4;
+    --bg-secondary: #dcfce7;
+    --text-primary: #166534;
+    --text-secondary: #15803d;
+    --border-color: #86efac;
+    --accent-color: #22c55e;
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}

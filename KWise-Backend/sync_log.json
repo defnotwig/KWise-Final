@@ -1,0 +1,174 @@
+{
+  "startTime": "2025-09-14T17:28:34.919Z",
+  "operations": [
+    {
+      "type": "INSERT",
+      "id": 14077,
+      "name": "Central Processing Unit",
+      "category": "CPU",
+      "price": 3495
+    },
+    {
+      "type": "INSERT",
+      "id": 14078,
+      "name": "AMD RYZEN 5 3400G (AM4) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 3995
+    },
+    {
+      "type": "INSERT",
+      "id": 14079,
+      "name": "AMD RYZEN 5 5500 (AM4) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 4150
+    },
+    {
+      "type": "INSERT",
+      "id": 14080,
+      "name": "AMD RYZEN 5 5600 (AM4) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 5485
+    },
+    {
+      "type": "INSERT",
+      "id": 14081,
+      "name": "AMD RYZEN 5 4600G (AM4) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 5495
+    },
+    {
+      "type": "INSERT",
+      "id": 14082,
+      "name": "AMD RYZEN 5 5600GT (AM4) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 7185
+    },
+    {
+      "type": "INSERT",
+      "id": 14083,
+      "name": "AMD RYZEN 7 5700X (AM4) (TTP)",
+      "category": "CPU",
+      "price": 7895
+    },
+    {
+      "type": "INSERT",
+      "id": 14084,
+      "name": "AMD RYZEN 7 5700G (AM4) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 8495
+    },
+    {
+      "type": "UPDATE",
+      "id": 39,
+      "name": "AMD RYZEN 7 5700X3D (AM4) (TTP)",
+      "changes": {
+        "oldPrice": "13995.00",
+        "newPrice": 11995,
+        "specsAdded": 7
+      }
+    },
+    {
+      "type": "INSERT",
+      "id": 14085,
+      "name": "AMD RYZEN 5 8400F (AM5) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 8495
+    },
+    {
+      "type": "INSERT",
+      "id": 14086,
+      "name": "AMD RYZEN 5 7600 (AM5) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 10495
+    },
+    {
+      "type": "INSERT",
+      "id": 14087,
+      "name": "AMD RYZEN 7 8700F (AM5) (TTP) W/ AMD COOLER",
+      "category": "CPU",
+      "price": 11495
+    },
+    {
+      "type": "UPDATE",
+      "id": 14,
+      "name": "AMD RYZEN 7 7700 (AM5) (TTP)",
+      "changes": {
+        "oldPrice": "12750.00",
+        "newPrice": 12750,
+        "specsAdded": 7
+      }
+    },
+    {
+      "type": "UPDATE",
+      "id": 15,
+      "name": "AMD RYZEN 5 8600G (AM5) (BOXED)",
+      "changes": {
+        "oldPrice": "12750.00",
+        "newPrice": 12750,
+        "specsAdded": 8
+      }
+    },
+    {
+      "type": "UPDATE",
+      "id": 16,
+      "name": "AMD RYZEN 7 8700G (AM5) (BOXED)",
+      "changes": {
+        "oldPrice": "17830.00",
+        "newPrice": 17830,
+        "specsAdded": 8
+      }
+    },
+    {
+      "type": "UPDATE",
+      "id": 17,
+      "name": "AMD RYZEN 7 9700x (AM5) (BOXED)",
+      "changes": {
+        "oldPrice": "23320.00",
+        "newPrice": 23320,
+        "specsAdded": 7
+      }
+    },
+    {
+      "type": "UPDATE",
+      "id": 18,
+      "name": "AMD RYZEN 9 9900x (AM5) (BOXED)",
+      "changes": {
+        "oldPrice": "28630.00",
+        "newPrice": 28630,
+        "specsAdded": 7
+      }
+    },
+    {
+      "type": "UPDATE",
+      "id": 19,
+      "name": "AMD RYZEN 7 9800X3D (AM5) (BOXED)",
+      "changes": {
+        "oldPrice": "32995.00",
+        "newPrice": 32995,
+        "specsAdded": 7
+      }
+    },
+    {
+      "type": "INSERT",
+      "id": 14088,
+      "name": "Intel Core i5 12400F *12th GEN (BOX TYPE)",
+      "category": "CPU",
+      "price": 7480
+    },
+    {
+      "type": "INSERT",
+      "id": 14089,
+      "name": "Intel Core i5 12400 *12th GEN (BOX TYPE)",
+      "category": "CPU",
+      "price": 8495
+    }
+  ],
+  "summary": {
+    "itemsProcessed": 20,
+    "itemsUpdated": 7,
+    "itemsInserted": 13,
+    "itemsSkipped": 0,
+    "errors": 0
+  },
+  "endTime": "2025-09-14T17:28:35.016Z"
+}

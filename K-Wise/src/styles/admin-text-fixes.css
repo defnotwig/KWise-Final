@@ -1,0 +1,344 @@
+/* ==========================================
+   K-WISE ADMIN PAGES TEXT VISIBILITY FIXES
+   ========================================== */
+
+/* CRITICAL FIX: Force text visibility across all admin pages */
+
+/* Dashboard page fixes */
+.admin-layout .dashboard-page h1,
+.admin-layout .dashboard-page h2,
+.admin-layout .dashboard-page h3 {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Stock page fixes */
+.admin-layout .stock-page h1,
+.admin-layout .stock-page h2,
+.admin-layout .stock-page h3,
+.admin-layout .stock-page .page-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Transaction History page fixes */
+.admin-layout .history-page h1,
+.admin-layout .history-page h2,
+.admin-layout .history-page h3,
+.admin-layout .history-page .page-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Order Queue page fixes */
+.admin-layout .queue-page h1,
+.admin-layout .queue-page h2,
+.admin-layout .queue-page h3,
+.admin-layout .queue-page .page-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Accounts page fixes */
+.admin-layout .accounts-page h1,
+.admin-layout .accounts-page h2,
+.admin-layout .accounts-page h3,
+.admin-layout .accounts-page .page-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Settings page fixes */
+.admin-layout .settings-page h1,
+.admin-layout .settings-page h2,
+.admin-layout .settings-page h3,
+.admin-layout .settings-page .page-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Log History page fixes */
+.admin-layout .log-page h1,
+.admin-layout .log-page h2,
+.admin-layout .log-page h3,
+.admin-layout .log-page .page-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* CRITICAL FIX: Generic page headers */
+.admin-layout .page-header,
+.admin-layout .content-header,
+.admin-layout .section-header {
+  margin-bottom: 1.5rem !important;
+}
+
+.admin-layout .page-header h1,
+.admin-layout .content-header h1,
+.admin-layout .section-header h1 {
+  color: #1f2937 !important;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  margin: 0 0 0.5rem 0 !important;
+  line-height: 1.2 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .page-header p,
+.admin-layout .content-header p,
+.admin-layout .section-header p {
+  color: #6b7280 !important;
+  font-size: 0.95rem !important;
+  margin: 0 !important;
+  line-height: 1.5 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL FIX: Table content visibility */
+.admin-layout table thead th {
+  background-color: #f8fafc !important;
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  padding: 12px 16px !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.admin-layout table tbody td {
+  background-color: #ffffff !important;
+  color: #374151 !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout table tbody tr:hover td {
+  background-color: #f1f5f9 !important;
+  color: #1f2937 !important;
+}
+
+/* CRITICAL FIX: Chart and graph titles */
+.admin-layout .chart-title,
+.admin-layout .graph-title,
+.admin-layout .metric-title {
+  color: #1f2937 !important;
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 1rem !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL FIX: Status badges and indicators */
+.admin-layout .status-badge,
+.admin-layout .badge,
+.admin-layout .indicator {
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL FIX: Form labels and inputs */
+.admin-layout label {
+  color: #374151 !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  margin-bottom: 0.5rem !important;
+  display: block !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .form-group label {
+  color: #374151 !important;
+  font-weight: 500 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* CRITICAL FIX: Action buttons visibility */
+.admin-layout .action-buttons button,
+.admin-layout .btn,
+.admin-layout .button {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL FIX: Navigation menu items */
+.admin-layout .nav-menu a,
+.admin-layout .navigation a,
+.admin-layout .menu-item {
+  color: #374151 !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .nav-menu a:hover,
+.admin-layout .navigation a:hover,
+.admin-layout .menu-item:hover {
+  color: #3b82f6 !important;
+}
+
+.admin-layout .nav-menu a.active,
+.admin-layout .navigation a.active,
+.admin-layout .menu-item.active {
+  color: #3b82f6 !important;
+  font-weight: 600 !important;
+}
+
+/* CRITICAL FIX: Pagination controls */
+.admin-layout .pagination button,
+.admin-layout .page-btn {
+  color: #374151 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .pagination button:hover,
+.admin-layout .page-btn:hover {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.admin-layout .pagination button.active,
+.admin-layout .page-btn.active {
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+
+/* CRITICAL FIX: Search and filter components */
+.admin-layout .search-component input,
+.admin-layout .filter-component select,
+.admin-layout .search-input {
+  background-color: #ffffff !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .search-component input::placeholder,
+.admin-layout .search-input::placeholder {
+  color: #9ca3af !important;
+  opacity: 1 !important;
+}
+
+/* CRITICAL FIX: Statistics and metrics */
+.admin-layout .stat-card .stat-label,
+.admin-layout .metric-card .metric-label {
+  color: #6b7280 !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .stat-card .stat-value,
+.admin-layout .metric-card .metric-value {
+  color: #1f2937 !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL FIX: Error and success messages */
+.admin-layout .error-message {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.admin-layout .success-message {
+  background-color: #f0fdf4 !important;
+  color: #16a34a !important;
+  border: 1px solid #bbf7d0 !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}

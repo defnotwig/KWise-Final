@@ -1,0 +1,1179 @@
+﻿/* ========================================
+   KIOSK FUTURE-UPGRADE RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.upgrade-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background-color:#002024;
+  color: #fff;
+  padding: 128px 48px 48px 48px;
+  height: 100vh;
+  width: 100vw;
+  /* Optimized for 1080x1920 kiosk resolution */
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.upgrade-logo {
+width: 130px;
+height: 130px;
+  /* Reduced size for kiosk header optimization */
+}
+
+.upgrade-title {
+  font-family: sans-serif;
+  letter-spacing: 2px;
+  width: 800px;
+  font-size: 64px;
+  font-weight: 900;
+  margin-bottom: 1rem;
+  text-align: center;
+  background: #fff;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+  /* Reduced size for kiosk header optimization */
+}
+
+.AI-identifyer {
+  color: #fff;
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  margin-bottom: 20px;
+}
+
+/* Current Component Display - Reference Design */
+.current-component-display {
+  width: 100%;
+  max-width: 984px;
+  margin: 0 auto 24px;
+  text-align: center;
+}
+
+.current-badge {
+  display: none; /* Removed from UI */
+}
+
+.current-component-title {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.current-category-label {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.current-item-name {
+  color: #00E083;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.upgrade-card-container {
+  margin-bottom: 0px;
+}
+
+/* Legacy styles for compatibility */
+.current-position-indicator{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.current-parts {
+  height: 61px;
+  width: 984px;
+  display: flex;  
+  align-items: center;
+  justify-items: center;
+  border: 2px solid #034C3B;
+  padding: 32px 24px;
+  gap: 12px;
+  align-self: stretch;
+}
+
+.current-component-name {
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+}
+
+.llama-suggestions h2 {
+  color: #fff;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  /* Reduced for kiosk header optimization */
+}
+
+/* Kiosk Single Row Layout with Enhanced Horizontal Scrolling */
+.suggestion-grid-container {
+  width: 100%;
+  max-width: 1080px;
+  /* FIX ISSUE #1A: Use min-height instead of fixed height to allow content to expand */
+  min-height: calc(100vh - 500px); /* Minimum space */
+  max-height: calc(100vh - 150px); /* Maximum space with more room */
+  padding-bottom: 80px; /* Space for Not Today button */
+  /* FIX ISSUE #1A: Allow vertical scrolling if content exceeds container */
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* FIX ISSUE #1A: Ensure container is visible */
+  display: block !important;
+  visibility: visible !important;
+}
+
+.suggestion-grid-container::after {
+  position: absolute;
+  bottom: 0;
+  content: '';
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(0deg, #002024 50.96%, rgba(0, 32, 36, 0.00) 100%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.suggestion-grid {
+  display: flex; /* Changed from grid to flex for single row */
+  width: 100%;
+  /* FIX ISSUE #1B: Use auto height to fit content naturally */
+  height: auto;
+  min-height: 500px; /* Minimum height to ensure visibility */
+  overflow: hidden;
+  /* FIX ISSUE #1B: Ensure grid is visible */
+  visibility: visible !important;
+}
+
+.vertical-scroll-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  /* FIX ISSUE #1C: Use auto height to fit content */
+  height: 62vh; /* Ensure minimum visible height */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  gap: 64px; /* Enhanced spacing between containers */
+  /* FIX ISSUE #1C: Ensure scroll container is visible */
+  visibility: visible !important;
+  position: relative;
+}
+
+.vertical-scroll-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.grid-page {
+  display: flex; /* Changed from grid to flex for single row */
+  flex-direction: row;
+  gap: 30px; /* Increased spacing between items */
+  flex-shrink: 0;
+  /* FIX ISSUE #1D: Use auto height to fit all content */
+  height: auto;
+  min-height: 500px; /* Ensure visibility */
+  min-width: fit-content;
+  align-items: stretch;
+}
+
+/* Enhanced Single Row Container Design with Improved Grouping */
+.component-upgrade-section {
+  border: 2px solid #00E083;
+  padding: 24px;
+  transition: all 0.4s ease;
+  /* Match screenshot: more compact height, same width */
+  height: auto;
+  min-height: 400px;
+  width: 984px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: visible;
+  margin: 0px;
+}
+
+
+
+.component-header {
+  margin-bottom: 1rem;
+  text-align: left;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.category-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #34d399;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.current-component {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(3, 76, 59, 0.3);
+  border: 2px solid #034C3B;
+  border-radius: 8px;
+}
+
+.current-component .label {
+  font-size: 0.9rem;
+  color: #ffffff;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.component-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.2;
+  flex: 1;
+}
+
+/* Component upgrade section with side-by-side layout */
+.component-upgrade-section {
+  width: 100%;
+  min-height: 600px;
+}
+
+.upgrade-content-wrapper {
+  display: flex;
+  gap: 32px;
+  width: 100%;
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+.upgrade-left {
+  flex: 0 0 48%;
+  min-height: auto;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.upgrade-right {
+  flex: 0 0 48%;
+  min-height: auto;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.dual-upgrade-options {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  margin-top: 0.8rem;
+  flex: 1;
+  min-height: 280px;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.upgrade-option {
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  grid-template-rows: auto auto auto auto;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 280px;
+  height: auto;
+}
+
+
+/* Product Image in Upgrade Card */
+.upgrade-image-container {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.upgrade-image {
+  width: 150px;
+  height: 150px;
+  filter: drop-shadow(1px 1px 20px #00E083);
+  object-fit: contain;
+  padding: 8px;
+}
+
+.upgrade-image-placeholder {
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 2rem;
+}
+
+.upgrade-header {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.upgrade-type-badge {
+  background: #10b981;
+  color: #ffffff; /* Changed to white */
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+}
+
+.stock_upgrade .upgrade-type-badge {
+  background: #fbbf24;
+  color: #ffffff; /* Changed to white */
+}
+
+.external_upgrade .upgrade-type-badge {
+  background: #8b5cf6;
+  color: #ffffff;
+}
+
+.source-label {
+font-size: 18px;
+font-style: normal;
+font-weight: 600;
+line-height: normal;
+background: linear-gradient(90deg, #00E083 0%, #6ECAF1 100%);
+background-clip: text;
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+}
+
+.upgrade-name-container {
+  height: 30px;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  border: 1px solid #04413C;
+  background: #03302C;
+  padding: 4px 8px;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  align-self: stretch;
+}
+
+.upgrade-name {
+font-size: 16px;
+font-style: normal;
+font-weight: 700;
+line-height: normal;
+text-align: center;
+}
+
+.upgrade-specs {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.spec-row {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  justify-content: space-between;
+  border-bottom: 1px solid #04413C;
+  gap: 20px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.spec-label-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-title {
+  font-size: 16px;
+  color: #fff;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.spec-label-future {
+  font-size: 16px;
+  color: #fff;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.spec-value-future {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 700;
+  text-align: left;
+}
+
+.upgrade-cost {
+  font-weight: 700;
+}
+
+.performance-gain {
+  font-weight: 700;
+}
+
+
+.availability.external-market {
+  color: #8b5cf6 !important;
+}
+
+
+.spec-comparison {
+  grid-column: 1 / -1;
+  padding: 0.75rem;
+  padding: 4px 8px;
+  align-items: center;
+  align-self: stretch;
+}
+
+.spec-comparison-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid #04413C;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.7rem;
+  min-height: 30px;
+}
+
+.spec-comparison-row .spec-label-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-comparison-row .spec-title {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 600;
+}
+
+
+.spec-comparison-label {
+  color: #fff;
+font-size: 16px;
+font-style: normal;
+font-weight: 600;
+line-height: normal;
+}
+
+.spec-comparison-value.current {
+  color: #ffffff;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.4;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  text-align: right;
+  max-width: 60%;
+}
+
+.spec-comparison-value.upgrade {
+  color: #ffffff;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.4;
+  background: linear-gradient(90deg, #00E083 0%, #6ECAF1 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  text-align: right;
+  max-width: 60%;
+}
+
+
+.upgrade-reason {
+  grid-column: 1 / -1;
+  grid-row: 5;
+  padding: 0.75rem;
+  border: 1px solid #04413C;
+  background: #03302C;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reason-label {
+color: #FCCD20;
+font-size: 16px;
+font-style: normal;
+font-weight: 700;
+line-height: normal;
+margin-bottom: 10px;
+}
+
+.reason-text {
+font-size: 14px;
+font-style: normal;
+font-weight: 600;
+line-height: normal;
+  color: #ffffff;
+  margin: 0;
+}
+
+.priority-badge {
+  display: none;
+}
+
+.upgrade-details {
+  display: contents;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dual-upgrade-options {
+    flex-direction: column;
+  }
+  
+  .upgrade-option {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    margin-bottom: 0.5rem;
+    min-height: 160px;
+  }
+  
+  .upgrade-image-container {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  
+  .upgrade-specs {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  
+  .spec-comparison {
+    grid-row: 4;
+  }
+  
+  .upgrade-reason {
+    grid-row: 5;
+  }
+  
+  .component-upgrade-section {
+    padding: 1rem;
+    min-height: 280px;
+    width: 90%;
+  }
+  
+  .upgrade-name {
+    font-size: 0.75rem;
+  }
+
+  .suggestion-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px;
+  }
+}
+
+.suggestion-grid::-webkit-scrollbar-thumb {
+  background-color: #065f46;
+  border-radius: 4px;
+}
+
+.suggestion-grid::-webkit-scrollbar-track {
+  background-color: #f0f9ff;
+}
+
+.suggestion-card {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 380px;
+  border: 3px solid #00E083;
+  background: #002024;
+  box-shadow: 0px 3px 20px 0px rgba(3, 76, 59, 0.50);
+  padding: 20px;
+  color: #333;
+  transition: all 0.3s ease;
+  min-height: 420px;
+  max-height: 450px;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+}
+
+.suggestion-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
+.suggestion-img {
+  max-width: 100%;
+  height: 140px;
+  object-fit: contain;
+  margin-bottom: 12px;
+}
+
+.no-image {
+  height: 140px;
+  background: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
+.suggestion-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 90%;
+}
+
+.suggestion-header {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 2px solid #065f46;
+}
+
+.suggestion-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-details p {
+  margin: 0;
+  line-height: 1.6;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.suggestion-details p:last-child {
+  border-bottom: none;
+}
+
+.suggestion-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.suggestion-specs {
+  font-size: 0.9rem;
+  color: #d1fae5;
+  margin-bottom: 8px;
+}
+
+.suggestion-year {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #bbf7d0;
+}
+
+.upgrade-info {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.price-difference {
+  color: #fff;
+  font-weight: 600;
+  background: transparent;
+  border-radius: 6px;
+  margin: 8px 0;
+  font-size: 1.1em;
+}
+
+.recommended-year {
+  color: #fff;
+  font-weight: 600;
+  background: transparent;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.reason {
+  color: #fff;
+  font-style: italic;
+  background: transparent;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.upgrade-empty {
+  font-size: 1.5rem;
+  color: #bbf7d0;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.no-suggestions-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 3rem;
+  text-align: center;
+}
+
+.no-suggestions-text {
+  font-size: 1.8rem;
+  color: #bbf7d0;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.no-suggestions-subtext {
+  font-size: 1.2rem;
+  color: #86efac;
+  opacity: 0.8;
+}
+
+.not-today-btn {
+  position: fixed;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 480px;
+  height: 80px;
+  padding: 12px 24px;
+  background-color: transparent;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border: 4px solid #034C3B;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  z-index: 1000;
+}
+
+.upgrade-section {
+  position: relative;
+}
+
+.current-setup {
+  font-weight: 600;
+  color: #fff;
+  padding: 0;
+}
+
+/* Enhanced styling for comprehensive upgrade display */
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #10b981;
+}
+
+.category-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.ai-verified {
+  background: linear-gradient(45deg, #f59e0b, #d97706);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.upgrade-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 12px;
+}
+
+.current-item, .upgrade-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label {
+  font-weight: 600;
+  color: #a7f3d0;
+  font-size: 0.9rem;
+}
+
+.item-name {
+  font-weight: 500;
+  color: #ffffff;
+  text-align: right;
+  max-width: 60%;
+  font-size: 0.85rem;
+}
+
+.upgrade-arrow {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #10b981;
+  font-weight: bold;
+}
+
+.upgrade-details {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  color: #a7f3d0;
+  font-weight: 600;
+}
+
+.detail-value {
+  font-size: 0.9rem;
+  color: #ffffff;
+  font-weight: 500;
+  text-align: right;
+}
+
+.upgrade-reason {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+
+.reason-text {
+  color: #ffffff;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.ai-verification {
+  background: linear-gradient(45deg, #10b981, #065f46);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+/* Navigation and Footer for Kiosk Interface */
+
+/* Page indicator for horizontal scrolling */
+.page-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1rem;
+  padding: 0.5rem;
+}
+
+.page-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(167, 243, 208, 0.3);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.page-dot.active {
+  background: #10b981;
+  transform: scale(1.2);
+}
+
+.page-dot:hover {
+  background: #34d399;
+}
+
+/* Kiosk-specific responsive adjustments for 1080x1920 */
+@media (max-width: 1080px) {
+  .upgrade-page {
+    max-width: 100vw;
+  }
+  
+  .grid-page {
+    grid-template-columns: repeat(2, 320px);
+    width: 660px; /* (320px * 2) + (15px * 1) */
+  }
+  
+  .component-upgrade-section {
+    min-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    width: calc(100vw - 40px);
+  }
+  
+  .component-upgrade-section {
+    min-height: 350px;
+  }
+  
+  .upgrade-title {
+    font-size: 1.5rem;
+  }
+  
+  .upgrade-logo {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* Suggested Complete Build Section - Match Reference Design */
+.suggested-build-section {
+  height: auto;
+  min-height: 500px;
+  max-height: none;
+  padding: 15px;
+  background: linear-gradient(135deg, rgba(0, 224, 131, 0.1) 0%, rgba(0, 32, 36, 0.8) 100%);
+  border: 2px solid #00E083;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.suggested-build-section::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.suggested-build-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(0, 224, 131, 0.3);
+  flex-shrink: 0;
+}
+
+.suggested-build-header h3 {
+  font-size: 18px;
+  font-weight: 900;
+  background: linear-gradient(90deg, #00E083 0%, #6ECAF1 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin: 0;
+  text-align: left;
+}
+
+.compatibility-badge {
+  display: none;
+}
+
+.compatibility-badge.compatible {
+  display: none;
+}
+
+.compatibility-badge.warning {
+  display: none;
+}
+
+.compatibility-score {
+  display: none;
+}
+
+.total-price {
+  display: none;
+}
+
+.compatibility-warnings {
+  /* FIX: Hide compatibility warnings section to match reference design */
+  display: none;
+  margin-bottom: 15px;
+  padding: 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 3px solid #f59e0b;
+  border-radius: 8px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.warning-item {
+  padding: 6px 0;
+  font-size: 12px;
+  color: #fbbf24;
+  line-height: 1.4;
+}
+
+.warning-item.critical {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.warning-item.major {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.warning-item.minor {
+  color: #fbbf24;
+}
+
+.future-build-components-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  align-items: flex-start;
+  /* 🔥 FIX: Show exactly 4 components visible (4 × 60px = 240px) */
+  max-height: 545px; /* Reduced to fit within 250px total height */
+  overflow-y: auto;
+  overflow-x: hidden;
+  gap: 6px; /* Reduced gap */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.future-build-components-list::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.future-build-component-item {
+  display: flex;
+  align-items: center;
+  gap: 32px; /* Reduced gap */
+  padding: 8px; /* Reduced padding */
+  transition: all 0.2s ease;
+  min-height: 60px; /* Reduced from 60px */
+  flex-shrink: 0; /* Prevent compression */
+}
+
+
+.future-build-component-image {
+  width: 56px;
+  height: 60px;
+  object-fit: contain;
+  filter: drop-shadow(1px 1px 20px #00E083);
+  padding: 3px;
+  flex-shrink: 0;
+  margin-left: 20px;
+}
+
+.future-build-component-image-placeholder {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.future-build-component-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.future-build-component-label {
+  font-size: 16px; /* Reduced from 10px */
+  font-weight: 600;
+  color: #00E083;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.future-build-component-category {
+  font-size: 9px; /* Reduced from 10px */
+  font-weight: 600;
+  color: #00E083;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.future-build-component-name {
+  font-size: 14px; /* Reduced from 13px */
+  font-weight: 700;
+  color: white;
+  overflow: hidden;
+}
+
+.future-build-component-price {
+  display: none; /* Removed from UI */
+}
+
+
+
+
+
+
+

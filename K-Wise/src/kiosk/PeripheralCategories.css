@@ -1,0 +1,66 @@
+﻿/* ========================================
+   KIOSK PERIPHERAL-CATEGORIES RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* PERIPHERALS CATEGORY GRID - Matching reference design */
+.peripherals-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  width: 792px;
+  margin: 0 auto;
+  padding-bottom: 150px; /* Space for bottom section */
+}
+
+/* Individual Peripheral Category Box */
+.peripheral-category-box {
+padding: 20px 43.5px;
+  cursor: pointer;  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  max-height: 237px;
+  max-width: 243px;
+  position: relative;
+  overflow: hidden;
+    border: 5px solid #034C3B;
+    background: #03644D;
+}
+
+/* Icon styling - Updated for image icons */
+.peripheral-category-icon {
+  width: 137px;
+  height: 156px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 12px rgba(0, 224, 131, 0.3));
+  transition: all 0.3s ease;
+}
+
+.peripheral-category-icon img {
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+}
+
+/* Name styling */
+.peripheral-category-name {
+    font-size: 30px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: normal;
+  color: #FFFFFF;
+  text-align: center;
+  letter-spacing: 1.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-transform: uppercase;
+}
+
+
+
+

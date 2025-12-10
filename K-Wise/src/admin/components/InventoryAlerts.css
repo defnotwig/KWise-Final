@@ -1,0 +1,209 @@
+/**
+ * TASK 13: INVENTORY ALERTS STYLES
+ */
+
+.inventory-alerts-widget {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.alerts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.alerts-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.threshold-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.alerts-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.alert-stat {
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.alert-stat.critical {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+}
+
+.alert-stat.warning {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+
+.alert-stat.total {
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+}
+
+.alert-stat .stat-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.alert-stat .stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.alert-stat.critical .stat-value {
+    color: #dc2626;
+}
+
+.alert-stat.warning .stat-value {
+    color: #d97706;
+}
+
+.alert-stat.total .stat-value {
+    color: #0284c7;
+}
+
+.alert-section {
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+}
+
+.section-title.critical {
+    color: #dc2626;
+}
+
+.section-title.warning {
+    color: #d97706;
+}
+
+.alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.alert-item {
+    display: grid;
+    grid-template-columns: 2fr 1fr auto;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: 6px;
+    align-items: center;
+}
+
+.alert-item.critical {
+    background: #fee2e2;
+    border-left: 4px solid #dc2626;
+}
+
+.alert-item.warning {
+    background: #fef3c7;
+    border-left: 4px solid #d97706;
+}
+
+.product-name {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.product-category {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.product-stock {
+    font-weight: 600;
+    color: #374151;
+}
+
+.more-items {
+    margin: 0.5rem 0 0 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.no-alerts {
+    text-align: center;
+    padding: 2rem;
+    color: #10b981;
+    font-size: 1.1rem;
+}
+
+.inventory-alerts-loading {
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+/* Dark Mode */
+[data-theme="dark"] .inventory-alerts-widget {
+    background: #2e3338;
+}
+
+[data-theme="dark"] .alerts-header h3 {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .threshold-select {
+    background: #3a4046;
+    border-color: #4a5056;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .alert-stat.critical {
+    background: #3a1f1f;
+    border-color: #5a2f2f;
+}
+
+[data-theme="dark"] .alert-stat.warning {
+    background: #3a2f1f;
+    border-color: #5a4f2f;
+}
+
+[data-theme="dark"] .alert-stat.total {
+    background: #1f2f3a;
+    border-color: #2f4f5a;
+}
+
+[data-theme="dark"] .alert-item.critical {
+    background: #3a1f1f;
+}
+
+[data-theme="dark"] .alert-item.warning {
+    background: #3a2f1f;
+}
+
+[data-theme="dark"] .product-name {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .product-category {
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .product-stock {
+    color: #d1d5db;
+}

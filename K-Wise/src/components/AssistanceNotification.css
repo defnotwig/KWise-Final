@@ -1,0 +1,194 @@
+/* Assistance Notification Modal */
+.assistance-notification-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.assistance-notification-modal {
+  background: linear-gradient(135deg, #00ff88 0%, #00cc99 100%);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 255, 136, 0.4);
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-100px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.assistance-notification-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.assistance-icon-pulse {
+  display: inline-block;
+  color: #fff;
+  margin-bottom: 15px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.assistance-notification-header h2 {
+  color: #fff;
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.assistance-notification-body {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 25px;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.assistance-message {
+  font-size: 20px;
+  color: #333;
+  margin: 0 0 15px 0;
+  line-height: 1.5;
+}
+
+.assistance-message strong {
+  color: #00cc99;
+  font-weight: 700;
+}
+
+.assistance-details {
+  font-size: 16px;
+  color: #666;
+  margin: 10px 0;
+}
+
+.assistance-type {
+  color: #00cc99;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.assistance-time {
+  font-size: 14px;
+  color: #999;
+  margin: 10px 0 0 0;
+}
+
+.assistance-queue {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 2px solid #e0e0e0;
+  font-size: 14px;
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.assistance-notification-footer {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.assistance-btn {
+  padding: 15px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  max-width: 200px;
+}
+
+.assistance-btn-dismiss {
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.assistance-btn-dismiss:hover {
+  background: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.assistance-btn-confirm {
+  background: #fff;
+  color: #00cc99;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.assistance-btn-confirm:hover {
+  background: #f0f0f0;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.assistance-btn-confirm:active,
+.assistance-btn-dismiss:active {
+  transform: translateY(0);
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .assistance-notification-modal {
+    padding: 30px 20px;
+    max-width: 95%;
+  }
+
+  .assistance-notification-header h2 {
+    font-size: 24px;
+  }
+
+  .assistance-message {
+    font-size: 18px;
+  }
+
+  .assistance-notification-footer {
+    flex-direction: column;
+  }
+
+  .assistance-btn {
+    max-width: 100%;
+  }
+}

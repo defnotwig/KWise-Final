@@ -1,0 +1,130 @@
+/* K-Wise Admin - Remove All Transparency Issues */
+
+/* Global opacity and background fixes */
+* {
+    opacity: 1;
+}
+
+/* All containers and sections must be 100% opaque */
+.container, .section, .panel, .widget, .modal, .dropdown,
+.card, .stat-card, .dashboard-card, .metric-card, .info-card,
+.admin-container, .content-wrapper, .main-content,
+.sidebar, .navbar, .footer,
+.form-container, .input-container, .button-container,
+.table-container, .pagination-container,
+.filter-container, .search-container,
+.settings-container, .log-container, .dev-tools-container,
+.presence-card-modern, .presence-widget-enhanced {
+    background-color: var(--bg-primary);
+    opacity: 1.0 ;
+    background-clip: padding-box;
+}
+
+/* Remove any rgba() backgrounds that cause transparency */
+
+/* Specific admin layout containers */
+.admin-layout .card,
+.admin-layout .container,
+.admin-layout .section,
+.admin-layout .panel,
+.admin-layout .widget {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+    border: 1px solid var(--border-light) !important;
+}
+
+/* Table containers */
+.table-container,
+.table-wrapper,
+.data-table {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Form and input containers */
+.form-group,
+.input-group,
+.filter-group {
+    background-color: transparent !important;
+    opacity: 1.0 !important;
+}
+
+/* Modal and overlay fixes */
+.modal-overlay {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.modal-container,
+.modal-content,
+.modal-body {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Dashboard specific */
+.dashboard-header,
+.dashboard-stats,
+.dashboard-content {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Navigation and sidebar */
+.nav-menu,
+.nav-items,
+.sidebar-content {
+    background-color: transparent !important;
+    opacity: 1.0 !important;
+}
+
+/* History page specific */
+.history-page .card,
+.history-page .table-container,
+.history-page .filters {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Stock page specific */
+.stock-page .card,
+.stock-page .table-container,
+.stock-page .filters {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Settings page specific */
+.settings-page .card,
+.settings-page .section,
+.settings-section {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Accounts page specific */
+.accounts-page .card,
+.accounts-page .table-container {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Queue page specific */
+.order-queue-page .card,
+.order-queue-page .table-container {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Log history page specific */
+.log-history-page .card,
+.log-history-page .table-container {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}
+
+/* Developer tools page specific */
+.dev-tools-page .card,
+.dev-tools-page .section {
+    background-color: var(--bg-primary) !important;
+    opacity: 1.0 !important;
+}

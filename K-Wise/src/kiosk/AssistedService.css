@@ -1,0 +1,153 @@
+﻿/* ========================================
+   KIOSK ASSISTED-SERVICE RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.assisted-service-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #00df82; /* Matching the exact green from reference */
+  text-align: center;
+  position: relative;
+  /* allow absolute children like loader */
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; /* System font stack for clean look */
+}
+.top-navigation-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100px;
+  /* adjust as needed */
+  width: 100%;
+  background-color: transparent;
+  z-index: 10;
+  cursor: pointer;
+}
+
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0px;
+  margin-bottom: 160px;
+}
+
+.logo {
+  width: clamp(750px, 70vw, 300px) !important;
+  height: clamp(200px, 70vw, 300px) !important;
+  object-fit: contain;
+}
+
+.assisted-service-container h2 {
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #0a3f32;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+/* Loading section */
+.loading {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 56px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.assisted-service-container .loading p {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff !important;
+  opacity: 1;
+  text-transform: none;
+  margin: 0;
+  letter-spacing: 1px;
+  margin-top: 1500px;
+}
+
+.loader {
+  width: 44px;
+  height: 44px;
+  border: 6px solid rgba(255, 255, 255, 0.3);
+  border-left-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite;
+  margin-right: 2px;
+  margin-top: 1500px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Staff confirmed message */
+.staff-confirmed {
+  width: 80px;
+  height: 80px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  color: #00df82;
+  font-weight: bold;
+  margin-top: 1500px;
+  animation: checkmark 0.5s ease;
+}
+
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.staff-message {
+  font-size: 32px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  margin-top: 1500px !important;
+}
+
+/* Ensure text color is white and not affected by other styles */
+.assisted-service-container .loading p {
+  color: #ffffff !important;
+}
+
+.assisted-service-container p {
+  color: #ffffff !important;
+  margin: 0;
+}
+
+/* Prevent external theme/dark-mode styles altering colors */
+.assisted-service-container,
+.assisted-service-container *,
+.assisted-service-container *::before,
+.assisted-service-container *::after {
+  color-scheme: light;
+  box-sizing: border-box;
+}

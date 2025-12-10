@@ -1,0 +1,99 @@
+﻿/* ========================================
+   KIOSK PAYMENT-WINDOW RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* Main container */
+.payment-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #002024;
+  color: white;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Logo */
+.logo {
+  width: 128px !important; 
+  height: 128px !important;
+  margin: 24px !important;
+}
+
+/* Title */
+.payment-title {
+  width: auto;
+  height: 140px;
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  text-align: center;
+  margin: 0;
+  margin-top: 32px;
+}
+
+/* Grid layout */
+.payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 316.704px);
+  gap: 24px;
+  margin-bottom: 50px;
+}
+
+/* Payment option card */
+.payment-card {
+  background-color: transparent;
+  border: 4px solid #00E083;
+  color: #fff;
+  width: 316.704px;
+  height: 316.704px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: box-shadow 0.3s ease;
+  padding: 10px;
+}
+.payment-card span {
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  position: relative;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.payment-card:hover {
+  box-shadow: 0 0 12px #00E083;
+}
+
+/* Icon inside card */
+.payment-icon {
+  width: 300px;
+  height: 300px;
+}
+
+/* Back button */
+.back-button-payment {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  background: transparent;
+  width: 659px;
+  height: 80px;
+  padding: 12px 24px;
+  border: 4px solid #00E083;
+  cursor: pointer;
+  color: #fff;
+}

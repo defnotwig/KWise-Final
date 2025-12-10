@@ -1,0 +1,123 @@
+/**
+ * ============================================================================
+ * CONFIDENCE BADGE STYLES - PHASE 2
+ * ============================================================================
+ */
+
+.confidence-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.confidence-badge--inline {
+    display: inline-flex;
+    margin: 0 4px;
+}
+
+/* Size Variants */
+.confidence-badge--small {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    gap: 4px;
+}
+
+.confidence-badge--medium {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    gap: 6px;
+}
+
+.confidence-badge--large {
+    padding: 8px 16px;
+    font-size: 1rem;
+    gap: 8px;
+}
+
+/* Level-Specific Backgrounds */
+.confidence-badge--excellent {
+    background: linear-gradient(135deg, #22c55e15, #22c55e25);
+    border: 1.5px solid #22c55e;
+}
+
+.confidence-badge--good {
+    background: linear-gradient(135deg, #3b82f615, #3b82f625);
+    border: 1.5px solid #3b82f6;
+}
+
+.confidence-badge--fair {
+    background: linear-gradient(135deg, #eab30815, #eab30825);
+    border: 1.5px solid #eab308;
+}
+
+.confidence-badge--low {
+    background: linear-gradient(135deg, #f9731615, #f9731625);
+    border: 1.5px solid #f97316;
+}
+
+.confidence-badge--very-low {
+    background: linear-gradient(135deg, #ef444415, #ef444425);
+    border: 1.5px solid #ef4444;
+}
+
+/* Icon */
+.confidence-badge__icon {
+    font-size: 1.1em;
+    font-weight: bold;
+    line-height: 1;
+}
+
+/* Percentage */
+.confidence-badge__percentage {
+    font-size: 1em;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* Label */
+.confidence-badge__label {
+    font-size: 0.9em;
+    font-weight: 600;
+    opacity: 0.9;
+    color: #374151;
+}
+
+/* Hover Effects */
+.confidence-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .confidence-badge {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .confidence-badge__label {
+        color: #e5e7eb;
+    }
+
+    .confidence-badge:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .confidence-badge--medium {
+        padding: 5px 10px;
+        font-size: 0.8125rem;
+    }
+
+    .confidence-badge--large {
+        padding: 6px 12px;
+        font-size: 0.875rem;
+    }
+}

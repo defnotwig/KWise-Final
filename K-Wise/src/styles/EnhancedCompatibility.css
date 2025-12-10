@@ -1,0 +1,414 @@
+/**
+ * Enhanced Compatibility Styles - Phase 2
+ * Styles for detailed compatibility scores, badges, tooltips, and BIOS warnings
+ * 
+ * @version 2.0.0
+ * @author K-Wise Phase 2 Team
+ */
+
+/* ============================================================================
+   COMPATIBILITY BADGES
+   ============================================================================ */
+
+.compatibility-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.compatibility-excellent {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.compatibility-good {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.compatibility-fair {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.compatibility-warning {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+.compatibility-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================================================
+   COMPATIBILITY SCORE DISPLAY
+   ============================================================================ */
+
+.compatibility-score-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.compatibility-score-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.compatibility-score-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.compatibility-score-fill.excellent {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.compatibility-score-fill.good {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.compatibility-score-fill.fair {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.compatibility-score-fill.warning {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.compatibility-score-text {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 35px;
+  text-align: right;
+}
+
+/* ============================================================================
+   BIOS WARNING BADGE
+   ============================================================================ */
+
+.bios-warning-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.bios-warning-icon {
+  font-size: 14px;
+}
+
+/* ============================================================================
+   COMPATIBILITY TOOLTIP
+   ============================================================================ */
+
+.compatibility-tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.compatibility-tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-line;
+  min-width: 200px;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.compatibility-tooltip:hover .compatibility-tooltip-content {
+  opacity: 1;
+  visibility: visible;
+}
+
+.compatibility-tooltip-content::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.95);
+}
+
+/* ============================================================================
+   PERFORMANCE NOTES SECTION
+   ============================================================================ */
+
+.performance-notes-container {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+}
+
+.performance-notes-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #3b82f6;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.performance-notes-text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ============================================================================
+   DETAILED ANALYSIS GRID
+   ============================================================================ */
+
+.detailed-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.analysis-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.analysis-item-icon {
+  font-size: 14px;
+}
+
+.analysis-item-label {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.analysis-item-value {
+  font-weight: 600;
+}
+
+.analysis-item-value.positive {
+  color: #10b981;
+}
+
+.analysis-item-value.negative {
+  color: #ef4444;
+}
+
+/* ============================================================================
+   COMPATIBILITY STATUS INDICATOR
+   ============================================================================ */
+
+.compatibility-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.compatibility-status.excellent {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.compatibility-status.good {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.compatibility-status.fair {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.compatibility-status.warning {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.compatibility-status-icon {
+  font-size: 16px;
+}
+
+/* ============================================================================
+   ENHANCED AI BADGE
+   ============================================================================ */
+
+.enhanced-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+  animation: glow-ai 3s infinite;
+}
+
+@keyframes glow-ai {
+  0%, 100% {
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
+  }
+}
+
+.enhanced-ai-icon {
+  font-size: 12px;
+  animation: rotate-ai 3s linear infinite;
+}
+
+@keyframes rotate-ai {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   COMPATIBILITY SUMMARY PANEL
+   ============================================================================ */
+
+.compatibility-summary {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.compatibility-summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.compatibility-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.summary-stat {
+  text-align: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.summary-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.summary-stat-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .compatibility-tooltip-content {
+    min-width: 180px;
+    max-width: 250px;
+    font-size: 11px;
+  }
+  
+  .detailed-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .compatibility-summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============================================================================
+   DARK MODE COMPATIBILITY
+   ============================================================================ */
+
+body.dark-mode .compatibility-badge,
+body.dark-mode .compatibility-status {
+  filter: brightness(1.1);
+}
+
+body.dark-mode .analysis-item {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .compatibility-tooltip-content {
+  background: rgba(0, 0, 0, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}

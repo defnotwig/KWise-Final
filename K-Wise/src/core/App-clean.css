@@ -1,0 +1,493 @@
+/*
+ * DEPRECATED: App-clean.css
+ * 
+ * This file has been deprecated as part of Phase 3 Frontend Consolidation.
+ * Use: src/core/App.css (main consolidated styles)
+ * 
+ * This file contained duplicate styles that are now available in the main App.css file.
+ * All CSS variables and styles have been consolidated to eliminate duplication.
+ * 
+ * Date: September 7, 2025
+ * Phase: 3 - Frontend & Final Testing
+ */
+
+/* Fallback - importing main styles to prevent breakage */
+@import './App.css';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+}
+
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+/* FRONTEND KIOSK STYLES ONLY */
+
+.App {
+  text-align: center;
+  height: 100vh;
+  background: #040F0F;
+  position: relative;
+  min-height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #002024;
+  padding: 20px;
+  color: white;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.Store-name {
+  color: white;
+  font-size: calc(10px + 2vmin);
+  text-align: center;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.Store-name img {
+  height: 400px;
+  width: 400px;
+  border-radius: 15px;
+  margin-bottom: 1rem;
+}
+
+.Store-name h1 {
+  font-size: 100px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  margin-bottom: 1rem;
+}
+
+.Store-name p {
+  color: #00E083;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  text-transform: uppercase;
+  margin-bottom: 2rem;
+}
+
+.start-up button {
+  background: linear-gradient(135deg, #00E083 0%, #00a67d 100%);
+  border: none;
+  color: white;
+  padding: 20px 40px;
+  font-size: 25px;
+  font-weight: 600;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.start-up button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 224, 131, 0.3);
+  background: linear-gradient(135deg, #00a67d 0%, #006f51 100%);
+}
+
+/* Background decorative vectors */
+.bg-vectors {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  isolation: isolate;
+  /* ensure blend only against .App background */
+}
+
+.bg-vectors .vec {
+  position: absolute;
+  mix-blend-mode: screen;
+  /* brighten on dark bg like reference */
+  opacity: 0.75;
+  will-change: transform, filter;
+  /* unified converge + zoom tempo */
+  --base-rotate: 0deg;
+  transform-origin: center;
+  animation: convergePulse 10s ease-in-out infinite;
+}
+
+.bg-vectors .vec svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  /* inner svg keeps center origin so scale is natural if needed later */
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+.bg-vectors .vec1 {
+  width: 716px;
+  height: 949px;
+  top: -120px;
+  left: -180px;
+  filter: blur(120px) saturate(130%);
+  opacity: 0.6;
+  /* variables to compute translate-to-center */
+  --w: 716px;
+  --h: 949px;
+  --pos-x: -180px;
+  --pos-y: -220px;
+  --to-cx: calc(50vw - (var(--pos-x) + var(--w) / 2));
+  --to-cy: calc(50vh - (var(--pos-y) + var(--h) / 2));
+}
+
+.bg-vectors .vec2 {
+  width: 489.108px;
+  height: 673.04px;
+  bottom: -80px;
+  right: -50px;
+  filter: blur(100px) saturate(130%);
+  opacity: 0.55;
+  /* variables to compute translate-to-center; convert right/bottom to left/top */
+  --w: 489.108px;
+  --h: 673.04px;
+  --right: -50px;
+  --bottom: -80px;
+  --pos-x: calc(100vw - (var(--right) + var(--w)));
+  --pos-y: calc(100vh - (var(--bottom) + var(--h)));
+  --to-cx: calc(50vw - (var(--pos-x) + var(--w) / 2));
+  --to-cy: calc(50vh - (var(--pos-y) + var(--h) / 2));
+}
+
+.bg-vectors .vec3 {
+  width: 647.514px;
+  height: 891.984px;
+  top: 10%;
+  right: -220px;
+  transform-origin: center;
+  filter: blur(140px) saturate(130%);
+  opacity: 0.7;
+  /* variables to compute translate-to-center; convert right to left */
+  --w: 647.514px;
+  --h: 891.984px;
+  --right: -220px;
+  --top: 10vh;
+  --pos-x: calc(100vw - (var(--right) + var(--w)));
+  --pos-y: var(--top);
+  --to-cx: calc(50vw - (var(--pos-x) + var(--w) / 2));
+  --to-cy: calc(50vh - (var(--pos-y) + var(--h) / 2));
+  --base-rotate: 51.439deg;
+}
+
+.store-logo {
+  height: 512px;
+  width: 512px;
+}
+
+.store-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.store-title h1 {
+  font-size: 140px;
+  font-style: normal;
+  font-weight: 800px;
+  line-height: normal;
+  letter-spacing: -5px;
+  color: #00E083;
+  margin: 0px;
+}
+
+.store-title p {
+  font-size: 28px;
+  font-style: normal;
+  font-weight: 300;
+  line-height: normal;
+  letter-spacing: -0.1px;
+  color: white;
+  margin-top: 0;
+}
+
+.App .Store-name .start-up button {
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  margin-top: 100px;
+  color: white;
+  text-decoration: none;
+  border: none;
+  background: none;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  animation: zoomInOut 1.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.App .Store-name .start-up button:active {
+  color: #00E083;
+  animation: none;
+  transform: scale(0.9);
+}
+
+/* Zoom in/out animation for the start button */
+@keyframes zoomInOut {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* Converge to center + zoom (same tempo for all) */
+@keyframes convergePulse {
+  0%, 100% {
+    transform: rotate(var(--base-rotate)) translate(0, 0) scale(1);
+  }
+  50% {
+    transform: rotate(var(--base-rotate)) translate(var(--to-cx), var(--to-cy)) scale(1.06);
+  }
+}
+
+/* Background decorative vectors animations */
+@keyframes float1 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(20px, -15px);
+  }
+}
+
+@keyframes float2 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-18px, 12px);
+  }
+}
+
+@keyframes float3 {
+  0%, 100% {
+    transform: rotate(51.439deg) translate(0, 0);
+  }
+  50% {
+    transform: rotate(51.439deg) translate(-15px, 10px);
+  }
+}
+
+/* Responsive Design for Frontend Kiosk */
+@media (max-width: 1200px) {
+  .Store-name img {
+    height: 350px;
+    width: 350px;
+  }
+
+  .Store-name h1 {
+    font-size: 80px;
+  }
+
+  .start-up button {
+    font-size: 22px;
+    padding: 18px 35px;
+  }
+
+  .App .Store-name .start-up button {
+    font-size: 26px;
+    margin-top: 80px;
+  }
+
+  .App .Store-name img {
+    height: 350px;
+    width: 350px;
+  }
+
+  .store-title h1 {
+    font-size: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .App {
+    background: #040F0F;
+  }
+
+  .Store-name img {
+    height: 300px;
+    width: 300px;
+  }
+
+  .Store-name h1 {
+    font-size: 60px;
+  }
+
+  .Store-name p {
+    font-size: 12px;
+  }
+
+  .start-up button {
+    font-size: 18px;
+    padding: 15px 30px;
+  }
+
+  .App .Store-name .start-up button {
+    font-size: 22px;
+    margin-top: 60px;
+  }
+
+  .App .Store-name img {
+    height: 300px;
+    width: 300px;
+  }
+
+  .store-title h1 {
+    font-size: 90px;
+  }
+
+  .App .Store-name p {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .Store-name img {
+    height: 250px;
+    width: 250px;
+  }
+
+  .Store-name h1 {
+    font-size: 50px;
+  }
+
+  .Store-name p {
+    font-size: 10px;
+  }
+
+  .start-up button {
+    font-size: 16px;
+    padding: 12px 25px;
+  }
+
+  .App .Store-name .start-up button {
+    font-size: 18px;
+    margin-top: 40px;
+  }
+
+  .App .Store-name img {
+    height: 250px;
+    width: 250px;
+  }
+
+  .store-title h1 {
+    font-size: 70px;
+  }
+
+  .App .Store-name p {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 350px) {
+  .Store-name img {
+    height: 200px;
+    width: 200px;
+  }
+
+  .Store-name h1 {
+    font-size: 40px;
+  }
+
+  .Store-name p {
+    font-size: 8px;
+  }
+
+  .start-up button {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+
+  .App .Store-name img {
+    height: 200px;
+    width: 200px;
+  }
+
+  .store-title h1 {
+    font-size: 50px;
+  }
+
+  .App .Store-name p {
+    font-size: 8px;
+  }
+
+  .App .Store-name .start-up button {
+    font-size: 14px;
+    margin-top: 30px;
+  }
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.App-link {
+  color: #61dafb;
+}

@@ -1,0 +1,188 @@
+{
+  "fullyDynamic": [
+    {
+      "file": "FutureUpgrade.js",
+      "dynamicCount": 2,
+      "dynamicLines": []
+    },
+    {
+      "file": "OrderSumBuild.js",
+      "dynamicCount": 1,
+      "dynamicLines": []
+    },
+    {
+      "file": "OrderSumClean.js",
+      "dynamicCount": 1,
+      "dynamicLines": []
+    },
+    {
+      "file": "OrderSumCustom.js",
+      "dynamicCount": 1,
+      "dynamicLines": []
+    },
+    {
+      "file": "OrderSummary.js",
+      "dynamicCount": 1,
+      "dynamicLines": []
+    },
+    {
+      "file": "OrderSumUpgrade.js",
+      "dynamicCount": 1,
+      "dynamicLines": []
+    },
+    {
+      "file": "PurposeOfUse.js",
+      "dynamicCount": 1,
+      "dynamicLines": []
+    }
+  ],
+  "partiallyStatic": [
+    {
+      "file": "kioskData.js",
+      "staticCount": 1,
+      "dynamicCount": 15,
+      "staticLines": [
+        "Line 17: export const menuItems = [];"
+      ],
+      "dynamicLines": [
+        "Line 4: * All kiosk components should now use kioskAPI.js for real-time data.",
+        "Line 8: * - Replace menuItems with kioskAPI.getCategories()"
+      ]
+    },
+    {
+      "file": "PC-Parts.js",
+      "staticCount": 2,
+      "dynamicCount": 39,
+      "staticLines": [
+        "Line 190: const allCategories = [homeCategory, ...transformedCategories];"
+      ],
+      "dynamicLines": [
+        "Line 168: const apiCategories = await kioskAPI.getCategories();",
+        "Line 215: const featuredData = await kioskAPI.getFeaturedProducts(25); // Get more products for AI analysis"
+      ]
+    },
+    {
+      "file": "PCCheckup.js",
+      "staticCount": 1,
+      "dynamicCount": 1,
+      "staticLines": [
+        "Line 7: const categories = ["
+      ],
+      "dynamicLines": []
+    },
+    {
+      "file": "PCCustomized.js",
+      "staticCount": 3,
+      "dynamicCount": 5,
+      "staticLines": [
+        "Line 406: export const menuItems = ["
+      ],
+      "dynamicLines": [
+        "Line 85: const components = await kioskAPI.getBuildComponents();",
+        "Line 85: const components = await kioskAPI.getBuildComponents();"
+      ]
+    },
+    {
+      "file": "PCUpgrade.js",
+      "staticCount": 3,
+      "dynamicCount": 2,
+      "staticLines": [
+        "Line 609: const issues = [];",
+        "Line 32: const upgradeOptions = ["
+      ],
+      "dynamicLines": []
+    },
+    {
+      "file": "ProductPage.js",
+      "staticCount": 3,
+      "dynamicCount": 1,
+      "staticLines": [
+        "Line 268: const items = [];",
+        "Line 38: price: \"₱0.00\",",
+        "Line 86: price: \"₱0.00\","
+      ],
+      "dynamicLines": []
+    },
+    {
+      "file": "ProductPageCustom.js",
+      "staticCount": 2,
+      "dynamicCount": 1,
+      "staticLines": [
+        "Line 12: price: \"₱0.00\",",
+        "Line 28: price: \"₱0.00\","
+      ],
+      "dynamicLines": []
+    },
+    {
+      "file": "ReviewIssues.js",
+      "staticCount": 1,
+      "dynamicCount": 1,
+      "staticLines": [
+        "Line 6: const categories = ["
+      ],
+      "dynamicLines": []
+    }
+  ],
+  "fullyStatic": [
+    {
+      "file": "PCCleaning.js",
+      "staticCount": 8,
+      "staticLines": [
+        "Line 12: const tiers = [",
+        "Line 15: price: \"₱500.00\",",
+        "Line 27: price: \"₱1,000.00\",",
+        "Line 41: price: \"₱1,500.00\",",
+        "Line 22: completion: \"WALK-IN COMPLETION: 1 HOUR\""
+      ]
+    },
+    {
+      "file": "PentagonStats.js",
+      "staticCount": 1,
+      "staticLines": [
+        "Line 32: const data = ["
+      ]
+    },
+    {
+      "file": "ProductList.js",
+      "staticCount": 27,
+      "staticLines": [
+        "Line 21: const pcProducts = ["
+      ]
+    },
+    {
+      "file": "Transac-components.js",
+      "staticCount": 1,
+      "staticLines": [
+        "Line 18: const boxData = ["
+      ]
+    }
+  ],
+  "backupFiles": [
+    {
+      "file": "PC-Parts-BACKUP-STATIC.js",
+      "staticCount": 10,
+      "dynamicCount": 6
+    },
+    {
+      "file": "PC-Parts-Enhanced.js",
+      "staticCount": 0,
+      "dynamicCount": 46
+    },
+    {
+      "file": "PC-Parts-Fixed.js",
+      "staticCount": 3,
+      "dynamicCount": 42
+    },
+    {
+      "file": "PC-Parts-ModernBackup.js",
+      "staticCount": 3,
+      "dynamicCount": 27
+    },
+    {
+      "file": "PCCustomized-Original-Backup.js",
+      "staticCount": 10,
+      "dynamicCount": 1
+    }
+  ],
+  "errors": []
+}

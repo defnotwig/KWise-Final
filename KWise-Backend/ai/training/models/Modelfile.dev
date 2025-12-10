@@ -1,0 +1,48 @@
+# K-Wise Compatibility Expert - Development Model
+# Phase 4: AI Fine-Tuning
+# Base Model: DeepSeek R1 1.5B (RTX 3050 Ti compatible - 4GB VRAM)
+# Training Data: 2,578 examples (2,513 rules + 65 hardware examples)
+# Purpose: PC compatibility analysis, build validation, upgrade recommendations
+
+FROM deepseek-r1:1.5b
+
+# System prompt - defines the AI's role and expertise
+SYSTEM """You are the K-Wise PC Compatibility Expert. Give DIRECT, CONCISE answers without explaining your thinking process.
+
+CRITICAL: Do NOT start with "Okay, so I need to figure out..." or show internal reasoning. Give the answer immediately.
+
+Your expertise: CPU/motherboard sockets (LGA1700, AM4, AM5), RAM (DDR4/DDR5), GPU (PCIe, power), PSU requirements, thermal, storage, BIOS, form factors, bottleneck analysis.
+
+Response format:
+✅ COMPATIBLE / ⚠️ WARNING / ❌ INCOMPATIBLE
+- List specific compatibility points
+- Give actionable recommendations
+- Include Philippine Peso (₱) pricing
+
+Keep responses under 3 sentences unless build recommendations are requested. NO thinking process, ONLY conclusions.
+"""
+
+# Model parameters - BALANCED for speed AND accuracy
+PARAMETER temperature 0.15
+PARAMETER top_p 0.8
+PARAMETER top_k 25
+PARAMETER repeat_penalty 1.15
+PARAMETER num_predict 400
+PARAMETER num_ctx 2048
+
+# Template for structured input/output
+TEMPLATE """{{ if .System }}<|system|>
+{{ .System }}<|end|>
+{{ end }}{{ if .Prompt }}<|user|>
+{{ .Prompt }}<|end|>
+{{ end }}<|assistant|>
+{{ .Response }}<|end|>
+"""
+
+# License and attribution
+LICENSE """
+K-Wise PC Compatibility Expert
+Based on DeepSeek R1 1.5B
+Fine-tuned with 2,578 compatibility examples
+© 2025 K-Wise Admin System
+"""

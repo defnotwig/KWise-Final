@@ -1,0 +1,255 @@
+﻿/* ========================================
+   KIOSK PC-CUSTOMIZED-AI-ASSESSMENT RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.ai-assessment-container {
+  min-height: 100vh;
+  background: #002024;
+  color: white;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ai-logo-container {
+  margin-bottom: 30px;
+}
+
+.ai-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
+
+.ai-title-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.ai-icon {
+  font-size: 64px;
+  margin-bottom: 10px;
+}
+
+.ai-main-title {
+  font-size: 48px;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+  color: #00E083;
+}
+
+.ai-subtitle {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+  color: white;
+}
+
+.ai-powered {
+  font-size: 18px;
+  color: #00A8FF;
+  margin: 0;
+  font-weight: 500;
+}
+
+.ai-progress {
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 40px;
+}
+
+.ai-progress-bar {
+  width: 100%;
+  height: 12px;
+  background: rgba(0, 224, 131, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.ai-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00E083 0%, #00A8FF 100%);
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.ai-progress-text {
+  text-align: center;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.ai-question-container {
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 40px;
+}
+
+.ai-question-step {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-question-title {
+  font-size: 36px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 40px;
+  color: white;
+}
+
+.ai-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  padding: 0 20px;
+}
+
+.ai-option-button {
+  background: rgba(0, 224, 131, 0.1);
+  border: 3px solid #00E083;
+  border-radius: 12px;
+  padding: 30px 20px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 140px;
+}
+
+.ai-option-button:hover {
+  background: rgba(0, 224, 131, 0.2);
+  border-color: #00E083;
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 224, 131, 0.3);
+}
+
+.ai-option-icon {
+  font-size: 48px;
+}
+
+.ai-option-text {
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ai-option-desc {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
+
+.ai-textarea {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  display: block;
+  background: rgba(0, 224, 131, 0.1);
+  border: 2px solid #00E083;
+  border-radius: 12px;
+  padding: 20px;
+  color: white;
+  font-size: 18px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 150px;
+}
+
+.ai-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ai-char-count {
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 10px 0 20px 0;
+}
+
+.ai-continue-button {
+  background: linear-gradient(135deg, #00E083 0%, #00A8FF 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 20px 40px;
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: block;
+  margin: 20px auto;
+  min-width: 300px;
+}
+
+.ai-continue-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 224, 131, 0.4);
+}
+
+.ai-back-button {
+  background: transparent;
+  border: 3px solid #00E083;
+  border-radius: 12px;
+  padding: 16px 40px;
+  color: white;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 20px;
+}
+
+.ai-back-button:hover {
+  background: rgba(0, 224, 131, 0.1);
+  transform: scale(1.05);
+}
+
+  /*cursor: pointer;
+  transition: all 0.2s ease;
+  display: block;
+  margin: 20px auto;
+  min-width: 300px;
+*/
+
+.ai-continue-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 224, 131, 0.4);
+}
+
+.ai-back-button {
+  background: transparent;
+  border: 3px solid #00E083;
+  border-radius: 12px;
+  padding: 16px 40px;
+  color: white;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 20px;
+}
+
+.ai-back-button:hover {
+  background: rgba(0, 224, 131, 0.1);
+  transform: scale(1.05);
+}
+

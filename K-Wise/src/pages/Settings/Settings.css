@@ -1,0 +1,697 @@
+/* src/styles/Settings.css */
+.settings-page {
+    padding-bottom: 2rem;
+}
+
+.settings-header {
+    margin-bottom: 1.5rem;
+}
+
+.settings-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+}
+
+.settings-tab {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.settings-tab.active {
+    border-bottom-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.settings-tab:hover {
+    color: var(--primary-color);
+}
+
+.settings-content {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.theme-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.theme-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.theme-preview {
+    width: 100%;
+    height: 80px;
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.theme-preview:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.theme-preview.selected {
+    border-color: var(--accent-color, #3b82f6) !important;
+    border-width: 3px !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+    transform: translateY(-2px);
+}
+
+/* Add theme indicator icons */
+.theme-preview::after {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: var(--accent-color, #3b82f6);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.theme-preview.selected::after {
+    opacity: 1;
+}
+
+.theme-name {
+    font-size: 0.875rem;
+    text-align: center;
+    color: var(--text-color);
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-role {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.last-updated {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.refresh-btn {
+    background:#f1f3f5;
+    border:1px solid #d0d5db;
+    color:#555;
+    border-radius:50%;
+    width:40px;
+    height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:all .2s ease;
+}
+.refresh-btn:hover:not(:disabled){ background:#e2e6ea; color:#222; }
+.refresh-btn:disabled { opacity:.55; cursor:not-allowed; }
+.refresh-btn.spinning { animation: spin 1s linear infinite; }
+[data-theme="dark"] .refresh-btn { background:#2e3338; border-color:#3a4046; color:#bbb; }
+[data-theme="dark"] .refresh-btn:hover:not(:disabled){ background:#3a4046; color:#fff; }
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.error-message {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border-left: 4px solid #dc2626;
+}
+
+.access-denied {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+.access-denied h1 {
+    color: var(--danger-color);
+    margin-bottom: 1rem;
+}
+
+.permission-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.developer-settings {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.developer-info {
+    background: var(--bg-light);
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.developer-info h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-color);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--card-bg);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.info-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.info-value {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.server-info {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.server-info-label {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.server-info-value {
+    color: var(--text-color);
+}
+
+/* Section titles */
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.subsection-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.75rem;
+    color: var(--text-color);
+}
+
+/* Form elements */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    transition: border-color 0.3s ease;
+}
+
+
+/* Form checks (checkboxes) */
+.form-check {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.form-check-input {
+    margin-right: 0.5rem;
+}
+
+.form-check-label {
+    color: var(--text-color);
+}
+
+/* Action buttons */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    gap: 1rem;
+}
+
+/* Security features list */
+.security-features-list {
+    padding-left: 1.5rem;
+    margin-top: 0.5rem;
+}
+
+.security-features-list li {
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .server-info {
+        grid-template-columns: 1fr;
+    }
+
+    .server-info-label {
+        margin-top: 1rem;
+        color: var(--text-light);
+    }
+
+    .theme-options {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Account Security Styles */
+.account-info {
+    background-color: var(--bg-light);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.account-info h3 {
+    margin-bottom: 1rem;
+    color: var(--text-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.account-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.account-field:last-child {
+    border-bottom: none;
+}
+
+.account-field label {
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+.account-value {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.reference-email-section {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.reference-email-section h3 {
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.reference-email-description {
+    color: var(--text-light);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.reference-email-form {
+    margin-bottom: 1.5rem;
+}
+
+.reference-email-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.reference-email-form .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.reference-email-form .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.95rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+
+.reference-email-form .form-control:disabled {
+    background-color: var(--bg-light);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.reference-email-form .message {
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.reference-email-form .message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.reference-email-form .message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.reference-email-form .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.reference-email-form .btn.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.reference-email-form .btn.btn-primary:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.reference-email-form .btn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.reference-email-note {
+    background-color: #e7f3ff;
+    border: 1px solid #b8daff;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.reference-email-note h4 {
+    margin-bottom: 0.75rem;
+    color: #004085;
+    font-size: 1rem;
+}
+
+.reference-email-note ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.reference-email-note li {
+    color: #004085;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.reference-email-note li:last-child {
+    margin-bottom: 0;
+}
+/* ========================================
+   THERMAL PRINTER TAB STYLES
+   ======================================== */
+
+.printer-status-card,
+.printer-info-card,
+.printer-technical-info {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.printer-status-card h3,
+.printer-info-card h3,
+.printer-technical-info h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.status-item strong {
+    color: var(--text-color);
+}
+
+.status-item span {
+    font-weight: 500;
+}
+
+.status-connected {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.status-disconnected {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.printer-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.printer-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.setup-steps {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.setup-steps > li {
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.setup-steps > li:last-child {
+    margin-bottom: 0;
+}
+
+.setup-steps strong {
+    color: var(--primary-color);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.setup-steps ul {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+}
+
+.setup-steps ul li {
+    margin-bottom: 0.5rem;
+    color: var(--text-light);
+}
+
+.tech-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.tech-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.tech-item strong {
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+.tech-item span {
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.printer-actions .btn-primary {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.printer-actions .btn-primary:hover:not(:disabled) {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+
+.printer-actions .btn-success {
+    background-color: #10b981;
+    border-color: #10b981;
+}
+
+.printer-actions .btn-success:hover:not(:disabled) {
+    background-color: #059669;
+    border-color: #059669;
+}
+
+.printer-actions .btn-danger {
+    background-color: #ef4444;
+    border-color: #ef4444;
+}
+
+.printer-actions .btn-danger:hover:not(:disabled) {
+    background-color: #dc2626;
+    border-color: #dc2626;
+}
+
+.printer-actions .btn-secondary {
+    background-color: #6b7280;
+    border-color: #6b7280;
+}
+
+.printer-actions .btn-secondary:hover:not(:disabled) {
+    background-color: #4b5563;
+    border-color: #4b5563;
+}
+
+@media (max-width: 768px) {
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .printer-actions {
+        flex-direction: column;
+    }
+    
+    .printer-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .tech-info-grid {
+        grid-template-columns: 1fr;
+    }
+}

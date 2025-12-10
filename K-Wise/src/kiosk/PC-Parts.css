@@ -1,0 +1,3773 @@
+﻿/* ========================================
+   KIOSK RESPONSIVE DESIGN SYSTEM
+   Primary Target: 1080px × 1920px (Portrait Kiosk)
+   Compatible: 320px - 4K+ displays
+   ======================================== */
+
+:root {
+  /* Kiosk Design Tokens */
+  --kiosk-width: 1080px;
+  --kiosk-height: 1920px;
+  --kiosk-sidebar-width: 224px;
+  --kiosk-bottom-height: 120px;
+  
+  /* Dynamic Scaling Variables */
+  --scale-factor: 1;
+  --touch-target-min: 44px;
+  
+  /* Color System */
+  --color-primary: #00e083;
+  --color-primary-dark: #03644D;
+  --color-primary-darker: #034C3B;
+  --color-background: #001a14;
+  --color-text-light: #ffffff;
+  --color-text-dark: #034C3B;
+  
+  /* Fluid Typography */
+  --font-size-base: clamp(14px, 1.5vw, 16px);
+  --font-size-large: clamp(18px, 2vw, 22px);
+  --font-size-xlarge: clamp(24px, 2.5vw, 32px);
+  
+  /* Spacing System */
+  --spacing-xs: clamp(4px, 0.5vw, 8px);
+  --spacing-sm: clamp(8px, 1vw, 12px);
+  --spacing-md: clamp(16px, 2vw, 20px);
+  --spacing-lg: clamp(24px, 3vw, 32px);
+  --spacing-xl: clamp(32px, 4vw, 48px);
+}
+
+/* KIOSK-ONLY CSS ISOLATION - Prevent conflicts with admin styles */
+.pc-parts-container {
+  /* Ensure kiosk has its own styling context */
+  isolation: isolate;
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  max-width: var(--kiosk-width);
+  margin: 0 auto;
+  background: var(--color-background);
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+  
+  /* Container Queries Support */
+  container-type: inline-size;
+  
+  /* Hardware Acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Override any global sidebar styles specifically for kiosk */
+.pc-parts-container .sidebar {
+  width: 224px;
+  height: 100%;
+  background: #03644D;
+  /* Required background color */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure kiosk sidebar elements don't inherit admin styles */
+.pc-parts-container .sidebar *,
+.pc-parts-container .sidebar *::before,
+.pc-parts-container .sidebar *::after {
+  box-sizing: border-box;
+}
+
+/* Bottom Section - Checkout Area - UPDATED TO MATCH REFERENCE */
+.pc-parts-bottom-section {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: #001a14 !important;
+  /* Dark green like selected sidebar item */
+  z-index: 1000;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 84px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ✅ FIX: Comparison Bar Styling - Use kiosk light green theme */
+.comparison-floating-bar {
+  width: 792px;
+  height: 72px;
+  position: absolute;
+  right: 32px;
+  bottom: 270px;
+  background: #00E083;
+  box-shadow: 0 0 25px 0 #00E083;
+  /* ✅ FIX: Light green kiosk theme */
+  color: #fff;
+  padding: 15px;
+  z-index: 10001;
+  /* Higher than everything including bottom section */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  pointer-events: auto;
+  /* Ensure clickable */
+}
+
+/* ✅ FIX: Ensure clear button text is visible */
+
+.comparison-floating-count {
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #034C3B;
+}
+
+.comparison-floating-button {
+  text-align: center;
+  background: #034C3B;
+  width: 131px;
+  height: 40px;
+  gap: 10px;
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #fff;
+}
+
+.comparison-floating-clear {
+  height: 40px;
+  width: 81px;
+  border: 2px solid #034C3B;
+  background: transparent;
+  gap: 10px;
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #034C3B;
+}
+
+.pc-parts-process-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1400px;
+}
+
+.pc-parts-order-info {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.pc-parts-cart-icon {
+  position: relative;
+  width: 90px;
+  /* Larger cart icon */
+  height: 90px;
+  background: rgba(0, 224, 131, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-parts-cart-icon img {
+  width: 60px;
+  /* Larger cart image */
+  height: 60px;
+  object-fit: contain;
+}
+
+.pc-parts-notification {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff0000 !important;
+  /* Red notification as requested */
+  color: white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  border: 2px solid #001a14;
+}
+
+.pc-parts-total-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: white !important;
+  /* White text on dark background */
+  width: 192px;
+  height: 59px;
+
+}
+
+.pc-parts-total {
+  font-size: 20px;
+  font-weight: bold;
+  color: white !important;
+  /* White text on dark background */
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.pc-parts-price {
+  font-size: 32px;
+  color: white !important;
+  /* White text on dark background */
+  font-weight: 800;
+}
+
+.pc-parts-right-buttons {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.pc-parts-order-summary {
+  background: #00e083 !important;
+  /* Light green as requested */
+  color: #001a14 !important;
+  border: 2px solid #00e083;
+  padding: 15px 30px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.pc-parts-order-summary:hover {
+  background: #00d175 !important;
+}
+
+.pc-parts-order-summary.disabled {
+  background: #4a4a4a !important;
+  color: #888 ;
+  border-color: #4a4a4a !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.pc-parts-order-summary.disabled:hover {
+  background: #4a4a4a !important;
+  color: #888 !important;
+}
+
+.pc-parts-action-buttons {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  /* Space between buttons */
+  width: auto;
+  /* Allow natural sizing */
+}
+
+.pc-parts-cancel-order,
+.pc-parts-start-over {
+  background: #001a14 !important;
+  /* Dark green background */
+  color: white !important;
+  border: 2px solid #00e083 !important;
+  /* Light green outline */
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+  /* Keep text on one line */
+  min-width: 110px;
+  text-align: center;
+}
+
+.pc-parts-cancel-order:hover,
+.pc-parts-start-over:hover {
+  background: #00e083 !important;
+  color: #001a14 !important;
+  border-color: #001a14 !important;
+}
+
+/* KIOSK PC-PARTS SIDEBAR - UNIQUE STYLING */
+.pc-parts-container .sidebar {
+  height: 100%;
+  background: #00e083 !important;
+  /* Required background color for entire sidebar */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Center all items horizontally */
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Logo Section - Much smaller logo at top */
+.pc-parts-container .sidebar .logo1 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: 12px;
+  /* Reduced top margin */
+  margin-bottom: 81px;
+  /* Reduced bottom margin */
+}
+
+.pc-parts-container .sidebar .logo1 img {
+  width: 28px;
+  /* Even smaller logo for sidebar - more balanced */
+  height: 28px;
+  /* Even smaller logo for sidebar - more balanced */
+  object-fit: contain;
+}
+
+/* Menu Section - Categories centered with close margins */
+.pc-parts-container .sidebar .menu {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Much smaller spacing between categories */
+  width: 100%;
+  align-items: start;
+  /* Center all menu items */
+  flex: 1;
+  /* Take available space */
+  /* Padding on sides */
+  justify-content: flex-start;
+  /* Align to start but center horizontally */
+  margin-left: 17px;
+}
+
+
+/* Active menu item styling - White text on #03644D background */
+
+/* Inactive menu items */
+.pc-parts-container .sidebar .menu-item.inactive {
+  background-color: transparent;
+  color: #03644D;
+  /* Semi-transparent white text */
+  opacity: 0.8;
+}
+
+/* Menu item hover effect */
+
+/* Menu item image container */
+.pc-parts-container .sidebar .menu-item-image {
+  width: 45px;
+  /* Smaller icon size */
+  height: 45px;
+  /* Smaller icon size */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pc-parts-container .sidebar .menu-item-image img {
+  width: 110%;
+  height: 110%;
+  object-fit: contain;
+  filter: brightness(0.9);
+  /* Slightly dim icons */
+}
+
+/* Active menu item icon */
+.pc-parts-container .sidebar .menu-item.active .menu-item-image img {
+  filter: brightness(1.2);
+  /* Brighter icons for active items */
+}
+
+/* Menu item text styling */
+.pc-parts-container .sidebar .menu-item-text {
+  font-size: 16px;
+  /* Slightly smaller text */
+  font-weight: 600;
+  color: #03644D;
+  /* Semi-transparent white by default */
+  padding-left: 5px;
+  /* Reduced padding */
+}
+
+/* Active menu item text - Pure white */
+.pc-parts-container .sidebar .menu-item.active .menu-item-text {
+  color: #03644D;
+  /* Pure white text when selected */
+  font-weight: 700;
+  /* Bolder text for active items */
+}
+
+/* HOME SECTION - Separated from categories */
+.pc-parts-container .sidebar .home-section {
+  padding: 0 10px;
+  margin-bottom: 10px;
+  margin-left: 70px;
+}
+
+
+.pc-parts-container .sidebar .home-section .home-button.active {
+  border: 1px solid #00e083 !important;
+  box-shadow: 0 0 10px rgba(0, 224, 131, 0.1);
+}
+
+/* CATEGORIES SECTION - Separated with divider */
+.pc-parts-container .sidebar .categories-section {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pc-parts-container .sidebar .section-divider {
+  width: 80%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 10px auto 15px auto;
+}
+
+.pc-parts-container .sidebar .categories-section .menu {
+  flex: 1;
+  margin-top: 20px;
+}
+
+/* REMOVED - Back Button Container (functionality moved to Cancel Order button) */
+
+/* REMOVED - This was causing conflicts with admin sidebar styling */
+/* Previous overly broad CSS selectors that affected other components have been removed */
+
+/* Force main content colors */
+.pc-parts-container .category-content,
+.pc-parts-container .home-content,
+.pc-parts-container .category-content * {
+  background: #03644D;
+  color: white;
+}
+
+.pc-parts-container .grid-item {
+  background-color: #034C3B !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.pc-parts-container .grid-item:hover {
+  background-color: #076b50 !important;
+  border-color: #00e083 !important;
+}
+
+.pc-parts-container .grid-item *,
+.pc-parts-container .product-name,
+.pc-parts-container .product-brand,
+.pc-parts-container .price,
+.pc-parts-container .sale-price,
+.pc-parts-container .original-price {
+  color: white !important;
+  background: transparent !important;
+}
+
+
+
+.pc-parts-container .pc-parts-order-summary {
+  background: #00E083 !important;
+  color: white;
+}
+
+.pc-parts-container .pc-parts-order-summary:hover {
+  background: #025a42 !important;
+  color: white !important;
+}
+
+/* Force brand filter colors */
+.pc-parts-container .brand-item,
+.pc-parts-container .subcategory-item {
+  background: #034C3B !important;
+  color: white !important;
+  border-color: #00e083 !important;
+}
+
+.pc-parts-container .brand-item.active,
+.pc-parts-container .subcategory-item.active {
+  background: #00e083 !important;
+  color: #000 !important;
+}
+
+/* Filter & Sort Button - White text as requested */
+.pc-parts-filter-button {
+  background: #00E083;
+  color: white;
+  /* White text as requested */
+  border: none;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  margin-left: 20px;
+  /* Move more to the left */
+  width: 180px;
+  height: 44px;
+}
+
+/* Comparing Active State - When Compare button is clicked */
+.pc-parts-filter-button.comparing-active {
+  background: #002024;
+}
+
+
+/* Filter & Sort Panel */
+.filter-sort-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 26, 20, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.filter-sort-content {
+  background: #001a14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.filter-sort-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.filter-sort-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.filter-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.filter-close-btn:hover {
+  color: white;
+  background: #002024;
+}
+
+.filter-section {
+  margin-bottom: 30px;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Style select dropdowns in filter options */
+.filter-options select {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #03644D 0%, #025940 100%);
+  color: #00e083;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300e083' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.filter-options select:hover {
+  background: linear-gradient(135deg, #04755a 0%, #036d51 100%);
+  border-color: rgba(0, 224, 131, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 224, 131, 0.3);
+}
+
+.filter-options select:focus {
+  outline: none;
+  border-color: rgba(0, 224, 131, 0.8);
+  box-shadow: 0 0 0 3px rgba(0, 224, 131, 0.2);
+}
+
+.filter-options select option {
+  background: #001a14;
+  color: white;
+  padding: 12px;
+}
+
+/* Style text inputs in filter options */
+.filter-options input[type="text"] {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #03644D 0%, #025940 100%);
+  border: 2px solid rgba(0, 224, 131, 0.4);
+  border-radius: 8px;
+  color: #00e083;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.filter-options input[type="text"]:hover {
+  background: linear-gradient(135deg, #04755a 0%, #036d51 100%);
+  border-color: rgba(0, 224, 131, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 224, 131, 0.3);
+}
+
+.filter-options input[type="text"]:focus {
+  outline: none;
+  border-color: rgba(0, 224, 131, 0.8);
+  box-shadow: 0 0 0 3px rgba(0, 224, 131, 0.2);
+}
+
+.filter-options input[type="text"]::placeholder {
+  color: rgba(0, 224, 131, 0.6);
+}
+
+.filter-option {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.filter-option:hover {
+  background: rgba(0, 224, 131, 0.2);
+  border-color: #00e083;
+}
+
+.filter-option.active {
+  background: #00e083;
+  color: #001a14;
+  border-color: #00e083;
+  font-weight: 600;
+}
+
+
+.price-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 120px;
+}
+
+.price-input:focus {
+  outline: none;
+  border-color: #00e083;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.clear-filters-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+  width: 100%;
+  text-transform: uppercase;
+}
+
+.clear-filters-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Main content area */
+.category-content,
+.home-content {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  position: relative;
+  z-index: 2;
+  background: #001a14;
+  color: white;
+  padding: 30px;
+  padding-bottom: 140px;
+  /* Space for fixed bottom section */
+}
+
+/* Category Page Header */
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.category-title-parts {
+  font-size: 60px;
+  /* Increased even more for maximum prominence */
+  font-weight: 900;
+  /* Even bolder */
+  color: white;
+  text-transform: uppercase;
+  margin: 0;
+  margin-top: 25px;
+  margin-bottom: 25px;
+  letter-spacing: 4px;
+  /* Increased spacing for better visibility */
+}
+
+.category-count {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: 15px;
+}
+
+.filter-sort-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Brand Filter Styling - UPDATED TO DROPDOWN */
+.brand-filter-container {
+  margin-bottom: 30px;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.brand-label {
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  min-width: 60px;
+}
+
+/* Brand Dropdown Styles */
+.pc-parts-brand-dropdown-container {
+  position: relative;
+  min-width: 280px;
+
+}
+
+.pc-parts-brand-dropdown-trigger {
+  color: #fff;
+  /* Bright green text */
+  padding: 14px 24px;
+  border: 1px solid #FFF;
+  background: #03644D;
+  font-weight: 700;
+  font-size: 16px;
+  width: 80%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  width: 300px;
+  height: 44px;
+}
+
+
+.pc-parts-brand-dropdown-trigger:active,
+.pc-parts-brand-dropdown-trigger.active {
+  background: linear-gradient(135deg, #03644D 0%, #025940 100%);
+  /* Keep dark green when clicked */
+}
+
+.pc-parts-brand-dropdown-trigger .dropdown-arrow {
+  margin-left: 10px;
+  font-size: 14px;
+  transition: transform 0.3s ease;
+  color: #fff;
+}
+
+
+.pc-parts-brand-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: 450px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0, 224, 131, 0.3);
+  animation: dropdownSlide 0.3s ease;
+}
+
+
+.pc-parts-brand-dropdown-menu button {
+  width: 100%;
+  height: 46px;
+  padding: 12px 18px;
+  background: #034C3B;
+  color: #fff;
+  /* Dark text for contrast */
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+
+.pc-parts-brand-dropdown-menu button:hover {
+  background: #03644D;
+  color: #fff;
+}
+
+.pc-parts-brand-dropdown-menu button.active {
+  background: #03644D;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  padding-left: 20px;
+}
+
+.pc-parts-brand-dropdown-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pc-parts-brand-dropdown-menu::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.pc-parts-brand-dropdown-menu::-webkit-scrollbar-thumb {
+  background: #00e083;
+  border-radius: 4px;
+}
+
+.pc-parts-brand-dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: #00d175;
+}
+
+/* OLD STYLES - Keep for backwards compatibility but hide */
+.pc-parts-brand-list {
+  display: none;
+  /* Hide old horizontal list */
+}
+
+.pc-parts-brand-item {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 2px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.pc-parts-brand-item:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-2px);
+}
+
+.pc-parts-brand-item.active {
+  background: rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+  border-color: white !important;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+}
+
+/* Home Page Styling */
+.home-content {
+  width: 100%;
+  padding: 32px;
+  color: white;
+}
+
+.home-title {
+  font-size: 60px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 40px;
+  margin-top: 40px;
+  color: white;
+}
+
+.home-section {
+  margin-bottom: 40px;
+}
+
+.home-section h3 {
+  font-size: 40px;
+  font-weight: 600;
+  color: white;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 10px;
+  opacity: 1;
+  visibility: visible;
+  z-index: 10;
+}
+
+
+/* Subcategory Filter Styling */
+.subcategory-filter-container {
+  margin: 20px 0;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.subcategory-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.subcategory-chip {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid transparent;
+  color: white;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.subcategory-chip:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.subcategory-chip.active {
+  background: #00e083;
+  border-color: white;
+  box-shadow: 0 4px 15px rgba(0, 224, 131, 0.3);
+}
+
+.subcategory-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.subcategory-label {
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  min-width: 80px;
+}
+
+.subcategory-list {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.subcategory-item {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid transparent;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.subcategory-item:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.subcategory-item.active {
+  background: #00e083;
+  border-color: white;
+  box-shadow: 0 4px 15px rgba(0, 224, 131, 0.3);
+}
+
+/* Price Range and Spec Filter Inputs */
+.price-inputs {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.price-inputs input {
+  flex: 1;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 14px;
+}
+
+.price-inputs input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Price Slider Styling */
+.price-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #03644D 0%, #00e083 100%);
+  outline: none;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.price-slider:hover {
+  opacity: 1;
+}
+
+.price-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #00e083;
+  cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 224, 131, 0.5);
+  transition: all 0.2s;
+}
+
+.price-slider::-webkit-slider-thumb:hover {
+  background: #00ff94;
+  box-shadow: 0 0 10px rgba(0, 224, 131, 0.8);
+  transform: scale(1.1);
+}
+
+.price-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #00e083;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 5px rgba(0, 224, 131, 0.5);
+  transition: all 0.2s;
+}
+
+.price-slider::-moz-range-thumb:hover {
+  background: #00ff94;
+  box-shadow: 0 0 10px rgba(0, 224, 131, 0.8);
+  transform: scale(1.1);
+}
+
+.price-input-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #00e083;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.price-range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.spec-filters-container {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.spec-field {
+  margin: 8px 0;
+}
+
+.range-input-pair {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.range-input-pair input {
+  flex: 1;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: white;
+  font-size: 12px;
+}
+
+.range-input-pair input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.range-input-pair .filter-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(255, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.range-input-pair .filter-btn:hover {
+  background: rgba(255, 0, 0, 0.8);
+}
+
+.spec-field select {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #03644D 0%, #025940 100%);
+  border: 2px solid rgba(0, 224, 131, 0.4);
+  border-radius: 8px;
+  color: #00e083;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300e083' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.spec-field select:hover {
+  background: linear-gradient(135deg, #04755a 0%, #036d51 100%);
+  border-color: rgba(0, 224, 131, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 224, 131, 0.3);
+}
+
+.spec-field select:focus {
+  outline: none;
+  border-color: rgba(0, 224, 131, 0.8);
+  box-shadow: 0 0 0 3px rgba(0, 224, 131, 0.2);
+}
+
+.spec-field select option {
+  background: #001a14;
+  color: white;
+  padding: 12px;
+}
+
+.spec-field input[type="text"] {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #03644D 0%, #025940 100%);
+  border: 2px solid rgba(0, 224, 131, 0.4);
+  border-radius: 8px;
+  color: #00e083;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.spec-field input[type="text"]:hover {
+  background: linear-gradient(135deg, #04755a 0%, #036d51 100%);
+  border-color: rgba(0, 224, 131, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 224, 131, 0.3);
+}
+
+.spec-field input[type="text"]:focus {
+  outline: none;
+  border-color: rgba(0, 224, 131, 0.8);
+  box-shadow: 0 0 0 3px rgba(0, 224, 131, 0.2);
+}
+
+.spec-field input[type="text"]::placeholder {
+  color: rgba(0, 224, 131, 0.6);
+}
+
+.sale-price-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.original-price {
+  color: #ccc;
+  font-size: 14px;
+  text-decoration: line-through;
+  margin: 0;
+}
+
+.sale-price {
+  color: #00e083;
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.discount-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #ff4444;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 2;
+}
+
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  transition: transform 0.3s ease;
+}
+
+.grid-item:hover .product-image {
+  transform: scale(1.05);
+}
+
+.sale-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff4444;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.product-info {
+  text-align: center;
+  padding: 4px;
+  width: 100%;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.product-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 2px;
+  line-height: 1.1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 26px;
+}
+
+.product-brand {
+  font-size: 10px;
+  color: #00e083;
+  margin-bottom: 4px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.original-price {
+  font-size: 12px;
+  color: #888;
+  text-decoration: line-through;
+}
+
+.sale-price {
+  font-size: 16px;
+  color: #ff4444;
+  font-weight: bold;
+}
+
+.price {
+  font-size: 16px;
+  color: #00e083;
+  font-weight: bold;
+}
+
+.low-stock {
+  font-size: 10px;
+  color: #ff9800;
+  font-weight: bold;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Large Box for "What's New!" */
+.home-large-box {
+  height: 224px;
+  width: 100%;
+}
+
+.carousel-container {
+  overflow: hidden;
+  width: 100%;
+  height: 224px;
+  position: relative;
+}
+
+.carousel-slider {
+  display: flex;
+  width: 100%;
+  /* Adjusted for 2 slides */
+  height: 100%;
+  animation: slide 8s infinite ease-in-out;
+}
+
+.carousel-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  border: 5px solid #034C3B;
+  background: linear-gradient(270deg, #00E083 0.04%, #03644D 99.96%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.carousel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+/* Slide animation for 2 images */
+@keyframes slide {
+
+  0%,
+  45% {
+    transform: translateX(0);
+  }
+
+  55%,
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+
+
+/* Grid for other sections */
+.home-grid {
+  display: flex;
+  gap: 10px;
+}
+
+.home-box {
+  width: 224px;
+  height: 224px;
+  background-color: #034C3B;
+}
+
+.product-thumbnail {
+  width: 100px;
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
+
+
+
+
+/* LEGACY SELECTORS - SCOPED TO KIOSK ONLY TO PREVENT ADMIN CONFLICTS */
+/* REMOVED DUPLICATE - Logo sizing is controlled at line 200 */
+/* REMOVED DUPLICATE - Logo container spacing is controlled at line 191 */
+
+.pc-parts-container .menu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  /* Reduced from 10px for closer spacing */
+  width: 100%;
+  align-items: center;
+  /* Center items horizontally */
+  flex: 1;
+  /* Take available space */
+  padding: 0 10px;
+  /* Add side padding */
+  justify-content: flex-start;
+  /* Start from top but center horizontally */
+}
+
+.pc-parts-container .sidebar .menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 240px;
+  height: 70px;
+  /* Reduced from 90px */
+  background-color: transparent;
+  /* Start transparent */
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 8px 12px;
+  /* Reduced padding */
+  gap: 15px;
+  transition: all 0.3s ease;
+  margin-bottom: 5px;
+  /* Reduced from 20px for closer spacing */
+}
+
+/* Highlight the selected menu item with white text */
+.pc-parts-container .sidebar .menu-item.active {
+  background-color: #03644D !important;
+  /* Same as sidebar background */
+  color: white !important;
+  /* White text when selected */
+  opacity: 1;
+}
+
+
+/* Menu Item Images - Smaller icons - SCOPED TO KIOSK */
+.pc-parts-container .menu-item-image {
+  width: 45px;
+  /* Reduced from 40px */
+  height: 45px;
+  /* Reduced from 40px */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pc-parts-container .menu-item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding-left: 8px;
+  /* Reduced padding */
+  filter: brightness(0.9);
+  /* Slightly dim by default */
+}
+
+/* Active menu item images - brighter - SCOPED TO KIOSK */
+.pc-parts-container .sidebar .menu-item.active .menu-item-image img {
+  filter: brightness(1.2);
+  /* Brighter for active items */
+}
+
+/* Menu Item Text - White when selected - SCOPED TO KIOSK */
+.pc-parts-container .menu-item-text {
+  font-size: 14px;
+  /* Slightly smaller */
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  /* Semi-transparent white by default */
+  padding-left: 5px;
+  /* Reduced padding */
+}
+
+/* Change text color when active - Pure white - SCOPED TO KIOSK */
+.pc-parts-container .sidebar .menu-item.active .menu-item-text {
+  color: white !important;
+  /* Pure white text when selected */
+  font-weight: 700;
+  /* Bolder for active items */
+}
+
+
+
+/* Kiosk Main Content - SCOPED TO AVOID ADMIN CONFLICTS */
+.pc-parts-container .main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* Account for bottom section */
+  background: #03644D !important;
+  /* Same as sidebar background */
+  overflow: hidden;
+  /* More padding for better spacing */
+}
+
+/* Category Header - Title and Brands Section */
+.category-header-section {
+  height: 224px;
+  width: 100%;
+  padding-top: 32px;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* Compact mode when showing peripheral category grid */
+.category-header-section.peripheral-grid-mode {
+  height: 224px;
+}
+
+.category-header-section::after {
+  margin-top: 20px;
+  content: "";
+  position: absolute;
+  top: 11%;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  /* Adjust height for shadow depth */
+  background: linear-gradient(180deg, #034C3B 0%, rgba(3, 76, 59, 0.00) 100%);
+  pointer-events: none;
+}
+
+/* Remove top positioning for peripheral grid mode */
+.category-header-section.peripheral-grid-mode::after {
+  top: 9%;
+}
+
+
+/* PERIPHERALS CATEGORY GRID - Matching reference design */
+.peripherals-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  width: 792px;
+  margin: 0 auto;
+  padding-bottom: 150px;
+  /* Space for bottom section */
+}
+
+/* Individual Peripheral Category Box */
+.peripheral-category-box {
+  padding: 20px 43.5px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  max-height: 237px;
+  max-width: 243px;
+  position: relative;
+  overflow: hidden;
+  border: 5px solid #034C3B;
+  background: #03644D;
+}
+
+/* Icon styling - Updated for image icons */
+.peripheral-category-icon {
+  width: 137px;
+  height: 156px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 12px rgba(0, 224, 131, 0.3));
+  transition: all 0.3s ease;
+}
+
+.peripheral-category-icon img {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+}
+
+/* Name styling */
+.peripheral-category-name {
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  color: #FFFFFF;
+  text-align: center;
+  letter-spacing: 1.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-transform: uppercase;
+}
+
+
+
+/* REMOVED DUPLICATE - Category title styling is controlled at line 638 */
+
+/* Show item count next to title as requested */
+.category-count {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff !important;
+  margin-left: 10px;
+}
+
+/* Brands and Filter Section */
+.pc-parts-brands-filter-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 50px;
+}
+
+.pc-parts-brands-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pc-parts-brands-label {
+  color: #001a14 !important;
+  /* Dark text on light background */
+  font-size: 16px;
+  font-weight: 600;
+  margin-right: 10px;
+}
+
+.pc-parts-filter-sort-section {
+  display: flex;
+  gap: 15px;
+}
+
+.pc-parts-brand-filter-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 90%;
+  margin-bottom: 50px;
+}
+
+.pc-parts-brand-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+/* Filter button moved to the left with white text */
+
+
+.pc-parts-brand-label {
+  color: #001a14 !important;
+  /* Dark text on light background */
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.pc-parts-brand-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 10px;
+  max-width: 380px;
+  /* Adjust this value based on your needs */
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* Custom scrollbar styling */
+.pc-parts-brand-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.pc-parts-brand-list::-webkit-scrollbar-track {
+  background: rgba(0, 26, 20, 0.1);
+  border-radius: 10px;
+}
+
+/* Brand item scrollbar styling */
+.pc-parts-brand-list::-webkit-scrollbar-thumb {
+  background: #001a14;
+  border-radius: 10px;
+}
+
+.pc-parts-brand-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 26, 20, 0.8);
+}
+
+/* REMOVED DUPLICATE brand-item styling - using the main definition above */
+
+
+
+
+
+/* Filter & Sort Pop-up */
+/* Popup Overlay */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Filter & Sort Panel */
+.popup {
+  width: 568px;
+  height: 1920px;
+  background: #002018;
+  color: white;
+  padding: 50px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0px 10px rgba(0, 0, 0, 0.2);
+}
+
+.popup-title {
+  color: #FFF;
+  font-size: 46px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.clear-all {
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 600;
+  color: #FFF;
+  cursor: pointer;
+  opacity: 0.5;
+  background: transparent;
+}
+
+/* Filter Header Top - Clear All and Apply Buttons */
+.filter-header-top {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.clear-all-btn,
+.apply-filters-btn {
+  border: none;
+  background: transparent;
+  color: #fff;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+
+
+/* Filter Sections */
+.filter-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 0;
+}
+
+.filter-header {
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.filter-header button {
+  width: 0px;
+  height: 32px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* Filter Buttons */
+.filter-options {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.filter-btn {
+  width: 155px;
+  height: 32px;
+  background: linear-gradient(135deg, #03644D 0%, #025940 100%);
+  color: white;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 224, 131, 0.3);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.filter-btn:hover {
+  background: linear-gradient(135deg, #04755a 0%, #036d51 100%);
+  border-color: rgba(0, 224, 131, 0.5);
+  box-shadow: 0 4px 8px rgba(0, 224, 131, 0.3);
+  transform: translateY(-1px);
+}
+
+.filter-btn.active {
+  background: linear-gradient(135deg, #00e083 0%, #00c96e 100%);
+  color: #001a14;
+  border-color: #00e083;
+  box-shadow: 0 4px 12px rgba(0, 224, 131, 0.5);
+  font-weight: 700;
+}
+
+/* Price Slider */
+.price-slider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.price-slider input {
+  flex-grow: 1;
+  margin: 0 10px;
+}
+
+.filter-section .filter-header .toggle-button {
+  font-size: 30px;
+  font-weight: bold;
+  padding: 5px 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+
+
+
+
+
+/* Products Grid - FIXED: Dedicated grid for product listings (exactly 3 items per row) */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* Exactly 3 columns */
+  gap: 32px;
+  /* Consistent gap between all items */
+  overflow-y: auto;
+  /* Enable vertical scrolling */
+  overflow-x: hidden;
+  /* Prevent horizontal scrolling */
+  height: 1480px;
+  /* Adjust height to allow scrolling */
+  /* Consistent padding on all sides */
+  /* Prevent content from going through bottom section (249px height + margin) */
+  scroll-behavior: smooth;
+  scrollbar-color: transparent transparent;
+  box-sizing: border-box;
+  align-items: stretch;
+  /* Make all items same height */
+  justify-items: center;
+  /* Center items horizontally */
+  align-content: start;
+  /* Align grid content to top */
+  padding-top: 0px;
+  padding-bottom: 50px;
+  padding-left: 32px;
+  padding-right: 32px;
+  margin-top: 20px;
+}
+
+
+/* Product Item - FIXED: Consistent sizing matching reference design */
+.product-item {
+  /* ✅ FIX: Clear background at base state, no white highlight */
+  border: 5px solid #034C3B;
+  /* Default dark green border */
+  padding: 16px;
+  /* Consistent padding */
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  width: 242px;
+  /* Fill grid cell exactly */
+  height: 231px;
+  /* Fill the grid row height exactly */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-self: stretch;
+  /* Ensure item fills the grid cell */
+}
+
+
+/* ✅ COMPATIBLE PRODUCT STYLING - Glowing border for compatible items */
+.product-item.compatible-product {
+  border: 5px solid #034C3B;
+  background: #03644D;
+  box-shadow: 0 3px 30px 0 #6ECAF1;
+  overflow: visible;
+  /* Allow box-shadow to show on all sides */
+  transition: all 0.3s ease;
+}
+
+
+
+/* ✅ FIX: Selected state for comparison (only when clicked, not at base) */
+.product-item.selected-for-compare {
+  background: rgba(0, 224, 131, 0.15) !important;
+  /* Light green highlight when selected */
+  border: 3px solid #00e083 !important;
+  /* Light green border when selected for compare */
+  box-shadow: 0 0 20px rgba(0, 224, 131, 0.3);
+}
+
+/* Compare Checkbox Container */
+.compare-checkbox-container {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+  pointer-events: none;
+  /* Checkbox is visual only, card handles clicks */
+}
+
+/* Custom Compare Checkbox Styling */
+.compare-checkbox {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  width: 24px !important;
+  height: 24px !important;
+  cursor: pointer;
+  position: relative;
+  background: #034C3B !important;
+  /* Default dark green background */
+  background-color: #034C3B !important;
+  border: 2px solid #034C3B !important;
+  transition: all 0.3s ease;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Checked state - light green background */
+.compare-checkbox.checked {
+  background: #00E083 !important;
+  background-color: #00E083 !important;
+  border: 2px solid #034C3B !important;
+}
+
+/* Checkmark using pseudo-element */
+.compare-checkbox.checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #034C3B;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+/* Hover effect for checkbox */
+.compare-checkbox:hover {
+  opacity: 0.9;
+}
+
+/* Product Image Container - FIXED: Proper sizing and centering */
+.product-item .product-image-container {
+  position: relative;
+  overflow: hidden;
+filter: drop-shadow(1px 1px 20px #00E083);
+  /* ✅ FIX: Same dark green as base state, no white highlight */
+  z-index: 2;
+  flex: 0 0 140px;
+  /* Fixed height, no grow/shrink */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-item .product-image {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  /* Keep aspect ratio */
+  border-radius: 6px;
+}
+
+/* Product Details - FIXED: Proper text styling and spacing */
+.product-item .product-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.product-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-item .product-names {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  width: 12vw;
+  height: 22px;
+  margin: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-item .product-price {
+color: #00E083;
+  font-size: 16px;
+  /* Prominent price display */
+  font-weight: 700;
+  margin: 0;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.pc-parts-add-product {
+  font-size: 25px;
+  font-weight: 300;
+  display: flex;
+  width: 30px;
+  height: 30px;
+  padding: 8px;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid #03644D;
+  background: #03644D;
+  box-shadow: 0 0 30px 0 rgba(0, 0, 0, 0.40);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+  user-select: none;
+}
+
+
+.pc-parts-add-product:active {
+  transform: scale(0.95) rotate(90deg);
+}
+
+/* Collapsed state - just showing quantity number */
+.pc-parts-add-product.in-cart-collapsed {
+  border: 2px solid #034C3B;
+  background: #00E083;
+  box-shadow: 0 0 30px 0 rgba(0, 0, 0, 0.40);
+  color: #034C3B;
+  font-size: 19px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+
+.pc-parts-add-product.in-cart-collapsed:active {
+  transform: scale(0.95);
+  rotate: 0deg;
+}
+
+
+/* Quantity Controls Container */
+.pc-parts-quantity-controls {
+  width: 101px;
+  height: 31px;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 2px solid #034C3B;
+  background: #00E083;
+}
+
+/* Reduce opacity of product details when item is in cart (collapsed state) */
+.product-item:has(.pc-parts-quantity-controls) .product-details {
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+/* Quantity Number Display */
+.pc-parts-quantity-number {
+  font-size: 19px;
+  font-weight: 800;
+  color: #034C3B;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Quantity Control Buttons */
+.pc-parts-quantity-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+/* Delete/Negative Button */
+.pc-parts-quantity-btn.delete-btn {
+  background-color: transparent;
+  font-size: 20px;
+  color: #034C3B;
+  font-weight: 800;
+}
+
+.pc-parts-quantity-btn.delete-btn:active {
+  transform: scale(0.95);
+}
+
+/* Add/Positive Button */
+.pc-parts-quantity-btn.add-btn {
+  font-weight: 800;
+  font-size: 20px;
+  background: transparent;
+  color: #034C3B;
+}
+
+
+.pc-parts-quantity-btn.add-btn:active {
+  transform: scale(0.95);
+}
+
+@keyframes quantityBounce {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+/* Loading and Empty States */
+.loading-indicator {
+  grid-column: 1 / -1;
+  /* Span all columns */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: white;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid #00e083;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-indicator p {
+  font-size: 16px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.no-products-message {
+  grid-column: 1 / -1;
+  /* Span all columns */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+.no-products-message p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Make home-grid horizontal scrollable - MATCHES REFERENCE DESIGN */
+.home-grid {
+  display: flex;
+  /* Use flexbox for horizontal layout */
+  flex-direction: row;
+  /* Horizontal direction */
+  gap: 20px;
+  /* Consistent gap between items */
+  overflow-x: auto;
+  /* Enable horizontal scrolling */
+  overflow-y: hidden;
+  /* Disable vertical scrolling */
+  /* Vertical padding only */
+  scroll-behavior: smooth;
+  scrollbar-color: #03644D rgba(0, 26, 20, 0.2);
+  width: 100%;
+  /* Full width */
+  min-height: 200px;
+  /* Fixed height for consistency */
+}
+
+/* Custom Scrollbar - BIGGER AND SPACED */
+.home-grid::-webkit-scrollbar {
+  width: 12px;
+  /* Bigger scroller */
+}
+
+.home-grid::-webkit-scrollbar-track {
+  background: rgba(0, 26, 20, 0.1);
+  border-radius: 20px;
+  margin: 10px;
+  /* Space between items and scroller */
+}
+
+.home-grid::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.home-grid::-webkit-scrollbar-thumb:hover {
+  background-clip: padding-box;
+}
+
+/* Clickable home-box - HORIZONTAL SCROLL LAYOUT */
+.home-box {
+  min-width: 200px;
+  /* Minimum width for horizontal layout */
+  width: 224px;
+  /* Fixed width for consistency */
+  height: auto;
+  /* Fixed height */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #03644D;
+  padding: 15px;
+  box-sizing: border-box;
+  border: 5px solid #034C3B;
+  box-shadow: 0 3px 30px 0 rgba(3, 76, 59, 0.50);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  /* Prevent shrinking in flex layout */
+}
+
+.home-box:hover {
+  background-color: #076b50;
+  border: 5px solid #00e083;
+}
+
+/* Center image - Better sizing for 3-column grid */
+.home-box-image {
+  width: 90%;
+  height: 90%;
+  /* Fixed height for consistency */
+  object-fit: contain;
+  /* Maintain aspect ratio */
+  border-radius: 4px;
+  padding: 10px;
+  box-sizing: border-box;
+  filter: drop-shadow(1px 1px 20px #00e083);
+}
+
+/* Image container for sale badges */
+.home-box-image-container {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: left;
+  filter: drop-shadow(1px 1px 20px #00e083);
+}
+
+/* Sale badge for home boxes */
+.home-sale-badge {
+  position: absolute;
+  top: 1px;
+  right: 120px;
+  background: #ff4444;
+  color: white;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: bold;
+  z-index: 2;
+}
+
+/* Sale pricing container for home boxes */
+.home-sale-pricing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 2px;
+}
+
+.home-original-price {
+  color: #ccc !important;
+  font-size: 12px !important;
+  text-decoration: line-through;
+  margin: 0 !important;
+  opacity: 0.7;
+}
+
+.home-sale-price {
+  color: #00e083 !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  margin: 0 !important;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Align name and price to the left */
+
+.home-box-name {
+  font-size: 14px;
+  /* Reduce font size slightly */
+  font-weight: bold;
+  color: white;
+  width: 100%;
+  /* Ensure it doesn’t exceed its parent container */
+  overflow: hidden;
+  /* Hide overflow text */
+  text-overflow: ellipsis;
+  /* Add "..." if text is too long */
+  white-space: nowrap;
+  /* Keep it in one line */
+}
+
+.home-box-price {
+    text-align: left;
+  width: 100%;
+  font-size: 14px;
+  color: #00E083;
+}
+
+/* Ensure price is below the name */
+.home-box p:nth-child(2) {
+  font-size: 14px;
+}
+
+
+.category-container {
+  display: flex;
+  align-items: center;
+  background-color: #004d40;
+  /* Adjust to match the background */
+  padding: 15px;
+}
+
+.category-logo {
+  width: 60px;
+  /* Adjust size as needed */
+  height: 60px;
+  background-color: #2ecc71;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+}
+
+.category-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+
+/* Scrollable Container */
+.scroll-container {
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 50%;
+}
+
+
+/* Grid Layout - FIXED: Exactly 3 items per row, smaller items, no horizontal scroll */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* FIXED: Exactly 3 columns */
+  gap: 12px;
+  /* Smaller gap */
+  width: 100%;
+  max-width: calc(100vw - 300px);
+  /* Account for sidebar width */
+  padding: 15px 15px 15px 10px;
+  /* Reduced padding */
+  padding-bottom: 270px;
+  /* Prevent content from going through bottom section (249px height + margin) */
+  overflow-x: hidden;
+  /* Prevent horizontal overflow */
+  overflow-y: auto;
+  /* Allow vertical scrolling */
+  box-sizing: border-box;
+  height: calc(100vh - 200px);
+  /* Limit height to enable vertical scrolling */
+}
+
+/* Clickable Grid Items - FIXED: Much smaller, controlled size */
+.grid-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  /* Smaller radius */
+  padding: 10px;
+  /* Much smaller padding */
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  /* Fill grid cell exactly */
+  max-width: 200px;
+  /* Maximum width constraint for smaller items */
+  min-width: 150px;
+  /* Minimum width constraint */
+  height: 220px;
+  /* Fixed height for consistency */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.grid-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(0, 224, 131, 0.1) 0%, rgba(0, 204, 117, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.grid-item:hover::before {
+  opacity: 1;
+}
+
+.grid-item:hover {
+  transform: translateY(-5px);
+  border-color: rgba(0, 224, 131, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 224, 131, 0.1);
+}
+
+.grid-item:hover {
+  background-color: #076b50;
+  border-color: #00e083;
+}
+
+/* Product styling within grid items - FIXED: Much smaller image sizing */
+
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Keep aspect ratio */
+  object-position: center;
+  /* Center the image */
+  padding: 4px;
+  /* Much smaller padding */
+  transition: transform 0.3s ease;
+  z-index: 2;
+  position: relative;
+}
+
+.product-image:hover {
+  transform: scale(1.05);
+}
+
+.sale-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #ff4444, #cc3333);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 3;
+  text-transform: uppercase;
+  box-shadow: 0 2px 10px rgba(255, 68, 68, 0.3);
+}
+
+.product-info {
+  z-index: 2;
+  position: relative;
+}
+
+.product-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  line-height: 1.3;
+  margin-bottom: 8px;
+  min-height: 40px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-brand {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.price-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #00e083;
+}
+
+.original-price {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: line-through;
+}
+
+.sale-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff4444;
+}
+
+.low-stock {
+  font-size: 11px;
+  color: #ffaa00;
+  margin-top: 8px;
+  background: rgba(255, 170, 0, 0.1);
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.grid-item .productname {
+  font-size: 12px;
+  /* Much smaller text */
+  font-weight: 500;
+  color: white;
+  margin-bottom: 4px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  /* Limit to 2 lines */
+  line-clamp: 2;
+  /* Standard property */
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+  flex: 1;
+  /* Take available space */
+}
+
+.grid-item .price {
+  font-weight: bold;
+  font-size: 13px;
+  /* Smaller price text */
+  color: #00e083;
+  margin-top: auto;
+  /* Push to bottom */
+}
+
+/* Additional grid item content styling */
+.grid-item .product-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+  min-height: 0;
+}
+
+
+
+
+/* Bottom Section */
+.pc-parts-bottom-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #001510;
+  position: fixed;
+  bottom: 0;
+  width: 1080px;
+  height: 224px;
+}
+
+.pc-parts-bottom-section::after {
+  content: "";
+  position: absolute;
+  left: 20.75%;
+  bottom: 100%;
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(360deg, #002024 0%, rgba(0, 32, 36, 0.00) 100%);
+  pointer-events: none;
+}
+
+.pc-parts-order-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+
+.pc-parts-cart-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-parts-cart-icon img {
+  width: 87px;
+  height: 82px;
+}
+
+.pc-parts-notification {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: red;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pc-parts-total-label {
+  display: flex;
+  flex-direction: column;
+
+}
+
+.pc-parts-total {
+  color: #fff;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.pc-parts-price {
+  width: 192px;
+  height: 34px;
+  display: inline-block;
+  font-size: 26px;
+  font-style: normal;
+  font-weight: 800;
+  color: white !important;
+  text-align: left;
+}
+
+.pc-parts-right-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.pc-parts-order-summary {
+  background-color: #00E083;
+  color: #FFF;
+  font-weight: bold;
+  cursor: pointer;
+  width: 599px;
+  height: 60px;
+  padding: 12px 24px;
+  font-size: 18px;
+  border: none;
+}
+
+.pc-parts-action-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.pc-parts-cancel-order,
+.pc-parts-start-over {
+  background: transparent;
+  color: #fff;
+  font-weight: bold;
+  border: 2px solid #00ff99;
+  width: 288px;
+  height: 46px;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ✅ NEW: Specification Range Styling (matches Price Range style) */
+.spec-number-filter {
+  margin-top: 10px;
+}
+
+.spec-range-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.spec-range-display small {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+}
+
+.spec-range-inputs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.spec-input-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.spec-input-group label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.spec-input-group input {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+}
+
+.spec-input-group input:focus {
+  outline: none;
+  border-color: #00e083;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.spec-input-group input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.reset-spec-filter-btn {
+  background: rgba(255, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.reset-spec-filter-btn:hover {
+  background: rgba(255, 0, 0, 0.8);
+}
+
+/* ===================================== */
+/* RESPONSIVE DESIGN FIXES */
+/* ===================================== */
+
+/* Fix #5: Responsive Sidebar - Remove Scrolling on All Screen Sizes */
+
+/* Large Screens (1920x1080 and above) */
+@media screen and (min-height: 1080px) {
+  .sidebar {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 180px);
+    /* Account for header and back button */
+  }
+}
+
+/* Medium-Large Screens (1440px to 1080px height) */
+@media screen and (min-height: 800px) and (max-height: 1079px) {
+  .sidebar {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px 15px;
+    /* Reduce header padding */
+  }
+
+  .sidebar-item {
+    padding: 12px 25px;
+    /* Reduce item padding */
+    font-size: 15px;
+    /* Slightly smaller font */
+  }
+
+  .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);
+    padding: 15px 0;
+  }
+}
+
+/* Medium Screens (768px to 799px height) - Tablets */
+@media screen and (min-height: 600px) and (max-height: 799px) {
+  .sidebar {
+    height: 100vh;
+    overflow: hidden;
+    width: 260px;
+    /* Slightly narrower */
+  }
+
+  .sidebar-header {
+    padding: 15px 12px;
+  }
+
+  .sidebar-logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .sidebar-title {
+    font-size: 20px;
+  }
+
+  .sidebar-item {
+    padding: 10px 20px;
+    font-size: 14px;
+    gap: 12px;
+  }
+
+  .menu-item-icon {
+    width: 35px;
+    height: 35px;
+  }
+
+  .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 140px);
+    padding: 10px 0;
+  }
+
+  .back-button-container {
+    padding: 10px 15px;
+  }
+
+  .back-button {
+    padding: 10px 15px;
+    font-size: 14px;
+  }
+}
+
+/* Small Screens (480px to 599px height) - Small Tablets/Large Phones */
+@media screen and (min-height: 480px) and (max-height: 599px) {
+  .sidebar {
+    height: 100vh;
+    overflow: hidden;
+    width: 240px;
+  }
+
+  .sidebar-header {
+    padding: 12px 10px;
+  }
+
+  .sidebar-logo {
+    width: 35px;
+    height: 35px;
+  }
+
+  .sidebar-title {
+    font-size: 18px;
+  }
+
+  .sidebar-item {
+    padding: 8px 15px;
+    font-size: 13px;
+    gap: 10px;
+  }
+
+  .menu-item-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 120px);
+    padding: 8px 0;
+  }
+}
+
+/* Extra Small Screens (below 480px height) - Phones in landscape */
+@media screen and (max-height: 479px) {
+  .sidebar {
+    height: 100vh;
+    overflow: hidden;
+    width: 220px;
+  }
+
+  .sidebar-header {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .sidebar-logo {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sidebar-title {
+    font-size: 16px;
+  }
+
+  .sidebar-item {
+    padding: 6px 12px;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .menu-item-icon {
+    width: 25px;
+    height: 25px;
+  }
+
+  .menu-item-text {
+    display: none;
+    /* Hide text on very small screens, show icons only */
+  }
+
+  .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 100px);
+    padding: 5px 0;
+  }
+}
+
+/* Width-based responsive adjustments */
+@media screen and (max-width: 768px) {
+  .sidebar {
+    width: 200px;
+    /* Narrower sidebar on small screens */
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .sidebar {
+    width: 180px;
+    /* Even narrower on phones */
+  }
+}
+
+/* Ensure kiosk main content adjusts to sidebar changes - SCOPED */
+@media screen and (max-width: 768px) {
+  .pc-parts-container .main-content {
+    margin-left: 200px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .pc-parts-container .main-content {
+    margin-left: 180px;
+  }
+}
+
+/* ============================================
+   AI INTEGRATION STYLES
+   ============================================ */
+
+/* AI Badge for Hot Picks and Value for Money sections */
+.ai-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  animation: aiGlow 2s infinite alternate;
+}
+
+/* Trending badge for Hot Picks */
+.trending-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  animation: trendingGlow 2s infinite alternate;
+}
+
+@keyframes trendingGlow {
+  0% {
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 2px 12px rgba(245, 158, 11, 0.6);
+  }
+}
+
+/* Small badges for individual items */
+.ai-badge-small {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: help;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.ai-badge-small:hover {
+  transform: scale(1.1);
+  background: rgba(99, 102, 241, 1);
+}
+
+.trending-badge-small {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(245, 158, 11, 0.9);
+  color: white;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: help;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.trending-badge-small:hover {
+  transform: scale(1.1);
+  background: rgba(245, 158, 11, 1);
+}
+
+@keyframes aiGlow {
+  0% {
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.6);
+  }
+}
+
+/* AI Analysis Tooltip */
+.ai-analysis-tooltip {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Enhanced home-box for AI recommendations */
+.home-box {
+  position: relative;
+}
+
+.home-box:hover .ai-analysis-tooltip {
+  opacity: 1;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
+/* AI Section Headers */
+.home-section h3 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* AI Loading State */
+.ai-loading {
+  display: inline-block;
+  margin-left: 8px;
+  opacity: 0.7;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   RESPONSIVE MEDIA QUERIES
+   Default: Optimized for 1080x1920 (Portrait Kiosk)
+   ======================================== */
+
+/* Mobile Devices (Portrait and Landscape) */
+@media only screen and (max-width: 767px) {
+  .pc-parts-container {
+    flex-direction: column;
+  }
+
+  .pc-parts-container .sidebar {
+    width: 100%;
+    height: 80px;
+    flex-direction: row;
+    padding: 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    order: -1;
+  }
+
+  .pc-parts-container .sidebar .logo1 {
+    display: none;
+  }
+
+  .pc-parts-container .sidebar .menu {
+    flex-direction: row;
+    width: max-content;
+    height: 100%;
+    align-items: center;
+    gap: 15px;
+    padding: 0 10px;
+  }
+
+  .pc-parts-container .sidebar .menu-item {
+    width: auto;
+    height: 60px;
+    padding: 5px 15px;
+    margin: 0;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .pc-parts-container .sidebar .menu-item-image {
+    width: 24px;
+    height: 24px;
+  }
+
+  .pc-parts-container .sidebar .menu-item-text {
+    font-size: 10px;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .pc-parts-container .main-content {
+    width: 100%;
+    height: calc(100vh - 200px); /* Sidebar + Bottom Section */
+    padding: 10px;
+    padding-bottom: 140px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    padding-bottom: 100px;
+  }
+
+  .product-item {
+    height: auto;
+    min-height: 280px;
+  }
+
+  .product-image {
+    height: 120px;
+  }
+
+  .pc-parts-bottom-section {
+    height: auto;
+    min-height: 120px;
+    padding: 10px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pc-parts-order-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pc-parts-right-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pc-parts-order-summary, 
+  .pc-parts-cancel-order {
+    flex: 1;
+    font-size: 14px;
+  }
+}
+
+/* Tablet Devices (Portrait and Landscape) */
+@media only screen and (min-width: 768px) and (max-width: 1023px) {
+  .pc-parts-container .sidebar {
+    width: 180px;
+  }
+
+  .pc-parts-container .sidebar .menu-item {
+    padding: 10px;
+  }
+
+  .pc-parts-container .sidebar .menu-item-text {
+    font-size: 12px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .product-item {
+    width: 100%;
+  }
+
+  .pc-parts-bottom-section {
+    padding: 0 20px;
+  }
+}
+
+/* Laptop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1024px) and (max-width: 1439px) {
+  /* Compatible with 1080px width kiosk layout */
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .pc-parts-container .sidebar {
+    width: 224px; /* Default width */
+  }
+}
+
+/* Desktop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1440px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr); /* Use extra space for more columns */
+    gap: 25px;
+  }
+
+  .pc-parts-container .sidebar {
+    width: 260px;
+  }
+
+  .pc-parts-container .sidebar .menu-item {
+    height: 70px;
+  }
+
+  .pc-parts-container .sidebar .menu-item-text {
+    font-size: 16px;
+  }
+
+  .product-item {
+    min-height: 380px;
+  }
+}  
+
+
+/* Ensure kiosk main content adjusts to sidebar changes - SCOPED */
+@media screen and (max-width: 768px) {
+  .pc-parts-container .main-content {
+    margin-left: 200px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .pc-parts-container .main-content {
+    margin-left: 180px;
+  }
+}
+
+/* ============================================
+   AI INTEGRATION STYLES
+   ============================================ */
+
+/* AI Badge for Hot Picks and Value for Money sections */
+.ai-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  animation: aiGlow 2s infinite alternate;
+}
+
+/* Trending badge for Hot Picks */
+.trending-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  animation: trendingGlow 2s infinite alternate;
+}
+
+@keyframes trendingGlow {
+  0% {
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 2px 12px rgba(245, 158, 11, 0.6);
+  }
+}
+
+/* Small badges for individual items */
+.ai-badge-small {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: help;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.ai-badge-small:hover {
+  transform: scale(1.1);
+  background: rgba(99, 102, 241, 1);
+}
+
+.trending-badge-small {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(245, 158, 11, 0.9);
+  color: white;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: help;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.trending-badge-small:hover {
+  transform: scale(1.1);
+  background: rgba(245, 158, 11, 1);
+}
+
+@keyframes aiGlow {
+  0% {
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.6);
+  }
+}
+
+/* AI Analysis Tooltip */
+.ai-analysis-tooltip {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Enhanced home-box for AI recommendations */
+.home-box {
+  position: relative;
+}
+
+.home-box:hover .ai-analysis-tooltip {
+  opacity: 1;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
+/* AI Section Headers */
+.home-section h3 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* AI Loading State */
+.ai-loading {
+  display: inline-block;
+  margin-left: 8px;
+  opacity: 0.7;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   RESPONSIVE MEDIA QUERIES
+   Default: Optimized for 1080x1920 (Portrait Kiosk)
+   ======================================== */
+
+/* Mobile Devices (Portrait and Landscape) */
+@media only screen and (max-width: 767px) {
+  .pc-parts-container {
+    flex-direction: column;
+  }
+
+  .pc-parts-container .sidebar {
+    width: 100%;
+    height: 80px;
+    flex-direction: row;
+    padding: 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    order: -1;
+  }
+
+  .pc-parts-container .sidebar .logo1 {
+    display: none;
+  }
+
+  .pc-parts-container .sidebar .menu {
+    flex-direction: row;
+    width: max-content;
+    height: 100%;
+    align-items: center;
+    gap: 15px;
+    padding: 0 10px;
+  }
+
+  .pc-parts-container .sidebar .menu-item {
+    width: auto;
+    height: 60px;
+    padding: 5px 15px;
+    margin: 0;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .pc-parts-container .sidebar .menu-item-image {
+    width: 24px;
+    height: 24px;
+  }
+
+  .pc-parts-container .sidebar .menu-item-text {
+    font-size: 10px;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .pc-parts-container .main-content {
+    width: 100%;
+    height: calc(100vh - 200px); /* Sidebar + Bottom Section */
+    padding: 10px;
+    padding-bottom: 140px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    padding-bottom: 100px;
+  }
+
+  .product-item {
+    height: auto;
+    min-height: 280px;
+  }
+
+  .product-image {
+    height: 120px;
+  }
+
+  .pc-parts-bottom-section {
+    height: auto;
+    min-height: 120px;
+    padding: 10px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pc-parts-order-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pc-parts-right-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pc-parts-order-summary, 
+  .pc-parts-cancel-order {
+    flex: 1;
+    font-size: 14px;
+  }
+}
+
+/* Tablet Devices (Portrait and Landscape) */
+@media only screen and (min-width: 768px) and (max-width: 1023px) {
+  .pc-parts-container .sidebar {
+    width: 180px;
+  }
+
+  .pc-parts-container .sidebar .menu-item {
+    padding: 10px;
+  }
+
+  .pc-parts-container .sidebar .menu-item-text {
+    font-size: 12px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .product-item {
+    width: 100%;
+  }
+
+  .pc-parts-bottom-section {
+    padding: 0 20px;
+  }
+}
+
+/* Laptop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1024px) and (max-width: 1439px) {
+  /* Compatible with 1080px width kiosk layout */
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .pc-parts-container .sidebar {
+    width: 224px; /* Default width */
+  }
+}
+
+/* Desktop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1440px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr); /* Use extra space for more columns */
+    gap: 25px;
+  }
+
+  .pc-parts-container .sidebar {
+    width: 260px;
+  }
+
+  .pc-parts-container .sidebar .menu-item {
+    height: 70px;
+  }
+
+  .pc-parts-container .sidebar .menu-item-text {
+    font-size: 16px;
+  }
+
+  .product-item {
+    min-height: 380px;
+  }
+}

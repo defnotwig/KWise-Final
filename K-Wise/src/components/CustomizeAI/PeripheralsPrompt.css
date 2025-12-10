@@ -1,0 +1,97 @@
+/* PeripheralsPrompt Component Styles */
+
+.peripherals-prompt-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.peripherals-prompt-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.peripherals-prompt-icon {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 30px;
+}
+
+.peripherals-prompt-title {
+  font-size: 28px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.peripherals-prompt-description {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+.peripherals-prompt-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.peripherals-prompt-button {
+  padding: 15px 40px;
+  font-size: 18px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+}
+
+.peripherals-prompt-button.yes {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.peripherals-prompt-button.yes:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+}
+
+.peripherals-prompt-button.no {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.peripherals-prompt-button.no:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .peripherals-prompt-card {
+    padding: 30px 20px;
+  }
+
+  .peripherals-prompt-title {
+    font-size: 24px;
+  }
+
+  .peripherals-prompt-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .peripherals-prompt-button {
+    width: 100%;
+  }
+}

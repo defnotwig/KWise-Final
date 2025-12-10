@@ -1,0 +1,219 @@
+﻿/* OrderSumUpgrade.css */
+.order-sum-upgrade-container {
+  background: #002024;
+  color: #fff;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.upgrade-summary-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.upgrade-summary-title {
+  font-size: 42px;
+  font-weight: 900;
+  color: #00E083;
+}
+
+.upgrade-details-section {
+  max-width: 900px;
+  margin: 0 auto 30px;
+  padding: 30px;
+  background: rgba(3, 76, 59, 0.2);
+  border: 2px solid #034C3B;
+  border-radius: 15px;
+}
+
+.upgrade-section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #00E083;
+  margin-bottom: 20px;
+}
+
+.upgrades-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.upgrade-summary-item {
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
+
+.upgrade-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.upgrade-type {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.upgrade-component-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.upgrade-price {
+  font-size: 22px;
+  font-weight: 900;
+  color: #00E083;
+}
+
+.upgrade-comparison {
+  padding: 15px;
+  background: rgba(0, 224, 131, 0.05);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.old-component {
+  flex: 1;
+  padding: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.arrow-separator {
+  color: #00E083;
+  font-size: 20px;
+}
+
+.new-component {
+  flex: 1;
+  padding: 10px;
+  background: rgba(0, 224, 131, 0.1);
+  border: 1px solid #00E083;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.upgrade-totals {
+  max-width: 900px;
+  margin: 0 auto 30px;
+  padding: 25px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 15px;
+}
+
+.upgrade-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #034C3B;
+}
+
+.upgrade-total-row:last-child {
+  border-bottom: none;
+  padding-top: 20px;
+  margin-top: 10px;
+  border-top: 2px solid #00E083;
+}
+
+.upgrade-total-label {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.upgrade-total-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.upgrade-total-row:last-child .upgrade-total-label {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.upgrade-total-row:last-child .upgrade-total-value {
+  font-size: 28px;
+  color: #00E083;
+}
+
+.upgrade-actions {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  gap: 20px;
+}
+
+.confirm-upgrade-btn {
+  flex: 1;
+  padding: 25px;
+  font-size: 22px;
+  font-weight: 700;
+  background: #00E083;
+  color: #002024;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.confirm-upgrade-btn:hover {
+  background: #10b981;
+}
+
+.modify-upgrade-btn {
+  padding: 25px 40px;
+  font-size: 20px;
+  font-weight: 700;
+  background: transparent;
+  border: 2px solid #034C3B;
+  color: #ffffff;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.modify-upgrade-btn:hover {
+  border-color: #FCCD20;
+  background: rgba(252, 205, 32, 0.1);
+}  
+
+/*
+  background: #00E083;
+  color: #002024;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+  */
+
+.confirm-upgrade-btn:hover {
+  background: #10b981;
+}
+
+.modify-upgrade-btn {
+  padding: 25px 40px;
+  font-size: 20px;
+  font-weight: 700;
+  background: transparent;
+  border: 2px solid #034C3B;
+  color: #ffffff;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.modify-upgrade-btn:hover {
+  border-color: #FCCD20;
+  background: rgba(252, 205, 32, 0.1);
+}

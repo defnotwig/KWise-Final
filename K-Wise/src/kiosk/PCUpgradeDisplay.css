@@ -1,0 +1,288 @@
+﻿/* ========================================
+   KIOSK PC-UPGRADE-DISPLAY RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/**
+ * PCUpgradeDisplay.css - Matches CustomizedProducts.css styling
+ * Import base styles from CustomizedProducts and add PC Upgrade specific overrides
+ */
+
+/* Import all CustomizedProducts styles as base */
+@import './CustomizedProducts.css';
+
+/* Additional PC Upgrade specific styles */
+
+/* Toolbar for Search, Sort, Filter, Compare */
+.pcu-display-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 15px 40px;
+  background: #034C3B;
+  border-radius: 8px;
+  margin: 0 auto 30px;
+  max-width: 1200px;
+}
+
+.pcu-search-box input {
+  width: 300px;
+  padding: 8px 12px;
+  border: 2px solid #00ffcc;
+  border-radius: 6px;
+  background: #002024;
+  color: #fff;
+  font-size: 14px;
+}
+
+.pcu-search-box input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pcu-sort-select,
+.pcu-brand-select {
+  padding: 8px 12px;
+  border: 2px solid #00ffcc;
+  border-radius: 6px;
+  background: #002024;
+  color: #fff;
+  font-size: 14px;
+  min-width: 150px;
+}
+
+.pcu-brand-select {
+  max-height: 150px;
+}
+
+/* Brand filter chips - 🔥 FIX ISSUE #3 */
+.pcu-brand-filter {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selected-brands-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #00E083;
+  color: #002024;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.brand-chip button {
+  background: none;
+  border: none;
+  color: #002024;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-chip button:hover {
+  color: #ff0000;
+}
+
+.pcu-compare-btn {
+  padding: 8px 16px;
+  border: 2px solid #00E083;
+  background: transparent;
+  color: #00E083;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.pcu-compare-btn:hover,
+.pcu-compare-btn.active {
+  background: #00E083;
+  color: #002024;
+}
+
+/* Loading & Error States */
+.pcu-display-loading,
+.pcu-display-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 20px;
+  color: #fff;
+  background: #002024;
+  padding: 40px;
+}
+
+.pcu-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #00ffcc;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.pcu-display-error button {
+  padding: 12px 24px;
+  border: 4px solid #00E083;
+  background: transparent;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.pcu-display-error button:hover {
+  background: #00E083;
+  color: #002024;
+}
+
+/* Compare Mode Checkbox */
+.compare-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+}
+
+.compare-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* Selected for comparison */
+.customized-products-card.selected-for-compare {
+  border: 3px solid #00ffcc;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+}
+
+/* Pagination */
+.pcu-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin: 30px auto;
+  padding: 15px;
+  max-width: 600px;
+}
+
+.pcu-pagination button {
+  padding: 10px 20px;
+  border: 2px solid #00E083;
+  background: transparent;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.pcu-pagination button:hover:not(:disabled) {
+  background: #00E083;
+  color: #002024;
+}
+
+.pcu-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pcu-pagination span {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Compare Bar */
+.pcu-compare-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #034C3B;
+  border: 2px solid #00ffcc;
+  border-radius: 8px;
+  padding: 12px 20px;
+  max-width: 400px;
+}
+
+.pcu-compare-bar span {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pcu-compare-bar button {
+  padding: 8px 16px;
+  border: 2px solid #00E083;
+  background: #00E083;
+  color: #002024;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.pcu-compare-bar button:hover {
+  background: #00ffcc;
+}
+
+.pcu-compare-bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/*  font-size: 14px;*/
+ /* font-weight: 600;*/
+
+
+.pcu-compare-bar button {
+  padding: 8px 16px;
+  border: 2px solid #00E083;
+  background: #00E083;
+  color: #002024;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.pcu-compare-bar button:hover {
+  background: #00ffcc;
+}
+
+.pcu-compare-bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

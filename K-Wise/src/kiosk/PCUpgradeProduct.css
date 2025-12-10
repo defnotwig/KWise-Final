@@ -1,0 +1,187 @@
+﻿/* ========================================
+   KIOSK PC-UPGRADE-PRODUCT RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/**
+ * PCUpgradeProduct.css - Matches CustomizedDisplay.css styling
+ * Import base styles from CustomizedDisplay and add PC Upgrade specific overrides
+ */
+
+/* Import all CustomizedDisplay styles as base */
+@import './CustomizedDisplay.css';
+
+/* Additional PC Upgrade specific styles */
+
+/* Compatibility Note Section - NEW FEATURE */
+.compatibility-note {
+  width: 100%;
+  max-width: 945px;
+  margin-top: 30px;
+  padding: 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.compatibility-note.compatible {
+  background: rgba(16, 185, 129, 0.1);
+  border: 2px solid #10b981;
+}
+
+.compatibility-note.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 2px solid #f59e0b;
+}
+
+.compatibility-note svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.compatibility-note.compatible svg {
+  color: #10b981;
+}
+
+.compatibility-note.warning svg {
+  color: #f59e0b;
+}
+
+.compatibility-note-content {
+  flex: 1;
+}
+
+.compatibility-note-content h3 {
+  margin: 0 0 10px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.compatibility-note-content p,
+.compatibility-note-content ul {
+  font-size: 18px;
+  margin: 5px 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.compatibility-note-content ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.compatibility-note-content li {
+  padding: 5px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.compatibility-note-content li::before {
+  content: "⚠️";
+  position: absolute;
+  left: 0;
+}
+
+.compatibility-note-advice {
+  margin-top: 10px;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Success Modal */
+.pcu-added-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pcu-added-modal {
+  background: #002024;
+  border: 3px solid #00ffcc;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  min-width: 400px;
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+  from { 
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to { 
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pcu-added-checkmark {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  background: #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  color: white;
+  font-weight: bold;
+}
+
+.pcu-added-modal h2 {
+  color: #00ffcc;
+  font-size: 28px;
+  margin: 0 0 10px 0;
+}
+
+.pcu-added-modal p {
+  color: #fff;
+  font-size: 18px;
+  margin: 5px 0;
+}
+
+/* Error State */
+.pcu-product-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 20px;
+  color: #fff;
+  padding: 40px;
+}
+
+.pcu-product-error button {
+  padding: 12px 24px;
+  border: 4px solid #00E083;
+  background: transparent;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.pcu-product-error button:hover {
+  background: #00E083;
+  color: #002024;
+}

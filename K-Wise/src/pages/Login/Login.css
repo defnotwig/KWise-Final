@@ -1,0 +1,4813 @@
+/* Enhanced K-Wise Login Styles - Modern Web App Design */
+
+/* ---- GLOBAL ---- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+html {
+    /* Prevent any page-level vertical scrolling and hide white gutters */
+    overflow: hidden;
+    background: linear-gradient(135deg, #006f51 0%, #00a67d 50%, #00E083 100%);
+}
+
+body {
+    margin: 0;
+    color: #1a1a1a;
+    /* disable page scroll (both axes) */
+    overflow: hidden;
+}
+
+/* safer dynamic viewport on desktop & mobile */
+:root {
+    --page-pad: clamp(12px, 3dvh, 32px);
+    --card-pad: clamp(16px, 2.4dvh, 28px);
+    --gap: clamp(10px, 1.6dvh, 20px);
+    --radius: 16px;
+    --shadow: 0 10px 30px rgba(0, 0, 0, .08);
+    --fs-xl: clamp(18px, 2.2dvh, 24px);
+    --fs-lg: clamp(16px, 1.9dvh, 20px);
+    --fs-md: clamp(14px, 1.7dvh, 16px);
+    --fs-sm: clamp(12px, 1.5dvh, 14px);
+    /* Add spacing variables for consistent margins */
+    --title-margin-top: clamp(0.5rem, 1dvh, 1rem);
+    --subtitle-margin-bottom: clamp(1.5rem, 2.5dvh, 2.5rem);
+    --form-top-margin: clamp(1rem, 2dvh, 2rem);
+}
+
+/* ---- PAGE LAYOUT ---- */
+.login-container {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    /* center the card */
+    padding: var(--page-pad);
+    /* breathing room at top & bottom */
+    background: linear-gradient(135deg, #006f51 0%, #00a67d 50%, #00E083 100%);
+    position: relative;
+    overflow: hidden;
+    /* prevent page scroll */
+}
+
+/* Professional Alert Notification System - Positioned outside container */
+.alert-notification {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    z-index: 9999;
+    max-width: 500px;
+    min-width: 400px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.15),
+        0 8px 16px rgba(0, 111, 81, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    padding: 1.25rem 1.75rem;
+    font-weight: 600;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transform: translateX(0);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: slideInRight 0.5s ease-out;
+    /* Professional enhancement: subtle glow effect */
+    filter: drop-shadow(0 0 20px rgba(0, 111, 81, 0.1));
+    /* Smart text fitting - single line with dynamic font sizing */
+    white-space: nowrap;
+    overflow: visible;
+    flex-direction: row;
+}
+
+/* Smart text sizing based on content length */
+.alert-notification .alert-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: clamp(0.75rem, 2.5vw, 1rem);
+    line-height: 1.4;
+    min-width: 0;
+}
+
+/* Dynamic font sizing for different text lengths */
+.alert-notification[data-text-length="short"] .alert-text {
+    font-size: clamp(0.9rem, 2.8vw, 1.1rem);
+}
+
+.alert-notification[data-text-length="medium"] .alert-text {
+    font-size: clamp(0.8rem, 2.6vw, 1rem);
+}
+
+.alert-notification[data-text-length="long"] .alert-text {
+    font-size: clamp(0.7rem, 2.2vw, 0.9rem);
+}
+
+.alert-notification[data-text-length="very-long"] .alert-text {
+    font-size: clamp(0.65rem, 2vw, 0.8rem);
+}
+
+/* Icon styling for alerts */
+.alert-notification .alert-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Demo credentials styling within alerts */
+.alert-notification .demo-credentials {
+    margin-top: 0.5rem;
+    font-size: 0.85em;
+    line-height: 1.3;
+}
+
+.alert-notification .demo-credentials p {
+    margin: 0 0 0.25rem 0;
+    font-weight: 600;
+}
+
+.alert-notification .demo-credentials ul {
+    margin: 0;
+    padding-left: 1rem;
+}
+
+.alert-notification .demo-credentials li {
+    margin: 0.1rem 0;
+}
+
+/* Alert icon styling */
+.alert-notification::before {
+    content: '';
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.2;
+    flex-shrink: 0;
+}
+
+.alert-notification.success::before {
+    background: #16a34a;
+    opacity: 0.3;
+}
+
+.alert-notification.danger::before {
+    background: #dc2626;
+    opacity: 0.3;
+}
+
+.alert-notification.info::before {
+    background: #2563eb;
+    opacity: 0.3;
+}
+
+.alert-notification.warning::before {
+    background: #d97706;
+    opacity: 0.3;
+}
+
+.alert-notification.success {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border-color: #bbf7d0;
+    color: #166534;
+}
+
+.alert-notification.danger {
+    background: linear-gradient(135deg, #fef2f2, #fee2e2);
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+.alert-notification.info {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-color: #bfdbfe;
+    color: #2563eb;
+}
+
+.alert-notification.warning {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border-color: #fed7aa;
+    color: #d97706;
+}
+
+/* Alert animations */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.alert-notification.hide {
+    animation: slideOutRight 0.4s ease-in forwards;
+}
+
+/* Alert close button */
+.alert-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: rgba(0, 0, 0, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: inherit;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.alert-close:hover {
+    background: rgba(0, 0, 0, 0.2);
+    transform: scale(1.1);
+}
+
+/* Responsive alert positioning */
+@media (max-width: 768px) {
+    .alert-notification {
+        top: 1rem;
+        right: 1rem;
+        left: 1rem;
+        max-width: none;
+        min-width: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .alert-notification .alert-text {
+        font-size: clamp(0.7rem, 2.2vw, 0.9rem);
+    }
+}
+
+@media (max-width: 480px) {
+    .alert-notification {
+        top: 0.5rem;
+        right: 0.5rem;
+        left: 0.5rem;
+        padding: 0.875rem 1.25rem;
+        max-width: none;
+        min-width: auto;
+    }
+
+    .alert-notification .alert-text {
+        font-size: clamp(0.65rem, 2vw, 0.8rem);
+    }
+}
+
+/* 1920x1080 and larger displays - Enhanced spacing and sizing */
+@media (min-width: 1920px) {
+    .login-title {
+        font-size: clamp(2rem, 5vw, 3rem);
+        margin-bottom: 2.5rem;
+    }
+
+    .login-subtitle {
+        font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+        margin-bottom: 2rem;
+    }
+
+    .alert-notification {
+        top: 3rem;
+        right: 3rem;
+        max-width: 500px;
+        min-width: 400px;
+        padding: 2rem 2.5rem;
+    }
+
+    .alert-notification .alert-text {
+        font-size: clamp(0.9rem, 2.8vw, 1.2rem);
+    }
+}
+
+/* Ultra-wide displays - Optimized for 21:9 and similar ratios */
+@media (min-width: 2560px) {
+    .login-title {
+        font-size: clamp(2.5rem, 6vw, 3.5rem);
+        margin-bottom: 3rem;
+    }
+
+    .login-subtitle {
+        font-size: clamp(1.8rem, 4vw, 2.5rem);
+        margin-bottom: 2.5rem;
+    }
+
+    .alert-notification {
+        top: 4rem;
+        right: 4rem;
+        max-width: 600px;
+        min-width: 500px;
+        padding: 2.5rem 3rem;
+    }
+
+    .alert-notification .alert-text {
+        font-size: clamp(1rem, 3vw, 1.3rem);
+    }
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        radial-gradient(circle at 20% 80%, rgba(0, 111, 81, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(0, 166, 125, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(0, 224, 131, 0.2) 0%, transparent 50%);
+    z-index: 1;
+}
+
+.login-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    opacity: 0.4;
+    z-index: 1;
+}
+
+.login-container>* {
+    position: relative;
+    z-index: 2;
+}
+
+/* ---- CARD ---- */
+.login-card {
+    width: 460px;
+    /* fixed width */
+    /* readable width */
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: var(--shadow);
+    padding: var(--card-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    animation: slideInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+
+    /* Responsive height: fit viewport at any zoom, but cap near 640px */
+    height: auto;
+    max-height: clamp(520px, 92vh, 640px);
+    overflow-y: visible !important;
+    /* enable popup to show outside card boundaries */
+}
+
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border-radius: 24px;
+    z-index: -1;
+}
+
+.login-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow:
+        0 24px 48px rgba(0, 0, 0, 0.16),
+        0 12px 24px rgba(0, 0, 0, 0.08);
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(40px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.login-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.login-logo img {
+    height: clamp(80px, 12vw, 120px);
+    width: clamp(80px, 12vw, 120px);
+    margin-bottom: clamp(0.75rem, 2vw, 1.25rem);
+    filter: drop-shadow(0 12px 24px rgba(0, 111, 81, 0.2));
+}
+
+.login-logo h1 {
+    font-weight: 900;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    color: #1a1a1a;
+    background: linear-gradient(135deg, #006f51, #00a67d, #00E083);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+    /* never break into two lines */
+    /* space below the alert */
+    text-shadow: 0 4px 8px rgba(0, 111, 81, 0.2);
+    position: relative;
+}
+
+
+.login-title {
+    text-align: center;
+    margin-bottom: 2rem;
+    /* significantly increased spacing between logo and welcome back text */
+    font-weight: 900;
+    font-size: clamp(1.2rem, 4.5vw, 2.5rem);
+    /* significantly larger and more prominent */
+    color: #1a1a1a;
+    /* removed gradient, using solid color */
+    letter-spacing: -0.02em;
+    text-shadow: 0 4px 8px rgba(0, 111, 81, 0.3);
+    position: relative;
+}
+
+/* removed the underline decoration */
+
+.login-subtitle {
+    text-align: center;
+    margin-bottom: var(--subtitle-margin-bottom);
+    /* better spacing below subtitle */
+    margin-top: 1rem;
+    /* increased spacing from title */
+    font-weight: 700;
+    font-size: clamp(1.2rem, 3.2vw, 1.8rem);
+    /* larger and more prominent subtitle */
+    color: #374151;
+    /* removed gradient, using solid color */
+    line-height: 1.4;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    letter-spacing: 0.01em;
+}
+
+/* Enhanced Form Label Visibility */
+.form-group label {
+    display: flex;
+    /* align icon and text */
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+    /* reduce gap to input */
+    font-weight: 800;
+    font-size: 1.2rem;
+    /* match layout and icon size */
+    color: #1a1a1a;
+    letter-spacing: 0.025em;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #006f51, #00a67d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    padding: 0.25rem 0;
+    /* slimmer */
+    border-bottom: 1px solid rgba(0, 166, 125, 0.25);
+    position: relative;
+}
+
+.form-group label::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, #006f51, #00a67d, #00E083);
+    border-radius: 1px;
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.form-group label:hover::after {
+    transform: scaleX(1);
+}
+
+.form-group label:hover {
+    background: linear-gradient(135deg, #00a67d, #00E083);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    border-bottom-color: rgba(0, 166, 125, 0.4);
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+}
+
+/* Enhanced form spacing */
+.form-group {
+    margin-bottom: 1rem;
+    position: relative;
+    padding: 0.75rem 0.75rem 1.25rem;
+    /* extra bottom padding so helper isn't overlapped */
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid rgba(229, 231, 235, 0.9);
+    transition: border-color 0.2s ease;
+}
+
+.form-group:hover {
+    background: #ffffff;
+    border-color: rgba(209, 213, 219, 0.9);
+}
+
+/* Disable blinking cursor in login page */
+.login-container * {
+    caret-color: transparent;
+}
+
+/* Form control enhancements */
+.input {
+    width: 100%;
+    padding: clamp(10px, 1.6dvh, 14px);
+    font-size: var(--fs-md);
+    border: 1px solid #e4efe9;
+    border-radius: 10px;
+    outline: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1a1a1a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-weight: 600;
+    letter-spacing: 0.015em;
+    position: relative;
+    z-index: 5;
+}
+
+/* Keep existing form-control for backward compatibility */
+.form-control {
+    width: 100%;
+    padding: clamp(10px, 1.6dvh, 14px) clamp(10px, 1.6dvh, 14px) clamp(10px, 1.6dvh, 14px) 3rem;
+    font-size: var(--fs-md);
+    border: 2px solid rgba(229, 231, 235, 0.9);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1a1a1a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-weight: 600;
+    letter-spacing: 0.015em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    position: relative;
+    z-index: 5;
+}
+
+
+.form-control::placeholder {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+/* Input group enhancements */
+.input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    overflow: visible;
+    /* allow tooltips/icons to extend outside */
+}
+
+.input-icon {
+    position: absolute;
+    left: 1.25rem;
+    color: #6b7280;
+    font-size: 1.3rem;
+    transition: color 0.3s ease;
+    z-index: 10;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 1.25rem;
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0.75rem;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    font-size: 1.3rem;
+    z-index: 10;
+}
+
+.password-toggle:hover {
+    color: #00a67d;
+    background: rgba(0, 166, 125, 0.12);
+}
+
+.btn {
+    width: 100%;
+    padding-block: clamp(10px, 1.8dvh, 14px);
+    border: 0;
+    border-radius: 10px;
+    font-size: var(--fs-md);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #006f51 0%, #00a67d 100%);
+    color: #fff;
+}
+
+.btn-secondary {
+    background: #eaf8f1;
+    color: #0aa55f;
+}
+
+/* Keep existing login-btn for backward compatibility */
+.login-btn {
+    width: 100%;
+    padding: clamp(10px, 1.8dvh, 14px) clamp(12px, 2dvh, 16px);
+    margin-top: var(--gap);
+    background: linear-gradient(135deg, #006f51 0%, #00a67d 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 1.15rem;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    box-shadow: 0 8px 22px rgba(0, 111, 81, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.login-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+}
+
+.login-btn:hover::before {
+    left: 100%;
+}
+
+.login-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 111, 81, 0.45);
+    background: linear-gradient(135deg, #00a67d 0%, #00E083 100%);
+}
+
+.login-btn:active {
+    transform: translateY(0);
+}
+
+.login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.secondary-btn {
+    background: transparent;
+    color: #00a67d;
+    border: 3px solid #00a67d;
+    font-weight: 700;
+    padding: 1.25rem 2rem;
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 1.2rem;
+    letter-spacing: 0.025em;
+    box-shadow: 0 8px 25px rgba(0, 166, 125, 0.2);
+}
+
+.secondary-btn:hover {
+    background: #00a67d;
+    color: white;
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(0, 166, 125, 0.4);
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    color: #00a67d;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.link-btn:hover {
+    color: #006f51;
+    background: rgba(0, 166, 125, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Legacy alert styles - kept for backward compatibility but not used in new design */
+.alert {
+    display: none;
+    /* Hidden since we're using the new notification system */
+}
+
+.alert-danger {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+.alert-success {
+    background: #f0fdf4;
+    color: #16a34a;
+    border-color: #bbf7d0;
+}
+
+.alert-info {
+    background: #eff6ff;
+    color: #2563eb;
+    border-color: #bfdbfe;
+}
+
+.alert-warning {
+    background: #fffbeb;
+    color: #d97706;
+    border-color: #fed7aa;
+}
+
+/* Enhanced Password Strength Container - Professional tooltip positioning */
+.password-strength-container {
+    display: none; /* Hidden by default for login form */
+    margin: 0 !important;
+    padding: 1.5rem !important;
+    background: #ffffff !important;
+    border-radius: 12px !important;
+    border: 2px solid rgba(0, 166, 125, 0.2) !important;
+    box-shadow: 0 8px 25px rgba(0, 111, 81, 0.15) !important;
+    transition: all 0.3s ease;
+    min-width: 280px !important;
+}
+
+/* Professional tooltip container for password requirements */
+.password-tooltip-container {
+    position: absolute !important;
+    top: -10px !important;
+    right: calc(100% + 25px) !important;
+    z-index: 1060;
+    width: 320px !important;
+    max-width: 320px !important;
+}
+
+.password-tooltip-container .password-strength-container {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    width: 100% !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 2px solid rgba(0, 166, 125, 0.3) !important;
+    box-shadow: 0 15px 35px rgba(0, 111, 81, 0.2), 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Add relative positioning to form containers for password popup */
+.reset-password-view .form-group.password-group,
+.create-account-view .form-group.password-group {
+    position: relative;
+}
+
+/* Show password strength meter for reset password and create account forms */
+.reset-password-view .password-strength-container,
+.create-account-view .password-strength-container {
+    display: block;
+    position: absolute;
+    left: calc(100% + 20px); /* Position to the right of the password field */
+    top: 0;
+    z-index: 1000;
+    width: 300px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Responsive positioning for smaller screens */
+@media (max-width: 1400px) {
+    .reset-password-view .password-strength-container,
+    .create-account-view .password-strength-container {
+        position: static;
+        left: auto;
+        top: auto;
+        width: 100%;
+        margin-top: 1rem;
+    }
+    
+    .password-tooltip-container {
+        position: static !important;
+        right: auto !important;
+        top: auto !important;
+        width: 100% !important;
+        margin-top: 1rem !important;
+    }
+}
+
+.password-strength-container:hover {
+    box-shadow: 0 12px 35px rgba(0, 111, 81, 0.2);
+    transform: translateY(-3px);
+}
+
+/* Enhanced Saved Accounts Feature */
+.saved-accounts-container {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 2px solid rgba(0, 166, 125, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 15px 35px rgba(0, 111, 81, 0.15), 0 5px 15px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    animation: slideDown 0.3s ease-out;
+}
+
+.saved-accounts-container h4 {
+    color: #00a67d;
+    margin: 0 0 0.75rem 0;
+    padding: 1rem 1rem 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(0, 166, 125, 0.1);
+}
+
+.saved-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(0, 166, 125, 0.05);
+}
+
+.saved-account-item:hover {
+    background: rgba(0, 166, 125, 0.08);
+    transform: translateX(2px);
+}
+
+.saved-account-item:last-child {
+    border-bottom: none;
+}
+
+.account-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.account-name {
+    font-weight: 600;
+    color: #1a1a1a;
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
+}
+
+.account-email {
+    color: #6b7280;
+    font-size: 0.8rem;
+}
+
+.remove-account-btn {
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.remove-account-btn:hover {
+    background: rgba(220, 53, 69, 0.1);
+    transform: scale(1.1);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.password-strength-header {
+    margin-bottom: 1.5rem;
+}
+
+.password-strength-header h4 {
+    color: #00a67d;
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.password-strength-header p {
+    color: #6b7280;
+    margin: 0 0 1rem 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.password-strength-bar {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.password-strength-fill {
+    height: 100%;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    position: relative;
+}
+
+.password-strength-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.password-strength-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.5rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.password-requirements {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.requirement-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.requirement-item:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateX(6px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.requirement-icon.met {
+    color: #00a67d;
+    background: rgba(0, 166, 125, 0.2);
+    border-radius: 50%;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 6px rgba(0, 166, 125, 0.3);
+    transition: all 0.3s ease;
+    min-width: 20px;
+    height: 20px;
+}
+
+.requirement-icon.met:hover {
+    transform: scale(1.2);
+    box-shadow: 0 6px 15px rgba(0, 166, 125, 0.4);
+}
+
+.requirement-icon.not-met {
+    color: #9ca3af;
+    background: rgba(156, 163, 175, 0.15);
+    border-radius: 50%;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+    min-width: 20px;
+    height: 20px;
+}
+
+.requirement-text.met {
+    color: #00a67d;
+    font-weight: 700;
+}
+
+.requirement-text.not-met {
+    color: #6b7280;
+    font-weight: 600;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+}
+
+.modal-content {
+    background: white;
+    padding: 3rem;
+    border-radius: 24px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.modal-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+/* footer / helper blocks inside the card */
+.helper-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--fs-sm);
+}
+
+/* Demo Credentials */
+.demo-credentials {
+    background: #f2fbf6;
+    border: 1px solid #e4efe9;
+    border-radius: 12px;
+    padding: clamp(10px, 1.8dvh, 14px);
+    font-size: var(--fs-sm);
+    line-height: 1.35;
+    /* tighter to save space at high zoom */
+    margin-top: var(--gap);
+}
+
+.demo-credentials p {
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: clamp(0.5rem, 2vw, 1rem);
+    font-size: clamp(0.8rem, 2vw, 1rem);
+}
+
+.demo-credentials .d-flex {
+    gap: 1rem;
+}
+
+.demo-credentials .text-muted {
+    font-weight: 700;
+    color: #6b7280;
+}
+
+.demo-credentials span {
+    font-weight: 700;
+    color: #00a67d;
+}
+
+/* Form Text */
+.form-text {
+    font-size: 0.78rem;
+    /* slightly larger and more readable */
+    font-weight: 600;
+    color: #4b5563;
+    margin-top: 0.35rem;
+    /* give breathing room below the field */
+    line-height: 1.45;
+    padding: 0.35rem 0.5rem;
+    /* card-like tooltip look */
+    background: rgba(0, 166, 125, 0.06);
+    border-radius: 8px;
+    border-left: 3px solid #00a67d;
+}
+
+/* Login Actions */
+.login-actions {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.login-actions small {
+    font-weight: 600;
+    color: #6b7280;
+}
+
+/* Password Input Container */
+.password-input-container {
+    position: relative !important;
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: visible !important;
+}
+
+.password-input-container .form-control {
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding-left: 3rem;
+    padding-right: 3.5rem;
+}
+
+
+/* Back to Login Button */
+.back-to-login-btn {
+    background: none;
+    border: none;
+    color: #00a67d;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.back-to-login-btn:hover {
+    color: #006f51;
+    background: rgba(0, 166, 125, 0.1);
+    transform: translateY(-1px);
+}
+
+.back-to-login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Back Button - Removed redundant back buttons */
+.back-btn,
+.back-to-login-btn {
+    font-size: clamp(0.68rem, 1.5vw, 0.82rem);
+    /* more smaller than subtitle */
+    /* smaller than title, same as subtitle */
+    font-weight: 700;
+    background: none;
+    border: none;
+    color: #00a67d;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.4rem;
+}
+
+/* View Container */
+.view-container {
+    min-height: auto;
+    transition: all 0.3s ease;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.view-enter {
+    animation: fadeInUp 0.4s ease;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Dense content adjustments */
+.view-enter .form-group label {
+    font-size: 1.15rem;
+    margin-bottom: 0.5rem;
+}
+
+.view-enter .form-control {
+    font-size: 0.975rem;
+    padding: 0.8rem 0.95rem 0.8rem 2.8rem;
+}
+
+.view-enter .login-btn {
+    margin-top: 1rem;
+}
+
+/* Flex Utilities */
+.d-flex {
+    display: flex;
+}
+
+.flex-column {
+    flex-direction: column;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.justify-content-between {
+    justify-content: space-between;
+}
+
+.justify-content-center {
+    justify-content: center;
+}
+
+.gap-2 {
+    gap: 0.5rem;
+}
+
+.gap-3 {
+    gap: 1rem;
+}
+
+.gap-4 {
+    gap: 1.5rem;
+}
+
+/* Margin Utilities */
+.mb-0 {
+    margin-bottom: 0;
+}
+
+.mb-1 {
+    margin-bottom: 0.25rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.mb-4 {
+    margin-bottom: 1.5rem;
+}
+
+.mb-5 {
+    margin-bottom: 2rem;
+}
+
+.mt-0 {
+    margin-top: 0;
+}
+
+.mt-1 {
+    margin-top: 0.25rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.mt-3 {
+    margin-top: 1rem;
+}
+
+.mt-4 {
+    margin-top: 1.5rem;
+}
+
+.mt-5 {
+    margin-top: 2rem;
+}
+
+/* Responsive Design - Enhanced for 1920x1080 and zooming */
+@media (max-width: 1200px) {
+    .login-card {
+        max-width: 560px;
+        padding: 2rem;
+        max-height: calc(100vh - 2rem);
+    }
+}
+
+@media (max-width: 992px) {
+    .login-card {
+        max-width: 520px;
+        padding: 1.75rem;
+        max-height: calc(100vh - 2rem);
+    }
+}
+
+@media (max-width: 768px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        max-width: 100%;
+        min-width: auto;
+        margin: 1rem;
+        padding: 2.5rem;
+    }
+
+    .login-logo h1 {
+        font-size: 2.5rem;
+    }
+
+    .login-title {
+        font-size: 1.8rem;
+    }
+
+    .login-subtitle {
+        font-size: 1.1rem;
+    }
+
+    .modal-content {
+        margin: 1rem;
+        padding: 2rem;
+    }
+
+    .password-requirements {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .password-strength-container {
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .form-control {
+        padding: 1rem 1.125rem;
+        font-size: 1rem;
+    }
+
+    .login-btn {
+        padding: 1.25rem 1.5rem;
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-card {
+        padding: 2rem;
+    }
+
+    .login-logo img {
+        height: 120px;
+        width: 120px;
+    }
+
+    .login-logo h1 {
+        font-size: 2.2rem;
+    }
+
+    .login-title {
+        font-size: 1.6rem;
+    }
+
+    .login-subtitle {
+        font-size: 1rem;
+    }
+
+    .form-control {
+        padding: 0.875rem 1rem;
+        font-size: 0.95rem;
+    }
+
+    .login-btn {
+        padding: 1rem 1.25rem;
+        font-size: 1.1rem;
+    }
+
+    .password-strength-container {
+        padding: 1.25rem;
+        margin-top: 1.25rem;
+    }
+
+    .password-requirements {
+        gap: 0.75rem;
+    }
+
+    .requirement-item {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* High DPI and Zoom Support */
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+    .login-card {
+        border-width: 0.5px;
+    }
+
+    .form-control {
+        border-width: 1.5px;
+    }
+
+    .login-btn {
+        border-width: 0.5px;
+    }
+}
+
+/* Zoom Support - Ensure visibility at different zoom levels */
+@media screen and (max-resolution: 96dpi) {
+    .login-card {
+        transform: none;
+    }
+}
+
+@media screen and (min-resolution: 144dpi) {
+    .login-card {
+        transform: none;
+    }
+}
+
+/* Loading States */
+.loading-spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Connection Status */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.connection-status.checking {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 2px solid #bfdbfe;
+}
+
+.connection-status.connected {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 2px solid #bbf7d0;
+}
+
+.connection-status.disconnected {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 2px solid #fecaca;
+}
+
+/* Text utilities */
+.text-muted {
+    color: #6b7280;
+    font-weight: 600;
+}
+
+/* Form label enhancements for specific forms */
+.form-label {
+    display: flex;
+    flex-direction: row;
+    /* place icon and text on the same row */
+    align-items: center;
+    /* vertical centering */
+    justify-content: flex-start;
+    /* horizontal align icon + text together */
+    gap: 0.9rem;
+    /* add more space between icon and label */
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #1a1a1a;
+    margin-bottom: 0.4rem;
+    /* closer to input */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    line-height: 1;
+    /* ensure consistent text height for alignment */
+}
+
+/* When label has no icon, keep spacing compact */
+.form-label.no-icon {
+    gap: 0.25rem;
+}
+
+.form-label-text {
+    margin-top: 0;
+    /* keep text vertically centered with icon */
+    display: inline-block;
+    line-height: 1;
+}
+
+.form-label svg {
+    color: #00a67d;
+    width: 1.2rem;
+    /* match text size proportionally */
+    height: 1.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transform: translateY(0.02em);
+    /* subtle baseline tweak */
+    background: rgba(0, 166, 125, 0.12);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 166, 125, 0.25);
+    padding: 0;
+    /* use explicit size instead of padding for better centering */
+}
+
+/* Enhanced form visibility and spacing for 1920x1080 */
+@media screen and (min-width: 1920px) {
+    .login-container {
+        padding: 2rem;
+    }
+
+    .login-card {
+        max-width: 560px;
+        padding: 2rem;
+    }
+
+    .login-logo h1 {
+        font-size: 2rem;
+    }
+
+    .login-title {
+        font-size: 1.75rem;
+    }
+
+    .login-subtitle {
+        font-size: 1.05rem;
+    }
+}
+
+/* Ensure proper visibility at different zoom levels */
+@media screen and (min-resolution: 120dpi) {
+    .login-card {
+        background: rgba(255, 255, 255, 0.99);
+        border-width: 2px;
+    }
+
+    .form-control {
+        background: #ffffff;
+        border-width: 3px;
+    }
+
+    .alert {
+        border-width: 2px;
+        background: rgba(255, 255, 255, 0.98);
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .login-card {
+        background: #ffffff;
+        border: 3px solid #000000;
+    }
+
+    .form-control {
+        border: 3px solid #000000;
+        background: #ffffff;
+        color: #000000;
+    }
+
+    .login-btn {
+        background: #006f51;
+        color: #ffffff;
+        border: 3px solid #000000;
+    }
+
+    .link-btn.forgot-password,
+    .link-btn.create-account {
+        background: #00a67d;
+        color: #ffffff;
+        border: 3px solid #000000;
+    }
+}
+
+/* Ensure forms are always visible */
+.login-form {
+    width: 100%;
+    max-width: 100%;
+    overflow: visible !important;
+}
+
+.login-form .form-group {
+    position: relative;
+    z-index: 10;
+    overflow: visible !important;
+}
+
+.login-form .form-control {
+    position: relative;
+    z-index: 5;
+}
+
+
+/* Ensure buttons are always visible and clickable */
+.login-btn,
+.link-btn,
+.secondary-btn {
+    position: relative;
+    z-index: 20;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Enhanced hover effects for better visibility */
+.login-btn:hover,
+.link-btn:hover,
+.secondary-btn:hover {
+    position: relative;
+    z-index: 25;
+}
+
+/* Ensure proper stacking context */
+.login-card {
+    position: relative;
+    z-index: 30;
+}
+
+.view-container {
+    position: relative;
+    z-index: 35;
+}
+
+/* Form validation visual feedback */
+.form-control.is-valid {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.15), 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.form-control.is-invalid {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.15), 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Loading state enhancements */
+.login-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    position: relative;
+    z-index: 15;
+}
+
+/* Ensure proper spacing in all views */
+.view-enter {
+    width: 100%;
+    max-width: 100%;
+}
+
+.view-enter>* {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Select dropdown enhancements */
+.form-control[type="select"],
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+    cursor: pointer;
+}
+
+
+/* Remember Me and Forgot Password Row Layout */
+.login-options-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+}
+
+/* Remember Me Container */
+.remember-me-container {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* closer to text but not too close */
+}
+
+/* Circular Toggle Button */
+.remember-toggle {
+    width: 1.1em;
+    /* scale with text size */
+    height: 1.1em;
+    /* scale with text size */
+    border: 2px solid #00a67d;
+    border-radius: 4px;
+    /* square-ish checkbox */
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Draw white checkmark when active */
+.remember-toggle::after {
+    content: '';
+    position: absolute;
+    width: 0.55em;
+    /* larger checkmark */
+    height: 0.95em;
+    /* larger checkmark */
+    border: 2px solid transparent;
+    border-right-color: #ffffff;
+    border-bottom-color: #ffffff;
+    transform: rotate(45deg) scale(1);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.remember-toggle:hover {
+    border-color: #008f68;
+}
+
+.remember-toggle.active {
+    background: #00a67d;
+    border-color: #00a67d;
+}
+
+.remember-toggle.active::after {
+    opacity: 1;
+}
+
+/* Hide legacy inner dot, checkbox now uses ::after checkmark */
+.toggle-circle {
+    display: none;
+}
+
+/* Remember Me Text */
+.remember-text {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #00a67d;
+    user-select: none;
+}
+
+/* Forgot Password Link - Green Text Only */
+.forgot-password-link {
+    background: none;
+    border: none;
+    color: #00a67d;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-decoration: underline;
+    transition: all 0.3s ease;
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.forgot-password-link:hover {
+    color: #006f51;
+    background: rgba(0, 166, 125, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Create Account Container - Centered below Sign In */
+.create-account-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Create Account Button */
+.create-account-btn {
+    background: linear-gradient(135deg, #00a67d 0%, #00E083 100%);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(0, 166, 125, 0.3);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.create-account-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.create-account-btn:hover::before {
+    left: 100%;
+}
+
+.create-account-btn:hover {
+    background: linear-gradient(135deg, #00E083 0%, #00a67d 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 166, 125, 0.4);
+    color: white;
+}
+
+/* Responsive Design for New Layout */
+@media (max-width: 768px) {
+    .login-options-row {
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: center;
+        text-align: center;
+    }
+
+    .remember-me-container {
+        order: 1;
+    }
+
+    .forgot-password-link {
+        order: 2;
+    }
+
+    .create-account-container {
+        order: 3;
+        margin-top: 1rem;
+    }
+
+    .remember-toggle {
+        width: 22px;
+        height: 22px;
+    }
+
+    .toggle-circle {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-options-row {
+        padding: 0 0.5rem;
+    }
+
+    .remember-toggle {
+        width: 22px;
+        height: 22px;
+    }
+
+    .toggle-circle {
+        display: none;
+    }
+
+    .remember-text {
+        font-size: 1rem;
+    }
+
+    .forgot-password-link {
+        font-size: 1rem;
+    }
+
+    .create-account-btn {
+        padding: 0.875rem 1.75rem;
+        font-size: 1rem;
+    }
+}
+
+/* Height-based compaction without scrollbars for dense views (Forgot/Reset/Create) */
+@media (max-height: 950px) {
+    .login-container {
+        padding: 1.25rem;
+    }
+
+    .login-card {
+        padding: 1.75rem;
+    }
+
+    .login-logo img {
+        height: 100px;
+        width: 100px;
+        margin-bottom: 0.75rem;
+    }
+
+    .login-logo h1 {
+        font-size: 1.7rem;
+    }
+
+    .login-title {
+        font-size: 1.55rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .login-subtitle {
+        font-size: 1rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.9rem;
+        padding: 0.7rem;
+    }
+
+    .form-group label {
+        font-size: 1.15rem;
+        margin-bottom: 0.45rem;
+    }
+
+    .form-control {
+        padding: 0.75rem 0.9rem;
+        font-size: 0.96rem;
+    }
+
+    .login-btn {
+        padding: 0.95rem 1.1rem;
+        font-size: 1.06rem;
+        margin-top: 0.9rem;
+    }
+
+    .password-strength-container {
+        padding: 1.25rem;
+        margin-top: 1rem;
+    }
+
+    .password-requirements {
+        grid-template-columns: 1fr;
+        gap: 0.9rem;
+    }
+
+    .requirement-item {
+        padding: 0.85rem;
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-height: 850px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        padding: 1.5rem;
+    }
+
+    .login-logo img {
+        height: 88px;
+        width: 88px;
+    }
+
+    .login-logo h1 {
+        font-size: 1.5rem;
+    }
+
+    .login-title {
+        font-size: 1.4rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.75rem;
+        padding: 0.6rem;
+    }
+
+    .form-group label {
+        font-size: 1.05rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .form-control {
+        padding: 0.65rem 0.85rem;
+        font-size: 0.92rem;
+    }
+
+    .login-btn {
+        padding: 0.85rem 1rem;
+        font-size: 1.02rem;
+    }
+
+    .password-strength-container {
+        padding: 1rem;
+    }
+}
+
+@media (max-height: 760px) {
+    .login-container {
+        padding: 0.75rem;
+    }
+
+    .login-card {
+        padding: 1.25rem;
+    }
+
+    .login-logo img {
+        height: 76px;
+        width: 76px;
+    }
+
+    .login-logo h1 {
+        font-size: 1.3rem;
+    }
+
+    .login-title {
+        font-size: 1.25rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.6rem;
+        padding: 0.5rem;
+    }
+
+    .form-group label {
+        font-size: 1rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .form-control {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+    }
+
+    .login-btn {
+        padding: 0.75rem 0.95rem;
+        font-size: 0.98rem;
+    }
+}
+
+/* Responsive scale-down to keep all content visible at any zoom without scrollbars */
+.login-card {
+    will-change: transform;
+}
+
+@media (max-height: 980px) {
+    .login-container {
+        padding: 1.5rem;
+    }
+
+    .login-card {
+        transform: scale(0.98);
+        transform-origin: top center;
+    }
+}
+
+@media (max-height: 920px) {
+    .login-container {
+        padding: 1.25rem;
+    }
+
+    .login-card {
+        transform: scale(0.96);
+        transform-origin: top center;
+    }
+}
+
+@media (max-height: 860px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        transform: scale(0.94);
+        transform-origin: top center;
+    }
+}
+
+@media (max-height: 800px) {
+    .login-container {
+        padding: 0.875rem;
+    }
+
+    .login-card {
+        transform: scale(0.92);
+        transform-origin: top center;
+    }
+}
+
+@media (max-height: 740px) {
+    .login-container {
+        padding: 0.75rem;
+    }
+
+    .login-card {
+        transform: scale(0.9);
+        transform-origin: top center;
+    }
+}
+
+@media (max-height: 680px) {
+    .login-container {
+        padding: 0.5rem;
+    }
+
+    .login-card {
+        transform: scale(0.86);
+        transform-origin: top center;
+    }
+}
+
+/* Also guard for narrow widths when users increase zoom on smaller screens */
+@media (max-width: 640px) {
+    .login-card {
+        transform: scale(0.96);
+        transform-origin: top center;
+    }
+}
+
+@media (max-width: 580px) {
+    .login-card {
+        transform: scale(0.92);
+        transform-origin: top center;
+    }
+}
+
+@media (max-width: 520px) {
+    .login-card {
+        transform: scale(0.88);
+        transform-origin: top center;
+    }
+}
+
+/* Large-screen compact baseline so 100% at 1920x1080 matches the compact view */
+@media screen and (min-width: 1600px) and (min-height: 900px) {
+
+    /* Ensure no transforms from other rules interfere */
+    .login-card {
+        max-width: 440px;
+        padding: 1.25rem;
+        transform: none !important;
+    }
+
+    .login-container {
+        padding: 1.25rem;
+    }
+
+    .login-logo img {
+        height: 80px;
+        width: 80px;
+        margin-bottom: 0.5rem;
+    }
+
+    .login-logo h1 {
+        font-size: 1.25rem;
+    }
+
+    .login-title {
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.9rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.65rem;
+        padding: 0.5rem;
+    }
+
+    .form-group label {
+        font-size: 1rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .form-control {
+        padding: 0.6rem 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .input-icon {
+        left: 0.75rem;
+        font-size: 1.1rem;
+    }
+
+    .password-toggle {
+        right: 0.75rem;
+        padding: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .login-btn {
+        padding: 0.7rem 0.9rem;
+        font-size: 0.95rem;
+        margin-top: 0.75rem;
+        border-radius: 10px;
+    }
+
+    .secondary-btn {
+        padding: 0.6rem 0.85rem;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+
+    .link-btn {
+        font-size: 0.95rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    .login-actions {
+        margin-top: 0.75rem;
+    }
+
+    /* Password helper sections trimmed for compactness */
+    .password-strength-container {
+        padding: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .password-strength-header h4 {
+        font-size: 1rem;
+    }
+
+    .password-strength-header p {
+        font-size: 0.9rem;
+    }
+
+    .password-strength-bar {
+        height: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .password-strength-label {
+        font-size: 1rem;
+        padding: 0.6rem;
+    }
+
+    .password-requirements {
+        grid-template-columns: 1fr;
+        gap: 0.6rem;
+    }
+
+    .requirement-item {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+
+    .requirement-icon.met,
+    .requirement-icon.not-met {
+        font-size: 0.9rem;
+        padding: 0.4rem;
+    }
+
+    .requirement-text.met,
+    .requirement-text.not-met {
+        font-size: 0.9rem;
+    }
+
+    /* Options row */
+    .login-options-row {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        padding: 0;
+    }
+
+    .remember-toggle {
+        width: 22px;
+        height: 22px;
+    }
+
+    .toggle-circle {
+        width: 10px;
+        height: 10px;
+    }
+
+    .remember-text,
+    .forgot-password-link {
+        font-size: 0.95rem;
+    }
+
+    /* Create account button */
+    .create-account-btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+}
+
+/* Responsive scaling overrides: scale with viewport via vmin and em, ensure full visibility */
+.login-card {
+    font-size: clamp(10px, min(1.0vmin, 0.8vw, 0.8vh), 13px) !important;
+    max-height: 94vh;
+}
+
+.login-container {
+    padding: 1.25rem;
+}
+
+/* Use em so children scale with .login-card font-size */
+.login-logo img {
+    height: 5em !important;
+    width: 5em !important;
+    margin-bottom: 0.8em !important;
+}
+
+.login-logo h1 {
+    font-size: 2em !important;
+}
+
+.login-title {
+    font-size: 1.45em !important;
+    margin-bottom: 0.7em !important;
+}
+
+.login-subtitle {
+    font-size: 1.02em !important;
+    margin-bottom: 0.8em !important;
+}
+
+.form-group {
+    margin-bottom: 0.9em !important;
+    padding: 0.7em !important;
+}
+
+.form-group label {
+    font-size: 1.05em !important;
+    margin-bottom: 0.45em !important;
+}
+
+.form-control {
+    padding: 0.8em 0.95em !important;
+    font-size: 1em !important;
+}
+
+.input-icon,
+.password-toggle {
+    font-size: 1.05em !important;
+}
+
+.login-btn {
+    padding: 0.9em 1.1em !important;
+    font-size: 1.05em !important;
+    margin-top: 0.9em !important;
+    border-radius: 0.7em !important;
+}
+
+.secondary-btn {
+    padding: 0.75em 1.0em !important;
+    font-size: 0.98em !important;
+    border-radius: 0.7em !important;
+}
+
+.link-btn {
+    font-size: 0.98em !important;
+    padding: 0.55em 0.75em !important;
+}
+
+/* Password helper sections */
+.password-strength-container {
+    padding: 0.9em !important;
+    margin-top: 0.9em !important;
+}
+
+.password-strength-header h4 {
+    font-size: 0.98em !important;
+}
+
+.password-strength-header p {
+    font-size: 0.92em !important;
+}
+
+.password-strength-bar {
+    height: 0.5em !important;
+    margin-bottom: 0.9em !important;
+}
+
+.password-strength-label {
+    font-size: 0.98em !important;
+    padding: 0.6em !important;
+}
+
+.password-requirements {
+    grid-template-columns: 1fr !important;
+    gap: 0.75em !important;
+}
+
+.requirement-item {
+    padding: 0.75em !important;
+    font-size: 0.92em !important;
+}
+
+/* Options row */
+.login-options-row {
+    margin-top: 0.9em !important;
+    margin-bottom: 0.9em !important;
+    padding: 0 !important;
+}
+
+.remember-toggle {
+    width: 1.6em !important;
+    height: 1.6em !important;
+}
+
+.toggle-circle {
+    width: 1em !important;
+    height: 1em !important;
+}
+
+.remember-text,
+.forgot-password-link {
+    font-size: 0.98em !important;
+}
+
+/* Ensure the card never grows beyond viewport; allow page scroll if still needed */
+@media (max-height: 740px) {
+    .login-card {
+        max-height: 90vh;
+    }
+}
+
+/* Final overrides: keep width constant; scale UI by height only; no transforms */
+.login-card {
+    /* Keep visual width constant (existing max-width governs width); do not transform-scale */
+    transform: none !important;
+    /* Scale typography with viewport height so content fits top-to-bottom */
+    font-size: clamp(10px, 1.6vh, 15px) !important;
+    max-height: 94vh;
+}
+
+/* Scale internals with em so they follow the card's font-size (height-based) */
+.login-logo img {
+    height: 5.2em !important;
+    width: 5.2em !important;
+    margin-bottom: 0.8em !important;
+}
+
+.login-logo h1 {
+    font-size: 2em !important;
+}
+
+.login-title {
+    font-size: 1.5em !important;
+    margin-bottom: 0.7em !important;
+}
+
+.login-subtitle {
+    font-size: 1.05em !important;
+    margin-bottom: 0.8em !important;
+}
+
+.form-group {
+    margin-bottom: 0.9em !important;
+    padding: 0.7em !important;
+}
+
+.form-group label {
+    font-size: 1.06em !important;
+    margin-bottom: 0.45em !important;
+}
+
+.form-control {
+    padding: 0.8em 0.95em !important;
+    font-size: 1em !important;
+}
+
+.input-icon,
+.password-toggle {
+    font-size: 1.05em !important;
+}
+
+.login-btn {
+    padding: 0.9em 1.1em !important;
+    font-size: 1.05em !important;
+    margin-top: 0.9em !important;
+    border-radius: 0.7em !important;
+}
+
+.secondary-btn {
+    padding: 0.75em 1em !important;
+    font-size: 1em !important;
+    border-radius: 0.7em !important;
+}
+
+.link-btn {
+    font-size: 1em !important;
+    padding: 0.55em 0.75em !important;
+}
+
+/* Helper sections */
+.password-strength-container {
+    padding: 0.9em !important;
+    margin-top: 0.9em !important;
+}
+
+.password-strength-header h4 {
+    font-size: 1em !important;
+}
+
+.password-strength-header p {
+    font-size: 0.95em !important;
+}
+
+.password-strength-bar {
+    height: 0.5em !important;
+    margin-bottom: 0.9em !important;
+}
+
+.password-strength-label {
+    font-size: 1em !important;
+    padding: 0.6em !important;
+}
+
+.password-requirements {
+    grid-template-columns: 1fr !important;
+    gap: 0.75em !important;
+}
+
+.requirement-item {
+    padding: 0.75em !important;
+    font-size: 0.95em !important;
+}
+
+/* Options row */
+.login-options-row {
+    margin-top: 0.9em !important;
+    margin-bottom: 0.9em !important;
+    padding: 0 !important;
+}
+
+.remember-toggle {
+    width: 1.6em !important;
+    height: 1.6em !important;
+}
+
+.toggle-circle {
+    width: 1em !important;
+    height: 1em !important;
+}
+
+.remember-text,
+.forgot-password-link {
+    font-size: 1em !important;
+}
+
+/* Slightly tighter layout on very short heights; width remains unchanged */
+@media (max-height: 740px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        max-height: 92vh;
+    }
+}
+
+/* Center the auth card horizontally and vertically */
+@supports (place-items: center) {
+    .login-container {
+        display: grid;
+        place-items: center;
+    }
+}
+
+.login-card {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Force true centering of the auth card */
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+.login-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    width: 100%;
+}
+
+.login-card {
+    margin: auto !important;
+}
+
+/* Create Account mode: wider card and two-column form */
+.login-card.create-mode {
+    width: min(95vw, 1000px) !important;
+    max-width: 1000px !important;
+    max-height: 92vh !important;
+    /* keep entire form visible at any zoom */
+    overflow: hidden !important;
+    /* Ensure Create Account has different styling from login/reset */
+    background: rgba(255, 255, 255, 0.99) !important;
+    backdrop-filter: blur(20px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+    border: 2px solid rgba(0, 166, 125, 0.15) !important;
+    box-shadow:
+        0 20px 40px rgba(0, 111, 81, 0.15),
+        0 8px 16px rgba(0, 166, 125, 0.1) !important;
+}
+
+/* Two-column grid for create account form */
+.view-enter .login-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+/* Only apply two columns in create account view on sufficient width */
+.login-card.create-mode .login-form {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(300px, 1fr)) !important;
+    gap: 1.25rem 2rem !important;
+    align-items: start !important;
+}
+
+/* Left column fields */
+.login-card.create-mode #createName,
+.login-card.create-mode #createEmail,
+.login-card.create-mode #createReferenceEmail,
+.login-card.create-mode #createRole {
+    width: 100%;
+}
+
+/* Ensure each .form-group spans appropriate column */
+.login-card.create-mode .form-group {
+    margin: 0;
+}
+
+/* Place left-side groups in column 1 */
+.login-card.create-mode .form-group:has(#createName),
+.login-card.create-mode .form-group:has(#createEmail),
+.login-card.create-mode .form-group:has(#createReferenceEmail),
+.login-card.create-mode .form-group:has(#createRole) {
+    grid-column: 1;
+}
+
+/* Place password groups in column 2 */
+.login-card.create-mode .form-group:has(#createPassword),
+.login-card.create-mode .form-group:has(#createConfirmPassword) {
+    grid-column: 2;
+}
+
+/* Submit button full width row and centered */
+.login-card.create-mode .login-btn[type="submit"] {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+    width: 260px !important;
+    margin-top: 1rem !important;
+    background: linear-gradient(135deg, #00a67d, #00E083) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    padding: 0.875rem 2rem !important;
+    border-radius: 12px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(0, 166, 125, 0.3) !important;
+}
+
+.login-card.create-mode .login-btn[type="submit"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(0, 166, 125, 0.4) !important;
+    background: linear-gradient(135deg, #009a6f, #00d67a) !important;
+}
+
+/* Responsive fallback to single column on smaller screens */
+@media (max-width: 992px) {
+    .login-card.create-mode {
+        width: min(95vw, 680px) !important;
+        max-width: 680px !important;
+    }
+
+    .login-card.create-mode .login-form {
+        grid-template-columns: 1fr !important;
+    }
+
+    .login-card.create-mode .login-btn[type="submit"] {
+        width: 100%;
+    }
+}
+
+/* Create Account layout refinements for alignment and containment */
+.login-card.create-mode {
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+/* Keep the create account card at a comfortable width */
+.login-card.create-mode {
+    max-width: 1000px !important;
+}
+
+.login-card.create-mode .login-form {
+    grid-auto-flow: row dense;
+    grid-auto-rows: minmax(min-content, auto);
+    place-content: start stretch;
+    align-items: stretch;
+}
+
+.login-card.create-mode .form-group {
+    min-width: 0;
+    align-self: start;
+}
+
+.login-card.create-mode .form-group .form-control,
+.login-card.create-mode .password-input-container,
+.login-card.create-mode .password-input-container .form-control {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.login-card.create-mode .input-group,
+.login-card.create-mode .password-input-container {
+    max-width: 100%;
+    overflow: visible;
+}
+
+/* Ensure the top row aligns: Full Name (left) with Password (right) */
+.login-card.create-mode .form-group:has(#createName) {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+.login-card.create-mode .form-group:has(#createPassword) {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+/* Next rows align accordingly */
+.login-card.create-mode .form-group:has(#createEmail) {
+    grid-row: 2;
+    grid-column: 1;
+}
+
+.login-card.create-mode .form-group:has(#createConfirmPassword) {
+    grid-row: 2;
+    grid-column: 2;
+}
+
+.login-card.create-mode .form-group:has(#createReferenceEmail) {
+    grid-row: 3;
+    grid-column: 1;
+}
+
+.login-card.create-mode .form-group:has(#createRole) {
+    grid-row: 4;
+    grid-column: 1;
+}
+
+/* Keep button centered and within container */
+.login-card.create-mode .login-btn[type="submit"] {
+    grid-row: 5;
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 260px;
+    max-width: 60%;
+}
+
+/* Prevent icon overlap on very narrow heights */
+@media (max-height: 760px) {
+    .login-card.create-mode .password-toggle {
+        position: relative;
+        right: 0.5rem;
+    }
+}
+
+/* Create Account spacing/align refinements */
+.login-card.create-mode .login-subtitle {
+    margin-bottom: 0.75rem !important;
+}
+
+.login-card.create-mode .login-form {
+    row-gap: 0.75rem;
+    column-gap: 1.25rem;
+    grid-auto-rows: minmax(min-content, auto);
+}
+
+.login-card.create-mode .form-group {
+    margin-bottom: 0 !important;
+    padding: 0.5rem !important;
+}
+
+.login-card.create-mode .form-group .form-text {
+    margin-top: 0.4rem;
+}
+
+/* Ensure left column blocks are close to each other and aligned */
+.login-card.create-mode .form-group:has(#createName),
+.login-card.create-mode .form-group:has(#createEmail),
+.login-card.create-mode .form-group:has(#createReferenceEmail),
+.login-card.create-mode .form-group:has(#createRole) {
+    grid-column: 1;
+}
+
+/* Keep submit button separate and centered without overlap */
+.login-card.create-mode .login-btn[type="submit"] {
+    margin-top: 0.75rem;
+    grid-column: 1 / -1;
+    justify-self: center;
+    align-self: start;
+    width: 260px;
+    max-width: 60%;
+}
+
+/* Create Account strict alignment: no horizontal gap between columns */
+.login-card.create-mode .login-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 0 !important;
+    row-gap: 0.5rem !important;
+}
+
+/* Remove extra padding/margins inside groups so columns meet without space */
+.login-card.create-mode .form-group {
+    margin: 0 !important;
+    padding: 0.5rem !important;
+    /* restore normal internal padding */
+}
+
+.login-card.create-mode .form-group label {
+    margin-bottom: 0.4rem !important;
+}
+
+.login-card.create-mode .input-group,
+.login-card.create-mode .password-input-container {
+    margin: 0 !important;
+}
+
+/* Ensure controls fill their column width exactly */
+.login-card.create-mode .form-control {
+    width: 100% !important;
+}
+
+/* Maintain explicit row alignment */
+.login-card.create-mode .form-group:has(#createName) {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+.login-card.create-mode .form-group:has(#createPassword) {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.login-card.create-mode .form-group:has(#createEmail) {
+    grid-row: 2;
+    grid-column: 1;
+}
+
+.login-card.create-mode .form-group:has(#createConfirmPassword) {
+    grid-row: 2;
+    grid-column: 2;
+}
+
+.login-card.create-mode .form-group:has(#createReferenceEmail) {
+    grid-row: 3;
+    grid-column: 1;
+}
+
+.login-card.create-mode .form-group:has(#createRole) {
+    grid-row: 4;
+    grid-column: 1;
+}
+
+/* Submit row spans both columns and is centered, separated by small top margin */
+.login-card.create-mode .login-btn[type="submit"] {
+    grid-row: 5;
+    grid-column: 1 / -1;
+    justify-self: center;
+    align-self: start;
+    margin-top: 0.75rem !important;
+    width: 260px;
+    max-width: 60%;
+}
+
+/* Align Email (left) with Password Requirements (right) in Create mode */
+.login-card.create-mode .form-group:has(#createEmail) {
+    margin-top: 5.75rem !important;
+    /* offset to align with password requirements */
+}
+
+@media (max-height: 800px) {
+    .login-card.create-mode .form-group:has(#createEmail) {
+        margin-top: 5.25rem !important;
+    }
+}
+
+@media (max-height: 720px) {
+    .login-card.create-mode .form-group:has(#createEmail) {
+        margin-top: 4.75rem !important;
+    }
+}
+
+/* Map semantic classes to exact grid positions for perfect alignment */
+.login-card.create-mode .login-form {
+    grid-template-columns: 1fr 1fr;
+}
+
+.login-card.create-mode .create-name {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+.login-card.create-mode .create-password {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.login-card.create-mode .create-email {
+    grid-row: 2;
+    grid-column: 1;
+}
+
+.login-card.create-mode .create-confirm {
+    grid-row: 2;
+    grid-column: 2;
+}
+
+.login-card.create-mode .create-reference {
+    grid-row: 3;
+    grid-column: 1;
+}
+
+.login-card.create-mode .create-role {
+    grid-row: 4;
+    grid-column: 1;
+}
+
+/* Keep zero horizontal gap */
+.login-card.create-mode .login-form {
+    column-gap: 0 !important;
+    row-gap: 0.5rem !important;
+}
+
+/* Ensure button sits on its own row centered */
+.login-card.create-mode .login-btn[type="submit"] {
+    grid-row: 5;
+    grid-column: 1 / -1;
+    justify-self: center;
+}
+
+/* Position new semantic groups for perfect horizontal alignment */
+.login-card.create-mode .create-name {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+.login-card.create-mode .create-password {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.login-card.create-mode .create-email {
+    grid-row: 2;
+    grid-column: 1;
+}
+
+.login-card.create-mode .create-reqs {
+    grid-row: 2;
+    grid-column: 2;
+}
+
+.login-card.create-mode .create-reference {
+    grid-row: 3;
+    grid-column: 1;
+}
+
+.login-card.create-mode .create-confirm {
+    grid-row: 3;
+    grid-column: 2;
+}
+
+.login-card.create-mode .create-role {
+    grid-row: 4;
+    grid-column: 1;
+}
+
+/* Keep zero column gap and tight rows */
+.login-card.create-mode .login-form {
+    column-gap: 0 !important;
+    row-gap: 0.5rem !important;
+}
+
+/* Ensure no inner spacing causes offset */
+.login-card.create-mode .form-group {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.login-card.create-mode .form-group label {
+    margin-bottom: 0.4rem !important;
+}
+
+/* Remove vertical space between Full Name and Email in create mode */
+.login-card.create-mode .login-form {
+    row-gap: 0.5rem !important;
+    /* match right column item spacing */
+}
+
+/* Column wrappers for create account layout */
+.login-card.create-mode .create-left {
+    grid-column: 1 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem !important;
+    /* add vertical space between left-side fields */
+    align-self: stretch;
+    width: 100% !important;
+}
+
+.login-card.create-mode .create-right {
+    grid-column: 2 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem !important;
+    align-self: stretch;
+    width: 100% !important;
+}
+
+/* Ensure right column fields (Password, Confirm) use full available width */
+.login-card.create-mode .create-right>.form-group {
+    width: 100% !important;
+    padding: 0.5rem !important;
+}
+
+/* Ensure password fields match role field size */
+.login-card.create-mode .create-password .password-input-container,
+.login-card.create-mode .create-confirm .password-input-container {
+    height: auto !important;
+}
+
+.login-card.create-mode .create-password .form-control,
+.login-card.create-mode .create-confirm .form-control {
+    height: auto !important;
+    min-height: 2.5rem !important;
+}
+
+.login-card.create-mode .create-right .password-input-container,
+.login-card.create-mode .create-right .password-input-container .form-control {
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.login-card.create-mode .create-password .form-control,
+.login-card.create-mode .create-confirm .form-control {
+    width: 100% !important;
+    border: 2px solid rgba(0, 166, 125, 0.2) !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    transition: all 0.3s ease !important;
+}
+
+
+/* Ensure left stack items have zero margins/paddings between them */
+.login-card.create-mode .create-left>.form-group {
+    margin: 0 !important;
+    padding: 0.5rem !important;
+    /* restore normal size for fields */
+    width: 100% !important;
+}
+
+/* Force full width controls in left column */
+.login-card.create-mode .create-left .form-control,
+.login-card.create-mode .create-left select.form-control {
+    width: 100% !important;
+    box-sizing: border-box;
+    padding-left: 3rem !important;
+    border: 2px solid rgba(0, 166, 125, 0.2) !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    transition: all 0.3s ease !important;
+}
+
+
+.login-card.create-mode .create-left>.form-group .form-label {
+    margin-bottom: 0.15rem !important;
+}
+
+.login-card.create-mode .create-left>.form-group .form-control,
+.login-card.create-mode .create-left>.form-group .form-text {
+    margin: 0 !important;
+}
+
+.login-card.create-mode .create-name {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.login-card.create-mode .create-name label {
+    margin-bottom: 0.25rem !important;
+}
+
+.login-card.create-mode .create-name .form-control {
+    margin: 0 !important;
+}
+
+.login-card.create-mode .create-email {
+    margin-top: 0 !important;
+}
+
+.login-card.create-mode .create-email label {
+    margin-top: 0 !important;
+}
+
+.login-card.create-mode .form-control {
+    margin: 0 !important;
+}
+
+/* Hide password requirements in login view */
+.login-card.login-mode .password-strength-container {
+    display: none !important;
+}
+
+/* Nudge Email up to align with Password Requirements top */
+.login-card.create-mode .create-email {
+    margin-top: 0 !important;
+}
+
+@media (min-height: 900px) {
+    .login-card.create-mode .create-email {
+        margin-top: 0 !important;
+    }
+}
+
+@media (max-height: 760px) {
+    .login-card.create-mode .create-email {
+        margin-top: 0 !important;
+    }
+}
+
+/* Ensure Email aligns with Password Requirements */
+.login-card.create-mode .create-reqs {
+    grid-row: 2;
+    grid-column: 2;
+}
+
+/* Keep no vertical gap between Full Name and Email */
+.login-card.create-mode .login-form {
+    row-gap: 0 !important;
+}
+
+.login-card.create-mode .create-name {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.login-card.create-mode .create-email {
+    margin-top: 0 !important;
+}
+
+/* Create Account: column-based layout (left stack, right stack) */
+.login-card.create-mode .login-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(300px, 1fr)) !important;
+    /* prevent narrow columns */
+    grid-auto-flow: row;
+    column-gap: 20px !important;
+    /* balanced spacing between columns */
+    row-gap: 0 !important;
+    grid-template-rows: auto auto auto;
+    /* Ensure create account button gets its own row */
+}
+
+/* Ensure create account button is always visible */
+.login-card.create-mode .login-btn {
+    grid-row: 3;
+    margin-top: clamp(0.5rem, 2vw, 1rem);
+}
+
+/* Reset any prior explicit row placement */
+.login-card.create-mode .create-name,
+.login-card.create-mode .create-email,
+.login-card.create-mode .create-reference,
+.login-card.create-mode .create-role,
+.login-card.create-mode .create-password,
+.login-card.create-mode .create-reqs,
+.login-card.create-mode .create-confirm {
+    grid-row: auto !important;
+}
+
+/* Column reassignment: Left column = role, password, confirm. Right = name, email, reference */
+.login-card.create-mode .create-role {
+    grid-column: 1;
+    order: 10;
+}
+
+.login-card.create-mode .create-password {
+    grid-column: 1;
+    order: 20;
+}
+
+.login-card.create-mode .create-confirm {
+    grid-column: 1;
+    order: 30;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.login-card.create-mode .create-name {
+    grid-column: 2;
+    order: 10;
+}
+
+.login-card.create-mode .create-email {
+    grid-column: 2;
+    order: 20;
+}
+
+.login-card.create-mode .create-reference {
+    grid-column: 2;
+    order: 30;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.login-card.create-mode .create-reqs {
+    grid-column: 2;
+    order: 40;
+}
+
+/* Submit button spans both columns below stacks */
+.login-card.create-mode .login-btn[type="submit"] {
+    grid-column: 1 / -1;
+    order: 100;
+    justify-self: center;
+}
+
+/* Remove extra vertical space on left column in Create mode */
+.login-card.create-mode .login-form {
+    row-gap: 0.25rem !important;
+}
+
+.login-card.create-mode .create-name,
+.login-card.create-mode .create-email,
+.login-card.create-mode .create-reference,
+.login-card.create-mode .create-role {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.login-card.create-mode .create-reference .form-text {
+    margin-top: 0.2rem !important;
+    line-height: 1.2 !important;
+}
+
+/* Ensure inputs have no extra margins contributing to gaps */
+.login-card.create-mode .create-name .form-control,
+.login-card.create-mode .create-email .form-control,
+.login-card.create-mode .create-reference .form-control,
+.login-card.create-mode .create-role .form-control {
+    margin: 0 !important;
+    padding-left: 3rem !important;
+}
+
+/* Create-mode left column: remove all inter-group vertical gaps */
+.login-card.create-mode .login-form {
+    row-gap: 0 !important;
+}
+
+/* Small screens: stack vertically */
+@media (max-width: 640px) {
+    .login-card.create-mode .login-form {
+        grid-template-columns: 1fr !important;
+        column-gap: 0 !important;
+    }
+}
+
+.login-card.create-mode .create-name,
+.login-card.create-mode .create-email,
+.login-card.create-mode .create-reference,
+.login-card.create-mode .create-role {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Minimal spacing only between label and input */
+.login-card.create-mode .create-name label,
+.login-card.create-mode .create-email label,
+.login-card.create-mode .create-reference label,
+.login-card.create-mode .create-role label {
+    margin-bottom: 0.15rem !important;
+}
+
+/* Ensure inputs and helper text do not add unexpected margins */
+.login-card.create-mode .create-name .form-control,
+.login-card.create-mode .create-email .form-control,
+.login-card.create-mode .create-reference .form-control,
+.login-card.create-mode .create-role .form-control {
+    margin: 0 !important;
+    padding-left: 3rem !important;
+}
+
+/* FINAL OVERRIDES: Remove any leftover vertical spacing between left-column fields */
+.login-card.create-mode .create-name,
+.login-card.create-mode .create-email,
+.login-card.create-mode .create-reference,
+.login-card.create-mode .create-role {
+    gap: 0 !important;
+}
+
+.login-card.create-mode .form-group:has(#createName),
+.login-card.create-mode .form-group:has(#createEmail),
+.login-card.create-mode .form-group:has(#createReferenceEmail),
+.login-card.create-mode .form-group:has(#createRole) {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.login-card.create-mode .form-group:has(#createEmail) {
+    margin-top: 0 !important;
+}
+
+.login-card.create-mode .form-group:has(#createReferenceEmail) {
+    margin-top: 0 !important;
+}
+
+.login-card.create-mode .create-reference .form-text {
+    margin: 0.15rem 0 0 0 !important;
+}
+
+/* Password requirements popup positioning next to password fields */
+.password-group {
+    position: relative;
+}
+
+.password-popup-container {
+    position: absolute !important;
+    top: 0 !important;
+    right: -1rem !important;
+    transform: translateX(100%) !important;
+    width: 320px !important;
+    max-width: 40vw !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.password-popup-container .password-strength-container {
+    background: #ffffff !important;
+    border: 2px solid rgba(0, 166, 125, 0.2) !important;
+    box-shadow: 0 8px 25px rgba(0, 111, 81, 0.15) !important;
+    border-radius: 12px !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+}
+
+/* Ensure password popup works in Create Account form */
+.login-card.create-mode .create-password {
+    position: relative !important;
+}
+
+.login-card.create-mode .create-password .password-popup-container {
+    position: absolute !important;
+    top: 0 !important;
+    right: -1rem !important;
+    transform: translateX(100%) !important;
+    width: 320px !important;
+    max-width: 40vw !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.login-card.create-mode .create-password .password-popup-container .password-strength-container {
+    background: #ffffff !important;
+    border: 2px solid rgba(0, 166, 125, 0.2) !important;
+    box-shadow: 0 8px 25px rgba(0, 111, 81, 0.15) !important;
+    border-radius: 12px !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+}
+
+/* Ensure password popup works in Reset Password form */
+.form-group.password-group {
+    position: relative !important;
+}
+
+.form-group.password-group .password-popup-container {
+    position: absolute !important;
+    top: 0 !important;
+    right: -1rem !important;
+    transform: translateX(100%) !important;
+    width: 320px !important;
+    max-width: 40vw !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.form-group.password-group .password-popup-container .password-strength-container {
+    background: #ffffff !important;
+    border: 2px solid rgba(0, 166, 125, 0.2) !important;
+    box-shadow: 0 8px 25px rgba(0, 111, 81, 0.15) !important;
+    border-radius: 12px !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+}
+
+/* Demo Accounts Popup */
+.demo-accounts-popup {
+    position: absolute;
+    top: 0.25rem;
+    right: -1rem;
+    transform: translateX(100%);
+    width: 320px;
+    max-width: 40vw;
+    z-index: 60;
+}
+
+.demo-accounts-popup-content {
+    background: #ffffff;
+    border: 2px solid rgba(0, 166, 125, 0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 8px 25px rgba(0, 111, 81, 0.15);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.demo-accounts-popup-content h4 {
+    color: #00a67d;
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.demo-account-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.demo-account-item:last-child {
+    margin-bottom: 0;
+}
+
+.demo-role {
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 0.85rem;
+    min-width: 80px;
+}
+
+.demo-email {
+    color: #00a67d;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Always-visible, faded requirements on the right side of the card */
+.login-card.create-mode {
+    position: relative;
+}
+
+.password-reqs-fixed {
+    position: absolute;
+    top: 200px;
+    right: -12px;
+    transform: translateX(100%);
+    width: 340px;
+    max-width: 42vw;
+    opacity: 1;
+    pointer-events: none;
+}
+
+/* Align password requirements with password field */
+.login-card.create-mode .create-password {
+    position: relative;
+}
+
+.password-reqs-fixed {
+    top: 0;
+    right: -12px;
+    transform: translateX(100%);
+}
+
+.password-reqs-fixed .password-strength-container {
+    opacity: 1;
+    background: #ffffff !important;
+    border: 2px solid rgba(0, 166, 125, 0.2);
+}
+
+/* ===== RESPONSIVE DESIGN BREAKPOINTS ===== */
+
+/* Large Desktop (1920x1080 and above) */
+@media (min-width: 1920px) {
+    .login-card {
+        max-width: 600px;
+        padding: 2.5rem;
+    }
+
+    .login-logo img {
+        height: 140px;
+        width: 140px;
+    }
+
+    .login-logo h1 {
+        font-size: 2.2rem;
+    }
+
+    .login-title {
+        font-size: 2rem;
+    }
+
+    .form-control {
+        font-size: 1.1rem;
+        padding: 1rem 1.2rem 1rem 3.5rem;
+    }
+}
+
+/* Medium Desktop (1366x768 to 1919px) */
+@media (max-width: 1919px) and (min-width: 1366px) {
+    .login-card {
+        max-width: 520px;
+        padding: 2rem;
+    }
+}
+
+/* Small Desktop (1024x768 to 1365px) */
+@media (max-width: 1365px) and (min-width: 1024px) {
+    .login-card {
+        max-width: 480px;
+        padding: 1.8rem;
+    }
+
+    .demo-credentials {
+        margin-top: 2rem;
+        padding: 1.5rem;
+    }
+}
+
+/* Tablet Landscape (768px to 1023px) */
+@media (max-width: 1023px) and (min-width: 768px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        max-width: 450px;
+        padding: 1.5rem;
+    }
+
+    .login-logo img {
+        height: 100px;
+        width: 100px;
+    }
+
+    .demo-credentials {
+        margin-top: 1.5rem;
+        padding: 1.25rem;
+    }
+}
+
+/* Tablet Portrait (481px to 767px) */
+@media (max-width: 767px) and (min-width: 481px) {
+    .login-container {
+        padding: 0.75rem;
+    }
+
+    .login-card {
+        max-width: 400px;
+        padding: 1.25rem;
+    }
+
+    .login-logo img {
+        height: 90px;
+        width: 90px;
+    }
+
+    .login-logo h1 {
+        font-size: 1.8rem;
+    }
+
+    .login-title {
+        font-size: 1.5rem;
+    }
+
+    .demo-credentials {
+        margin-top: 1.25rem;
+        padding: 1rem;
+    }
+}
+
+/* Mobile (320px to 480px) */
+@media (max-width: 480px) {
+    .login-container {
+        padding: 0.5rem;
+    }
+
+    .login-card {
+        max-width: 100%;
+        padding: 1rem;
+        border-radius: 12px;
+    }
+
+    .login-logo img {
+        height: 80px;
+        width: 80px;
+    }
+
+    .login-logo h1 {
+        font-size: 1.6rem;
+    }
+
+    .login-title {
+        font-size: 1.3rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .form-control {
+        font-size: 0.9rem;
+        padding: 0.75rem 0.8rem 0.75rem 2.5rem;
+    }
+
+    .demo-credentials {
+        margin-top: 1rem;
+        padding: 0.75rem;
+    }
+
+    .demo-credentials p {
+        font-size: 0.95rem;
+    }
+}
+
+/* Height-based responsive adjustments - No scrollbars approach */
+@media (max-height: 800px) {
+    .login-container {
+        align-items: flex-start;
+        padding-top: 0.25rem;
+    }
+
+    .login-card {
+        max-height: 98vh;
+        padding: clamp(0.75rem, 2vw, 1rem);
+    }
+
+    .login-logo {
+        margin-bottom: 0.15rem;
+    }
+
+    .login-logo img {
+        height: clamp(40px, 5vw, 60px);
+        width: clamp(40px, 5vw, 60px);
+        margin-bottom: 0.15rem;
+    }
+
+    .login-logo h1 {
+        font-size: clamp(1rem, 2.5vw, 1.4rem);
+    }
+
+    .login-title {
+        font-size: clamp(0.9rem, 2vw, 1.2rem);
+        margin-bottom: 0.15rem;
+    }
+
+    .login-subtitle {
+        font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+        margin-bottom: 0.25rem;
+    }
+
+    .demo-credentials {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+        max-height: 25vh;
+    }
+
+    .demo-credentials p {
+        font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+        margin-bottom: 0.25rem;
+    }
+}
+
+@media (max-height: 600px) {
+    .login-container {
+        align-items: flex-start;
+        padding-top: 0.15rem;
+    }
+
+    .login-card {
+        max-height: 99vh;
+        padding: clamp(0.5rem, 1.5vw, 0.75rem);
+    }
+
+    .login-logo img {
+        height: 30px;
+        width: 30px;
+        margin-bottom: 0.1rem;
+    }
+
+    .login-logo h1 {
+        font-size: 1rem;
+    }
+
+    .login-title {
+        font-size: 0.9rem;
+        margin-bottom: 0.1rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.7rem;
+        margin-bottom: 0.15rem;
+    }
+
+    .form-control {
+        padding: clamp(0.5rem, 1.2vw, 0.6rem) clamp(0.5rem, 1.2vw, 0.6rem) clamp(0.5rem, 1.2vw, 0.6rem) 2rem;
+        font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+    }
+
+    .demo-credentials {
+        margin-top: 0.25rem;
+        padding: 0.25rem;
+        max-height: 20vh;
+    }
+
+    .demo-credentials p {
+        font-size: 0.7rem;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* Zoom-specific adjustments for 50-67% zoom on 1920x1080 - No scrollbars */
+@media (min-width: 1920px) and (max-height: 1080px) {
+    .login-container {
+        align-items: flex-start;
+        padding-top: 0.15rem;
+    }
+
+    .login-card {
+        max-height: 98vh;
+        padding: clamp(0.5rem, 1.5vw, 0.75rem);
+    }
+
+    .login-logo img {
+        height: clamp(40px, 5vw, 60px);
+        width: clamp(40px, 5vw, 60px);
+    }
+
+    .login-logo h1 {
+        font-size: clamp(1rem, 2.5vw, 1.4rem);
+    }
+
+    .login-title {
+        font-size: clamp(0.9rem, 2vw, 1.2rem);
+    }
+
+    .login-subtitle {
+        font-size: clamp(0.7rem, 1.8vw, 0.9rem);
+        margin-bottom: 0.2rem;
+    }
+
+    .form-control {
+        padding: clamp(0.6rem, 1.5vw, 0.75rem) clamp(0.6rem, 1.5vw, 0.8rem) clamp(0.6rem, 1.5vw, 0.75rem) 2.5rem;
+        font-size: clamp(0.8rem, 2vw, 0.9rem);
+    }
+
+    .login-btn {
+        padding: clamp(0.7rem, 1.8vw, 0.9rem) clamp(1rem, 2.5vw, 1.25rem);
+        font-size: clamp(0.8rem, 2vw, 0.95rem);
+        margin-top: 0.5rem;
+    }
+
+    .demo-credentials {
+        margin-top: 0.3rem;
+        padding: 0.5rem;
+        max-height: 20vh;
+    }
+
+    .demo-credentials p {
+        font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+        margin-bottom: 0.3rem;
+    }
+}
+
+/* sections inside card */
+.login-header {
+    text-align: center;
+}
+
+.login-header img {
+    width: clamp(70px, 10dvh, 100px);
+    height: auto;
+    display: block;
+    margin: 0 auto var(--gap);
+}
+
+.login-title {
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    margin: 0;
+}
+
+.login-subtitle {
+    font-size: var(--fs-sm);
+    opacity: .8;
+    margin: 4px 0 0;
+}
+
+.login-form {
+    display: grid;
+    gap: var(--gap);
+}
+
+.login-container {
+    box-sizing: border-box;
+}
+
+/* Adaptive content sizing based on viewport */
+.view-enter {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.05rem, 0.6vw, 0.25rem);
+    /* maintain proper spacing */
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    margin-top: 0.5rem;
+    /* proper spacing from logo */
+}
+
+/* Responsive form spacing */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.25rem, 1.5vw, 0.75rem);
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Adaptive demo credentials - hide on very small screens */
+@media (max-height: 500px) {
+    .demo-credentials {
+        display: none;
+    }
+
+    .login-card {
+        max-height: 100vh;
+        padding: clamp(0.4rem, 1vw, 0.6rem);
+    }
+
+    .login-logo img {
+        height: 25px;
+        width: 25px;
+        margin-bottom: 0.05rem;
+    }
+
+    .login-logo h1 {
+        font-size: 0.9rem;
+    }
+
+    .login-title {
+        font-size: 0.8rem;
+        margin-bottom: 0.05rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.6rem;
+        margin-bottom: 0.1rem;
+    }
+
+    .form-control {
+        padding: 0.4rem 0.5rem 0.4rem 1.8rem;
+        font-size: 0.7rem;
+    }
+}
+
+/* Ultra-compact mode for very small viewports */
+@media (max-height: 400px) {
+
+    /* Ensure minimum spacing even at very small heights */
+    .login-title {
+        margin-bottom: 0.75rem !important;
+        margin-top: 0.5rem !important;
+    }
+
+    .alert {
+        margin-bottom: 0.75rem !important;
+        margin-top: 0.5rem !important;
+    }
+}
+
+/* Additional zoom level handling for very small viewports */
+@media (max-height: 400px) {
+    .login-logo {
+        display: none;
+    }
+
+    .login-title {
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        padding: 0.5rem 0.6rem 0.5rem 2rem;
+        font-size: 0.8rem;
+    }
+
+    .login-btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* Ensure alert spacing in compact mode */
+    .alert {
+        margin-bottom: 1rem;
+        margin-top: 0.5rem;
+        padding: 1rem 1.25rem;
+    }
+}
+
+/* Critical zoom level fixes - 75% zoom demo credentials visibility */
+@media (min-width: 1440px) and (max-height: 810px) {
+    .login-container {
+        align-items: flex-start;
+        padding-top: 0.1rem;
+    }
+
+    .login-card {
+        max-height: 99vh;
+        padding: clamp(0.4rem, 1.2vw, 0.6rem);
+    }
+
+    /* Ensure proper spacing at high zoom levels */
+    .login-title {
+        margin-bottom: 2rem;
+        margin-top: 1rem;
+    }
+
+    .alert {
+        margin-bottom: 2rem;
+        margin-top: 1.5rem;
+    }
+
+    /* Additional zoom level handling */
+    .login-title {
+        margin-bottom: clamp(1.5rem, 3dvh, 2.5rem);
+        margin-top: clamp(0.75rem, 1.5dvh, 1.5rem);
+    }
+
+    .alert {
+        margin-bottom: clamp(1.5rem, 3dvh, 2.5rem);
+        margin-top: clamp(0.75rem, 1.5dvh, 1.5rem);
+    }
+
+    .login-logo img {
+        height: clamp(35px, 4vw, 50px);
+        width: clamp(35px, 4vw, 50px);
+        margin-bottom: 0.1rem;
+    }
+
+    .login-logo h1 {
+        font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+    }
+
+    .login-title {
+        font-size: clamp(0.8rem, 1.8vw, 1rem);
+        margin-bottom: 0.1rem;
+    }
+
+    .login-subtitle {
+        font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+        margin-bottom: 0.15rem;
+    }
+
+    .form-control {
+        padding: clamp(0.5rem, 1.2vw, 0.6rem) clamp(0.5rem, 1.2vw, 0.6rem) clamp(0.5rem, 1.2vw, 0.6rem) 2.2rem;
+        font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+    }
+
+    .login-btn {
+        padding: clamp(0.6rem, 1.5vw, 0.8rem) clamp(0.8rem, 2vw, 1rem);
+        font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+        margin-top: 0.3rem;
+    }
+
+    .demo-credentials {
+        margin-top: 0.2rem;
+        padding: 0.3rem;
+        max-height: 18vh;
+    }
+
+    .demo-credentials p {
+        font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+        margin-bottom: 0.2rem;
+    }
+}
+
+/* Critical zoom level fixes - 80-100% zoom create account button visibility */
+@media (min-width: 1536px) and (max-height: 864px) {
+    .login-container {
+        align-items: flex-start;
+        padding-top: 0.05rem;
+    }
+
+    .login-card {
+        max-height: 99.5vh;
+        padding: clamp(0.3rem, 1vw, 0.5rem);
+    }
+
+    .login-logo img {
+        height: clamp(30px, 3.5vw, 45px);
+        width: clamp(30px, 3.5vw, 45px);
+        margin-bottom: 0.05rem;
+    }
+
+    .login-logo h1 {
+        font-size: clamp(0.8rem, 2vw, 1.1rem);
+    }
+
+    .login-title {
+        font-size: clamp(0.7rem, 1.6vw, 0.9rem);
+        margin-bottom: 0.05rem;
+    }
+
+    .login-subtitle {
+        font-size: clamp(0.5rem, 1.3vw, 0.7rem);
+        margin-bottom: 0.1rem;
+    }
+
+    .form-control {
+        padding: clamp(0.4rem, 1vw, 0.5rem) clamp(0.4rem, 1vw, 0.5rem) clamp(0.4rem, 1vw, 0.5rem) 2rem;
+        font-size: clamp(0.6rem, 1.6vw, 0.75rem);
+    }
+
+    .login-btn {
+        padding: clamp(0.5rem, 1.3vw, 0.7rem) clamp(0.7rem, 1.8vw, 0.9rem);
+        font-size: clamp(0.6rem, 1.6vw, 0.8rem);
+        margin-top: 0.2rem;
+    }
+
+    .demo-credentials {
+        margin-top: 0.15rem;
+        padding: 0.25rem;
+        max-height: 15vh;
+    }
+
+    .demo-credentials p {
+        font-size: clamp(0.5rem, 1.3vw, 0.65rem);
+        margin-bottom: 0.15rem;
+    }
+}
+
+/* Smart content prioritization */
+@media (max-height: 600px) and (max-width: 768px) {
+    .login-card {
+        grid-template-rows: auto auto auto;
+        gap: 0.5rem;
+    }
+
+    .demo-credentials {
+        order: -1;
+        margin-top: 0;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Create Account form specific optimizations for button visibility */
+.login-card.create-mode {
+    max-height: 98vh;
+}
+
+@media (max-height: 700px) {
+    .login-card.create-mode {
+        max-height: 99vh;
+        padding: clamp(0.4rem, 1.2vw, 0.6rem);
+    }
+
+    .login-card.create-mode .login-form {
+        gap: clamp(0.2rem, 1vw, 0.4rem);
+    }
+
+    .login-card.create-mode .create-left,
+    .login-card.create-mode .create-right {
+        gap: clamp(0.2rem, 1vw, 0.4rem);
+    }
+
+    .login-card.create-mode .form-group {
+        margin-bottom: clamp(0.2rem, 1vw, 0.4rem);
+    }
+
+    .login-card.create-mode .form-control {
+        padding: clamp(0.4rem, 1vw, 0.6rem) clamp(0.4rem, 1vw, 0.6rem) clamp(0.4rem, 1vw, 0.6rem) 2.2rem;
+        font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+    }
+
+    .login-card.create-mode .login-btn {
+        padding: clamp(0.5rem, 1.3vw, 0.7rem) clamp(0.7rem, 1.8vw, 0.9rem);
+        font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+        margin-top: 0.3rem;
+    }
+}
+
+/* Landscape orientation optimizations */
+@media (orientation: landscape) and (max-height: 600px) {
+    .login-container {
+        align-items: flex-start;
+        padding: 0.5rem;
+    }
+
+    .login-card {
+        padding: 1rem;
+    }
+
+    .login-logo img {
+        height: 50px;
+        width: 50px;
+        margin-bottom: 0.15rem;
+    }
+
+    .login-logo h1 {
+        font-size: 1.1rem;
+    }
+
+    .login-title {
+        font-size: 1rem;
+        margin-bottom: 0.15rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .form-control {
+        padding: 0.6rem 0.7rem 0.6rem 2.5rem;
+        font-size: 0.85rem;
+    }
+
+    .demo-credentials {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .demo-credentials p {
+        font-size: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* ---- HEIGHT-AWARE TWEAKS ---- */
+/* If viewport is short (e.g., 75–100% zoom on smaller screens),
+   reduce vertical padding/gap so everything fits before scrolling. */
+@media (max-height: 900px) {
+    :root {
+        --page-pad: clamp(10px, 2.2dvh, 24px);
+        --card-pad: clamp(12px, 2dvh, 22px);
+        --gap: clamp(8px, 1.2dvh, 16px);
+    }
+}
+
+/* If it's very short, make inputs/buttons a bit denser */
+@media (max-height: 750px) {
+
+    .input,
+    .btn {
+        padding-block: clamp(8px, 1.4dvh, 12px);
+    }
+
+    .demo-credentials {
+        line-height: 1.25;
+    }
+}
+
+/* Avoid any accidental global clipping */
+html,
+body,
+.login-container {
+    overflow-x: hidden;
+}
+
+/* Responsive Demo Accounts Popup */
+@media (max-width: 768px) {
+    .demo-accounts-popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90vw;
+        max-width: 350px;
+        z-index: 1000;
+    }
+
+    .demo-accounts-popup-content {
+        padding: 1.25rem;
+        font-size: 1rem;
+    }
+
+    .demo-accounts-popup-content h4 {
+        font-size: 1.1rem;
+    }
+
+    .demo-role,
+    .demo-email {
+        font-size: 0.9rem;
+    }
+}
+
+/* Responsive Password Requirements Popup */
+@media (max-width: 768px) {
+
+    .password-popup-container .password-strength-container,
+    .login-card.create-mode .create-password .password-popup-container .password-strength-container,
+    .form-group.password-group .password-popup-container .password-strength-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90vw;
+        max-width: 350px;
+        z-index: 1000;
+    }
+}
+
+@media (max-height: 600px) {
+    .demo-accounts-popup {
+        top: 10%;
+        transform: translate(-50%, 0);
+    }
+
+    .demo-accounts-popup-content {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .demo-accounts-popup-content h4 {
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .demo-account-item {
+        margin-bottom: 0.25rem;
+    }
+
+    .demo-role,
+    .demo-email {
+        font-size: 0.8rem;
+    }
+}
+
+/* ------------------------------ */
+/* Hotfix: Prevent icon overlap on login inputs */
+/* These overrides ensure the leading icon never blocks placeholder text */
+.input-group {
+    position: relative;
+}
+
+.input-group .form-control {
+    padding-left: 3.1rem !important;
+}
+
+.input-icon {
+    position: absolute;
+    left: 0.9rem !important;
+    top: 50% !important;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 10;
+    /* ensure icon appears above input background */
+}
+
+.password-input-container {
+    position: relative;
+}
+
+.password-input-container .form-control {
+    padding-right: 3rem !important;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.9rem !important;
+    top: 50% !important;
+    transform: translateY(-50%);
+    z-index: 10;
+    /* ensure toggle stays visible */
+}
+
+.login-card.create-mode .input-group .form-control {
+    padding-left: 3.1rem !important;
+}
+
+/* Stronger input text for all auth flows (login/create/reset) */
+.login-card .form-control,
+.login-card input.form-control,
+.login-card select.form-control,
+.login-card textarea.form-control {
+    color: #0f172a !important;
+    /* dark slate for clarity */
+    font-weight: 500 !important;
+    /* medium: clear but not bold */
+}
+
+/* Ensure Create Account inputs inherit the same clear styles */
+.login-card.create-mode .form-control,
+.login-card.create-mode input.form-control,
+.login-card.create-mode select.form-control,
+.login-card.create-mode textarea.form-control {
+    color: #0f172a !important;
+    font-weight: 500 !important;
+}
+
+.login-card.create-mode .form-control::placeholder {
+    color: #475569 !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+}
+
+/* ---------------- Right-aligned email demo tooltip ---------------- */
+.demo-accounts-tooltip {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    transform: translateY(-50%);
+    margin-left: 10px;
+    width: 260px;
+    max-width: 38vw;
+    background: #ffffff;
+    border: 1px solid rgba(0, 166, 125, 0.2);
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+    z-index: 1000;
+}
+
+.demo-accounts-tooltip.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.demo-accounts-tooltip-content {
+    padding: 0.75rem;
+}
+
+.demo-accounts-tooltip-content h4 {
+    margin: 0 0 0.35rem 0;
+    font-size: 0.95rem;
+}
+
+/* item styles for readability */
+.demo-accounts-tooltip .demo-account-item {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+}
+
+.demo-accounts-tooltip .demo-role {
+    font-weight: 600;
+    color: #0f766e;
+}
+
+.demo-accounts-tooltip .demo-email {
+    color: #111827;
+}
+
+@media (max-width: 900px) {
+    .demo-accounts-tooltip {
+        display: none;
+    }
+}
+
+/* Enhanced Saved Accounts Styling */
+.saved-accounts-container {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    background-color: rgba(240, 245, 250, 0.9);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    max-height: 200px;
+    overflow-y: auto;
+    position: relative;
+}
+
+.saved-accounts-container h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.95rem;
+    color: #444;
+    font-weight: 600;
+}
+
+.saved-accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.saved-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.saved-account-btn {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    flex-grow: 1;
+    transition: all 0.2s ease;
+}
+
+.saved-account-btn:hover {
+    background-color: #f9fafb;
+    border-color: #00a67d;
+}
+
+.saved-account-icon {
+    width: 32px;
+    height: 32px;
+    background-color: #00a67d;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 0.75rem;
+}
+
+.saved-account-info {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.saved-account-email {
+    font-size: 0.85rem;
+    color: #4b5563;
+    font-weight: 500;
+}
+
+.saved-account-date {
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+
+.remove-account-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #9ca3af;
+}
+
+.remove-account-btn:hover {
+    background-color: #fee2e2;
+    color: #ef4444;
+    border-color: #fca5a5;
+}
+
+/* Auto Login Option */
+.auto-login-option {
+    display: flex;
+    align-items: center;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+    gap: 0.5rem;
+}
+
+.auto-login-text {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+/* Password Requirements Popup - Floating on Right Side */
+.password-requirements-popup {
+    background-color: white !important;
+    border-radius: 0.5rem;
+    border: 2px solid #00a67d !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    padding: 1.5rem;
+    width: 320px;
+    z-index: 1061;
+    max-height: 400px;
+    overflow-y: auto;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.password-requirements-popup-right {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 15px);
+    z-index: 1061;
+    pointer-events: auto;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 320px;
+    /* Ensure it doesn't get cut off on smaller screens */
+    max-width: calc(100vw - 500px);
+}
+
+.password-requirements-header {
+    margin-bottom: 1rem;
+}
+
+.password-requirements-header h4 {
+    color: #00a67d;
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.password-requirements-header p {
+    color: #6b7280;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.password-requirements {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.requirement-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    padding: 0.25rem 0;
+}
+
+.requirement-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.requirement-icon.met {
+    background-color: #10b981;
+    color: white;
+}
+
+.requirement-icon.not-met {
+    background-color: #ef4444;
+    color: white;
+}
+
+.requirement-text {
+    flex-grow: 1;
+    font-weight: 500;
+}
+
+.requirement-text.met {
+    color: #059669;
+}
+
+.requirement-text.not-met {
+    color: #6b7280;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .password-requirements-popup-right {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        margin-left: 0;
+        max-width: 90vw;
+    }
+    
+    .password-requirements-popup {
+        width: 280px;
+        max-width: 90vw;
+    }
+}
+
+/* Legacy tooltip container styles (keep for backward compatibility) */
+.password-tooltip-container {
+    position: absolute;
+    z-index: 50;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-width: 300px;
+    transform: translateY(8px);
+    background-color: white;
+    border-radius: 0.375rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    padding: 1rem;
+}
+
+/* Right-aligned tooltip for reset password and create account forms */
+.password-tooltip-right {
+    left: 100%;
+    top: 0;
+    transform: translateX(8px);
+    margin-left: 8px;
+}
+
+@media screen and (max-width: 480px) {
+    .password-tooltip-container {
+        max-width: calc(100% - 20px);
+        left: 10px;
+    }
+    
+    .password-tooltip-right {
+        left: 0;
+        transform: translateY(8px);
+        margin-left: 0;
+    }
+}

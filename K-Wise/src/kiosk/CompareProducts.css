@@ -1,0 +1,672 @@
+﻿/* ========================================
+   KIOSK COMPARE-PRODUCTS RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/**
+ * Product Comparison Component Styles
+ * TASK 5: Professional vertical split comparison interface
+ */
+
+/* Modal Overlay */
+.compare-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+  backdrop-filter: blur(8px);
+}
+
+/* Main Modal Container - Dark teal theme like image */
+.compare-modal {
+  background: #002024;
+  width: 100%;
+  max-width: 800px;
+  max-height: 1131px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
+  animation: slideUp 0.3s ease-out;
+  font-size: 14px;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.compare-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid rgba(3, 76, 59, 0.5);
+  background: transparent;
+  position: relative;
+}
+
+.compare-title {
+  color: #ffffff;
+  font-size: 26px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  margin: 0;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.compare-close-btn-icon {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 32px;
+  font-weight: 300;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.compare-close-btn-icon:hover {
+  color: #00e083;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* AI Analysis Section */
+.compare-ai-loading {
+  text-align: center;
+  padding: 40px;
+  color: #fff;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #00e083;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+.ai-analysis-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0;
+  background: #002024;
+}
+
+.comparison-icon {
+  width: 50px;
+  height: 50px;
+}
+
+.ai-icon {
+  font-size: 24px;
+  color: #ffd700;
+  filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.7));
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.7));
+  }
+  50% { 
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 16px rgba(255, 215, 0, 0.9));
+  }
+}
+
+.ai-analysis-header h2 {
+  background: linear-gradient(90deg, #00E083 0%, #6ECAF1 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 24px;
+  margin: 0;
+  font-weight: 800;
+  font-style: normal;
+  line-height: normal;
+  text-transform: uppercase;
+}
+
+.ai-analysis-content {
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+.ai-summary {
+color: #FFF;
+font-size: 16px;
+font-style: normal;
+font-weight: 600;
+line-height: normal;
+}
+
+.ai-value {
+  color: #fff;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.8;
+  background: transparent;
+  display: block;
+  white-space: pre-line;
+  word-wrap: break-word;
+}
+
+.ai-title {
+  color: #00E083;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.ai-price-icon, .ai-tier-icon {
+  width: 24px;
+  height: 25px;
+  padding-top: 5px;
+}
+.ai-recommendation {
+  border: 1px solid #04413C;
+  background: #03302C;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #f0f0f0;
+}
+
+.ai-recommendation strong {
+  color: #FCCD20;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+}
+
+/* AI Analysis Content Section - Below Table */
+.compare-ai-analysis-content-section {
+  background: transparent;
+  padding-bottom: 32px;
+  padding-left: 32px;
+  padding-right: 32px;
+  position: relative;  
+}
+
+
+.compare-ai-analysis-content-section .ai-analysis-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Price Banner - Hidden as not in image */
+.compare-price-banner {
+  display: none;
+}
+
+/* Comparison Grid */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 32px;
+  padding: 32px;
+}
+
+/* Product Card */
+.compare-product-card {
+  width: 318px;
+  height: 363px;
+  background: transparent;
+  transition: all 0.3s ease;
+  position: relative;
+  font-size: 14px;
+}
+
+/* Winner Background Glow */
+.compare-product-card.winner::before {
+  content: '';
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 170px;
+  height: 89px;
+  background: #FFB800;
+  filter: blur(50px);
+  pointer-events: none;
+}
+
+
+.winner-badge {
+  height: 24px;
+  position: absolute;
+  background: #FFB800;
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.winner-badge svg {
+  width: 10px;
+  height: 10px;
+  display: flex;
+  align-items: center;
+}
+
+/* Product Image */
+.compare-product-image {
+  width: 100%;
+  height: 220px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+
+.compare-product-image img {
+  max-width: 139px;
+  max-height: 150px;
+  object-fit: contain;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+/* Product Name */
+.compare-product-name {
+  width: 318px;
+  height: 44px;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  color: #ffffff;
+  margin-bottom: 20px;
+  text-align: center;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tier Badge - Hide as not in image */
+.compare-tier-badge {
+  display: none;
+}
+
+/* Price */
+.compare-price {
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #ffffff;
+  text-align: center;
+}
+
+/* Stock - Hide as not in image */
+.compare-stock {
+  display: none;
+}
+
+/* Specifications - Move to bottom as comparison table */
+.compare-specs {
+  display: none; /* Hide individual specs, will show table instead */
+}
+
+/* Add to Cart Button */
+.compare-add-btn {
+  align-items: center;
+  width: 100%;
+  background: #00E083;
+  color: #002024;
+  border: none;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  text-align: center;
+  cursor: pointer;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+/* Divider */
+.compare-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.compare-divider span {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  background: linear-gradient(90deg, #00E083 0%, #6ECAF1 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+
+/* Comparison Table Section */
+.compare-table-section {
+  max-height: 308px;
+  background: transparent;
+  padding: 32px;
+  padding-top: 0px;
+  overflow-y: auto;
+  margin-bottom: 32px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.compare-table-wrapper {
+  display: block;
+  width: 100%;
+}
+
+.compare-table-labels {
+  display: none;
+}
+
+.spec-label-row {
+  display: none;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.compare-table thead {
+  display: none;
+}
+
+.compare-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease;
+  display: block;
+  padding: 0;
+}
+
+
+.compare-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.compare-table .spec-label {
+  display: block;
+  width: 100%;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  line-height: 1.2;
+  color: #00E083;
+  text-transform: uppercase;
+  padding: 12px 20px 8px 0px;
+  text-align: left;
+}
+
+.compare-table .spec-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  text-align: right;
+  gap: 0;
+  width: 100%;
+  color:#fff;
+}
+
+.compare-table td {
+  color: #ffffff;
+  padding: 8px 0px 12px 20px;
+  font-size: 18px;
+  line-height: 1.2;
+  text-align: center;
+  font-weight: 400;
+  display: block;
+}
+
+.compare-table td:first-child {
+  text-align: right;
+  margin-right: 50px;
+}
+
+.compare-table td:last-child {
+  text-align: right;
+  margin-left: 50px;
+}
+
+/* Error State */
+.compare-error {
+  background: #fff;
+  padding: 60px;
+  border-radius: 20px;
+  text-align: center;
+  max-width: 500px;
+}
+
+.compare-error h2 {
+  color: #e74c3c;
+  margin-bottom: 20px;
+}
+
+.compare-error p {
+  color: #555;
+  margin-bottom: 30px;
+  font-size: 1.1rem;
+}
+
+
+/* Responsive Design */
+
+@media (max-width: 1024px) {
+  .compare-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 32px;
+  }
+
+  .compare-divider {
+    order: 2;
+  }
+
+  .compare-divider span {
+    transform: rotate(90deg);
+  }
+
+  .compare-product-card:nth-child(1) {
+    order: 1;
+  }
+
+  .compare-product-card:nth-child(3) {
+    order: 3;
+  }
+  
+  .compare-table-section {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .compare-header {
+    padding: 20px 24px;
+  }
+  
+  .compare-title {
+    font-size: 20px;
+    letter-spacing: 1px;
+  }
+  
+  .compare-back-btn,
+  .compare-close-btn-icon {
+    font-size: 14px;
+    padding: 8px 16px;
+  }
+  
+  .compare-close-btn-icon {
+    font-size: 20px;
+  }
+
+  .compare-ai-analysis {
+    margin: 20px 24px;
+    padding: 20px;
+  }
+  
+  .ai-analysis-header h2 {
+    font-size: 16px;
+  }
+
+  .compare-grid {
+    padding: 20px;
+  }
+
+  .compare-product-card {
+    padding: 20px;
+  }
+
+  .compare-product-name {
+    font-size: 15px;
+    min-height: 40px;
+  }
+
+  .compare-price {
+    font-size: 28px;
+  }
+  
+  .compare-table-section {
+    margin: 0 24px 24px 24px;
+    padding: 20px;
+  }
+  
+  .compare-table th,
+  .compare-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .compare-modal {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .compare-modal-overlay {
+    padding: 0;
+  }
+  
+  .compare-header {
+    padding: 16px 20px;
+  }
+  
+  .compare-title {
+    font-size: 18px;
+  }
+  
+  .compare-grid {
+    padding: 16px;
+    gap: 24px;
+  }
+  
+  .compare-product-image {
+    height: 180px;
+  }
+  
+  .compare-table th,
+  .compare-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}
+
+/* Scrollbar Styling */
+.compare-modal::-webkit-scrollbar {
+  width: 12px;
+}
+
+.compare-modal::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  margin: 8px 0;
+}
+
+.compare-modal::-webkit-scrollbar-thumb {
+  background: rgba(0, 224, 131, 0.3);
+  border-radius: 12px;
+  border: 2px solid rgba(0, 32, 36, 0.5);
+}
+
+.compare-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 224, 131, 0.5);
+}
+
+.compare-table-section::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  display: none;
+}
+
+.compare-table-section::-webkit-scrollbar-track {
+  display: none;
+}
+
+.compare-table-section::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+.compare-table-section::-webkit-scrollbar-thumb:hover {
+  display: none;
+}

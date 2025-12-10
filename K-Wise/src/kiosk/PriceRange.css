@@ -1,0 +1,274 @@
+﻿/* ========================================
+   KIOSK PRICE-RANGE RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* Container */
+.price-range-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #002024;
+  color: white;
+  text-align: center;
+}
+
+.price-range-header {
+border-bottom: 0.5px solid #034C3B;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-top: 30px;
+    margin-bottom: 48px;
+    width: 1080px;
+    height: 224px;
+}
+
+/* Logo */
+.logo {
+  margin: 0;
+}
+.price-range-built-logo {
+  margin-top: 30px;
+    margin-left: 48px;
+    margin-bottom: 20px;
+    width: 260px;
+    height: 220px;
+}
+
+/* Add a new container for title and subtitle */
+.price-range-title-container {
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  text-align: left;
+}
+
+.price-title {
+font-size: 70px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: normal;
+    color: white;
+    margin: 0;
+}
+
+.price-range-subtitle {
+  margin: 0;
+  color: white;
+  opacity: 0.8;
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  margin-bottom: 60px;
+}
+
+.select-tier {
+  opacity: 0.5;
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: normal;
+  margin-top: 120px;
+  text-align: left;
+  margin-left: 60px;
+  margin-bottom: 20px;
+}
+
+/* Price Options */
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-left: 64px;
+  max-width: 1080px;
+  height: 100vh;
+  max-height: 1044px;
+  margin-right: 64px;
+  justify-content: center;
+}
+
+.price-options {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  gap: 32px;
+  margin-bottom: 953px;
+  
+}
+
+.mid-level-container {
+  display: flex;
+  gap: 32px;
+}
+
+.price-option {
+  background-color: transparent;
+  border: 4px solid #00E083;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.starter-option {
+width: 459.889px;
+height: 510px;
+}
+
+.mid-entry-option,
+.mid-tier-option {
+  width: 460px;
+}
+
+.high-mid-tier-option {
+  width: 952px;
+}
+
+.price-option:hover {
+  transform: scale(1.02);
+}
+
+.tier-image {
+width: 370px;
+height: 285px;
+  background-color: #002024;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+}
+
+.price-option h1 {
+  width: 400px;
+height: 50px;
+  color: #fff;
+  font-size: 50px;
+  font-style: normal;
+  font-weight: 800;
+  line-height:normal;
+  text-transform: uppercase;
+  margin: 0.5rem 0;
+}
+
+.price-option h2 {
+  color: #fff;
+  opacity: 0.5;
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* Stats Icon */
+.price-range-stats-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.price-range-stats-icon img {
+  width: 113px;
+  height: 129px;
+}
+
+.price-range-stats-icon p {
+  margin-top: 5px;
+  font-size: 16px;
+  color: white;
+  font-weight: bold;
+}
+
+/* Process Container */
+.price-range-process-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Order Info */
+.price-range-order-info {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  position: relative;
+  padding: 0;
+}
+
+/* Cart Icon */
+.price-range-cart-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.price-range-cart-icon img {
+  width: 87px;
+  height: 82px;
+}
+
+/* Notification Badge */
+.price-range-notification {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: red;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Price Text */
+.price-range-price {
+  font-size: 26px;
+  font-weight: bold;
+  color: white;
+  padding-left: 35px;
+  padding-right: 35px;
+  min-width: 160px;
+  text-align: center;
+  display: inline-block;
+}
+
+.price-range-footer {
+  width: 1080px;
+  height: 223.95px;
+  display: flex;
+  justify-content: left;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  position: fixed;
+  bottom: 0;
+}
+
+
+.price-range-action-buttons button {
+  margin-left: 60px;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  width: 444px;
+  height: 71.346px;
+  padding: 12px 24px;
+  background-color: transparent;
+  color: #fff;
+  border: 4px solid #00E083;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  transition: background-color 0.3s;
+}

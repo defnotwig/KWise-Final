@@ -1,0 +1,469 @@
+﻿/* ========================================
+   KIOSK PC-CLEANING-ASSESSMENT RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* PC Cleaning Assessment Page Styles - Matching Reference Design Exactly */
+.pca-container {
+  height: 100vh;
+  width: 100vw;
+  background: #002024;
+  color: #ffffff;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.pca-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 1920px;
+}
+
+.pca-content-header {
+  height: 568px;
+  display: flex;
+  padding: 128px 64px 64px 64px;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  text-align: center;
+  width: 100%;
+}
+
+.pca-icon {
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  margin: 0 auto 24px;
+  display: block;
+  filter: drop-shadow(0 0 40px rgba(0, 224, 131, 0.4));
+}
+
+.pca-title {
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  color: #FFFFFF;
+  text-transform: uppercase;
+}
+
+.pca-description {
+  color: #fff;
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  opacity: 0.5;
+}
+
+.pca-step-indicator {
+  align-items: center;
+  margin: 0 auto;
+}
+
+.pca-step-progress-bar {
+  width: 952px;
+  height: 12px;
+  background: rgba(3, 76, 59, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid rgba(0, 224, 131, 0.3);
+}
+
+.pca-step-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00E083 0%, #00cc99 100%);
+  border-radius: 3px;
+  transition: width 0.4s ease-out;
+  box-shadow: 0 0 12px rgba(0, 224, 131, 0.5);
+}
+
+.pca-step-text {
+font-size: 24px;
+font-style: normal;
+font-weight: 600;
+line-height: normal;
+color: #fff;
+opacity: 0.5;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.pca-question-container {
+  min-height: 968px;
+  display: flex;
+  padding: 192px 64px 64px 64px;
+  flex-direction: column;
+  align-items: center;
+  gap: 64px;
+  text-align: center;
+  flex: 1 0 0;
+  align-self: stretch;
+  margin: 0 auto;
+}
+
+.pca-spacer {
+  height: 183px;
+  gap: 25px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pca-question {
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  color: #ffffff;
+  width: 100%;
+  height: 134px;
+}
+
+.pca-question-sub {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #fff;
+  opacity: 0.5;
+  margin: 0 0 60px 0;
+}
+
+.pca-options {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.pca-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  max-width: 800px;
+  width: 100%;
+}
+
+.pca-options-grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  max-width: 700px;
+  width: 100%;
+}
+
+.pca-options-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.pca-option-btn {
+  width: 435px;
+  padding: 32px;
+  font-size: 28px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  color: #ffffff;
+  background: transparent;
+  border: 4px solid #00E083;
+  cursor: pointer;
+  position: relative;
+  max-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pca-option-btn:hover {
+  background: rgba(0, 224, 131, 0.15);
+  border-color: #1CF399;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 224, 131, 0.25);
+}
+
+.pca-option-btn.active {
+  background: #00E083;
+  border-color: #00E083;
+  color: #001A1A;
+  font-weight: 800;
+  box-shadow: 0 8px 32px rgba(0, 224, 131, 0.4);
+}
+
+.pca-option-btn-detailed {
+  text-align: left;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 904px;
+  min-height: 184px;
+}
+
+.pca-option-title {
+  font-size: 28px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+.pca-option-description {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #fff;
+  opacity: 0.5;
+}
+
+.pca-back-btn {
+  padding: 20px 48px;
+  font-size: 16px;
+  font-weight: 700;
+  background: transparent;
+  border: 3px solid rgba(0, 224, 131, 0.3);
+  color: #ffffff;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  width: 100%;
+  max-width: 900px;
+  display: block;
+  border-radius: 0;
+  margin-top: 40px;
+  transition: all 0.2s ease;
+}
+
+.pca-back-btn:hover {
+  background: rgba(0, 224, 131, 0.1);
+  border-color: #00E083;
+  transform: translateY(-2px);
+}
+
+/* Footer for buttons */
+.pca-button-footer {
+  display: flex;
+  width: 1080px;
+  height: 224px;
+  padding: 43px 64px;
+  justify-content: center;
+  gap: 32px;
+  align-items: center;
+}
+
+.pca-button-footer .pca-back-btn,
+.pca-button-footer .pca-continue-btn {
+  flex: 1;
+  margin: 0;
+  padding: 24px 32px;
+  font-size: 18px;
+}
+
+.pca-button-footer .pca-back-btn {
+  max-width: none;
+}
+
+
+/* Issue Selection Styles - Matching Reference Design */
+.pca-issue-selection-container {
+  width: 100%;
+  max-width: 100%;
+  padding: 64px;
+  
+}
+
+.pca-large-title {
+  font-size: 56px ;
+  font-weight: 800 ;
+}
+
+.pca-large-subtitle {
+  font-size: 18px ;
+  margin-bottom: 60px ;
+}
+
+.pca-issue-categories {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 64px;
+  max-height: 1000px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 16px;
+}
+
+.pca-issue-categories::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pca-issue-categories::-webkit-scrollbar-track {
+  background: rgba(3, 76, 59, 0.3);
+  border-radius: 4px;
+}
+
+.pca-issue-categories::-webkit-scrollbar-thumb {
+  background: #00E083;
+  border-radius: 4px;
+}
+
+.pca-issue-categories::-webkit-scrollbar-thumb:hover {
+  background: #1CF399;
+}
+
+.pca-issue-category {
+  width: 100%;
+}
+
+.pca-issue-category-title {
+  border-bottom: 1px solid #03644D;
+  background: linear-gradient(90deg, #00E083 0%, #6ECAF1 32.77%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+  text-align: left;
+}
+
+.pca-issue-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: flex-start;
+}
+
+.pca-issue-btn {
+  padding: 16px 28px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  background: transparent;
+  border: 4px solid #03644D;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 47px;
+}
+
+
+.pca-issue-btn.selected {
+  border: 4px solid #03644D;
+  background: linear-gradient(96deg, #00E083 0%, #6ECAF1 99.96%);
+  color: #001A1A;
+  font-weight: 700;
+}
+
+.pca-continue-btn {
+  width: auto;
+  min-width: 200px;
+  margin-top: 50px;
+  padding: 24px 60px;
+  font-size: 18px;
+  background: #00E083;
+  border: 3px solid #00E083;
+  color: #001A1A;
+  font-weight: 800;
+  text-transform: uppercase;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pca-continue-btn:hover:not(:disabled) {
+  background: #1CF399;
+  border-color: #1CF399;
+  box-shadow: 0 8px 32px rgba(0, 224, 131, 0.4);
+}
+
+.pca-continue-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: rgba(0, 224, 131, 0.3);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 768px) {
+  .pca-content {
+    padding: 40px 24px 60px;
+  }
+
+  .pca-icon {
+    width: 120px;
+    height: 120px;
+  }
+
+  .pca-title {
+    font-size: 36px;
+  }
+
+  .pca-description {
+    font-size: 14px;
+  }
+
+  .pca-question {
+    font-size: 28px;
+  }
+
+  .pca-question-sub {
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+
+  .pca-options-grid,
+  .pca-options-grid-two {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .pca-option-btn {
+    padding: 20px 32px;
+    font-size: 16px;
+    min-height: 70px;
+  }
+
+  .pca-option-btn-detailed {
+    padding: 24px 24px;
+  }
+
+  .pca-large-title {
+    font-size: 32px !important;
+  }
+
+  .pca-large-subtitle {
+    font-size: 14px !important;
+  }
+
+  .pca-issue-category-title {
+    font-size: 16px;
+  }
+
+  .pca-issue-btn {
+    padding: 14px 20px;
+    font-size: 14px;
+  }
+}

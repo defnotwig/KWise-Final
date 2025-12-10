@@ -1,0 +1,1200 @@
+{
+  "timestamp": "2025-11-03T22:30:59.060Z",
+  "tests": [
+    {
+      "testName": "Intel Core i9 + AMD Motherboard (INCOMPATIBLE)",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:30:59.118Z",
+      "success": true,
+      "responseTime": 1344,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1307ms",
+          "timestamp": "2025-11-03T22:31:00.456Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "AMD Ryzen 7 + Compatible AM5 Motherboard",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:00.572Z",
+      "success": true,
+      "responseTime": 531,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "523ms",
+          "timestamp": "2025-11-03T22:31:01.102Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "DDR5 RAM + DDR4 Motherboard (INCOMPATIBLE)",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:01.206Z",
+      "success": true,
+      "responseTime": 284,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "280ms",
+          "timestamp": "2025-11-03T22:31:01.489Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "RTX 4090 + 450W PSU (UNDERPOWERED)",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:01.601Z",
+      "success": true,
+      "responseTime": 316,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "311ms",
+          "timestamp": "2025-11-03T22:31:01.916Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Complete Balanced Build (ALL COMPATIBLE)",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:02.021Z",
+      "success": true,
+      "responseTime": 841,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "837ms",
+          "timestamp": "2025-11-03T22:31:02.861Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Budget Gaming PC - Upgrade Path",
+      "endpoint": "/api/ai/recommend-upgrade",
+      "timestamp": "2025-11-03T22:31:02.971Z",
+      "success": true,
+      "responseTime": 7002,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Upgrade recommendations generated successfully",
+        "data": {
+          "currentBuild": {
+            "cpu": {
+              "name": "Intel Core i3-12100F",
+              "price": 5500,
+              "performance": "entry"
+            },
+            "gpu": {
+              "name": "GTX 1650",
+              "price": 8500,
+              "performance": "entry"
+            },
+            "ram": {
+              "name": "8GB DDR4-2666",
+              "price": 1500,
+              "capacity": 8
+            },
+            "storage": {
+              "name": "256GB SATA SSD",
+              "price": 1200,
+              "capacity": 256
+            }
+          },
+          "bottlenecks": [
+            "GPU",
+            "RAM"
+          ],
+          "recommendations": {},
+          "mode": "in-stock only",
+          "executionTime": 6952
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Mid-Range Build - Performance Boost",
+      "endpoint": "/api/ai/recommend-upgrade",
+      "timestamp": "2025-11-03T22:31:10.082Z",
+      "success": true,
+      "responseTime": 144,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Upgrade recommendations generated successfully",
+        "data": {
+          "currentBuild": {
+            "cpu": {
+              "name": "AMD Ryzen 5 5600",
+              "price": 8500,
+              "performance": "mid"
+            },
+            "gpu": {
+              "name": "RTX 3060",
+              "price": 18000,
+              "performance": "mid"
+            },
+            "ram": {
+              "name": "16GB DDR4-3200",
+              "price": 3000,
+              "capacity": 16
+            },
+            "motherboard": {
+              "name": "B450M",
+              "chipset": "B450",
+              "socket": "AM4"
+            }
+          },
+          "bottlenecks": [
+            "GPU",
+            "RAM"
+          ],
+          "recommendations": {},
+          "mode": "in-stock only",
+          "executionTime": 95
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Workstation - Productivity Upgrade",
+      "endpoint": "/api/ai/recommend-upgrade",
+      "timestamp": "2025-11-03T22:31:10.331Z",
+      "success": true,
+      "responseTime": 345,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Upgrade recommendations generated successfully",
+        "data": {
+          "currentBuild": {
+            "cpu": {
+              "name": "Intel Core i7-10700",
+              "price": 15000,
+              "cores": 8,
+              "performance": "mid"
+            },
+            "ram": {
+              "name": "32GB DDR4-3200",
+              "price": 6000,
+              "capacity": 32
+            },
+            "storage": {
+              "name": "512GB NVMe SSD",
+              "price": 3500,
+              "capacity": 512
+            }
+          },
+          "bottlenecks": [
+            "GPU",
+            "RAM"
+          ],
+          "recommendations": {},
+          "mode": "in-stock only",
+          "executionTime": 187
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #12",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.795Z",
+      "success": true,
+      "responseTime": 1276,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1228ms",
+          "timestamp": "2025-11-03T22:31:12.066Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #7",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.790Z",
+      "success": true,
+      "responseTime": 1317,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1276ms",
+          "timestamp": "2025-11-03T22:31:12.105Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #19",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.800Z",
+      "success": true,
+      "responseTime": 1312,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1243ms",
+          "timestamp": "2025-11-03T22:31:12.112Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #5",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.788Z",
+      "success": true,
+      "responseTime": 1334,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1298ms",
+          "timestamp": "2025-11-03T22:31:12.121Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #17",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.799Z",
+      "success": true,
+      "responseTime": 1332,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1270ms",
+          "timestamp": "2025-11-03T22:31:12.130Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #9",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.792Z",
+      "success": true,
+      "responseTime": 1348,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1307ms",
+          "timestamp": "2025-11-03T22:31:12.140Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #14",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.797Z",
+      "success": true,
+      "responseTime": 1354,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1308ms",
+          "timestamp": "2025-11-03T22:31:12.150Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #16",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.799Z",
+      "success": true,
+      "responseTime": 1367,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1308ms",
+          "timestamp": "2025-11-03T22:31:12.164Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #1",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.783Z",
+      "success": true,
+      "responseTime": 1395,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1371ms",
+          "timestamp": "2025-11-03T22:31:12.176Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #8",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.791Z",
+      "success": true,
+      "responseTime": 1402,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1361ms",
+          "timestamp": "2025-11-03T22:31:12.192Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #18",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.800Z",
+      "success": true,
+      "responseTime": 1416,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1350ms",
+          "timestamp": "2025-11-03T22:31:12.214Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #11",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.794Z",
+      "success": true,
+      "responseTime": 1430,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1387ms",
+          "timestamp": "2025-11-03T22:31:12.224Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #3",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.786Z",
+      "success": true,
+      "responseTime": 1452,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1415ms",
+          "timestamp": "2025-11-03T22:31:12.236Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #10",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.793Z",
+      "success": true,
+      "responseTime": 1461,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1418ms",
+          "timestamp": "2025-11-03T22:31:12.253Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #2",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.785Z",
+      "success": true,
+      "responseTime": 1484,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1448ms",
+          "timestamp": "2025-11-03T22:31:12.267Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #20",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.801Z",
+      "success": true,
+      "responseTime": 1503,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1428ms",
+          "timestamp": "2025-11-03T22:31:12.302Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #6",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.789Z",
+      "success": true,
+      "responseTime": 1523,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1484ms",
+          "timestamp": "2025-11-03T22:31:12.311Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #13",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.796Z",
+      "success": true,
+      "responseTime": 1529,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1483ms",
+          "timestamp": "2025-11-03T22:31:12.324Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #15",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.798Z",
+      "success": true,
+      "responseTime": 1539,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1482ms",
+          "timestamp": "2025-11-03T22:31:12.335Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Concurrent Request #4",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:10.787Z",
+      "success": true,
+      "responseTime": 1560,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "1523ms",
+          "timestamp": "2025-11-03T22:31:12.345Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Cache Test - First Request",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:12.352Z",
+      "success": true,
+      "responseTime": 74,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "68ms",
+          "timestamp": "2025-11-03T22:31:12.425Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Cache Test - Second Request",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:12.427Z",
+      "success": true,
+      "responseTime": 60,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "54ms",
+          "timestamp": "2025-11-03T22:31:12.486Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    },
+    {
+      "testName": "Cache Test - Third Request",
+      "endpoint": "/api/ai/compatibility/analyze",
+      "timestamp": "2025-11-03T22:31:12.488Z",
+      "success": true,
+      "responseTime": 60,
+      "error": null,
+      "response": {
+        "success": true,
+        "message": "Compatibility analysis completed",
+        "data": {
+          "overall_assessment": "acceptable",
+          "confidence": 60,
+          "issues": [],
+          "strengths": [
+            "All technical specifications meet compatibility requirements"
+          ],
+          "upgrade_priorities": [],
+          "reasoning": "Compatibility assessed using deterministic rules. AI enhancement unavailable - consider admin review for complex builds.",
+          "deterministic_score": 0,
+          "data_sources": {
+            "deterministic": true,
+            "ai": false
+          },
+          "ai_available": false,
+          "fallback": true
+        },
+        "metadata": {
+          "latency": "53ms",
+          "timestamp": "2025-11-03T22:31:12.547Z"
+        }
+      },
+      "usedCache": false,
+      "usedFallback": false,
+      "aiModel": "unknown"
+    }
+  ],
+  "summary": {
+    "totalTests": 31,
+    "passed": 31,
+    "failed": 0,
+    "avgResponseTime": 0,
+    "minResponseTime": 60,
+    "maxResponseTime": 7002,
+    "timeouts": 0,
+    "errors": []
+  },
+  "ratings": {
+    "compatibility": {
+      "score": 90,
+      "issues": [
+        "Low cache hit rate"
+      ],
+      "strengths": [
+        "Fast response times (< 5 seconds)",
+        "High AI utilization (> 80%)",
+        "No request failures"
+      ]
+    },
+    "upgrades": {
+      "score": 100,
+      "issues": [],
+      "strengths": [
+        "Fast upgrade analysis",
+        "Good AI-powered recommendations"
+      ]
+    },
+    "performance": {
+      "score": 100,
+      "issues": [
+        "Cache hit rate below expected threshold"
+      ],
+      "strengths": [
+        "Excellent reliability under load (>= 95%)",
+        "High throughput (12.78 req/sec)",
+        "Low latency under load"
+      ]
+    },
+    "reliability": {
+      "score": 100,
+      "issues": [],
+      "strengths": [
+        "High reliability (> 90% success rate)"
+      ]
+    },
+    "overall": {
+      "score": 97,
+      "rating": "EXCELLENT (A+)"
+    }
+  }
+}

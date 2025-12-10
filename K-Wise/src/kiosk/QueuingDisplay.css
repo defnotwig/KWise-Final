@@ -1,0 +1,264 @@
+﻿/* ========================================
+   KIOSK QUEUING-DISPLAY RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.queuing-display-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100vw;
+    background: #002024;
+    color: white;
+    text-align: center;
+}
+
+.queue-logo {
+    width: 128px;
+    height: 128px;
+    margin-top: 100px;
+    color:white;
+}
+
+.status-text {
+    font-size: 64px;
+    font-style: normal;
+    font-weight: 800;
+    color: #fff;
+    margin-top: 60px;
+}
+
+/* Queue Number Container with SVG */
+.queue-number-container {
+    position: relative;
+    width: 864px;
+    height: 352px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.queue-number-svg {
+    object-fit: contain;
+}
+
+.queue-bottom-bar {
+    position: absolute;
+    bottom: 0px;
+    top:100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 680px;
+    height: 8px;
+    background: #002024;
+    margin-top: 40px;
+}
+
+.queue-number-overlay {
+    position: absolute;
+    top: 70%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.queue-get {
+    margin-top: 50px;
+    font-size: 32px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    color: #002024;
+}
+
+.queue-display-number {
+    margin: 0;
+    font-size: 128px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: normal;
+    color: #002024;
+}
+
+.queue-display-number.loading {
+    font-size: 2rem;
+    color: #666;
+}
+
+.waiting-turn {
+    font-size: 64px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: normal;
+    margin-bottom: 250px;
+}
+
+.queuing-back-button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 18px;
+    background: white;
+    color: black;
+    border: none;
+    cursor: pointer;
+}
+
+.bottom-container {
+    display: flex;
+    flex-direction: column;
+    gap: 80px;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+.getting-content {
+    max-height: 1000px;
+    width: 249px;
+    height: 222px;
+    margin-left: 670px;
+    background: transparent;
+    border-top: 4px solid #00E083;
+    border-right: 4px solid #00E083;
+    border-left: 4px solid #00E083;
+    position: fixed;
+    bottom: 0;
+}
+
+.getting-content h1 {
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 800;
+    padding: 20px;
+}
+.getting-content img{
+    width: 57px;
+    height: 105px;
+}
+
+/* Order Summary Section */
+.order-summary-section {
+    background: rgba(0, 224, 131, 0.1);
+    border: 2px solid #00E083;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    max-width: 600px;
+    width: 90%;
+}
+
+.order-summary-title {
+    color: #FFFFFF;
+    font-size: 64px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: normal;
+}
+
+.order-items-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+.order-item-display {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.item-details {
+    flex: 1;
+    text-align: left;
+}
+
+.item-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.item-price-qty {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.item-quantity {
+    font-size: 14px;
+    color: #ccc;
+}
+
+.item-price {
+    font-size: 14px;
+    font-weight: 600;
+    color: #00E083;
+}
+
+.order-total {
+    text-align: center;
+    padding: 15px;
+    border-top: 2px solid #00E083;
+    font-size: 20px;
+    color: #00E083;
+}
+
+/* Order Details Section */
+.order-details-section {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    max-width: 400px;
+}
+
+.order-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0;
+    padding: 5px 0;
+}
+
+.order-label {
+    font-size: 14px;
+    color: #ccc;
+    font-weight: 500;
+}
+
+.order-value {
+    font-size: 14px;
+    color: #00E083;
+    font-weight: 600;
+}
+
+/* Countdown Timer Display */
+.countdown-display {
+    margin: 20px 0;
+}
+
+.countdown-display p {
+    font-size: 24px;
+    font-weight: 600;
+    color: #00E083;
+    background: rgba(0, 224, 131, 0.1);
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 2px solid #00E083;
+    margin: 0;
+}

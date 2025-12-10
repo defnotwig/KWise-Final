@@ -1,0 +1,143 @@
+﻿/* ========================================
+   KIOSK ORDER RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+.order-container {
+  display: flex;
+  height: 100vh;
+  overflow-x: hidden;
+}
+
+.order-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  text-align: center;
+  font-size: 40px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: 2.8px;
+}
+
+.assisted {
+  background-color: #00E083;
+  /* Light green */
+}
+
+.assisted p {
+  color:#03644D;
+  /* Strong contrast per reference */
+  font-size: 40px;
+}
+
+.self-order {
+  background-color: #03644D;
+  /* Dark green */
+}
+
+.self-order p {
+  color: #00E083 !important;
+  /* Ensure no theme override */
+  font-size: 40px;
+}
+
+/* Neutralize any inherited dark-mode text overrides on kiosk order screen */
+.order-container,
+.order-container *,
+.order-container *::before,
+.order-container *::after {
+  color-scheme: only light;
+}
+
+.order-option img {
+  width: 192px;
+  height: 210px;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+}
+
+/* ========================================
+   RESPONSIVE MEDIA QUERIES
+   ======================================== */
+
+/* Mobile Devices (Portrait and Landscape) */
+@media only screen and (max-width: 767px) {
+  .order-option {
+    font-size: clamp(18px, 5vw, 28px);
+    letter-spacing: 1.5px;
+  }
+
+  .order-option img {
+    width: clamp(120px, 35vw, 160px);
+    height: clamp(130px, 38vw, 175px);
+    margin-bottom: 15px;
+  }
+
+  .assisted p,
+  .self-order p {
+    font-size: clamp(18px, 5vw, 28px) !important;
+  }
+}
+
+/* Tablet Devices (Portrait and Landscape) */
+@media only screen and (min-width: 768px) and (max-width: 1023px) {
+  .order-option {
+    font-size: 32px;
+    letter-spacing: 2px;
+  }
+
+  .order-option img {
+    width: 170px;
+    height: 185px;
+    margin-bottom: 18px;
+  }
+
+  .assisted p,
+  .self-order p {
+    font-size: 32px !important;
+  }
+}
+
+/* Laptop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1024px) and (max-width: 1439px) {
+  .order-option {
+    font-size: 36px;
+    letter-spacing: 2.4px;
+  }
+
+  .order-option img {
+    width: 180px;
+    height: 195px;
+    margin-bottom: 12px;
+  }
+
+  .assisted p,
+  .self-order p {
+    font-size: 36px !important;
+  }
+}
+
+/* Desktop Devices (Portrait and Landscape) */
+@media only screen and (min-width: 1440px) {
+  .order-option {
+    font-size: 40px;
+    letter-spacing: 2.8px;
+  }
+
+  .order-option img {
+    width: 192px;
+    height: 210px;
+    margin-bottom: 10px;
+  }
+
+  .assisted p,
+  .self-order p {
+    font-size: 40px !important;
+  }
+}

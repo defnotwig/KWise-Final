@@ -1,0 +1,30 @@
+{
+  "name": "kwise-brutal-stress-test",
+  "version": "1.0.0",
+  "description": "Brutal compatibility stress testing for K-Wise system with DeepSeek-R1 AI validation",
+  "main": "brutal-test-runner.js",
+  "scripts": {
+    "test:brutal": "node brutal-test-runner.js",
+    "test:brutal:section": "node brutal-test-runner.js --section",
+    "test:brutal:verbose": "node brutal-test-runner.js --verbose --ai-debug",
+    "test:brutal:section1": "node brutal-test-runner.js --section=1",
+    "test:brutal:section2": "node brutal-test-runner.js --section=2",
+    "test:brutal:performance": "node brutal-test-runner.js --section=9",
+    "test:brutal:no-stop": "node brutal-test-runner.js --no-stop",
+    "test:brutal:quick": "node brutal-test-runner.js --section=1,2 --no-report"
+  },
+  "keywords": [
+    "testing",
+    "compatibility",
+    "ai",
+    "deepseek",
+    "ollama",
+    "stress-test"
+  ],
+  "author": "K-Wise Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
+

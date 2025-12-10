@@ -1,0 +1,138 @@
+name: Brutal Stress Test CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run nightly at 2 AM
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  brutal-stress-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: kwise
+          POSTGRES_PASSWORD: kwise_password
+          POSTGRES_DB: kwise_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: KWise-Backend/package-lock.json
+      
+      - name: Install backend dependencies
+        working-directory: KWise-Backend
+        run: npm ci
+      
+      - name: Install test dependencies
+        working-directory: KWise-Backend/tests/brutal-stress-test
+        run: npm ci
+      
+      - name: Setup database
+        working-directory: KWise-Backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: kwise_db
+          DB_USER: kwise
+          DB_PASSWORD: kwise_password
+        run: |
+          npm run migrate
+          node tests/brutal-stress-test/scripts/add-test-data.sql
+      
+      - name: Pull Ollama models
+        run: |
+          ollama pull deepseek-r1:1.5b
+          ollama list
+      
+      - name: Start backend server
+        working-directory: KWise-Backend
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: kwise_db
+          DB_USER: kwise
+          DB_PASSWORD: kwise_password
+          PORT: 5000
+        run: |
+          npm start &
+          sleep 10
+          curl http://localhost:5000/api/health
+      
+      - name: Run brutal stress tests
+        working-directory: KWise-Backend/tests/brutal-stress-test
+        env:
+          API_URL: http://localhost:5000/api
+          NODE_ENV: test
+        run: |
+          npm run test:brutal
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: brutal-test-results-${{ github.run_number }}
+          path: |
+            KWise-Backend/tests/brutal-stress-test/results/*.json
+            KWise-Backend/tests/brutal-stress-test/results/*.md
+            KWise-Backend/tests/brutal-stress-test/*.log
+          retention-days: 30
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryPath = 'KWise-Backend/tests/brutal-stress-test/results/brutal-test-summary-latest.txt';
+            
+            if (fs.existsSync(summaryPath)) {
+              const summary = fs.readFileSync(summaryPath, 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.name,
+                body: `## 🎯 Brutal Stress Test Results\n\n\`\`\`\n${summary}\n\`\`\``
+              });
+            }
+      
+      - name: Fail if rating below 4.5
+        working-directory: KWise-Backend/tests/brutal-stress-test
+        run: |
+          RATING=$(cat results/brutal-test-summary-latest.txt | grep "Overall Rating:" | awk '{print $3}')
+          echo "Test Rating: $RATING"
+          
+          if (( $(echo "$RATING < 4.5" | bc -l) )); then
+            echo "❌ Test rating $RATING is below 4.5/5.0 threshold"
+            exit 1
+          fi
+          
+          echo "✅ Test rating $RATING meets or exceeds 4.5/5.0 threshold"
+

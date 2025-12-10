@@ -1,0 +1,13 @@
+{
+  "currentProduct": {
+    "id": 1,
+    "name": "Intel Core i9-14900K",
+    "category": "CPU",
+    "price": 599.99,
+    "specifications": {
+      "socket": "LGA1700",
+      "cores": 24,
+      "tdp": 125
+    }
+  }
+}

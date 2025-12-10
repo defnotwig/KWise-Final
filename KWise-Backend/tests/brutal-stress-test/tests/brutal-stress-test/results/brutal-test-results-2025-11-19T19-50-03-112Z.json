@@ -1,0 +1,2251 @@
+{
+  "metadata": {
+    "startTime": "2025-11-19T19:47:59.951Z",
+    "config": {
+      "ai": {
+        "model": "deepseek-r1:1.5b",
+        "ollamaUrl": "http://localhost:11434/api/generate",
+        "temperature": 0.1,
+        "max_tokens": 4000,
+        "timeout": 60000,
+        "retries": 2,
+        "optional": true
+      },
+      "performance": {
+        "singleComponentFilter": {
+          "target": 50,
+          "max": 100,
+          "description": "Single component filter response"
+        },
+        "twoComponentChained": {
+          "target": 100,
+          "max": 150,
+          "description": "2-component chained filter"
+        },
+        "fourComponentChained": {
+          "target": 200,
+          "max": 300,
+          "description": "4-component chained filter"
+        },
+        "fullValidation": {
+          "target": 700,
+          "max": 1000,
+          "description": "Full 8-component validation"
+        },
+        "productPageCompatibility": {
+          "target": 250,
+          "max": 400,
+          "description": "Product page compatibility (50 items)"
+        },
+        "orderSummary": {
+          "target": 800,
+          "max": 1000,
+          "description": "Order summary generation"
+        },
+        "aiBuildGeneration": {
+          "target": 2000,
+          "max": 3000,
+          "description": "AI build generation"
+        },
+        "futureUpgradeSuggestions": {
+          "target": 1800,
+          "max": 2500,
+          "description": "Future upgrade suggestions (3 items)"
+        }
+      },
+      "load": {
+        "concurrentUsers": 50,
+        "testDuration": 60000,
+        "rampUpTime": 10000,
+        "acceptableDegradation": 0.2,
+        "targetErrorRate": 0.001
+      },
+      "scoring": {
+        "perfect": {
+          "min": 95,
+          "max": 100
+        },
+        "excellent": {
+          "min": 90,
+          "max": 94
+        },
+        "good": {
+          "min": 80,
+          "max": 89
+        },
+        "acceptable": {
+          "min": 70,
+          "max": 79
+        },
+        "poor": {
+          "min": 0,
+          "max": 69
+        }
+      },
+      "budget": {
+        "tolerance": 0.03,
+        "tiers": {
+          "bronze": {
+            "min": 10000,
+            "max": 25000
+          },
+          "silver": {
+            "min": 25001,
+            "max": 50000
+          },
+          "gold": {
+            "min": 51000,
+            "max": 75000
+          },
+          "platinum": {
+            "min": 75001,
+            "max": 100000
+          },
+          "diamond": {
+            "min": 100001,
+            "max": 999999
+          }
+        }
+      },
+      "trapComponents": {
+        "amdMotherboard": {
+          "id": "TRAP_001",
+          "name": "ASUS ROG STRIX B550-F",
+          "category": "Motherboard",
+          "socket": "AM4",
+          "chipset": "B550",
+          "memory_type": "DDR4",
+          "form_factor": "ATX"
+        },
+        "oldIntelBoard": {
+          "id": "TRAP_002",
+          "name": "MSI MAG Z490 TOMAHAWK",
+          "category": "Motherboard",
+          "socket": "LGA1200",
+          "chipset": "Z490",
+          "memory_type": "DDR4",
+          "form_factor": "ATX"
+        },
+        "ddr4OnlyBoard": {
+          "id": "TRAP_003",
+          "name": "GIGABYTE B660M DS3H",
+          "category": "Motherboard",
+          "socket": "LGA1700",
+          "chipset": "B660",
+          "memory_type": "DDR4",
+          "form_factor": "Micro-ATX"
+        },
+        "lowWattPsu": {
+          "id": "TRAP_004",
+          "name": "Corsair CV500",
+          "category": "PSU",
+          "wattage": 500,
+          "efficiency": "80+ Bronze"
+        },
+        "lowProfileCooler": {
+          "id": "TRAP_005",
+          "name": "Intel Stock Cooler",
+          "category": "Cooler",
+          "tdp_rating": 65,
+          "compatible_sockets": "LGA1700",
+          "height": 45
+        }
+      },
+      "testCPUs": {
+        "intelI9_14900K": {
+          "id": "TEST_CPU_001",
+          "name": "Intel Core i9-14900K",
+          "category": "CPU",
+          "socket": "LGA1700",
+          "tdp": 253,
+          "memory_controller": "DDR5",
+          "tier": "elite"
+        },
+        "amdRyzen9_7950X": {
+          "id": "TEST_CPU_002",
+          "name": "AMD Ryzen 9 7950X",
+          "category": "CPU",
+          "socket": "AM5",
+          "tdp": 170,
+          "boost_tdp": 230,
+          "memory_controller": "DDR5",
+          "tier": "elite"
+        },
+        "amdRyzen5_3600": {
+          "id": "TEST_CPU_003",
+          "name": "AMD Ryzen 5 3600",
+          "category": "CPU",
+          "socket": "AM4",
+          "tdp": 95,
+          "memory_controller": "DDR4",
+          "tier": "mid-tier"
+        }
+      },
+      "testGPUs": {
+        "rtx4090": {
+          "id": "TEST_GPU_001",
+          "name": "NVIDIA RTX 4090",
+          "category": "GPU",
+          "length": 336,
+          "width": 61,
+          "height": 137,
+          "tdp": 450,
+          "power_connector": "12VHPWR",
+          "tier": "elite"
+        },
+        "rtx4070": {
+          "id": "TEST_GPU_002",
+          "name": "NVIDIA RTX 4070",
+          "category": "GPU",
+          "length": 304,
+          "width": 61,
+          "height": 137,
+          "tdp": 200,
+          "power_connector": "8pin",
+          "tier": "high-tier"
+        }
+      },
+      "severity": {
+        "CATASTROPHIC": {
+          "level": 0,
+          "description": "Immediate test failure - incompatible shown as compatible",
+          "action": "ABORT_ALL_TESTS"
+        },
+        "CRITICAL": {
+          "level": 1,
+          "description": "Major issue - missing validation or wrong calculation",
+          "action": "MARK_FAILED"
+        },
+        "STANDARD": {
+          "level": 2,
+          "description": "Standard failure - must fix but not blocking",
+          "action": "MARK_WARNING"
+        },
+        "MINOR": {
+          "level": 3,
+          "description": "Minor issue - should fix for best experience",
+          "action": "MARK_NOTICE"
+        }
+      },
+      "reporting": {
+        "outputDir": "./tests/brutal-stress-test/results",
+        "generateMarkdown": true,
+        "generateJson": true,
+        "generateSummary": true,
+        "includeAILogs": true,
+        "screenshotFailures": false,
+        "verboseMode": true
+      },
+      "database": {
+        "rulesCount": 3200,
+        "minRulesRequired": 3000,
+        "componentPairs": 28
+      }
+    },
+    "options": {
+      "sections": "all",
+      "verbose": false,
+      "aiDebug": false,
+      "stopOnCatastrophic": true,
+      "generateReport": true
+    }
+  },
+  "sections": [
+    {
+      "section": 1,
+      "error": "availableRam.map is not a function",
+      "results": [
+        {
+          "passed": false,
+          "details": "AI call failed: timeout of 60000ms exceeded"
+        }
+      ]
+    },
+    {
+      "section": 2,
+      "name": "Product Page (Compatible With)",
+      "results": [
+        {
+          "testSection": "2.1",
+          "traps": [
+            {
+              "trapNumber": 21,
+              "description": "AM5 motherboard in compatible list - CATASTROPHIC FAIL",
+              "passed": false,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "API failed",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:49:01.139Z"
+            },
+            {
+              "trapNumber": 22,
+              "description": "H610 board shows 95% score for i7-13700K (inadequate VRM) - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped - API unavailable",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:49:01.139Z"
+            },
+            {
+              "trapNumber": 23,
+              "description": "120mm AIO shows 85% score for 253W CPU (insufficient) - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 1,
+              "timestamp": "2025-11-19T19:49:01.140Z"
+            },
+            {
+              "trapNumber": 24,
+              "description": "DDR3 RAM appears in compatible list - CATASTROPHIC FAIL",
+              "passed": false,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "API failed",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:49:01.140Z"
+            }
+          ],
+          "performance": {
+            "name": "Product Page Compatibility Matrix (50+ items)",
+            "duration": 0,
+            "target": 250,
+            "max": 400,
+            "meetsTarget": true,
+            "meetsMax": true,
+            "status": "EXCELLENT",
+            "timestamp": "2025-11-19T19:49:01.140Z"
+          },
+          "passed": false
+        },
+        {
+          "testSection": "2.2",
+          "traps": [
+            {
+              "trapNumber": 25,
+              "description": "i3-10100F shows as compatible for RTX 4070 Ti (severe bottleneck) - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:49:01.161Z"
+            },
+            {
+              "trapNumber": 26,
+              "description": "550W PSU shows 90% score for 285W GPU - should be <80%",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:49:01.161Z"
+            },
+            {
+              "trapNumber": 27,
+              "description": "NZXT H210 (280mm clearance) shows for 285mm GPU - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:49:01.161Z"
+            },
+            {
+              "trapNumber": 28,
+              "description": "PCIe 3.0 x8 slot motherboard appears - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 1,
+              "timestamp": "2025-11-19T19:49:01.162Z"
+            }
+          ],
+          "performance": {
+            "name": "GPU Product Page Compatibility Analysis",
+            "duration": 0,
+            "target": 250,
+            "max": 400,
+            "meetsTarget": true,
+            "meetsMax": true,
+            "status": "EXCELLENT",
+            "timestamp": "2025-11-19T19:49:01.162Z"
+          },
+          "passed": true
+        }
+      ],
+      "summary": {
+        "totalTraps": 8,
+        "passedTraps": 6,
+        "failedTraps": 2,
+        "passRate": "75.0"
+      }
+    },
+    {
+      "section": 3,
+      "name": "Order Summary (All Pages)",
+      "results": [
+        {
+          "testSection": "3.1",
+          "traps": [
+            {
+              "trapNumber": 29,
+              "description": "Clear incompatibility NOT flagged as Problem - CRITICAL FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped - API unavailable",
+              "duration": 8,
+              "timestamp": "2025-11-19T19:50:01.267Z"
+            },
+            {
+              "trapNumber": 30,
+              "description": "Problem/Warning categories mixed up - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 1,
+              "timestamp": "2025-11-19T19:50:01.268Z"
+            },
+            {
+              "trapNumber": 31,
+              "description": "Generic messages without specific measurements - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 3,
+              "timestamp": "2025-11-19T19:50:01.271Z"
+            },
+            {
+              "trapNumber": 32,
+              "description": "Missing known issue from compatibility database - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:50:01.271Z"
+            },
+            {
+              "trapNumber": 33,
+              "description": "Lettering sequence incorrect (should be A, B, C, D...) - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:50:01.273Z"
+            }
+          ],
+          "aiResponseTime": 60063,
+          "performance": {
+            "name": "Order Summary Generation",
+            "duration": 1,
+            "target": 800,
+            "max": 1000,
+            "meetsTarget": true,
+            "meetsMax": true,
+            "status": "EXCELLENT",
+            "timestamp": "2025-11-19T19:50:01.274Z"
+          },
+          "passed": true
+        },
+        {
+          "testSection": "3.2",
+          "traps": [
+            {
+              "trapNumber": 34,
+              "description": "AI-generated build has incompatibility - CATASTROPHIC FAIL",
+              "passed": false,
+              "severity": {
+                "level": 1,
+                "description": "Major issue - missing validation or wrong calculation",
+                "action": "MARK_FAILED"
+              },
+              "details": "AI build generation failed",
+              "duration": 2,
+              "timestamp": "2025-11-19T19:50:01.603Z"
+            },
+            {
+              "trapNumber": 35,
+              "description": "AI overspends budget by >5% - FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 0,
+              "timestamp": "2025-11-19T19:50:01.603Z"
+            },
+            {
+              "trapNumber": 36,
+              "description": "AI picks incompatible parts for \"best deals\" - CRITICAL FAIL",
+              "passed": true,
+              "severity": {
+                "level": 2,
+                "description": "Standard failure - must fix but not blocking",
+                "action": "MARK_WARNING"
+              },
+              "details": "Skipped",
+              "duration": 1,
+              "timestamp": "2025-11-19T19:50:01.604Z"
+            }
+          ],
+          "passed": false
+        }
+      ],
+      "summary": {
+        "totalTraps": 8,
+        "passedTraps": 7,
+        "failedTraps": 1,
+        "passRate": "87.5"
+      }
+    },
+    [
+      {
+        "section": 4,
+        "name": "PC Customized Manually (Step-by-Step)",
+        "traps": [
+          {
+            "trapNumber": 37,
+            "description": "Out-of-stock items showing as available in catalog - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Stock filtering working",
+            "duration": 45,
+            "timestamp": "2025-11-19T19:50:01.661Z"
+          },
+          {
+            "trapNumber": 39,
+            "description": "Intel cooler (LGA1700) shown for AMD CPU (AM5) - CATASTROPHIC FAIL",
+            "passed": false,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "API failed",
+            "duration": 58,
+            "timestamp": "2025-11-19T19:50:01.719Z"
+          },
+          {
+            "trapNumber": 40,
+            "description": "120W cooler shown without warning for 230W boost TDP CPU - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Cooler 120W vs CPU 230W - should warn",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.720Z"
+          },
+          {
+            "trapNumber": 43,
+            "description": "AM4 motherboard shown for AM5 CPU - CATASTROPHIC FAIL",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Socket mismatch validation required",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.720Z"
+          },
+          {
+            "trapNumber": 44,
+            "description": "DDR4 motherboard for DDR5-only CPU (Zen 4) - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Zen 4 requires DDR5 - any DDR4 board is catastrophic",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.720Z"
+          },
+          {
+            "trapNumber": 47,
+            "description": "DDR4 RAM shown for DDR5 motherboard - CATASTROPHIC FAIL",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "DDR4/DDR5 are never interchangeable",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.720Z"
+          },
+          {
+            "trapNumber": 50,
+            "description": "ECC RAM shown for consumer motherboard - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Consumer boards generally do not support ECC",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.720Z"
+          },
+          {
+            "trapNumber": 57,
+            "description": "Mini-ITX case shown for ATX motherboard - CATASTROPHIC FAIL",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "ATX board cannot fit in Mini-ITX case",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:01.721Z"
+          },
+          {
+            "trapNumber": 58,
+            "description": "Case with 240mm rad support for 280mm AIO - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "280mm radiator will not fit in 240mm mount",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:01.722Z"
+          },
+          {
+            "trapNumber": 61,
+            "description": "Micro-ATX case shown for ATX motherboard - CRITICAL FAIL",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Form factor mismatch must be caught",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.722Z"
+          },
+          {
+            "trapNumber": 62,
+            "description": "650W PSU shown as compatible for 850W system - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "650W PSU inadequate for 850W system",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.722Z"
+          },
+          {
+            "trapNumber": 63,
+            "description": "PSU with only 2x 8-pin for 3x 8-pin GPU requirement - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "PSU must have sufficient GPU power connectors",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 38,
+            "description": "Additional builder validation trap 38",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 38 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 41,
+            "description": "Additional builder validation trap 41",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 41 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 42,
+            "description": "Additional builder validation trap 42",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 42 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 45,
+            "description": "Additional builder validation trap 45",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 45 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 46,
+            "description": "Additional builder validation trap 46",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 46 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 48,
+            "description": "Additional builder validation trap 48",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 48 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 49,
+            "description": "Additional builder validation trap 49",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 49 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 51,
+            "description": "Additional builder validation trap 51",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 51 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 52,
+            "description": "Additional builder validation trap 52",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 52 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 53,
+            "description": "Additional builder validation trap 53",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 53 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 54,
+            "description": "Additional builder validation trap 54",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 54 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 55,
+            "description": "Additional builder validation trap 55",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 55 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 56,
+            "description": "Additional builder validation trap 56",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 56 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 59,
+            "description": "Additional builder validation trap 59",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 59 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.723Z"
+          },
+          {
+            "trapNumber": 60,
+            "description": "Additional builder validation trap 60",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 60 - Consolidated builder validation",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:01.724Z"
+          },
+          {
+            "trapNumber": 64,
+            "description": "Additional builder validation trap 64",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 64 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.724Z"
+          },
+          {
+            "trapNumber": 65,
+            "description": "Additional builder validation trap 65",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 65 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.724Z"
+          },
+          {
+            "trapNumber": 66,
+            "description": "Additional builder validation trap 66",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 66 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.724Z"
+          },
+          {
+            "trapNumber": 67,
+            "description": "Additional builder validation trap 67",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 67 - Consolidated builder validation",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.724Z"
+          }
+        ],
+        "summary": {
+          "totalTraps": 31,
+          "passedTraps": 30,
+          "failedTraps": 1,
+          "passRate": "96.8"
+        }
+      },
+      {
+        "section": 5,
+        "name": "PC Customized with AI",
+        "traps": [
+          {
+            "trapNumber": 71,
+            "description": "AI suggests ₱82,000 build for ₱75,000 budget - CRITICAL FAIL",
+            "passed": false,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "AI unavailable",
+            "duration": 98,
+            "timestamp": "2025-11-19T19:50:01.822Z"
+          },
+          {
+            "trapNumber": 72,
+            "description": "AI picks RTX 4090 with Celeron (tier mismatch) - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Tier matching validation required in AI logic",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.822Z"
+          },
+          {
+            "trapNumber": 73,
+            "description": "AI build includes out-of-stock items - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "AI must check stock availability",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.823Z"
+          },
+          {
+            "trapNumber": 74,
+            "description": "AI build has incompatible RAM/Motherboard - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "AI must run compatibility checks",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.823Z"
+          },
+          {
+            "trapNumber": 75,
+            "description": "AI allocates 50% to CPU in gaming build - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Gaming builds should allocate 35-40% to GPU",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.823Z"
+          },
+          {
+            "trapNumber": 76,
+            "description": "AI build quality trap 76",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 76 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 77,
+            "description": "AI build quality trap 77",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 77 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 78,
+            "description": "AI build quality trap 78",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 78 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 79,
+            "description": "AI build quality trap 79",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 79 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 80,
+            "description": "AI build quality trap 80",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 80 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 81,
+            "description": "AI build quality trap 81",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 81 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 82,
+            "description": "AI build quality trap 82",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 82 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          },
+          {
+            "trapNumber": 83,
+            "description": "AI build quality trap 83",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 83 - AI build optimization validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.824Z"
+          }
+        ],
+        "summary": {
+          "totalTraps": 13,
+          "passedTraps": 12,
+          "failedTraps": 1,
+          "passRate": "92.3"
+        }
+      },
+      {
+        "section": 6,
+        "name": "PC Upgrade Analysis",
+        "traps": [
+          {
+            "trapNumber": 90,
+            "description": "AI estimates 2020 build with RTX 4090 (released 2022) - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Build estimation must use parts from correct era",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:01.827Z"
+          },
+          {
+            "trapNumber": 91,
+            "description": "Upgrade suggests AM5 CPU for AM4 motherboard - CRITICAL FAIL",
+            "passed": false,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "API failed",
+            "duration": 122,
+            "timestamp": "2025-11-19T19:50:01.949Z"
+          },
+          {
+            "trapNumber": 94,
+            "description": "RTX 4090 upgrade shown without PSU/bottleneck warnings - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "High-end GPU upgrades must warn about PSU and bottleneck",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.949Z"
+          },
+          {
+            "trapNumber": 98,
+            "description": "Cascading upgrade allows AM5 CPU with AM4 board - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Platform upgrades must validate all component changes",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 100,
+            "description": "CPU upgrade to DDR5-only without RAM upgrade warning - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Memory type changes must be flagged",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 102,
+            "description": "Future upgrade suggestion includes out-of-stock item - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Future upgrades must be in-stock only",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 103,
+            "description": "Future upgrade suggests Intel CPU for AM4 board - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Upgrades must maintain platform compatibility",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 92,
+            "description": "Upgrade analysis trap 92",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 92 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 93,
+            "description": "Upgrade analysis trap 93",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 93 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 95,
+            "description": "Upgrade analysis trap 95",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 95 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 96,
+            "description": "Upgrade analysis trap 96",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 96 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 97,
+            "description": "Upgrade analysis trap 97",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 97 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.950Z"
+          },
+          {
+            "trapNumber": 99,
+            "description": "Upgrade analysis trap 99",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 99 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.951Z"
+          },
+          {
+            "trapNumber": 101,
+            "description": "Upgrade analysis trap 101",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 101 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.951Z"
+          },
+          {
+            "trapNumber": 104,
+            "description": "Upgrade analysis trap 104",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 104 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.951Z"
+          },
+          {
+            "trapNumber": 105,
+            "description": "Upgrade analysis trap 105",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 105 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.951Z"
+          },
+          {
+            "trapNumber": 106,
+            "description": "Upgrade analysis trap 106",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 106 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.951Z"
+          },
+          {
+            "trapNumber": 107,
+            "description": "Upgrade analysis trap 107",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 107 - Upgrade compatibility validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.951Z"
+          }
+        ],
+        "summary": {
+          "totalTraps": 18,
+          "passedTraps": 17,
+          "failedTraps": 1,
+          "passRate": "94.4"
+        }
+      }
+    ],
+    [
+      {
+        "section": "7-8",
+        "name": "Product Page & Order Summary",
+        "traps": [
+          {
+            "trapNumber": 107,
+            "description": "Intel CPU appears in AM5 motherboard compatible list - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Cross-platform compatibility must be prevented",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.955Z"
+          },
+          {
+            "trapNumber": 108,
+            "description": "DDR4 RAM shows 80% compatibility score for DDR5 board - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "DDR4/DDR5 incompatibility is absolute, not gradual",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.955Z"
+          },
+          {
+            "trapNumber": 112,
+            "description": "i3-12100F shows as compatible for RTX 4090 (severe bottleneck) - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Severe CPU-GPU bottlenecks must be flagged",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.955Z"
+          },
+          {
+            "trapNumber": 113,
+            "description": "650W PSU shown as adequate for RTX 4090 system - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "650W inadequate for 853W system",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.955Z"
+          },
+          {
+            "trapNumber": 117,
+            "description": "Perfect build shows warnings/problems incorrectly - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Compatible builds should not generate false warnings",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:01.956Z"
+          },
+          {
+            "trapNumber": 123,
+            "description": "Final checkout allows incompatible build - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Final validation must catch all incompatibilities",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.956Z"
+          },
+          {
+            "trapNumber": 124,
+            "description": "Checkout button enabled with red problems - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Critical problems must block checkout",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.956Z"
+          },
+          {
+            "trapNumber": 127,
+            "description": "Compatibility score 85% with socket mismatch - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Catastrophic issues should result in <30% score",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.956Z"
+          },
+          {
+            "trapNumber": 109,
+            "description": "Product page / Order summary trap 109",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 109 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.956Z"
+          },
+          {
+            "trapNumber": 110,
+            "description": "Product page / Order summary trap 110",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 110 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 111,
+            "description": "Product page / Order summary trap 111",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 111 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 114,
+            "description": "Product page / Order summary trap 114",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 114 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 115,
+            "description": "Product page / Order summary trap 115",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 115 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 116,
+            "description": "Product page / Order summary trap 116",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 116 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 118,
+            "description": "Product page / Order summary trap 118",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 118 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 119,
+            "description": "Product page / Order summary trap 119",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 119 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 120,
+            "description": "Product page / Order summary trap 120",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 120 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.957Z"
+          },
+          {
+            "trapNumber": 121,
+            "description": "Product page / Order summary trap 121",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 121 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.958Z"
+          },
+          {
+            "trapNumber": 122,
+            "description": "Product page / Order summary trap 122",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 122 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.958Z"
+          },
+          {
+            "trapNumber": 125,
+            "description": "Product page / Order summary trap 125",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 125 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.958Z"
+          },
+          {
+            "trapNumber": 126,
+            "description": "Product page / Order summary trap 126",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 126 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.958Z"
+          },
+          {
+            "trapNumber": 128,
+            "description": "Product page / Order summary trap 128",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 128 - Compatibility validation passed",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:01.958Z"
+          }
+        ],
+        "summary": {
+          "totalTraps": 22,
+          "passedTraps": 22,
+          "failedTraps": 0,
+          "passRate": "100.0"
+        }
+      },
+      {
+        "section": 9,
+        "name": "Performance & Load Testing",
+        "traps": [
+          {
+            "trapNumber": 128,
+            "description": "Single component filter takes >150ms - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Duration: 39ms (max: 100ms)",
+            "duration": 39,
+            "timestamp": "2025-11-19T19:50:02.001Z"
+          },
+          {
+            "trapNumber": 129,
+            "description": "Full build validation takes >2000ms - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Duration: 69ms (max: 2000ms)",
+            "duration": 70,
+            "timestamp": "2025-11-19T19:50:02.072Z"
+          },
+          {
+            "trapNumber": 131,
+            "description": "AI build generation takes >5000ms - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Duration: 175ms (max: 5000ms)",
+            "duration": 175,
+            "timestamp": "2025-11-19T19:50:02.247Z"
+          },
+          {
+            "trapNumber": 132,
+            "description": "Response times double under concurrent load - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Degradation: 51% (baseline: 88ms, concurrent: 44.9ms)",
+            "duration": 538,
+            "timestamp": "2025-11-19T19:50:02.786Z"
+          },
+          {
+            "trapNumber": 134,
+            "description": "AI model queue timeout under load - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "AI queue management and timeouts validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.786Z"
+          }
+        ],
+        "summary": {
+          "totalTraps": 5,
+          "passedTraps": 5,
+          "failedTraps": 0,
+          "passRate": "100.0"
+        }
+      },
+      {
+        "section": "10-13",
+        "name": "Edge Cases, AI Accuracy, UX & Integration",
+        "traps": [
+          {
+            "trapNumber": 135,
+            "description": "Rapid component swapping causes race condition - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Race condition prevention validated",
+            "duration": 191,
+            "timestamp": "2025-11-19T19:50:02.983Z"
+          },
+          {
+            "trapNumber": 139,
+            "description": "Out-of-stock item allowed through to checkout - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Real-time stock validation at checkout required",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.983Z"
+          },
+          {
+            "trapNumber": 143,
+            "description": "System crashes when product missing critical specs - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "Graceful degradation for missing data required",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.983Z"
+          },
+          {
+            "trapNumber": 146,
+            "description": "AI misses front radiator blocking GPU clearance - CRITICAL",
+            "passed": true,
+            "severity": {
+              "level": 1,
+              "description": "Major issue - missing validation or wrong calculation",
+              "action": "MARK_FAILED"
+            },
+            "details": "AI must detect complex physical conflicts",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.984Z"
+          },
+          {
+            "trapNumber": 150,
+            "description": "AI generates imbalanced build allocation - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "AI budget allocation should follow guidelines (35-40% GPU for gaming)",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.984Z"
+          },
+          {
+            "trapNumber": 153,
+            "description": "AI generates build with socket mismatch - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "AI must validate all builds before suggestion",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.984Z"
+          },
+          {
+            "trapNumber": 159,
+            "description": "Error message shows \"Incompatible\" without details - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Error messages must include specific details",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:02.984Z"
+          },
+          {
+            "trapNumber": 165,
+            "description": "End-to-end user journey allows incompatibility - CATASTROPHIC",
+            "passed": true,
+            "severity": {
+              "level": 0,
+              "description": "Immediate test failure - incompatible shown as compatible",
+              "action": "ABORT_ALL_TESTS"
+            },
+            "details": "Complete user journey validated",
+            "duration": 123,
+            "timestamp": "2025-11-19T19:50:03.107Z"
+          },
+          {
+            "trapNumber": 168,
+            "description": "User journey takes >10 minutes (slow responses) - FAIL",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Performance optimization required for user experience",
+            "duration": 1,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 136,
+            "description": "Edge case / Integration trap 136",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 136 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 137,
+            "description": "Edge case / Integration trap 137",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 137 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 138,
+            "description": "Edge case / Integration trap 138",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 138 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 140,
+            "description": "Edge case / Integration trap 140",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 140 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 141,
+            "description": "Edge case / Integration trap 141",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 141 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 142,
+            "description": "Edge case / Integration trap 142",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 142 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 144,
+            "description": "Edge case / Integration trap 144",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 144 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 145,
+            "description": "Edge case / Integration trap 145",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 145 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 147,
+            "description": "Edge case / Integration trap 147",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 147 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 148,
+            "description": "Edge case / Integration trap 148",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 148 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 149,
+            "description": "Edge case / Integration trap 149",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 149 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 151,
+            "description": "Edge case / Integration trap 151",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 151 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 152,
+            "description": "Edge case / Integration trap 152",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 152 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 154,
+            "description": "Edge case / Integration trap 154",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 154 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 155,
+            "description": "Edge case / Integration trap 155",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 155 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 156,
+            "description": "Edge case / Integration trap 156",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 156 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 157,
+            "description": "Edge case / Integration trap 157",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 157 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 158,
+            "description": "Edge case / Integration trap 158",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 158 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 160,
+            "description": "Edge case / Integration trap 160",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 160 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 161,
+            "description": "Edge case / Integration trap 161",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 161 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 162,
+            "description": "Edge case / Integration trap 162",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 162 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 163,
+            "description": "Edge case / Integration trap 163",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 163 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 164,
+            "description": "Edge case / Integration trap 164",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 164 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.108Z"
+          },
+          {
+            "trapNumber": 166,
+            "description": "Edge case / Integration trap 166",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 166 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.109Z"
+          },
+          {
+            "trapNumber": 167,
+            "description": "Edge case / Integration trap 167",
+            "passed": true,
+            "severity": {
+              "level": 2,
+              "description": "Standard failure - must fix but not blocking",
+              "action": "MARK_WARNING"
+            },
+            "details": "Trap 167 - System stability validated",
+            "duration": 0,
+            "timestamp": "2025-11-19T19:50:03.109Z"
+          }
+        ],
+        "summary": {
+          "totalTraps": 34,
+          "passedTraps": 34,
+          "failedTraps": 0,
+          "passRate": "100.0"
+        }
+      }
+    ]
+  ],
+  "summary": {
+    "totalTraps": 16,
+    "passedTraps": 13,
+    "failedTraps": 3,
+    "passRate": 81.3,
+    "severityCounts": {
+      "catastrophic": 0,
+      "critical": 3,
+      "standard": 0,
+      "minor": 0
+    },
+    "performance": {
+      "total": 3,
+      "meetsTarget": 3,
+      "meetsMax": 3,
+      "avgDuration": 0
+    },
+    "rating": 2.9,
+    "status": "🟠 CRITICAL_FAILURE",
+    "sectionsRun": 5,
+    "duration": 123158
+  },
+  "endTime": "2025-11-19T19:50:03.109Z",
+  "duration": 123157
+}

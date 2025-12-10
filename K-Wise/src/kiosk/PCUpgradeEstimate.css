@@ -1,0 +1,450 @@
+﻿  /* ========================================
+   KIOSK PC-UPGRADE-ESTIMATE RESPONSIVE SYSTEM
+   Import global kiosk responsive framework
+======================================== */
+@import '../styles/kiosk-responsive.css';
+
+/* PC UPGRADE ESTIMATE - MODERN REDESIGN WITH ICON GRID LAYOUT */
+
+/* ========== CONTAINER ========== */
+.pcu-estimate-container {
+  min-height: 100vh;
+  background: #002024;
+  color: white;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+}
+
+/* ========== LOGO ========== */
+.pcu-estimate-logo-container {
+  margin-bottom: 0px;
+}
+
+.pcu-estimate-logo-image {
+  width: 300px;
+  height: 300px;
+  object-fit: contain;
+}
+
+/* ========== HEADER ========== */
+.pcu-estimate-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.pcu-estimate-icon {
+  font-size: 64px;
+  margin-bottom: 10px;
+}
+
+.pcu-estimate-main-title {
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  margin: 0 0 10px 0;
+  color: #fff;
+  letter-spacing: 3px;
+}
+
+.pcu-estimate-tagline {
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #fff;
+  opacity: 0.5;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ========== PROGRESS ========== */
+.pcu-estimate-progress {
+  width: 100%;
+  max-width: 952px;
+  margin-bottom: 40px;
+}
+
+.pcu-estimate-progress-bar {
+  width: 100%;
+  height: 12px;
+  background: rgba(0, 224, 131, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.pcu-estimate-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00E083 0%, #00A8FF 100%);
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.pcu-estimate-progress-text {
+  text-align: center;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  color: #fff;
+  opacity: 0.5;
+  margin: 0;
+}
+
+/* ========== CONTENT ========== */
+.pcu-estimate-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.pcu-estimate-question-container {
+  width: 100%;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pcu-estimate-question {
+  font-size: 64px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: normal;
+  text-align: center;
+  margin: 0 0 40px 0;
+  color: white;
+}
+
+/* ========== OPTIONS GRID (FOR USAGE WITH ICONS) ========== */
+.pcu-estimate-options-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  padding: 0 20px;
+  margin: 0 auto;
+}
+
+.pcu-estimate-option-card {
+  background: transparent;
+  border: 4px solid #00E083;
+  padding: 32px 16px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 54px;
+  min-height: 296px;
+  
+}
+
+
+.pcu-estimate-option-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 15px;
+}
+
+.pcu-estimate-option-icon-svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(1px 1px 10px #00E083);
+  /* Remove filter to show original SVG colors */
+}
+
+.pcu-estimate-option-text {
+  font-size: 28px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  text-align: center;
+}
+
+/* ========== OPTIONS LIST (FOR YEAR/BUDGET) ========== */
+.pcu-estimate-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.pcu-estimate-option-btn {
+  height: 296px;
+  background: transparent;
+  color: white;
+  border: 4px solid #00E083;
+  padding: 32px 16px;
+  font-size: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+/* ========== SUMMARY ========== */
+.pcu-estimate-summary {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: transparent;
+  border: 4px solid #00E083;
+  max-width: 600px;
+  margin: 0 auto 30px auto;
+}
+
+.pcu-estimate-summary p {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 10px 0;
+}
+
+.pcu-estimate-summary strong {
+  color: #fff;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+}
+
+/* ========== SUBMIT BUTTON ========== */
+.pcu-estimate-submit-btn {
+  background: linear-gradient(135deg, #00E083 0%, #00A8FF 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 20px 40px;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 12px rgba(0, 224, 131, 0.3);
+  display: block;
+  margin: 20px auto;
+  min-width: 400px;
+}
+
+.pcu-estimate-submit-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 224, 131, 0.4);
+}
+
+.pcu-estimate-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========== ERROR MESSAGE ========== */
+.pcu-estimate-error {
+  background-color: rgba(255, 77, 77, 0.15);
+  border: 2px solid #ff4d4d;
+  border-radius: 8px;
+  padding: 15px 20px;
+  color: #ff6666;
+  font-size: 16px;
+  text-align: center;
+  margin: 20px auto;
+  max-width: 600px;
+}
+
+/* ========== LOADING STATE ========== */
+.pcu-estimate-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 40px;
+}
+
+.pcu-estimate-loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(0, 224, 131, 0.2);
+  border-top-color: #00E083;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pcu-estimate-loading-text {
+  font-size: 24px;
+  color: #00E083;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.pcu-estimate-loading-subtext {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ========== ACTIONS (FOOTER) ========== */
+.pcu-estimate-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  gap: 20px;
+  padding: 20px;
+  margin: 0 auto;
+}
+
+.pcu-estimate-back-btn {
+  background-color: transparent;
+  color: white;
+  border: 4px solid #034C3B;
+  display: flex;
+  width: 100%;
+  height: 71.346px;
+  padding: 12px 24px;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pcu-estimate-options-cost-grid{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.pcu-estimate-option-cost-btn{
+  height: 84px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  color: white;
+  border: 4px solid #00E083;
+  padding: 32px 16px;
+  font-size: 28px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+  .pcu-estimate-options-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .pcu-estimate-main-title {
+    font-size: 40px;
+  }
+  
+  .pcu-estimate-question {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pcu-estimate-options-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .pcu-estimate-main-title {
+    font-size: 36px;
+  }
+  
+  .pcu-estimate-question {
+    font-size: 26px;
+  }
+  
+  .pcu-estimate-option-card {
+    min-height: 150px;
+    padding: 25px 15px;
+  }
+  
+  .pcu-estimate-option-icon-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .pcu-estimate-submit-btn {
+    min-width: 300px;
+    font-size: 18px;
+    padding: 18px 35px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pcu-estimate-logo-image {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .pcu-estimate-icon {
+    font-size: 48px;
+  }
+  
+  .pcu-estimate-main-title {
+    font-size: 32px;
+    letter-spacing: 2px;
+  }
+  
+  .pcu-estimate-tagline {
+    font-size: 18px;
+  }
+  
+  .pcu-estimate-question {
+    font-size: 22px;
+    margin-bottom: 30px;
+  }
+  
+  .pcu-estimate-option-btn {
+    font-size: 16px;
+    padding: 15px 20px;
+  }
+  
+  .pcu-estimate-submit-btn {
+    min-width: 100%;
+    font-size: 16px;
+    padding: 15px 25px;
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "totalRules": 2513,
+  "totalExamples": 2513,
+  "rulesByCategory": [
+    {
+      "category": "bios",
+      "count": 176
+    },
+    {
+      "category": "chipset",
+      "count": 47
+    },
+    {
+      "category": "compatibility",
+      "count": 466
+    },
+    {
+      "category": "memory",
+      "count": 221
+    },
+    {
+      "category": "pcie",
+      "count": 90
+    },
+    {
+      "category": "performance",
+      "count": 218
+    },
+    {
+      "category": "physical",
+      "count": 376
+    },
+    {
+      "category": "power",
+      "count": 299
+    },
+    {
+      "category": "socket",
+      "count": 103
+    },
+    {
+      "category": "storage",
+      "count": 190
+    },
+    {
+      "category": "thermal",
+      "count": 327
+    }
+  ],
+  "bySeverity": {
+    "error": 214,
+    "warning": 500,
+    "info": 1799
+  },
+  "generatedAt": "2025-11-09T19:55:18.087Z",
+  "outputFile": "C:\\Users\\Ludwig Rivera\\Downloads\\K-Wise Final 2\\KWise-Backend\\ai\\training\\datasets\\compatibility_rules_training.jsonl"
+}

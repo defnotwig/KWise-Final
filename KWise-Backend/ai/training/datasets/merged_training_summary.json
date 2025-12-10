@@ -1,0 +1,12 @@
+{
+  "totalExamples": 2578,
+  "sources": {
+    "compatibilityRules": 2513,
+    "hardwareExamples": 65
+  },
+  "validExamples": 2578,
+  "invalidExamples": 0,
+  "fileSize": "1205.67 KB",
+  "createdAt": "2025-11-09T20:14:07.338Z",
+  "outputFile": "C:\\Users\\Ludwig Rivera\\Downloads\\K-Wise Final 2\\KWise-Backend\\ai\\training\\datasets\\merged_training_dataset.jsonl"
+}

@@ -1,0 +1,271 @@
+/**
+ * CompatibilityBadge Styles
+ * Unified badge design for all compatibility indicators
+ */
+
+.compatibility-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background-color: var(--badge-bg);
+    color: var(--badge-color);
+    border: 2px solid var(--badge-color);
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* Sizes */
+.compatibility-badge.small {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    gap: 4px;
+}
+
+.compatibility-badge.large {
+    padding: 8px 16px;
+    font-size: 1rem;
+    gap: 8px;
+}
+
+/* Status Colors */
+.compatibility-badge.excellent {
+    --badge-color: #10b981;
+    --badge-bg: #d1fae5;
+}
+
+.compatibility-badge.good {
+    --badge-color: #3b82f6;
+    --badge-bg: #dbeafe;
+}
+
+.compatibility-badge.warning {
+    --badge-color: #f59e0b;
+    --badge-bg: #fef3c7;
+}
+
+.compatibility-badge.incompatible {
+    --badge-color: #ef4444;
+    --badge-bg: #fee2e2;
+}
+
+.compatibility-badge.unknown {
+    --badge-color: #6b7280;
+    --badge-bg: #f3f4f6;
+}
+
+/* Glow Effect (for compatible products) */
+.compatibility-badge.glow-effect {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5),
+                0 0 20px rgba(16, 185, 129, 0.3),
+                0 0 30px rgba(16, 185, 129, 0.2);
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.5),
+                    0 0 20px rgba(16, 185, 129, 0.3),
+                    0 0 30px rgba(16, 185, 129, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.7),
+                    0 0 30px rgba(16, 185, 129, 0.5),
+                    0 0 45px rgba(16, 185, 129, 0.3);
+    }
+}
+
+/* Clickable state */
+.compatibility-badge.clickable {
+    cursor: pointer;
+}
+
+.compatibility-badge.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.compatibility-badge.clickable:active {
+    transform: translateY(0);
+}
+
+/* Badge Elements */
+.badge-icon {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.badge-score {
+    font-weight: 700;
+    font-size: 1.05em;
+}
+
+.badge-label {
+    font-weight: 600;
+}
+
+/* Tooltip */
+.compatibility-tooltip {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 250px;
+    max-width: 400px;
+    z-index: 1000;
+    font-size: 0.875rem;
+    font-weight: normal;
+    animation: tooltip-fade-in 0.2s ease;
+    pointer-events: none;
+}
+
+@keyframes tooltip-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Tooltip arrow */
+.compatibility-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-bottom-color: #1f2937;
+}
+
+.tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-icon {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.tooltip-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.tooltip-status {
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: #d1d5db;
+}
+
+.tooltip-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-section-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    color: #f3f4f6;
+}
+
+.tooltip-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tooltip-list li {
+    padding: 2px 0;
+    font-size: 0.8rem;
+    color: #d1d5db;
+    line-height: 1.4;
+}
+
+.tooltip-list li::before {
+    content: '• ';
+    color: #9ca3af;
+    margin-right: 4px;
+}
+
+.tooltip-more {
+    font-style: italic;
+    color: #9ca3af;
+}
+
+.tooltip-perfect {
+    text-align: center;
+    padding: 8px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 4px;
+    color: #10b981;
+    font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .compatibility-badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        gap: 4px;
+    }
+
+    .compatibility-badge.small {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+
+    .compatibility-badge.large {
+        font-size: 0.875rem;
+        padding: 6px 12px;
+    }
+
+    .compatibility-tooltip {
+        min-width: 200px;
+        max-width: 300px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .compatibility-badge.excellent {
+        --badge-bg: rgba(16, 185, 129, 0.2);
+    }
+
+    .compatibility-badge.good {
+        --badge-bg: rgba(59, 130, 246, 0.2);
+    }
+
+    .compatibility-badge.warning {
+        --badge-bg: rgba(245, 158, 11, 0.2);
+    }
+
+    .compatibility-badge.incompatible {
+        --badge-bg: rgba(239, 68, 68, 0.2);
+    }
+
+    .compatibility-badge.unknown {
+        --badge-bg: rgba(107, 114, 128, 0.2);
+    }
+}
