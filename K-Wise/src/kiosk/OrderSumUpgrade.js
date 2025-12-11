@@ -108,29 +108,36 @@ function OrderSumUpgrade() {
       setIsManualProcessing(manualMode);
 
       if (manualMode) {
-        console.log('⏭️ Manual processing mode detected - showing 0 pesos order');
-        // Create a dummy order with description for manual processing
-        const estimatedBuild = JSON.parse(localStorage.getItem("pc-upgrade-estimated")) || {};
+        console.log('⏭️ Manual processing mode detected - showing order summary first');
+        // 🔥 FIX: Show OrderSumUpgrade FIRST with consultation fee, THEN user clicks "Proceed to Payment"
+        
+        // Create a minimal valid order with 200 peso consultation fee
+        const CONSULTATION_FEE = 200;
         const manualOrder = {
           id: Date.now(),
           items: [{
-            name: 'PC Upgrade - Manual Processing',
-            price: 0,
-            category: 'Service',
-            description: 'PC Upgrade will be processed manually by staff. Parts will be added to order queue after consultation.'
+            id: null,
+            name: 'PC Upgrade Consultation',
+            price: CONSULTATION_FEE,
+            category: 'service',
+            description: 'Initial consultation fee for PC upgrade service. Actual upgrade parts will be added by staff after assessment.'
           }],
-          categories: ['Service'],
+          categories: ['service'],
           quantity: 1,
           createdAt: new Date().toISOString(),
-          isManualProcessing: true,
-          estimatedBuild: estimatedBuild
+          isManualProcessing: true
         };
 
         localStorage.setItem("upgradeOrders", JSON.stringify([manualOrder]));
         setOrders([manualOrder]);
-
-        // Clear the manual flag
+        
+        // Clear the manual flag and all working data
         localStorage.removeItem("pc-upgrade-manual");
+        localStorage.removeItem("pc-upgrade-selections");
+        localStorage.removeItem("pc-upgrade-estimated");
+        localStorage.removeItem("pc-upgrade-selected");
+        
+        // Stay on OrderSumUpgrade page - user will click "Proceed to Payment" button
         return;
       }
 

@@ -152,9 +152,9 @@ const Sidebar = () => {
 
     return (
         <div className="sidebar">
-            <div className="logo">
-                <img src={logo} alt="PC WISE" />
-                <span>K-WISE</span>
+            <div className="sidebar-logo">
+                <img src={logo} alt="PC WISE" className="logopcswise" />
+                <h1>PC WISE</h1>
             </div>
             <nav className="nav-menu">
                 {navItems.map((item) => {
@@ -168,14 +168,14 @@ const Sidebar = () => {
                             to={item.to}
                             className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                             <span className="icon">{item.icon}</span>
-                            <span className="label">{item.label}</span>
+                            <span className="nav-label">{item.label}</span>
                         </NavLink>
                     );
                 })}
 
-                <button className="logout-btn" onClick={handleLogout}>
+                <button className="logout-btn nav-item" onClick={handleLogout}>
                     <span className="icon"><FiLogOut /></span>
-                    <span className="label">Logout</span>
+                    <span className="nav-label">Logout</span>
                 </button>
             </nav>
         </div>

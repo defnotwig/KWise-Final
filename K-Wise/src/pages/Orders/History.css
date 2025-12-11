@@ -200,7 +200,7 @@
     width: 100%;
     padding: 10px;
     border-radius: 5px;
-    border: 1px solid var(--border-color);
+    border: none;
     background-color: var(--card-bg);
     color: var(--text-color);
 }
@@ -361,7 +361,7 @@
 }
 
 .stat-value {
-    font-size: 1.1rem;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-color);
 }

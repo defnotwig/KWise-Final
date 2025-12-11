@@ -308,7 +308,7 @@
 .admin-layout .stat-card .stat-value,
 .admin-layout .metric-card .metric-value {
   color: #1f2937 !important;
-  font-size: 1.5rem !important;
+  font-size: 17.6px !important;
   font-weight: 700 !important;
   text-rendering: optimizeLegibility !important;
   -webkit-font-smoothing: antialiased !important;
