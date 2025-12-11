@@ -23,7 +23,6 @@
 }
 
 .admin-content-container.content-container {
-    padding: 2rem; /* Add padding for content */
     width: 100%;
     height: 100vh;
     overflow-y: auto;

@@ -497,54 +497,76 @@ const Dashboard = () => {
 
             {/* Stats Cards */}
             <div className="stats-grid">
-                <div className="stat-card" onClick={() => navigate('/admin/history')} style={{cursor: 'pointer'}} title="Click to view orders">
+                <div className="stat-dashboard-card" onClick={() => navigate('/admin/history')} style={{cursor: 'pointer'}} title="Click to view orders">
                     <div className="stat-icon">
                         <FiShoppingCart />
                     </div>
-                    <h3 className="stat-title">Total Orders</h3>
+                    <div className="stat-content">
+                    <div className="stat-badge">
+                    <h3 className="stat-title">Total Orders:</h3>
                     <div className="stat-value">{stats.orders?.total || 0}</div>
+                    </div>
                     <div className="stat-desc">
                         {stats.system?.hasOrders ? (
                             <>
-                                <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterToday: true } }); }} style={{cursor: 'pointer', textDecoration: 'underline'}}>Today: {stats.orders?.today || 0}</span> | <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterWeek: true } }); }} style={{cursor: 'pointer', textDecoration: 'underline'}}>Week: {stats.orders?.week || 0}</span>
+                                <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterToday: true } }); }} style={{cursor: 'pointer'}}>Today: {stats.orders?.today || 0}</span> | <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterWeek: true } }); }} style={{cursor: 'pointer'}}>Week: {stats.orders?.week || 0}</span>
                             </>
                         ) : (
                             <span style={{color: '#ffa500'}}>No orders yet - Add some test orders!</span>
                         )}
+                    
+                    </div>
                     </div>
                 </div>
 
-                <div className="stat-card" onClick={() => navigate('/admin/history', { state: { filterStatus: 'completed' } })} style={{cursor: 'pointer'}} title="Click to view completed orders">
+                <div className="stat-dashboard-card" onClick={() => navigate('/admin/history', { state: { filterStatus: 'completed' } })} style={{cursor: 'pointer'}} title="Click to view completed orders">
                     <div className="stat-icon">
                         <FiCheckCircle />
                     </div>
-                    <h3 className="stat-title">Completed Orders</h3>
+                    <div className="stat-content">
+                    <div className="stat-badge">
+                    
+                    <h3 className="stat-title">Completed Orders:</h3>
                     <div className="stat-value">{stats.orders.completed}</div>
-                    <div className="stat-desc">
-                        <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterStatus: 'pending' } }); }} style={{cursor: 'pointer', textDecoration: 'underline'}}>Pending: {stats.orders.pending}</span> | <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterStatus: 'cancelled' } }); }} style={{cursor: 'pointer', textDecoration: 'underline'}}>Cancelled: {stats.orders.cancelled}</span>
                     </div>
+                    <div className="stat-desc">
+                        <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterStatus: 'pending' } }); }} style={{cursor: 'pointer'}}>Pending: {stats.orders.pending}</span> | <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterStatus: 'cancelled' } }); }} style={{cursor: 'pointer'}}>Cancelled: {stats.orders.cancelled}</span>
+                    </div>
+                    </div>
+                    
                 </div>
 
-                <div className="stat-card" style={{cursor: 'pointer'}} title="Click to view products">
+                <div className="stat-dashboard-card" style={{cursor: 'pointer'}} title="Click to view products">
                     <div className="stat-icon">
                         <FiPackage />
                     </div>
-                    <h3 className="stat-title">Total Products</h3>
+                    <div className="stat-content">
+                    <div className="stat-badge">
+                    
+                    <h3 className="stat-title">Total Products:</h3>
                     <div className="stat-value" onClick={() => navigate('/admin/stock')}>{stats.inventory?.totalProducts || 0}</div>
-                    <div className="stat-desc">
-                        <span onClick={(e) => { e.stopPropagation(); fetchLowStockAnalytics(); }} style={{cursor: 'pointer', textDecoration: 'underline', fontWeight: 'bold', color: stats.inventory?.lowStock > 0 ? '#ff6b6b' : 'inherit'}}>Low Stock: {stats.inventory?.lowStock || 0}</span> | <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterStatus: 'completed' } }); }} style={{cursor: 'pointer', textDecoration: 'underline'}}>Value: ₱{(stats.inventory?.totalValue || 0).toLocaleString()}</span>
                     </div>
+                    <div className="stat-desc">
+                        <span onClick={(e) => { e.stopPropagation(); fetchLowStockAnalytics(); }} style={{cursor: 'pointer', fontWeight: 'bold', color: stats.inventory?.lowStock > 0 ? '#ff6b6b' : 'inherit'}}>Low Stock: {stats.inventory?.lowStock || 0}</span> | <span onClick={(e) => { e.stopPropagation(); navigate('/admin/history', { state: { filterStatus: 'completed' } }); }} style={{cursor: 'pointer'}}>Value: ₱{(stats.inventory?.totalValue || 0).toLocaleString()}</span>
+                    </div>
+                    </div>
+                    
                 </div>
 
-                <div className="stat-card" onClick={() => navigate('/admin/accounts')} style={{cursor: 'pointer'}} title="Click to view accounts">
+                <div className="stat-dashboard-card" onClick={() => navigate('/admin/accounts')} style={{cursor: 'pointer'}} title="Click to view accounts">
                     <div className="stat-icon">
                         <FiUsers />
                     </div>
-                    <h3 className="stat-title">Active Users</h3>
+                    <div className="stat-content">
+                    <div className="stat-badge">
+                    <h3 className="stat-title">Active Users:</h3>
                     <div className="stat-value">{stats.users?.active || 0}</div>
-                    <div className="stat-desc">
+                   </div> 
+                   <div className="stat-desc">
                         Total: {stats.users?.total || 0} | Revenue: ₱{(stats.revenue?.total || 0).toLocaleString()}
                     </div>
+                    </div>
+                    
                 </div>
             </div>
             {/* Sales Chart */}
@@ -597,9 +619,6 @@ const Dashboard = () => {
                                         <td>{order.customerName || order.customer}</td>
                                         <td>{formatCurrency(order.totalAmount || order.amount || 0)}</td>
                                         <td>
-                                            <span className={getStatusBadgeClass(order.status || 'pending')}>
-                                                {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
-                                            </span>
                                         </td>
                                         <td>{new Date(order.createdAt || order.date).toLocaleDateString()}</td>
                                     </tr>

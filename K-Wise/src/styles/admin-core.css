@@ -13,10 +13,8 @@
 /* FIXED: Text readability overrides - Remove inheritance that causes blur/invisible text */
 .admin-layout h1, .admin-layout h2, .admin-layout h3, 
 .admin-layout h4, .admin-layout h5, .admin-layout h6 {
-  color: var(--text-primary, #1f2937) !important;
   font-weight: 600 !important;
   line-height: 1.2 !important;
-  margin-bottom: 0.5rem !important;
   text-rendering: optimizeLegibility !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
@@ -80,6 +78,11 @@
   opacity: 1; /* 100% opacity - no transparency */
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* Remove border from search-input specifically */
+.admin-layout .search-input {
+  border: none;
 }
 
 /* CRITICAL FIX: Notification components - remove any transparency */
@@ -498,9 +501,7 @@
 .admin-layout .metric-card h3,
 .admin-layout .stat-title {
   color: var(--text-primary, #1f2937) !important;
-  font-size: 1.1rem !important;
   font-weight: 600 !important;
-  margin-bottom: 0.5rem !important;
   text-rendering: optimizeLegibility !important;
   -webkit-font-smoothing: antialiased !important;
 }
@@ -508,7 +509,6 @@
 .admin-layout .stat-value,
 .admin-layout .metric-value {
   color: var(--accent-color, #3b82f6) !important;
-  font-size: 2rem !important;
   font-weight: 700 !important;
   line-height: 1 !important;
   text-rendering: optimizeLegibility !important;

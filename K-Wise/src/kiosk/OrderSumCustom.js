@@ -726,64 +726,114 @@ function OrderSumCustom() {
       });
 
       console.log('📦 Build components for validation:', Object.keys(buildComponents));
+      console.log('📦 Full build components:', buildComponents);
 
-      // 🔥 FIX: If we have less than 2 recognized components, skip validation and proceed
+      // 🔥 FIX: If we have less than 2 recognized components, skip validation and go DIRECTLY to payment
       if (Object.keys(buildComponents).length < 2) {
-        console.log('⚠️ Less than 2 components found, skipping validation');
-        proceedToFutureUpgrades();
+        console.log('⚠️ Less than 2 components found, bypassing validation and going directly to payment');
+        console.log('🚀 Calling proceedDirectlyToPayment()...');
+        proceedDirectlyToPayment();
         return;
       }
 
+      console.log('✅ Starting full build validation with', Object.keys(buildComponents).length, 'components...');
+      
       // Call full build validation
       const validation = await compatibilityValidator.validateFullBuild(buildComponents);
       
       console.log('📊 Validation result:', validation);
+      console.log('📊 Validation blocking:', validation.blocking);
+      console.log('📊 Validation warnings:', validation.warnings);
 
       if (validation.blocking) {
         // Critical issues found - block checkout
+        console.log('🚫 CRITICAL issues found, showing modal to block checkout');
         setCompatibilityValidation(validation);
         setShowCompatibilityModal(true);
         setIsValidatingCompatibility(false);
         return;
       }
 
+      // 🔥 CRITICAL FIX: Don't show modal for warnings - proceed directly
+      // Warnings are informational only and should not block checkout
       if (validation.warnings && validation.warnings.length > 0) {
-        // Warnings found - show modal with option to proceed
-        setCompatibilityValidation(validation);
-        setShowCompatibilityModal(true);
-        setIsValidatingCompatibility(false);
-        return;
+        console.log('⚠️ Validation warnings found but NOT blocking - proceeding to payment');
+        console.log('📋 Warnings:', validation.warnings);
       }
 
-      // No issues - proceed directly
-      proceedToFutureUpgrades();
+      // No critical issues - proceed directly (ignore warnings)
+      console.log('✅ No critical issues, proceeding to payment...');
+      console.log('🚀 Calling proceedToPayment()...');
+      setIsValidatingCompatibility(false);
+      proceedToPayment();
       
     } catch (error) {
       console.error('❌ Error validating compatibility:', error);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Error message:', error.message);
       setIsValidatingCompatibility(false);
       
-      // Ask user if they want to proceed anyway
-      if (window.confirm('Unable to validate compatibility. Proceed anyway?')) {
-        proceedToFutureUpgrades();
-      }
+      // 🔥 CRITICAL: Don't ask user, just proceed directly to payment
+      console.log('⚠️ Validation error occurred, proceeding directly to payment anyway...');
+      proceedDirectlyToPayment();
     }
   };
 
-  // Helper function to actually navigate to payment
-  const proceedToFutureUpgrades = () => {
+  // Helper function to actually navigate to payment or future upgrades
+  const proceedToPayment = () => {
     const allItems = orders.flatMap(order => order.items || []);
     const fromSource = location.state?.from || "pc-customized";
-    console.log('🚀 Proceeding to Future Upgrade from', fromSource, 'with', allItems.length, 'items');
+    console.log('🚀 proceedToPayment called');
+    console.log('🚀 From source:', fromSource, 'with', allItems.length, 'items');
     
+    // Close modal and clear validation state
     setIsValidatingCompatibility(false);
     setShowCompatibilityModal(false);
+    setCompatibilityValidation(null);
     
-    navigate("/future-upgrades", {
-      state: {
-        from: fromSource,
-        cartItems: allItems
-      }
-    });
+    // 🔥 FIX: Go DIRECTLY to payment-window, skip future-upgrades
+    // User expects to go to payment after clicking "Proceed to Payment"
+    console.log('🚀 Navigating to /payment-window (skipping future-upgrades)');
+    console.log('📦 Passing state:', { from: fromSource, cartItems: allItems });
+    
+    // Use setTimeout to ensure state is cleared before navigation
+    setTimeout(() => {
+      navigate("/payment-window", {
+        state: {
+          from: fromSource,
+          cartItems: allItems
+        },
+        replace: false // Don't replace history, allow back navigation
+      });
+      console.log('✅ Navigation to payment-window executed');
+    }, 100);
+  };
+  
+  // Alternative: Skip future upgrades and go directly to payment
+  const proceedDirectlyToPayment = () => {
+    const allItems = orders.flatMap(order => order.items || []);
+    const fromSource = location.state?.from || "pc-customized";
+    console.log('🚀 proceedDirectlyToPayment called');
+    console.log('🚀 From source:', fromSource, 'with', allItems.length, 'items');
+    
+    // Close modal and clear validation state
+    setIsValidatingCompatibility(false);
+    setShowCompatibilityModal(false);
+    setCompatibilityValidation(null);
+    
+    console.log('🚀 Navigating to /payment-window with state:', { from: fromSource, cartItems: allItems });
+    
+    // Use setTimeout to ensure state is cleared before navigation
+    setTimeout(() => {
+      navigate("/payment-window", {
+        state: { 
+          from: fromSource,
+          cartItems: allItems // Include cart items
+        },
+        replace: false
+      });
+      console.log('✅ Navigation command executed');
+    }, 100);
   };
 
   return (
@@ -990,22 +1040,41 @@ function OrderSumCustom() {
       {/* ✅ COMPATIBILITY WARNING MODAL */}
       {showCompatibilityModal && compatibilityValidation && (
         <CompatibilityWarningModal
-          isOpen={showCompatibilityModal}
+          show={showCompatibilityModal}
+          compatibility={{
+            score: compatibilityValidation.score || 0,
+            issues: compatibilityValidation.issues || [],
+            warnings: compatibilityValidation.warnings || [],
+            recommendations: compatibilityValidation.recommendations || []
+          }}
           onClose={() => {
+            console.log('🚪 Modal closed by user');
             setShowCompatibilityModal(false);
             setCompatibilityValidation(null);
+            setIsValidatingCompatibility(false);
           }}
           onProceed={() => {
+            console.log('✅ User clicked Proceed in modal');
+            console.log('🔍 Blocking status:', compatibilityValidation.blocking);
             if (!compatibilityValidation.blocking) {
-              proceedToFutureUpgrades();
+              proceedToPayment();
+            } else {
+              console.log('🚫 Cannot proceed - critical issues present');
             }
           }}
-          product={null}
-          compatibilityScore={compatibilityValidation.score}
-          issues={compatibilityValidation.issues}
-          warnings={compatibilityValidation.warnings}
-          blocking={compatibilityValidation.blocking}
-          message={compatibilityValidation.message}
+          onFixIssues={() => {
+            console.log('🔧 User clicked Fix Issues');
+            setShowCompatibilityModal(false);
+            setCompatibilityValidation(null);
+            setIsValidatingCompatibility(false);
+            // Navigate back to appropriate customizer
+            const fromSource = location.state?.from;
+            if (fromSource === 'customize-ai') {
+              navigate('/customize-ai');
+            } else {
+              navigate('/pc-customized');
+            }
+          }}
         />
       )}
     </div>

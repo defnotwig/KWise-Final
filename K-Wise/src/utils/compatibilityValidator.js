@@ -297,22 +297,43 @@ class CompatibilityValidator {
       const score = data.compatibility_score || data.compatibilityScore || 0;
       const issues = data.critical_issues || data.criticalIssues || [];
       const warnings = data.warnings || [];
+      
+      // 🔥 CRITICAL FIX: Only block if there are ACTUAL critical issues
+      // Backend marks builds as "compatible" even with low scores
+      // Warnings should NEVER block navigation to payment
+      const isCompatible = data.compatible === true || data.overall_status === 'compatible';
+      
+      // ONLY block if:
+      // 1. There are critical issues (issues array not empty)
+      // 2. AND the backend explicitly marked it as incompatible
+      const hasCriticalIssues = issues.length > 0;
+      const blocking = hasCriticalIssues && !isCompatible;
 
-      const blocking = issues.length > 0 || score < 50;
+      console.log('🔍 Validation result:', {
+        isCompatible,
+        hasCriticalIssues,
+        blocking,
+        issuesCount: issues.length,
+        warningsCount: warnings.length,
+        score
+      });
 
       return {
-        valid: !blocking,
-        blocking: blocking,
+        valid: !blocking, // Build is valid if not blocking
+        blocking: blocking, // Only block if critical issues + incompatible
         message: blocking 
           ? `⚠️ Build has critical compatibility issues`
           : score >= 90
             ? '✅ Fully Compatible Build'
             : score >= 75
               ? '⚠️ Build Compatible with Minor Warnings'
-              : '🔶 Build May Work (Not Recommended)',
-        issues: issues,
-        warnings: warnings,
+              : isCompatible
+                ? '✅ Build Compatible'
+                : '🔶 Build May Work (Not Recommended)',
+        issues: issues, // Critical issues only
+        warnings: warnings, // Non-blocking warnings
         compatibilityScore: score,
+        score: score, // Also provide as 'score' for consistency
         details: data.details || {}
       };
 
