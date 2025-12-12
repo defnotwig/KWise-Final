@@ -1,3 +1,43 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
 
-# Database backups (too large for GitHub)
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+frontend-compile.log
+
+# Build / artifacts
+dist/
+build/
+public/assets/
+
+# Backups and large data
+backups/
+*.sql
 KWiseDB_full_backup_*.sql
+final-run-*.log
+frontend-compile.log
+
+# Reports and test results (generated)
+reports/
+load-testing/results/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Ignore local-only generated folders
+K-Wise/public/kiosk/
+K-Wise/public/assets/
+KWise-Backend/public/assets/
