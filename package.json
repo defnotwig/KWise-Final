@@ -1,0 +1,14 @@
+{
+  "name": "kwise-launcher",
+  "version": "1.0.0",
+  "description": "Launcher wrapper to start K-Wise frontend and backend with one click (Windows)",
+  "main": "launcher.js",
+  "scripts": {
+    "start-all": "node launcher.js",
+    "build-exe": "npx pkg . --targets node18-win-x64 --output kwise-launcher.exe"
+  },
+  "bin": "launcher.js",
+  "devDependencies": {
+    "pkg": "^5.8.0"
+  }
+}
