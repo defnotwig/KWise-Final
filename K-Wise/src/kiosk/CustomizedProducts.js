@@ -347,7 +347,9 @@ const CustomizedProducts = () => {
         if (!comp) return;
         
         // Determine component type based on category or name
-        const category = comp.categoryName || comp.category || '';
+        // 🔥 CRITICAL FIX: Use comp.category (normalized lowercase) BEFORE comp.categoryName (display name)
+        // This fixes filtering failure where "Processor" vs "cpu" key mismatch causes filter to skip
+        const category = comp.category || comp.categoryName || '';
         const catLower = category.toLowerCase();
         
         console.log(`🔍 Analyzing component: ${comp.name} (${category})`);

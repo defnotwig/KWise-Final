@@ -284,7 +284,9 @@ const PCUpgradeDisplay = () => {
       selectedComponents.forEach(comp => {
         if (!comp) return;
         
-        const category = comp.categoryName || comp.category || '';
+        // 🔥 CRITICAL FIX: Use comp.category (normalized lowercase) BEFORE comp.categoryName (display name)
+        // This fixes filtering failure where "Processor" vs "cpu" key mismatch causes filter to skip
+        const category = comp.category || comp.categoryName || '';
         const catLower = category.toLowerCase();
         
         if (catLower.includes('cpu') || catLower.includes('processor')) {
