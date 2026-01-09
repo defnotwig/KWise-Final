@@ -25,6 +25,7 @@ This directory contains executable scripts to manage the K-Wise application usin
 ## Prerequisites
 
 1. **PM2 must be installed globally:**
+
    ```bash
    npm install -g pm2
    ```
@@ -39,6 +40,7 @@ This directory contains executable scripts to manage the K-Wise application usin
 ### Windows
 
 Simply double-click the `.cmd` files or run from Command Prompt:
+
 ```cmd
 start-pm2.cmd
 stop-pm2.cmd
@@ -48,6 +50,7 @@ restart-pm2.cmd
 ### Linux/Unix
 
 Run from terminal:
+
 ```bash
 ./start-pm2.sh
 ./stop-pm2.sh
@@ -66,6 +69,7 @@ Run from terminal:
 4. Test run when asked
 
 The script will:
+
 - ✅ Create a scheduled task with optimal settings
 - ✅ Configure automatic startup with 1-minute delay
 - ✅ Set up retry logic (3 attempts)
@@ -73,12 +77,14 @@ The script will:
 - ✅ Run as SYSTEM with highest privileges
 
 **Or run from PowerShell (as Administrator):**
+
 ```powershell
 cd "C:\Users\Ludwig Rivera\Downloads\K-Wise Final 2"
 .\setup-task-scheduler.ps1
 ```
 
 To remove and recreate:
+
 ```powershell
 .\setup-task-scheduler.ps1 -RemoveExisting
 ```
@@ -125,6 +131,7 @@ schtasks /create /tn "K-Wise Startup" /tr "C:\Users\Ludwig Rivera\Downloads\K-Wi
 ### Start on System Boot
 
 1. Edit root crontab:
+
    ```bash
    sudo crontab -e
    ```
@@ -145,11 +152,13 @@ schtasks /create /tn "K-Wise Startup" /tr "C:\Users\Ludwig Rivera\Downloads\K-Wi
 For more robust Linux startup, create a systemd service:
 
 1. Create service file:
+
    ```bash
    sudo nano /etc/systemd/system/kwise.service
    ```
 
 2. Add this content:
+
    ```ini
    [Unit]
    Description=K-Wise Application
@@ -228,7 +237,7 @@ chmod +x *.sh
 
 After starting with these scripts:
 
-```bash
+````bash
 # View status
 pm2 status
 
@@ -248,14 +257,16 @@ pm2 monit
 1. **Install PM2 globally** (if not already installed):
    ```cmd
    npm install -g pm2
-   ```
+````
 
 2. **Run the automated setup**:
+
    - Right-click `setup-task-scheduler.ps1`
    - Select "Run with PowerShell as Administrator"
    - Follow prompts
 
 3. **Verify**:
+
    ```cmd
    schtasks /query /tn "K-Wise Startup"
    ```
@@ -271,34 +282,41 @@ Double-click `start-pm2.cmd` to test the startup process interactively.
 ## Task Scheduler Management
 
 ### View Task Status
+
 ```cmd
 schtasks /query /tn "K-Wise Startup" /v /fo list
 ```
 
 ### Run Task Manually
+
 ```cmd
 schtasks /run /tn "K-Wise Startup"
 ```
 
 ### Disable Task
+
 ```cmd
 schtasks /change /tn "K-Wise Startup" /disable
 ```
 
 ### Enable Task
+
 ```cmd
 schtasks /change /tn "K-Wise Startup" /enable
 ```
 
 ### Delete Task
+
 ```cmd
 schtasks /delete /tn "K-Wise Startup" /f
 ```
 
 ### View Task in GUI
+
 ```cmd
 taskschd.msc
 ```
+
 Then navigate to: Task Scheduler Library → K-Wise Startup
 
 ## Notes
@@ -315,5 +333,6 @@ Then navigate to: Task Scheduler Library → K-Wise Startup
 ## Support
 
 For issues or questions, refer to:
+
 - PM2 Documentation: https://pm2.keymetrics.io/
 - K-Wise Project Documentation

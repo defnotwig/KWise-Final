@@ -44,6 +44,7 @@ Double-click `test-pm2-setup.cmd` to verify everything is ready.
 **Right-click** `setup-task-scheduler.ps1` and select **"Run with PowerShell as Administrator"**
 
 This will:
+
 - ✅ Create a scheduled task named "K-Wise Startup"
 - ✅ Configure automatic startup on system boot (1-minute delay)
 - ✅ Set up retry logic (3 attempts if failed)
@@ -67,12 +68,14 @@ dir logs\pm2-startup-*.log
 ## 📋 Alternative Setup Methods
 
 ### Method A: Import XML Template
+
 1. Open Task Scheduler (`taskschd.msc`)
 2. Right-click "Task Scheduler Library" → Import Task
 3. Select `kwise-task-scheduler.xml`
 4. Edit paths if needed
 
 ### Method B: Manual GUI Setup
+
 1. Open Task Scheduler
 2. Create Basic Task
 3. Name: "K-Wise Startup"
@@ -81,6 +84,7 @@ dir logs\pm2-startup-*.log
 6. Enable "Run with highest privileges"
 
 ### Method C: PowerShell One-Liner
+
 ```powershell
 # As Administrator
 $action = New-ScheduledTaskAction -Execute "$PWD\start-pm2-silent.cmd" -WorkingDirectory $PWD
@@ -92,6 +96,7 @@ Register-ScheduledTask -TaskName "K-Wise Startup" -Action $action -Trigger $trig
 ## 🎯 Usage Examples
 
 ### For Manual Testing
+
 ```cmd
 # Interactive (shows output, waits for keypress)
 start-pm2.cmd
@@ -101,9 +106,11 @@ start-pm2-silent.cmd
 ```
 
 ### For Task Scheduler
+
 Use `start-pm2-silent.cmd` - it creates timestamped logs in `logs/` directory.
 
 ### Daily Operations
+
 ```cmd
 # View status
 pm2 status
@@ -142,32 +149,37 @@ taskschd.msc
 
 ## 📁 Log Files
 
-| Type | Location | Description |
-|------|----------|-------------|
-| Startup logs | `logs/pm2-startup-YYYYMMDD-HHMMSS.log` | Timestamped startup logs |
-| Backend logs | `KWise-Backend/logs/backend-error.log` | Backend errors |
-| Backend output | `KWise-Backend/logs/backend-out.log` | Backend console output |
-| Frontend logs | `KWise-Backend/logs/frontend-error.log` | Frontend errors |
-| Frontend output | `KWise-Backend/logs/frontend-out.log` | Frontend console output |
+| Type            | Location                                | Description              |
+| --------------- | --------------------------------------- | ------------------------ |
+| Startup logs    | `logs/pm2-startup-YYYYMMDD-HHMMSS.log`  | Timestamped startup logs |
+| Backend logs    | `KWise-Backend/logs/backend-error.log`  | Backend errors           |
+| Backend output  | `KWise-Backend/logs/backend-out.log`    | Backend console output   |
+| Frontend logs   | `KWise-Backend/logs/frontend-error.log` | Frontend errors          |
+| Frontend output | `KWise-Backend/logs/frontend-out.log`   | Frontend console output  |
 
 ## 🔧 Troubleshooting
 
 ### Issue: "PM2 not found"
+
 ```cmd
 npm install -g pm2
 ```
 
 ### Issue: "Task runs but app doesn't start"
+
 1. Check paths in `ecosystem.config.js`
 2. View logs: `dir logs\pm2-startup-*.log /o-d`
 3. Check PM2 logs: `pm2 logs`
 
 ### Issue: "Permission denied"
+
 - Ensure Task Scheduler runs as SYSTEM with highest privileges
 - Check that scripts aren't blocked (Right-click → Properties → Unblock)
 
 ### Issue: "Frontend not found"
+
 Build the frontend first:
+
 ```cmd
 cd K-Wise
 npm run build
@@ -176,12 +188,15 @@ npm run build
 ## 🎁 Bonus Features
 
 ### Linux/Unix Support
+
 The `.sh` scripts work on Linux/Unix systems. Make them executable:
+
 ```bash
 chmod +x *.sh
 ```
 
 ### Cron Job (Linux)
+
 ```bash
 # Edit crontab
 sudo crontab -e
@@ -191,6 +206,7 @@ sudo crontab -e
 ```
 
 ### Systemd Service (Linux)
+
 See `PM2_SCRIPTS_README.md` for full systemd configuration.
 
 ## ✨ Key Features
