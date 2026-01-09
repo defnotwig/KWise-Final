@@ -8,13 +8,14 @@ The production branch has been successfully pulled and all PM2 executable script
 
 ### ✨ Main Executable Scripts
 
-1. **start-pm2.cmd** - Interactive startup (for manual testing)
-2. **start-pm2-silent.cmd** - Silent startup with logging (for Task Scheduler) ⭐
-3. **stop-pm2.cmd** - Stop all K-Wise processes
-4. **restart-pm2.cmd** - Restart all K-Wise processes
-5. **start-pm2.sh** - Linux/Unix startup script
-6. **stop-pm2.sh** - Linux/Unix stop script
-7. **restart-pm2.sh** - Linux/Unix restart script
+1. **PM2-LAUNCHER.cmd** - Interactive menu launcher (prevents window from closing) ⭐⭐⭐
+2. **start-pm2.cmd** - Interactive startup (for manual testing)
+3. **start-pm2-silent.cmd** - Silent startup with logging (for Task Scheduler) ⭐
+4. **stop-pm2.cmd** - Stop all K-Wise processes
+5. **restart-pm2.cmd** - Restart all K-Wise processes
+6. **start-pm2.sh** - Linux/Unix startup script
+7. **stop-pm2.sh** - Linux/Unix stop script
+8. **restart-pm2.sh** - Linux/Unix restart script
 
 ### 🛠️ Setup & Configuration Tools
 
@@ -28,6 +29,14 @@ The production branch has been successfully pulled and all PM2 executable script
 12. **PM2_QUICK_REFERENCE.md** - Quick command reference
 
 ## 🚀 Quick Start Guide
+
+### ⚡ Easy Method: Use the Launcher
+
+**Double-click** `PM2-LAUNCHER.cmd` for an interactive menu that:
+- ✅ Prevents window from closing
+- ✅ Shows all available options
+- ✅ Guides you through setup
+- ✅ No terminal experience needed!
 
 ### Step 1: Install PM2 (if not already installed)
 
@@ -158,6 +167,28 @@ taskschd.msc
 | Frontend output | `KWise-Backend/logs/frontend-out.log`   | Frontend console output  |
 
 ## 🔧 Troubleshooting
+
+### Issue: "Window closes immediately when double-clicking .cmd files"
+
+**Solution 1 (Easiest):** Use the launcher
+```cmd
+PM2-LAUNCHER.cmd
+```
+Double-click this file for an interactive menu that won't close.
+
+**Solution 2:** Run from Command Prompt
+1. Press `Win + R`
+2. Type `cmd` and press Enter
+3. Navigate to folder: `cd "C:\path\to\K-Wise Final 2"`
+4. Run the script: `start-pm2.cmd`
+
+**Solution 3:** Run from PowerShell
+```powershell
+cd "C:\path\to\K-Wise Final 2"
+.\start-pm2.cmd
+```
+
+**Solution 4:** Right-click the file → "Edit" to see what's wrong before running
 
 ### Issue: "PM2 not found"
 

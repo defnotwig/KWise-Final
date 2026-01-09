@@ -19,12 +19,14 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 if (-not $isAdmin) {
     Write-Host "ERROR: This script must be run as Administrator" -ForegroundColor Red
     Write-Host "Please right-click and select 'Run as Administrator'" -ForegroundColor Yellow
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
 # Check if script exists
 if (-not (Test-Path $ScriptPath)) {
     Write-Host "ERROR: Script not found: $ScriptPath" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
@@ -134,9 +136,11 @@ try {
     Write-Host ""
     Write-Host "ERROR: Failed to create scheduled task" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
 Write-Host ""
 Write-Host "Setup complete!" -ForegroundColor Green
 Write-Host ""
+Read-Host "Press Enter to exit"
