@@ -33,6 +33,7 @@ The production branch has been successfully pulled and all PM2 executable script
 ### ⚡ Easy Method: Use the Launcher
 
 **Double-click** `PM2-LAUNCHER.cmd` for an interactive menu that:
+
 - ✅ Prevents window from closing
 - ✅ Shows all available options
 - ✅ Guides you through setup
@@ -171,18 +172,22 @@ taskschd.msc
 ### Issue: "Window closes immediately when double-clicking .cmd files"
 
 **Solution 1 (Easiest):** Use the launcher
+
 ```cmd
 PM2-LAUNCHER.cmd
 ```
+
 Double-click this file for an interactive menu that won't close.
 
 **Solution 2:** Run from Command Prompt
+
 1. Press `Win + R`
 2. Type `cmd` and press Enter
 3. Navigate to folder: `cd "C:\path\to\K-Wise Final 2"`
 4. Run the script: `start-pm2.cmd`
 
 **Solution 3:** Run from PowerShell
+
 ```powershell
 cd "C:\path\to\K-Wise Final 2"
 .\start-pm2.cmd
