@@ -47,6 +47,10 @@ const CATEGORY_SPEC_TABLES = {
     'Webcam': 'webcams'
 };
 
+// Validate spec field names to prevent SQL injection via column names
+const VALID_SPEC_FIELD_PATTERN = /^[a-z][a-z0-9_]{0,62}$/;
+const isValidSpecField = (field) => VALID_SPEC_FIELD_PATTERN.test(field);
+
 // GET /api/stock - List all parts with filtering, pagination, and specifications
 const list = async (req, res) => {
     try {
@@ -552,6 +556,11 @@ const create = async (req, res) => {
         if (specifications && CATEGORY_SPEC_TABLES[category]) {
             const specTable = CATEGORY_SPEC_TABLES[category];
             const specFields = Object.keys(specifications);
+            const invalidFields = specFields.filter(f => !isValidSpecField(f));
+            if (invalidFields.length > 0) {
+                await query('ROLLBACK');
+                return res.status(400).json({ success: false, message: `Invalid specification field names: ${invalidFields.join(', ')}` });
+            }
             
             if (specFields.length > 0) {
                 const columns = ['part_id', 'name', ...specFields];
@@ -670,6 +679,11 @@ const update = async (req, res) => {
                 
                 // Update or insert specifications
                 const specFields = Object.keys(specifications);
+                const invalidFields = specFields.filter(f => !isValidSpecField(f));
+                if (invalidFields.length > 0) {
+                    await query('ROLLBACK');
+                    return res.status(400).json({ success: false, message: `Invalid specification field names: ${invalidFields.join(', ')}` });
+                }
                 
                 if (specFields.length > 0) {
                     // Check if specifications exist

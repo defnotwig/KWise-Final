@@ -7,8 +7,9 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
+const { protect } = require('../middleware/auth');
 
-// Create assistance request
+// Create assistance request (public - kiosk can request without auth)
 router.post('/request', async (req, res) => {
   try {
     const { kiosk_id, request_type = 'assisted_service' } = req.body;
@@ -55,8 +56,8 @@ router.post('/request', async (req, res) => {
   }
 });
 
-// Get pending assistance requests (for admin)
-router.get('/pending', async (req, res) => {
+// Get pending assistance requests (for admin - requires auth)
+router.get('/pending', protect, async (req, res) => {
   try {
     const result = await query(`
       SELECT * FROM assistance_requests
@@ -80,7 +81,7 @@ router.get('/pending', async (req, res) => {
 });
 
 // Acknowledge assistance request
-router.patch('/:id/acknowledge', async (req, res) => {
+router.patch('/:id/acknowledge', protect, async (req, res) => {
   try {
     const { id } = req.params;
     const { admin_id, admin_name } = req.body;
@@ -132,7 +133,7 @@ router.patch('/:id/acknowledge', async (req, res) => {
 });
 
 // Complete assistance request
-router.patch('/:id/complete', async (req, res) => {
+router.patch('/:id/complete', protect, async (req, res) => {
   try {
     const { id } = req.params;
 

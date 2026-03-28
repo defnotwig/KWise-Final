@@ -24,7 +24,10 @@ const initializeSocket = (server) => {
         return next(new Error('Authentication token required'));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+      if (!process.env.JWT_SECRET) {
+        return next(new Error('JWT_SECRET environment variable is not configured'));
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.userId = decoded.id;
       socket.userRole = decoded.role;
       socket.userName = decoded.name;

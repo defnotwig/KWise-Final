@@ -223,7 +223,10 @@ app.use(cors({
 
 // Handle preflight OPTIONS requests before rate limiting
 app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    const origin = req.headers.origin;
+    if (origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Cache-Control,Accept,Accept-Language,Accept-Encoding');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -513,12 +516,10 @@ app.use('/assets', (req, res, next) => {
             res.header('Access-Control-Allow-Origin', refererOrigin);
             console.log(`✅ CORS allowed for referer origin: ${refererOrigin}`);
         } else {
-            res.header('Access-Control-Allow-Origin', '*');
-            console.log(`⚠️ CORS fallback (*) for referer: ${refererOrigin}`);
+            console.log(`⚠️ CORS denied for referer: ${refererOrigin}`);
         }
     } else {
-        res.header('Access-Control-Allow-Origin', '*');
-        console.log(`⚠️ CORS fallback (*) - no origin or referer`);
+        console.log(`⚠️ CORS: no origin or referer for assets request`);
     }
 
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -571,11 +572,7 @@ app.use('/uploads', (req, res, next) => {
 
         if (isRefererAllowed) {
             res.header('Access-Control-Allow-Origin', refererOrigin);
-        } else {
-            res.header('Access-Control-Allow-Origin', '*');
         }
-    } else {
-        res.header('Access-Control-Allow-Origin', '*');
     }
 
     res.header('Access-Control-Allow-Credentials', 'true');
