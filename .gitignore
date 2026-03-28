@@ -41,6 +41,9 @@ Thumbs.db
 # VS Code
 .vscode/
 
+# Agent configs (local only)
+.github/agents/
+
 # Playwright MCP testing artifacts
 .playwright-mcp/
 
