@@ -95,6 +95,11 @@ if (isTest) {
     application_name: 'kwise-backend'
   });
   
+  // Handle unexpected pool errors (e.g., PostgreSQL restarts, idle connection termination)
+  pool.on('error', (err) => {
+    logger.error('Unexpected PostgreSQL pool error:', err.message);
+  });
+
   logger.info(`📊 PostgreSQL connection pool initialized:`);
   logger.info(`   Max connections: ${isLoadTestMode ? 200 : 100}`);
   logger.info(`   Min connections: 10`);
@@ -102,16 +107,24 @@ if (isTest) {
   logger.info(`   Idle timeout: 60000ms`);
 }
 
-// Connect to database
-const connectDB = async () => {
-  try {
-    // Test connection
-    const client = await pool.connect();
-    logger.info('PostgreSQL database connected successfully');
-    if (client && typeof client.release === 'function') client.release();
-  } catch (err) {
-    logger.error('Error connecting to PostgreSQL database:', err.message);
-    process.exit(1);
+// Connect to database with retry logic
+const connectDB = async (retries = 5, delay = 2000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const client = await pool.connect();
+      logger.info('PostgreSQL database connected successfully');
+      if (client && typeof client.release === 'function') client.release();
+      return;
+    } catch (err) {
+      logger.error(`Error connecting to PostgreSQL (attempt ${attempt}/${retries}):`, err.message);
+      if (attempt === retries) {
+        logger.error('All database connection attempts failed. Exiting.');
+        process.exit(1);
+      }
+      logger.info(`Retrying in ${delay / 1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 2, 30000); // exponential backoff, max 30s
+    }
   }
 };
 

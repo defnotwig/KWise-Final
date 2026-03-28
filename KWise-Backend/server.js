@@ -2189,6 +2189,21 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
+// Global safety-net error handlers
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ Uncaught Exception:', err.message);
+    console.error(err.stack);
+    // Log to file if logger is available
+    try { require('./utils/logger').error('Uncaught Exception:', err.message, { stack: err.stack }); } catch (_) {}
+});
+
+process.on('unhandledRejection', (reason) => {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    console.error('⚠️ Unhandled Rejection:', msg);
+    // Log to file if logger is available
+    try { require('./utils/logger').error('Unhandled Rejection:', msg); } catch (_) {}
+});
+
 // Export for testing; auto-start unless in test environment
 if (require.main === module) {
     startServer();

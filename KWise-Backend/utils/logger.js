@@ -61,7 +61,7 @@ if (config.server.env !== 'production') {
             winston.format.simple(),
             winston.format.printf(info => {
                 const { timestamp, level, message, service, ...args } = info;
-                const ts = timestamp.slice(0, 19).replace('T', ' ');
+                const ts = (typeof timestamp === 'string' ? timestamp : new Date().toISOString()).slice(0, 19).replace('T', ' ');
                 
                 // Clean formatting that avoids object serialization issues
                 let formattedMessage = message;
