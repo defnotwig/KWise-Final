@@ -16,6 +16,10 @@ logs/
 backups/
 *.sql
 *.dump
+# Exception: setup and migration SQL files must be tracked
+!scripts/setup/schema.sql
+!scripts/setup/seed-data.sql
+!sql/migrations/*.sql
 
 # Uploads
 uploads/
@@ -34,6 +38,16 @@ Thumbs.db
 # Testing
 coverage/
 *.test.js.snap
+
+# Temporary analysis outputs
+*_schema.txt
+*_report.txt
+*_analysis.txt
+custom_types.txt
+final_db_stats.txt
+unused_idx.txt
+unused_indexes.txt
+triggers_functions.txt
 
 # Build
 dist/

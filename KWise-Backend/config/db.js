@@ -59,11 +59,16 @@ if (isTest) {
   // 🚀 PERFORMANCE OPTIMIZATION: Tuned for high concurrent load
   const isLoadTestMode = process.env.LOAD_TEST_MODE === 'true';
   
+  // Validate required database credentials are set via environment variables
+  if (!process.env.DB_PASSWORD) {
+    logger.warn('⚠️  DB_PASSWORD not set in environment variables. Database connection may fail.');
+  }
+
   pool = new Pool({
     user: process.env.DB_USER || 'postgres',
     host: process.env.DB_HOST || 'localhost',
     database: process.env.DB_NAME || 'KWiseDB',
-    password: process.env.DB_PASSWORD || 'humbleludwig13',
+    password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT || 5432,
     
     // 🚀 OPTIMIZED CONNECTION POOL SETTINGS

@@ -45,25 +45,12 @@ PostgreSQL is the database engine. **This is required.**
 4. Keep **pgAdmin** and **Command Line Tools** checked
 5. Complete the installation
 
-### Create the Database
+### Create the Database (Optional — setup script does this automatically)
 
-Open **pgAdmin 4** (installed with PostgreSQL) or use the command line:
+The setup script in Step 6 will automatically create the `KWiseDB` database if it doesn't exist. If you prefer to create it manually:
 
-**Option A — Using pgAdmin:**
-1. Open pgAdmin 4 from Start Menu
-2. Connect to the local server (password: `humbleludwig13`)
-3. Right-click **Databases** → **Create** → **Database**
-4. Name: `KWiseDB`
-5. Click **Save**
-
-**Option B — Using Command Line (psql):**
 ```bash
-# Open Command Prompt or PowerShell
-psql -U postgres
-# Enter password: humbleludwig13
-
-CREATE DATABASE "KWiseDB";
-\q
+psql -U postgres -c "CREATE DATABASE \"KWiseDB\";"
 ```
 
 ### Verify PostgreSQL is Running
@@ -148,14 +135,29 @@ npm install
 
 ---
 
-## Step 6: Initialize the Database Schema
+## Step 6: Initialize the Database (Schema + Seed Data)
 
 ```bash
 cd ..\KWise-Backend
 node scripts/setup/setup-database.js
 ```
 
-This creates all required tables, indexes, and default settings.
+This command automatically:
+1. **Creates** the `KWiseDB` database if it doesn't exist
+2. **Imports** the full schema (tables, indexes, triggers, functions)
+3. **Seeds** all product catalog data (PC parts, components, categories, users, settings, compatibility rules, prebuilt PCs)
+4. **Verifies** the setup with 11 data-integrity checks
+
+> **You do NOT need a database dump from the team lead.** All essential data is included in the repository.
+
+### Optional Flags
+
+| Flag | Description |
+|------|-------------|
+| `--verify` | Only run verification checks (no changes) |
+| `--schema` | Import schema only (skip data seeding) |
+| `--seed` | Seed data only (assumes schema exists) |
+| `--reset` | **Drop and recreate** the database from scratch |
 
 ---
 
@@ -249,5 +251,6 @@ The frontend opens at http://localhost:3000
 
 Contact the team lead (Gabriel Ludwig Rivera) for:
 - Gmail credentials (for email features)
-- Database dumps (if you need pre-populated data)
 - Any setup issues not covered here
+
+> **Note:** Database dumps are no longer needed. The setup script seeds all essential data automatically.

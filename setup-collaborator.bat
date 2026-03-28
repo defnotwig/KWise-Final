@@ -95,17 +95,22 @@ echo    Frontend dependencies installed.
 
 cd ..
 
-REM Run database setup
+REM Run database setup (creates DB, imports schema, seeds all product data)
 echo [7/7] Running database setup...
 if "%PSQL_AVAILABLE%"=="1" (
     cd KWise-Backend
+    echo    This will create the KWiseDB database, import the schema,
+    echo    and seed all product catalog data (PC parts, users, settings, etc.)
     node scripts/setup/setup-database.js
     cd ..
     echo    Database setup complete.
 ) else (
-    echo    SKIPPED: PostgreSQL not available.
-    echo    Install PostgreSQL, create the KWiseDB database,
-    echo    then run: cd KWise-Backend ^&^& node scripts/setup/setup-database.js
+    echo    SKIPPED: PostgreSQL CLI (psql) not available.
+    echo    Install PostgreSQL and add psql to your PATH, then run:
+    echo      cd KWise-Backend ^&^& node scripts/setup/setup-database.js
+    echo.
+    echo    This will create the database, schema, AND seed all product data.
+    echo    You do NOT need a database dump from the team lead.
 )
 
 echo.

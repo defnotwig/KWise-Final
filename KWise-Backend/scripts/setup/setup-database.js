@@ -1,24 +1,37 @@
 #!/usr/bin/env node
 
 /**
- * Consolidated Database Setup Script
- * Replaces all phase-specific setup scripts
- * Usage: node scripts/setup/setup-database.js [--reset] [--seed]
+ * K-Wise Database Setup Script
+ * 
+ * Creates the KWiseDB database, imports the full schema, and seeds
+ * the product catalog with all PC parts, components, users, and settings.
+ * 
+ * Usage:
+ *   node scripts/setup/setup-database.js           # Full setup (schema + seed)
+ *   node scripts/setup/setup-database.js --schema   # Schema only (no data)
+ *   node scripts/setup/setup-database.js --seed     # Seed data only (schema must exist)
+ *   node scripts/setup/setup-database.js --reset    # Drop and recreate everything
+ *   node scripts/setup/setup-database.js --verify   # Verify database is set up correctly
  */
 
-const { Pool } = require('pg');
+const { Pool, Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
-const pool = new Pool({
+const DB_CONFIG = {
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'KWiseDB',
+    port: parseInt(process.env.DB_PORT, 10) || 5432,
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'password'
-});
+    password: process.env.DB_PASSWORD || 'humbleludwig13',
+    database: process.env.DB_NAME || 'KWiseDB'
+};
+
+const SETUP_DIR = __dirname;
+const SCHEMA_FILE = path.join(SETUP_DIR, 'schema.sql');
+const SEED_FILE = path.join(SETUP_DIR, 'seed-data.sql');
 
 // Parse command line arguments
 function parseArgs() {
@@ -32,194 +45,296 @@ function parseArgs() {
     return args;
 }
 
-async function createMissingTables() {
-    console.log('🏗️  Creating missing tables and columns...');
-    
-    const migrations = [
-        // Ensure users table has all required columns
-        `ALTER TABLE users 
-         ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ,
-         ADD COLUMN IF NOT EXISTS profile_image VARCHAR(255),
-         ADD COLUMN IF NOT EXISTS reference_email VARCHAR(255),
-         ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false,
-         ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255),
-         ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ,
-         ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMPTZ`,
-        
-        // Ensure orders table has all required columns  
-        `ALTER TABLE orders
-         ADD COLUMN IF NOT EXISTS assisted_by INTEGER REFERENCES users(id),
-         ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'pending',
-         ADD COLUMN IF NOT EXISTS order_number VARCHAR(50) UNIQUE`,
-        
-        // Ensure pc_parts table has image support
-        `ALTER TABLE pc_parts
-         ADD COLUMN IF NOT EXISTS image_path VARCHAR(500),
-         ADD COLUMN IF NOT EXISTS images TEXT[]`,
-        
-        // Create system_settings table if not exists
-        `CREATE TABLE IF NOT EXISTS system_settings (
-            id SERIAL PRIMARY KEY,
-            key VARCHAR(100) UNIQUE NOT NULL,
-            value TEXT NOT NULL,
-            type VARCHAR(20) DEFAULT 'string',
-            description TEXT,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        // Create audit_logs table if not exists
-        `CREATE TABLE IF NOT EXISTS audit_logs (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            action VARCHAR(50) NOT NULL,
-            entity VARCHAR(50) NOT NULL,
-            entity_id INTEGER,
-            description TEXT,
-            old_values JSONB,
-            new_values JSONB,
-            severity VARCHAR(20) DEFAULT 'info',
-            ip_address INET,
-            user_agent TEXT,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        // Create password_resets table if not exists
-        `CREATE TABLE IF NOT EXISTS password_resets (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            reset_code VARCHAR(6) NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            status VARCHAR(20) DEFAULT 'pending',
-            attempts INTEGER DEFAULT 0,
-            ip_address INET,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )`
-    ];
-    
-    for (const migration of migrations) {
-        try {
-            await pool.query(migration);
-            console.log('  ✅ Migration executed successfully');
-        } catch (error) {
-            console.log(`  ⚠️  Migration warning: ${error.message}`);
-        }
-    }
+function log(emoji, msg) {
+    console.log(`${emoji}  ${msg}`);
 }
 
-async function createIndexes() {
-    console.log('📊 Creating database indexes...');
+// ─── Step 1: Ensure the KWiseDB database exists ───
+async function ensureDatabaseExists() {
+    log('🔍', 'Checking if database exists...');
     
-    const indexes = [
-        'CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)',
-        'CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active, last_active_at)',
-        'CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)',
-        'CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)',
-        'CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id)',
-        'CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)',
-        'CREATE INDEX IF NOT EXISTS idx_pc_parts_category ON pc_parts(category)',
-        'CREATE INDEX IF NOT EXISTS idx_pc_parts_active ON pc_parts(is_active)'
-    ];
-    
-    for (const index of indexes) {
-        try {
-            await pool.query(index);
-            console.log('  ✅ Index created successfully');
-        } catch (error) {
-            console.log(`  ⚠️  Index warning: ${error.message}`);
-        }
-    }
-}
-
-async function seedDefaultSettings() {
-    console.log('🌱 Seeding default system settings...');
-    
-    const defaultSettings = [
-        ['app_name', 'K-Wise Admin System', 'string', 'Application name'],
-        ['theme', 'light', 'string', 'Default theme (light/dark/blue/green)'],
-        ['language', 'en', 'string', 'Default language'],
-        ['notifications_enabled', 'true', 'boolean', 'Enable notifications'],
-        ['server_address', 'localhost', 'string', 'Server address'],
-        ['server_port', '5000', 'number', 'Server port'],
-        ['database_type', 'PostgreSQL', 'string', 'Database type'],
-        ['database_name', 'KWiseDB', 'string', 'Database name'],
-        ['encryption_enabled', 'true', 'boolean', 'Enable data encryption'],
-        ['backup_frequency', 'daily', 'string', 'Backup frequency setting'],
-        ['max_login_attempts', '5', 'number', 'Maximum login attempts'],
-        ['session_timeout', '3600', 'number', 'Session timeout in seconds']
-    ];
-    
-    for (const [key, value, type, description] of defaultSettings) {
-        try {
-            await pool.query(`
-                INSERT INTO system_settings (key, value, type, description)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (key) DO NOTHING
-            `, [key, value, type, description]);
-        } catch (error) {
-            console.log(`  ⚠️  Setting warning for ${key}: ${error.message}`);
-        }
-    }
-    
-    console.log('  ✅ Default settings seeded successfully');
-}
-
-async function resetDatabase() {
-    console.log('🔄 Resetting database (clearing data)...');
-    
-    const resetQueries = [
-        'TRUNCATE audit_logs RESTART IDENTITY CASCADE',
-        'TRUNCATE password_resets RESTART IDENTITY CASCADE', 
-        'DELETE FROM orders WHERE id > 0',
-        'DELETE FROM users WHERE email NOT LIKE \'%@kwise.com\'', // Keep system users
-        'TRUNCATE system_settings RESTART IDENTITY CASCADE'
-    ];
-    
-    for (const query of resetQueries) {
-        try {
-            await pool.query(query);
-            console.log('  ✅ Table reset successfully');
-        } catch (error) {
-            console.log(`  ⚠️  Reset warning: ${error.message}`);
-        }
-    }
-}
-
-async function main() {
-    const args = parseArgs();
-    
-    console.log('🚀 Starting database setup...\n');
+    const client = new Client({
+        host: DB_CONFIG.host,
+        port: DB_CONFIG.port,
+        user: DB_CONFIG.user,
+        password: DB_CONFIG.password,
+        database: 'postgres' // connect to default DB to check/create
+    });
     
     try {
-        if (args.reset) {
+        await client.connect();
+        const result = await client.query(
+            `SELECT 1 FROM pg_database WHERE datname = $1`,
+            [DB_CONFIG.database]
+        );
+        
+        if (result.rows.length === 0) {
+            log('🏗️', `Creating database "${DB_CONFIG.database}"...`);
+            await client.query(`CREATE DATABASE "${DB_CONFIG.database}"`);
+            log('✅', `Database "${DB_CONFIG.database}" created.`);
+            return true; // newly created
+        } else {
+            log('✅', `Database "${DB_CONFIG.database}" already exists.`);
+            return false; // already existed
+        }
+    } finally {
+        await client.end();
+    }
+}
+
+// ─── Step 2: Check if schema is already populated ───
+async function isSchemaPopulated(pool) {
+    try {
+        const result = await pool.query(`
+            SELECT count(*) AS cnt FROM pg_tables WHERE schemaname = 'public'
+        `);
+        return parseInt(result.rows[0].cnt, 10) > 5;
+    } catch {
+        return false;
+    }
+}
+
+// ─── Step 3: Import schema via psql ───
+async function importSchema() {
+    log('📐', 'Importing database schema...');
+    
+    if (!fs.existsSync(SCHEMA_FILE)) {
+        throw new Error(`Schema file not found: ${SCHEMA_FILE}\nRun this script from the KWise-Backend directory.`);
+    }
+    
+    const env = {
+        ...process.env,
+        PGPASSWORD: DB_CONFIG.password
+    };
+    
+    try {
+        execSync(
+            `psql -U "${DB_CONFIG.user}" -h "${DB_CONFIG.host}" -p ${DB_CONFIG.port} -d "${DB_CONFIG.database}" -f "${SCHEMA_FILE}" --quiet --no-psqlrc`,
+            { env, stdio: 'pipe', timeout: 120000 }
+        );
+        log('✅', 'Schema imported successfully.');
+    } catch (err) {
+        // psql may return non-zero for warnings (e.g., "already exists")
+        const stderr = err.stderr ? err.stderr.toString() : '';
+        const hasRealError = stderr.split('\n').some(line => 
+            line.includes('ERROR') && !line.includes('already exists')
+        );
+        if (hasRealError) {
+            throw new Error(`Schema import failed:\n${stderr}`);
+        }
+        log('⚠️', 'Schema imported with warnings (objects may already exist).');
+    }
+}
+
+// ─── Step 4: Seed data via psql ───
+async function seedData() {
+    log('🌱', 'Seeding product catalog and reference data...');
+    
+    if (!fs.existsSync(SEED_FILE)) {
+        throw new Error(`Seed file not found: ${SEED_FILE}\nRun this script from the KWise-Backend directory.`);
+    }
+    
+    const env = {
+        ...process.env,
+        PGPASSWORD: DB_CONFIG.password
+    };
+    
+    try {
+        execSync(
+            `psql -U "${DB_CONFIG.user}" -h "${DB_CONFIG.host}" -p ${DB_CONFIG.port} -d "${DB_CONFIG.database}" -f "${SEED_FILE}" --quiet --no-psqlrc`,
+            { env, stdio: 'pipe', timeout: 120000 }
+        );
+        log('✅', 'Seed data imported successfully.');
+    } catch (err) {
+        const stderr = err.stderr ? err.stderr.toString() : '';
+        const hasRealError = stderr.split('\n').some(line => 
+            line.includes('ERROR') && !line.includes('duplicate key') && !line.includes('already exists')
+        );
+        if (hasRealError) {
+            throw new Error(`Seed import failed:\n${stderr}`);
+        }
+        log('⚠️', 'Seed data imported with warnings (some rows may already exist).');
+    }
+}
+
+// ─── Step 5: Verify the setup ───
+async function verifySetup(pool) {
+    log('🔎', 'Verifying database setup...');
+    
+    const checks = [
+        { label: 'Tables exist', query: `SELECT count(*) AS cnt FROM pg_tables WHERE schemaname = 'public'`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 50 },
+        { label: 'Users seeded', query: `SELECT count(*) AS cnt FROM users`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Categories seeded', query: `SELECT count(*) AS cnt FROM categories`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'PC Parts seeded', query: `SELECT count(*) AS cnt FROM pc_parts`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 100 },
+        { label: 'CPUs seeded', query: `SELECT count(*) AS cnt FROM cpu`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'GPUs seeded', query: `SELECT count(*) AS cnt FROM gpu`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Motherboards seeded', query: `SELECT count(*) AS cnt FROM motherboard`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Settings seeded', query: `SELECT count(*) AS cnt FROM settings`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'System settings seeded', query: `SELECT count(*) AS cnt FROM system_settings`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Compatibility rules', query: `SELECT count(*) AS cnt FROM compatibility_rules`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Prebuilt PCs', query: `SELECT count(*) AS cnt FROM prebuilt_pcs`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+    ];
+    
+    let passed = 0;
+    let failed = 0;
+    
+    for (const check of checks) {
+        try {
+            const result = await pool.query(check.query);
+            const ok = check.expect(result);
+            if (ok) {
+                const cnt = result.rows[0].cnt;
+                console.log(`   ✅ ${check.label}: ${cnt}`);
+                passed++;
+            } else {
+                const cnt = result.rows[0].cnt;
+                console.log(`   ❌ ${check.label}: ${cnt} (expected > 0)`);
+                failed++;
+            }
+        } catch (err) {
+            console.log(`   ❌ ${check.label}: ${err.message}`);
+            failed++;
+        }
+    }
+    
+    console.log('');
+    if (failed === 0) {
+        log('🎉', `All ${passed} checks passed!`);
+    } else {
+        log('⚠️', `${passed} passed, ${failed} failed.`);
+    }
+    
+    return failed === 0;
+}
+
+// ─── Step 6: Reset (drop all and recreate) ───
+async function resetDatabase() {
+    log('🔄', 'Resetting database...');
+    
+    const client = new Client({
+        host: DB_CONFIG.host,
+        port: DB_CONFIG.port,
+        user: DB_CONFIG.user,
+        password: DB_CONFIG.password,
+        database: 'postgres'
+    });
+    
+    try {
+        await client.connect();
+        
+        // Terminate existing connections
+        await client.query(`
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = $1 AND pid <> pg_backend_pid()
+        `, [DB_CONFIG.database]);
+        
+        await client.query(`DROP DATABASE IF EXISTS "${DB_CONFIG.database}"`);
+        log('✅', 'Database dropped.');
+        
+        await client.query(`CREATE DATABASE "${DB_CONFIG.database}"`);
+        log('✅', 'Database recreated.');
+    } finally {
+        await client.end();
+    }
+}
+
+// ─── Main ───
+async function main() {
+    const args = parseArgs();
+    const schemaOnly = args.schema && !args.seed;
+    const seedOnly = args.seed && !args.schema;
+    const verifyOnly = args.verify;
+    const doReset = args.reset;
+    const fullSetup = !schemaOnly && !seedOnly && !verifyOnly;
+    
+    console.log('');
+    console.log('╔══════════════════════════════════════════╗');
+    console.log('║     K-Wise Database Setup                ║');
+    console.log('╚══════════════════════════════════════════╝');
+    console.log('');
+    
+    // Check required files exist
+    if (!verifyOnly) {
+        if (!seedOnly && !fs.existsSync(SCHEMA_FILE)) {
+            console.error(`❌ Missing file: ${SCHEMA_FILE}`);
+            console.error('   This file contains the database schema and should be in the repository.');
+            process.exit(1);
+        }
+        if (!schemaOnly && !fs.existsSync(SEED_FILE)) {
+            console.error(`❌ Missing file: ${SEED_FILE}`);
+            console.error('   This file contains the product catalog data and should be in the repository.');
+            process.exit(1);
+        }
+    }
+    
+    // Check psql is available
+    if (!verifyOnly) {
+        try {
+            execSync('psql --version', { stdio: 'pipe' });
+        } catch {
+            console.error('❌ psql command not found.');
+            console.error('   Please install PostgreSQL and ensure psql is in your PATH.');
+            console.error('   Typical path: C:\\Program Files\\PostgreSQL\\17\\bin');
+            process.exit(1);
+        }
+    }
+    
+    try {
+        if (doReset) {
             await resetDatabase();
-            console.log('');
         }
         
-        await createMissingTables();
-        console.log('');
-        
-        await createIndexes();
-        console.log('');
-        
-        if (args.seed || args.reset) {
-            await seedDefaultSettings();
-            console.log('');
+        if (fullSetup || doReset) {
+            await ensureDatabaseExists();
+            await importSchema();
+            await seedData();
+        } else if (schemaOnly) {
+            await ensureDatabaseExists();
+            await importSchema();
+        } else if (seedOnly) {
+            await seedData();
         }
         
-        console.log('🎉 Database setup completed successfully!');
+        // Always verify at the end
+        const pool = new Pool(DB_CONFIG);
+        try {
+            const success = await verifySetup(pool);
+            if (!success && !verifyOnly) {
+                log('💡', 'Some checks failed. Try running with --reset for a clean setup.');
+            }
+        } finally {
+            await pool.end();
+        }
         
-        if (args.seed) {
-            console.log('\n💡 Tip: Run test data generation:');
-            console.log('  node scripts/test-data/generate-test-data.js --type=all');
+        if (!verifyOnly) {
+            console.log('');
+            console.log('╔══════════════════════════════════════════╗');
+            console.log('║     Setup Complete!                      ║');
+            console.log('╠══════════════════════════════════════════╣');
+            console.log('║                                          ║');
+            console.log('║  Start backend:                          ║');
+            console.log('║    cd KWise-Backend                      ║');
+            console.log('║    npm run dev:no-ollama                 ║');
+            console.log('║                                          ║');
+            console.log('║  Start frontend (separate terminal):     ║');
+            console.log('║    cd K-Wise                             ║');
+            console.log('║    npm start                             ║');
+            console.log('║                                          ║');
+            console.log('╚══════════════════════════════════════════╝');
+            console.log('');
         }
         
     } catch (error) {
-        console.error('💥 Database setup failed:', error.message);
+        console.error('');
+        console.error(`💥 Setup failed: ${error.message}`);
+        console.error('');
+        console.error('Common fixes:');
+        console.error('  1. Make sure PostgreSQL is running');
+        console.error('  2. Check your .env DB_PASSWORD matches your PostgreSQL password');
+        console.error('  3. Ensure psql is in your PATH');
+        console.error('  4. See COLLABORATOR_SETUP.md for help');
         process.exit(1);
-    } finally {
-        await pool.end();
     }
 }
 
@@ -227,4 +342,4 @@ if (require.main === module) {
     main();
 }
 
-module.exports = { createMissingTables, createIndexes, seedDefaultSettings };
+module.exports = { ensureDatabaseExists, importSchema, seedData, verifySetup };

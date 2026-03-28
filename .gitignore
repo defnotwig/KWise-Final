@@ -23,6 +23,10 @@ public/assets/
 backups/
 *.sql
 KWiseDB_full_backup_*.sql
+# Exception: setup and migration SQL files must be tracked
+!KWise-Backend/scripts/setup/schema.sql
+!KWise-Backend/scripts/setup/seed-data.sql
+!KWise-Backend/sql/migrations/*.sql
 final-run-*.log
 frontend-compile.log
 
