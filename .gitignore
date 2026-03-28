@@ -37,6 +37,9 @@ Thumbs.db
 # VS Code
 .vscode/
 
+# Playwright MCP testing artifacts
+.playwright-mcp/
+
 # Ignore local-only generated folders
 K-Wise/public/kiosk/
 K-Wise/public/assets/
