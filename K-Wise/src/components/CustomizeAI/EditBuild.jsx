@@ -218,7 +218,8 @@ const EditBuild = () => {
     console.log('🔄 Fresh components received from validation:', freshComponents ? Object.keys(freshComponents) : 'none');
     
     // Use fresh components if provided, otherwise fallback to existing buildComponents
-    const componentsToUse = freshComponents || buildComponents;
+    // eslint-disable-next-line no-unused-vars
+    const _componentsToUse = freshComponents || buildComponents;
     
     // Convert fresh components from API format back to buildComponents format
     // Fresh components have category keys like 'cpu', 'motherboard', etc.

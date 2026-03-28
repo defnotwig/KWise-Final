@@ -159,7 +159,7 @@ function PCCustomizedAISuggestions() {
         }
 
         try {
-          const response = await axios.get(`${getApiBaseUrl()}/parts/${productId}`);
+          const response = await axios.get(`${getApiBaseUrl()}/stock/${productId}`);
           if (response.data.success) {
             components[category] = response.data.data;
           } else {
@@ -203,7 +203,7 @@ function PCCustomizedAISuggestions() {
       };
 
       // Fetch all products and select closest to allocated budget
-      const categoriesResponse = await axios.get(`${getApiBaseUrl()}/pc-parts/categories`);
+      const categoriesResponse = await axios.get(`${getApiBaseUrl()}/stock/categories`);
       if (!categoriesResponse.data.success) {
         throw new Error('Failed to fetch categories');
       }
@@ -214,7 +214,7 @@ function PCCustomizedAISuggestions() {
         if (budget === 0) continue;
 
         try {
-          const categoryResponse = await axios.get(`${getApiBaseUrl()}/pc-parts/category/${category}`);
+          const categoryResponse = await axios.get(`${getApiBaseUrl()}/stock`, { params: { category } });
           if (categoryResponse.data.success && categoryResponse.data.data.length > 0) {
             const products = categoryResponse.data.data;
             

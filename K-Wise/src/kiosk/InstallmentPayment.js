@@ -99,7 +99,7 @@ const InstallmentPayment = () => {
               className={`installment-option-button ${selectedBank === bank.id ? 'selected' : ''}`}
               onClick={() => handleBankSelect(bank.id)}
             >
-              <img src={bank.icon} className="bank-icon" />
+              <img src={bank.icon} className="bank-icon" alt="" />
               <span className="bank-name">{bank.name}</span>
             </button>
           ))}

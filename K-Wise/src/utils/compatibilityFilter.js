@@ -953,7 +953,9 @@ export const getIncompatibilityReason = (product, selectedComponents, currentCat
     return null;
 };;
 
-export default {
+const compatibilityFilter = {
     filterCompatibleProducts,
     getIncompatibilityReason
 };
+
+export default compatibilityFilter;

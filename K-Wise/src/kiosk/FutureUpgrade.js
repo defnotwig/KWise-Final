@@ -29,7 +29,7 @@ const formatSpecifications = (specs) => {
     // Check if it's already a nicely formatted spec string (not JSON)
     if (!specs.startsWith('{') && !specs.startsWith('[')) {
       // Clean up any raw formatting issues
-      const cleaned = specs.replace(/[{}"\[\]]|\\n/g, '').trim();
+      const cleaned = specs.replace(/[{}"[\]]|\\n/g, '').trim();
       return cleaned || 'N/A';
     }
     
@@ -38,7 +38,7 @@ const formatSpecifications = (specs) => {
       specs = JSON.parse(specs);
     } catch (e) {
       // Not valid JSON, return cleaned string
-      return specs.replace(/[{}"\[\]]|\\n/g, '').trim() || 'N/A';
+      return specs.replace(/[{}"[\]]|\\n/g, '').trim() || 'N/A';
     }
   }
   
@@ -127,7 +127,7 @@ const formatSpecifications = (specs) => {
         } else if (typeof value === 'number') {
           formattedValue = value.toLocaleString();
         } else if (typeof value === 'object') {
-          formattedValue = JSON.stringify(value).replace(/[{}"\[\]]|\\n/g, '');
+          formattedValue = JSON.stringify(value).replace(/[{}"[\]]|\\n/g, '');
         }
         
         return `${formattedKey}: ${formattedValue}`;

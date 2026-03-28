@@ -124,7 +124,7 @@ export const productsAPI = {
      * @returns {Promise}
      */
     getAll: (params = {}) => {
-        return axiosInstance.get('/pc-parts', { params });
+        return axiosInstance.get('/stock', { params });
     },
 
     /**
@@ -133,7 +133,7 @@ export const productsAPI = {
      * @returns {Promise}
      */
     getById: (id) => {
-        return axiosInstance.get(`/pc-parts/${id}`);
+        return axiosInstance.get(`/stock/${id}`);
     },
 
     /**
@@ -142,7 +142,7 @@ export const productsAPI = {
      * @returns {Promise}
      */
     create: (productData) => {
-        return axiosInstance.post('/pc-parts', productData);
+        return axiosInstance.post('/stock', productData);
     },
 
     /**
@@ -152,7 +152,7 @@ export const productsAPI = {
      * @returns {Promise}
      */
     update: (id, productData) => {
-        return axiosInstance.put(`/pc-parts/${id}`, productData);
+        return axiosInstance.patch(`/stock/${id}`, productData);
     },
 
     /**
@@ -161,7 +161,7 @@ export const productsAPI = {
      * @returns {Promise}
      */
     delete: (id) => {
-        return axiosInstance.delete(`/pc-parts/${id}`);
+        return axiosInstance.delete(`/stock/${id}`);
     },
 
     /**

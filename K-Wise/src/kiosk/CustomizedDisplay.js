@@ -24,7 +24,7 @@ const CustomizedDisplay = () => {
     categoryName, 
     products,
     slotKey,
-    multiSlotCart 
+    multiSlotCart: _multiSlotCart // eslint-disable-line no-unused-vars
   } = location.state || {};
 
   // Default category images mapping

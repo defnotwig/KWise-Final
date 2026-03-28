@@ -121,7 +121,8 @@ const CustomizedProducts = () => {
    * Helper: Extract brand from product using multiple fallback paths
    * Builder API products may have brand in different fields
    */
-  const extractBrandFromProduct = (product, category) => {
+  // eslint-disable-next-line no-unused-vars
+  const _extractBrandFromProduct = (product, category) => {
     if (!product) return '';
 
     // Try all possible brand field variations
@@ -696,7 +697,8 @@ const CustomizedProducts = () => {
    * Analyze products with AGGRESSIVE throttling to prevent rate limiting
    * Only used as fallback when database filtering can't determine compatibility
    */
-  const analyzeProductsWithBatching = async (products, selectedComponents) => {
+  // eslint-disable-next-line no-unused-vars
+  const _analyzeProductsWithBatching = async (products, selectedComponents) => {
     const BATCH_SIZE = 2; // Only 2 products at a time (very conservative)
     const BATCH_DELAY = 1000; // 1 second delay between batches
     const REQUEST_DELAY = 500; // 500ms delay between individual requests in batch

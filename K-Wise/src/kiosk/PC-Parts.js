@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+
 import "./PC-Parts.css";
 import "./PCCustomized.css";
 import "./PeripheralCategories.css"; // Import peripheral category styles
@@ -100,7 +99,8 @@ import HyperXPulsefireHaste from "../assets/HyperXPulsefireHaste.webp";
 
 // Sample Product Data (Replace with your database fetch logic)
 // Helper component for enumerated spec values
-const SpecValueSelector = ({ category, field, value, onChange }) => {
+// eslint-disable-next-line no-unused-vars
+const _SpecValueSelector = ({ category, field, value, onChange }) => {
   const [options, setOptions] = React.useState([]);
   React.useEffect(() => {
     if (!category || !field) return;
@@ -1449,7 +1449,8 @@ function PCParts() {
   const [priceOpen, setPriceOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [specSectionOpen, setSpecSectionOpen] = useState({});
-  const [specRanges, setSpecRanges] = useState({}); // Store min/max values for numeric specs
+  // eslint-disable-next-line no-unused-vars
+  const [_specRanges, setSpecRanges] = useState({}); // Store min/max values for numeric specs
   const [randomHotPicks, setRandomHotPicks] = useState([]);
   const [randomValueForMoney, setRandomValueForMoney] = useState([]);
   const [randomOnSale, setRandomOnSale] = useState([]);
@@ -1713,7 +1714,8 @@ function PCParts() {
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false); // Brand dropdown state
   const [priceRange, setPriceRange] = useState({ min: 0, max: 0 }); // ✅ FIXED: Typo in max property
   const [selectedPrice, setSelectedPrice] = useState({ min: '', max: '' });
-  const [specMeta, setSpecMeta] = useState([]); // fields definitions
+  // eslint-disable-next-line no-unused-vars
+  const [_specMeta, setSpecMeta] = useState([]); // fields definitions
   const [specFilters, setSpecFilters] = useState({}); // key -> value or {min,max}
   const [availableSpecFilters, setAvailableSpecFilters] = useState({}); // 🔥 Top 5 spec values per category
   const [sortOrder, setSortOrder] = useState({ sort: 'name', order: 'ASC' });
@@ -2082,7 +2084,7 @@ function PCParts() {
     setAvailableSpecFilters(topSpecFilters);
     
     console.log(`🔍 Top spec filters for ${selectedCategory}:`, topSpecFilters);
-  }, [products, selectedItem, menuItems]);
+  }, [products, selectedItem]);
 
   // 🎯 COMPATIBLE-FIRST SORTING SYSTEM - Detect compatibility context from localStorage AND cart items
   useEffect(() => {

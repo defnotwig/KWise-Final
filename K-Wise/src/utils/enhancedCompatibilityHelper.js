@@ -234,7 +234,7 @@ export const getCompatibilitySummary = (products) => {
   };
 };
 
-export default {
+const enhancedCompatibilityHelper = {
   loadEnhancedCompatibleProducts,
   formatCompatibilityTooltip,
   getCompatibilityBadgeClass,
@@ -243,3 +243,5 @@ export default {
   requiresBIOSUpdate,
   getCompatibilitySummary
 };
+
+export default enhancedCompatibilityHelper;

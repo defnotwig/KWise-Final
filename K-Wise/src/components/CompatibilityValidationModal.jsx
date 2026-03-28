@@ -608,11 +608,12 @@ const CompatibilityValidationModal = ({
     return { problems, warnings, notes, compatible, disclaimers };
   }, [validationResult]);
 
-  const { problems = [], warnings = [], notes = [], compatible = [], disclaimers = [] } = useMemo(() => categorizeIssues(), [categorizeIssues]);
+  const { problems = [], warnings: _warnings = [], notes: _notes = [], compatible: _compatible = [], disclaimers: _disclaimers = [] } = useMemo(() => categorizeIssues(), [categorizeIssues]); // eslint-disable-line no-unused-vars
 
   // Determine if checkout should be blocked based on page type
   const hasBlockingProblems = problems?.length > 0;
-  const compatibilityScore = validationResult?.compatibility_score || 0;
+  // eslint-disable-next-line no-unused-vars
+  const _compatibilityScore = validationResult?.compatibility_score || 0;
 
   // PAGE-SPECIFIC CHECKOUT BLOCKING LOGIC
   // PC-Parts: Allow checkout with warnings (user choice)
@@ -685,7 +686,8 @@ const CompatibilityValidationModal = ({
   if (!isOpen) return null;
 
   // Generate letter labels (A, B, C, ...)
-  const getLetterLabel = (index) => {
+  // eslint-disable-next-line no-unused-vars
+  const _getLetterLabel = (index) => {
     return String.fromCharCode(65 + index); // 65 = 'A' in ASCII
   };
 
