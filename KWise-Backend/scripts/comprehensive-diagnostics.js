@@ -120,7 +120,7 @@ async function testAPIEndpoints() {
   const endpoints = [
     { path: '/api/auth/login', method: 'POST' },
     { path: '/api/pc-parts', method: 'GET' },
-    { path: '/api/compatibility/check', method: 'POST' },
+    { path: '/api/compatibility/analyze', method: 'POST' },
     { path: '/api/ai/analyze-build', method: 'POST' },
     { path: '/api/cache/stats', method: 'GET' },
     { path: '/api/system/metrics', method: 'GET' },

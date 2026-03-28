@@ -1,9 +1,10 @@
 // Load environment variables
 require('dotenv').config();
 
-// Default secure keys (should only be used if environment variables are not set)
-const DEFAULT_JWT_SECRET = 'eq8hnXKk5nz6VmDP7UfBCMGQrtEsvFcxgy9SazhN4J8TLRWYmP2vV3bAQKpj7wdH6u4EDkXtc95GJZrsPYLqB3NfZ';
-const DEFAULT_ENCRYPTION_KEY = 'xP8Jm2qL5VkEf6ZyRnCb3TaN7WsXdH4D9GjUvt';
+// Validate required secrets at startup
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required. Set it in your .env file.');
+}
 
 module.exports = {
   // Server configuration
@@ -17,7 +18,7 @@ module.exports = {
   
   // JWT configuration
   jwt: {
-    secret: process.env.JWT_SECRET || DEFAULT_JWT_SECRET,
+    secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || '1d',
     cookieExpires: parseInt(process.env.JWT_COOKIE_EXPIRES_IN, 10) || 1,
     issuer: process.env.JWT_ISSUER || 'K-WISE',
@@ -27,8 +28,8 @@ module.exports = {
   
   // Encryption configuration
   encryption: {
-    key: process.env.ENCRYPTION_KEY || DEFAULT_ENCRYPTION_KEY,
-    enabled: process.env.ENCRYPTION_ENABLED !== 'false', // Enabled by default
+    key: process.env.ENCRYPTION_KEY,
+    enabled: process.env.ENCRYPTION_ENABLED !== 'false',
     algorithm: process.env.ENCRYPTION_ALGORITHM || 'aes-256-cbc'
   },
   

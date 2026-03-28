@@ -361,7 +361,7 @@ async function testPCCustomizedManually() {
       const startTime = Date.now();
       
       const compatibilityResponse = await axios.post(
-        `${BASE_URL}/compatibility/check`,
+        `${BASE_URL}/compatibility/analyze`,
         {
           baseComponent: { id: testCPU.id, category: 'CPU' },
           candidateComponent: { id: testMotherboard.id, category: 'Motherboard' },
@@ -808,7 +808,7 @@ async function testAIPerformance() {
     
     // First request (should miss cache)
     const cache1Start = Date.now();
-    await axios.post(`${BASE_URL}/compatibility/check`, {
+    await axios.post(`${BASE_URL}/compatibility/analyze`, {
       baseComponent: { id: 1, category: 'CPU' },
       candidateComponent: { id: 2, category: 'Motherboard' },
     });
@@ -816,7 +816,7 @@ async function testAIPerformance() {
 
     // Second request (should hit cache)
     const cache2Start = Date.now();
-    await axios.post(`${BASE_URL}/compatibility/check`, {
+    await axios.post(`${BASE_URL}/compatibility/analyze`, {
       baseComponent: { id: 1, category: 'CPU' },
       candidateComponent: { id: 2, category: 'Motherboard' },
     });

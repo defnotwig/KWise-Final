@@ -3464,8 +3464,7 @@ KWise-Backend/
 #### API Endpoint:
 
 ```javascript
-POST /api/compatibility/check
-Request:
+POST /api/compatibility/analyzeRequest:
 {
   "currentProduct": {
     "id": 123,
@@ -4774,7 +4773,7 @@ GET    /api/builder/saved-builds                 # List saved builds
 ### Compatibility Endpoints
 
 ```
-POST   /api/compatibility/check                  # Check product compatibility
+POST   /api/compatibility/analyze                 # Check product compatibility
 POST   /api/compatibility/analyze-build          # Analyze complete build
 GET    /api/compatibility/rules                  # Get compatibility rules
 POST   /api/compatibility/validate-upgrade       # Validate upgrade path

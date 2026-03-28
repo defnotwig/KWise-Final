@@ -184,12 +184,7 @@ app.use(cors({
             'http://localhost:3000',
             'http://127.0.0.1:3000',
             'http://localhost:3001',
-            'http://127.0.0.1:3001',
-            'http://192.168.1.7:3000',
-            'http://192.168.1.7:3001',
-            'http://192.168.100.7:3000',
-            'http://192.168.100.7:3001',
-            'http://192.168.100.7:5000'
+            'http://127.0.0.1:3001'
         ];
 
         // Check if origin is allowed or matches local network pattern (support ALL 192.168.x.x)
@@ -482,8 +477,6 @@ app.use('/assets', (req, res, next) => {
         'http://127.0.0.1:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3001',
-        'http://192.168.1.7:3000',
-        'http://192.168.1.7:3001',
         // Allow any local network IP for development
         /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001)$/
     ];
@@ -545,8 +538,6 @@ app.use('/uploads', (req, res, next) => {
         'http://127.0.0.1:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3001',
-        'http://192.168.1.7:3000',
-        'http://192.168.1.7:3001',
         // Allow any local network IP for development
         /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001)$/
     ];
@@ -1567,9 +1558,7 @@ const startServer = async (options = {}) => {
                 'http://localhost:3001',
                 'http://127.0.0.1:3001',
                 'http://localhost:3000',
-                'http://127.0.0.1:3000',
-                'http://192.168.1.7:3000',
-                'http://192.168.1.7:3001'
+                'http://127.0.0.1:3000'
             ];
 
             // Determine CORS origin
@@ -1918,9 +1907,7 @@ const startServer = async (options = {}) => {
                             "http://localhost:3000",
                             "http://127.0.0.1:3000",
                             "http://localhost:3001",
-                            "http://127.0.0.1:3001",
-                            "http://192.168.1.7:3000",
-                            "http://192.168.1.7:3001"
+                            "http://127.0.0.1:3001"
                         ];
 
                         // Check if origin is allowed or matches local network pattern
