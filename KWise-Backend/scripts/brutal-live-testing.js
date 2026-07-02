@@ -117,7 +117,7 @@ async function testPCPartsCompatibility() {
         time: filterTime,
         compatibleCount: compatibleMotherboards,
         totalCount: totalMotherboards,
-        filterRate: parseFloat(filterRate),
+        filterRate: Number.parseFloat(filterRate),
       });
 
       // Test 1.3: Check if AI was used
@@ -830,7 +830,7 @@ async function testAIPerformance() {
     phaseResults.tests.push({
       name: 'Cache Effectiveness',
       passed: true,
-      speedup: parseFloat(speedup),
+      speedup: Number.parseFloat(speedup),
       firstRequestTime: time1,
       secondRequestTime: time2,
     });
@@ -859,9 +859,9 @@ async function testAIPerformance() {
       phaseResults.tests.push({
         name: 'AI Usage Ratio',
         passed: true,
-        aiUsagePercent: parseFloat(aiUsagePercent),
-        totalQueries: parseInt(metrics.total_queries),
-        avgResponseTime: parseFloat(metrics.avg_response_time),
+        aiUsagePercent: Number.parseFloat(aiUsagePercent),
+        totalQueries: Number.parseInt(metrics.total_queries, 10),
+        avgResponseTime: Number.parseFloat(metrics.avg_response_time),
       });
     }
 
@@ -954,7 +954,7 @@ function generateFinalReport() {
   recommendations.forEach((rec) => console.log(`  ${colors.yellow}${rec}${colors.reset}`));
 
   // Save report
-  const fs = require('fs');
+  const fs = require('node:fs');
   const reportPath = './BRUTAL_AI_TESTING_REPORT.json';
   fs.writeFileSync(reportPath, JSON.stringify(testResults, null, 2));
   log.success(`\nReport saved: ${reportPath}`);
