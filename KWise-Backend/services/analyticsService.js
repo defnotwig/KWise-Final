@@ -17,28 +17,32 @@ const getRevenueTrends = async (period = 'daily', limit = 30) => {
   try {
     let groupByClause;
     let dateFormat;
+    let intervalUnit;
 
     switch (period) {
-      case 'daily':
-        groupByClause = "DATE(created_at)";
-        dateFormat = "TO_CHAR(DATE(created_at), 'YYYY-MM-DD')";
-        break;
       case 'weekly':
         groupByClause = "DATE_TRUNC('week', created_at)";
         dateFormat = "TO_CHAR(DATE_TRUNC('week', created_at), 'YYYY-MM-DD')";
+        intervalUnit = 'week';
         break;
       case 'monthly':
         groupByClause = "DATE_TRUNC('month', created_at)";
         dateFormat = "TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM')";
+        intervalUnit = 'month';
         break;
       case 'yearly':
         groupByClause = "DATE_TRUNC('year', created_at)";
         dateFormat = "TO_CHAR(DATE_TRUNC('year', created_at), 'YYYY')";
+        intervalUnit = 'year';
         break;
+      case 'daily':
       default:
         groupByClause = "DATE(created_at)";
         dateFormat = "TO_CHAR(DATE(created_at), 'YYYY-MM-DD')";
+        intervalUnit = 'day';
     }
+
+    const safeLimit = Number.parseInt(limit, 10) || 30;
 
     const query = `
       SELECT 
@@ -48,19 +52,19 @@ const getRevenueTrends = async (period = 'daily', limit = 30) => {
         COALESCE(AVG(total_amount), 0)::decimal(10,2) as avg_order_value
       FROM orders
       WHERE status != 'cancelled'
-        AND created_at >= NOW() - INTERVAL '${limit} ${period === 'daily' ? 'days' : period === 'weekly' ? 'weeks' : period === 'monthly' ? 'months' : 'years'}'
+        AND created_at >= NOW() - $1 * INTERVAL '1 ${intervalUnit}'
       GROUP BY ${groupByClause}
       ORDER BY ${groupByClause} ASC
-      LIMIT $1
+      LIMIT $2
     `;
 
-    const result = await pool.query(query, [limit]);
+    const result = await pool.query(query, [safeLimit, safeLimit]);
     
     return result.rows.map(row => ({
       period: row.period,
       orderCount: row.order_count,
-      revenue: parseFloat(row.revenue),
-      avgOrderValue: parseFloat(row.avg_order_value)
+      revenue: Number.parseFloat(row.revenue),
+      avgOrderValue: Number.parseFloat(row.avg_order_value)
     }));
   } catch (error) {
     logger.error('Error fetching revenue trends:', error);
@@ -113,10 +117,10 @@ const getTopProducts = async (limit = 10, timeframe = 'all') => {
       name: row.name,
       category: row.category,
       tier: row.tier,
-      price: parseFloat(row.price),
+      price: Number.parseFloat(row.price),
       timesSold: row.times_sold,
       totalQuantity: row.total_quantity,
-      totalRevenue: parseFloat(row.total_revenue)
+      totalRevenue: Number.parseFloat(row.total_revenue)
     }));
   } catch (error) {
     logger.error('Error fetching top products:', error);
@@ -151,8 +155,8 @@ const getCategoryPerformance = async () => {
       category: row.category,
       orderCount: row.order_count,
       totalQuantity: row.total_quantity,
-      revenue: parseFloat(row.revenue),
-      avgSaleValue: parseFloat(row.avg_sale_value)
+      revenue: Number.parseFloat(row.revenue),
+      avgSaleValue: Number.parseFloat(row.avg_sale_value)
     }));
   } catch (error) {
     logger.error('Error fetching category performance:', error);
@@ -181,7 +185,7 @@ const getOrderStatusDistribution = async () => {
     return result.rows.map(row => ({
       status: row.status,
       count: row.count,
-      totalValue: parseFloat(row.total_value)
+      totalValue: Number.parseFloat(row.total_value)
     }));
   } catch (error) {
     logger.error('Error fetching order status distribution:', error);
@@ -261,7 +265,7 @@ const getCustomerInsights = async () => {
       spendingSegments: avgValueResult.rows.map(row => ({
         segment: row.segment,
         customerCount: row.customer_count,
-        avgSpending: parseFloat(row.avg_spending)
+        avgSpending: Number.parseFloat(row.avg_spending)
       }))
     };
   } catch (error) {
@@ -301,7 +305,7 @@ const getOrderPatterns = async () => {
       hourlyData[row.hour] = {
         hour: row.hour,
         orderCount: row.order_count,
-        avgOrderValue: parseFloat(row.avg_order_value)
+        avgOrderValue: Number.parseFloat(row.avg_order_value)
       };
     });
 

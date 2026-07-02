@@ -2,12 +2,24 @@
  * AI Smart Search Service
  * TASK 14 - PHASE 3: AI-Powered Product Browsing
  * Intelligent search with natural language understanding
+ * PHASE 4: Integrated with Hybrid RAG Pipeline (Vector + BM25 → RRF fusion)
  */
 
 const axios = require('axios');
 const pool = require('../config/db');
 const logger = require('../utils/logger');
 const ollamaService = require('../ai/services/ollamaService'); // PHASE 4: Fine-tuned AI model integration
+
+// PHASE 4: RAG Pipeline for hybrid search
+let ragPipeline;
+try {
+  ragPipeline = require('./ragPipeline');
+} catch (e) {
+  logger.warn('⚠️ RAG Pipeline not available for smart search', {
+    error: e.message
+  });
+  ragPipeline = null;
+}
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
@@ -261,9 +273,48 @@ Respond ONLY with valid JSON.`;
   }
 };
 
+/**
+ * Hybrid RAG-powered product search
+ * Uses Vector + BM25 with RRF fusion for superior relevance
+ * Falls back to legacy smartSearch if RAG pipeline unavailable
+ * @param {string} query - Natural language query
+ * @param {Object} filters - Optional filters (category, minPrice, maxPrice, tier)
+ * @returns {Promise<Object>} Search results with AI insights
+ */
+const ragProductSearch = async (query, filters = {}) => {
+  try {
+    // Try RAG pipeline first
+    if (ragPipeline) {
+      logger.info(`🔗 RAG Product Search: "${query}"`);
+      const result = await ragPipeline.productSearch(query, filters, true);
+      if (result.success && result.products.length > 0) {
+        return {
+          success: true,
+          query,
+          searchMode: 'hybrid_rag',
+          products: result.products,
+          totalResults: result.totalResults,
+          aiInsights: result.aiSummary ? { summary: result.aiSummary } : null,
+          retrievalStats: result.retrievalStats,
+          timestamp: new Date().toISOString(),
+          latencyMs: result.latencyMs
+        };
+      }
+      logger.info('⚠️ RAG search returned no results, falling back to legacy search');
+    }
+
+    // Fallback to legacy AI search
+    return await aiProductSearch(query);
+  } catch (error) {
+    logger.error('Error in RAG product search, falling back:', error.message);
+    return await aiProductSearch(query);
+  }
+};
+
 module.exports = {
   parseSearchQuery,
   smartSearch,
   aiProductSearch,
+  ragProductSearch,
   generateSearchInsights
 };

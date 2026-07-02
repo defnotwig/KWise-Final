@@ -8,8 +8,8 @@
  * without manual intervention.
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
+const { spawn } = require('node:child_process');
+const path = require('node:path');
 const logger = require('../utils/logger');
 
 class AutoRestartService {

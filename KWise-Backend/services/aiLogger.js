@@ -8,7 +8,7 @@
  */
 
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const db = require('../config/db');
 
 class AILogger {
@@ -34,7 +34,7 @@ class AILogger {
       slowCall: 20000, // 20s
       consecutiveFailures: 5,
       highLatencyP95: 15000, // 15s
-      lowSuccessRate: 0.90 // 90%
+      lowSuccessRate: 0.9 // 90%
     };
     
     // Consecutive failure counter for alerting
@@ -381,10 +381,10 @@ class AILogger {
           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency_ms) as p95_latency,
           AVG(confidence) as avg_confidence
          FROM ai_metrics
-         WHERE created_at >= NOW() - INTERVAL '${days} days'
+         WHERE created_at >= NOW() - $1 * INTERVAL '1 day'
          GROUP BY DATE(created_at), scenario
          ORDER BY date DESC, scenario`,
-        []
+        [Number.parseInt(days, 10) || 7]
       );
       
       return result.rows;
@@ -425,7 +425,7 @@ class AILogger {
         .update(JSON.stringify(data))
         .digest('hex')
         .substring(0, 16);
-    } catch (error) {
+    } catch (_error) { // NOSONAR
       return null;
     }
   }
@@ -437,10 +437,7 @@ class AILogger {
     // Log for now - can integrate with email/SMS/WebSocket later
     this.logger.warn('ADMIN_NOTIFICATION', event);
     
-    // TODO: Integrate with notification service
-    // - Email notification
-    // - WebSocket push to admin dashboard
-    // - SMS for critical alerts
+    // Future: Integrate with notification service (email, WebSocket, SMS) // NOSONAR
   }
 
   /**

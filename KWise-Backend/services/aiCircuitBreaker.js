@@ -9,7 +9,7 @@
  */
 
 const logger = require('../utils/logger');
-const EventEmitter = require('events');
+const EventEmitter = require('node:events');
 
 /**
  * Circuit Breaker States:
@@ -423,7 +423,7 @@ class AICircuitBreaker extends EventEmitter {
         circuitCloses: this.metrics.circuitCloses,
         avgLatency: Math.round(this.metrics.avgLatency),
         successRate: this.metrics.totalCalls > 0 
-          ? parseFloat((this.metrics.successfulCalls / this.metrics.totalCalls * 100).toFixed(2))
+          ? Number.parseFloat((this.metrics.successfulCalls / this.metrics.totalCalls * 100).toFixed(2))
           : 0
       },
       lastFailureTime: this.lastFailureTime,

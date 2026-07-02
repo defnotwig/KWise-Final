@@ -16,7 +16,7 @@
  */
 
 const NodeCache = require('node-cache');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const logger = require('../utils/logger');
 
 class AIResponseCache {
@@ -350,7 +350,7 @@ class AIResponseCache {
      * Check if hit rate target (80%+) is met
      */
     isHitRateTargetMet() {
-        const hitRate = parseFloat(this.getHitRate());
+        const hitRate = Number.parseFloat(this.getHitRate());
         return hitRate >= 80;
     }
 

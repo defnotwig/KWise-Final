@@ -5,7 +5,7 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 /**
  * Generate random test orders
@@ -39,7 +39,7 @@ async function generateTestOrders(options = {}) {
         for (let j = 0; j < itemCount; j++) {
             const product = products[Math.floor(Math.random() * products.length)];
             const quantity = Math.floor(Math.random() * 3) + 1;
-            const price = parseFloat(product.price) || 0;
+            const price = Number.parseFloat(product.price) || 0;
             
             orderItems.push({
                 type: 'product',
@@ -56,7 +56,7 @@ async function generateTestOrders(options = {}) {
         // Optionally add service
         if (includeServices && Math.random() > 0.5 && services.length > 0) {
             const service = services[Math.floor(Math.random() * services.length)];
-            const servicePrice = parseFloat(service.price) || 0;
+            const servicePrice = Number.parseFloat(service.price) || 0;
             
             orderItems.push({
                 type: 'service',

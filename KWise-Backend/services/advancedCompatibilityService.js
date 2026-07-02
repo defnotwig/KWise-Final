@@ -42,6 +42,25 @@ class AdvancedCompatibilityService {
     }
 
     /**
+     * Helper: Extract a specific component from pairwise check arguments
+     */
+    _getComponent(compA, compB, typeA, typeB, targetType) {
+        if (typeA === targetType) return compA;
+        if (typeB === targetType) return compB;
+        return null;
+    }
+
+    /**
+     * Helper: Determine severity level from issue/warning counts
+     */
+    _determineSeverity(criticalCount, warningCount, infoCount = 0) {
+        if (criticalCount > 0) return 'critical';
+        if (warningCount > 0) return 'warning';
+        if (infoCount > 0) return 'info';
+        return 'success';
+    }
+
+    /**
      * LAYER 1: POWER BUDGET CALCULATOR
      * Analyzes total system power consumption and PSU adequacy
      * @param {Object} components - Build components
@@ -73,8 +92,6 @@ class AdvancedCompatibilityService {
             }
             
             const ram = components.ram || components.RAM || components.memory;
-            const motherboard = components.motherboard || components.Motherboard;
-            const storage = components.storage || components.Storage;
 
             // 🔥 FIX #3: Downgrade no_psu from critical to warning (allow estimation)
             if (!psu) {
@@ -143,8 +160,8 @@ class AdvancedCompatibilityService {
             const minimumWattage = Math.ceil(totalPower.peak * 1.1 / 50) * 50;
 
             // PSU load analysis
-            const loadAtPeak = (totalPower.peak / psuWattage) * 100;
-            const loadAtTypical = (totalPower.typical / psuWattage) * 100;
+            const loadAtPeak = psuWattage > 0 ? (totalPower.peak / psuWattage) * 100 : 100;
+            const loadAtTypical = psuWattage > 0 ? (totalPower.typical / psuWattage) * 100 : 100;
             const efficiencyOptimal = loadAtPeak >= 50 && loadAtPeak <= 80; // 50-80% is optimal
 
             // Connector validation
@@ -167,20 +184,18 @@ class AdvancedCompatibilityService {
                 status = 'minimal';
                 severity = 'warning';
                 message = `⚠️ PSU barely adequate. ${psuWattage}W PSU is minimum for this build. Recommended: ${recommendedWattage}W for headroom.`;
-            } else if (!efficiencyOptimal) {
-                if (loadAtPeak < 50) {
-                    status = 'oversized';
-                    severity = 'info';
-                    message = `ℹ️ PSU oversized. ${psuWattage}W PSU only ${Math.round(loadAtPeak)}% loaded. Consider ${recommendedWattage}W for better efficiency.`;
-                } else {
-                    status = 'high_load';
-                    severity = 'warning';
-                    message = `⚠️ PSU near capacity. ${Math.round(loadAtPeak)}% load at peak. PSU longevity may be reduced.`;
-                }
-            } else {
+            } else if (efficiencyOptimal) {
                 status = 'optimal';
                 severity = 'success';
                 message = `✅ PSU optimal! ${psuWattage}W PSU operating at ${Math.round(loadAtPeak)}% peak load (50-80% is ideal).`;
+            } else if (loadAtPeak < 50) {
+                status = 'oversized';
+                severity = 'info';
+                message = `ℹ️ PSU oversized. ${psuWattage}W PSU only ${Math.round(loadAtPeak)}% loaded. Consider ${recommendedWattage}W for better efficiency.`;
+            } else {
+                status = 'high_load';
+                severity = 'warning';
+                message = `⚠️ PSU near capacity. ${Math.round(loadAtPeak)}% load at peak. PSU longevity may be reduced.`;
             }
 
             const result = {
@@ -256,162 +271,16 @@ class AdvancedCompatibilityService {
 
             // Use new physicalClearanceService for real dimension validation
             const validationResults = await physicalClearanceService.validateAllClearances(
-                Object.values(components).filter(c => c), // Filter out null/undefined
+                Object.values(components).filter(Boolean),
                 []
             );
 
-            // GPU CLEARANCE (Enhanced with real dimensions)
-            if (gpu && pcCase) {
-                const gpuResult = physicalClearanceService.validateGPUClearance(gpu, pcCase);
-                
-                checks.gpu_clearance = {
-                    gpu_length: gpuResult.gpu_length_mm || 0,
-                    case_max: gpuResult.case_max_mm || 0,
-                    fits: gpuResult.compatible,
-                    clearance: gpuResult.clearance_mm || 0,
-                    using_real_data: gpuResult.using_real_data || false
-                };
-
-                if (!gpuResult.compatible) {
-                    issues.push({
-                        type: 'gpu_clearance',
-                        severity: 'critical',
-                        component: gpu.name,
-                        message: gpuResult.issue || `❌ GPU clearance issue detected`,
-                        solution: gpuResult.recommendation || 'Select compatible GPU or larger case'
-                    });
-                } else if (gpuResult.warning) {
-                    warnings.push({
-                        type: 'gpu_clearance',
-                        severity: 'warning',
-                        component: gpu.name,
-                        message: gpuResult.warning,
-                        solution: gpuResult.recommendation || 'Verify case clearance'
-                    });
-                }
-
-                logger.info(`✅ [CLEARANCE] GPU: ${gpuResult.using_real_data ? 'Real dimensions' : 'Fallback'}`);
-            }
-
-            // COOLER CLEARANCE (Enhanced with socket + TDP validation)
-            if (cooler && pcCase) {
-                const coolerResult = physicalClearanceService.validateCoolerClearance(cooler, pcCase, cpu);
-                
-                checks.cooler_clearance = {
-                    cooler_height: coolerResult.cooler_height_mm || 0,
-                    case_max: coolerResult.case_max_mm || 0,
-                    fits: coolerResult.compatible,
-                    clearance: coolerResult.clearance_mm || 0,
-                    socket_compatible: coolerResult.socket_compatible,
-                    tdp_adequate: coolerResult.tdp_adequate,
-                    using_real_data: coolerResult.using_real_data || false
-                };
-
-                if (!coolerResult.compatible) {
-                    issues.push({
-                        type: 'cooler_clearance',
-                        severity: 'critical',
-                        component: cooler.name,
-                        message: coolerResult.issue || `❌ Cooler clearance issue detected`,
-                        solution: coolerResult.recommendation || 'Select compatible cooler or larger case'
-                    });
-                } else if (coolerResult.warning) {
-                    warnings.push({
-                        type: 'cooler_clearance',
-                        severity: 'warning',
-                        component: cooler.name,
-                        message: coolerResult.warning,
-                        solution: coolerResult.recommendation || 'Verify cooler compatibility'
-                    });
-                }
-
-                logger.info(`✅ [CLEARANCE] Cooler: ${coolerResult.using_real_data ? 'Real dimensions' : 'Fallback'}`);
-            }
-
-            // MOTHERBOARD FORM FACTOR
-            if (motherboard && pcCase) {
-                const mbResult = physicalClearanceService.validateMotherboardFormFactor(motherboard, pcCase);
-                
-                checks.motherboard_clearance = {
-                    motherboard_form_factor: mbResult.motherboard_form_factor,
-                    case_form_factor: mbResult.case_form_factor,
-                    fits: mbResult.compatible,
-                    using_real_data: mbResult.using_real_data || false
-                };
-
-                if (!mbResult.compatible) {
-                    issues.push({
-                        type: 'motherboard_clearance',
-                        severity: 'critical',
-                        component: motherboard.name,
-                        message: mbResult.issue || `❌ Motherboard form factor incompatible`,
-                        solution: mbResult.recommendation || 'Select compatible motherboard or case'
-                    });
-                }
-
-                logger.info(`✅ [CLEARANCE] Motherboard: ${mbResult.using_real_data ? 'Real form factor' : 'Fallback'}`);
-            }
-
-            // RAM CLEARANCE (cooler blocking RAM slots) - Fallback to old method
-            if (cooler && ram) {
-                const coolerRamClearance = this.extractDimension(cooler, 'ram_clearance', 999);
-                const ramHeight = this.extractDimension(ram, 'height', 32); // Standard RAM ~32mm
-
-                checks.ram_clearance = {
-                    ram_height: ramHeight,
-                    cooler_clearance: coolerRamClearance,
-                    fits: ramHeight <= coolerRamClearance,
-                    margin: coolerRamClearance - ramHeight
-                };
-
-                if (ramHeight > coolerRamClearance) {
-                    issues.push({
-                        type: 'ram_clearance',
-                        severity: 'critical',
-                        component: `${cooler.name} + ${ram.name}`,
-                        message: `❌ RAM too tall for cooler! ${ram.name} (${ramHeight}mm) blocked by ${cooler.name} (${coolerRamClearance}mm clearance)`,
-                        solution: `Use low-profile RAM (≤ ${coolerRamClearance}mm) or different cooler`
-                    });
-                }
-            }
-
-            // PSU LENGTH CHECK - Fallback to old method
-            if (psu && pcCase) {
-                const psuLength = this.extractDimension(psu, 'length', 140); // Standard PSU ~140mm
-                const caseMaxPsu = this.extractDimension(pcCase, 'max_psu_length', 999);
-
-                checks.psu_length = {
-                    psu_length: psuLength,
-                    case_max: caseMaxPsu,
-                    fits: psuLength <= caseMaxPsu,
-                    clearance: caseMaxPsu - psuLength
-                };
-
-                if (psuLength > caseMaxPsu) {
-                    issues.push({
-                        type: 'psu_length',
-                        severity: 'critical',
-                        component: psu.name,
-                        message: `❌ PSU too long! ${psu.name} (${psuLength}mm) exceeds case PSU bay (${caseMaxPsu}mm)`,
-                        solution: `Select shorter PSU or case with ${psuLength}mm+ PSU clearance`
-                    });
-                }
-            }
-
-            // GPU SLOT WIDTH (multi-slot GPUs)
-            if (gpu) {
-                const gpuSlots = this.extractGpuSlots(gpu);
-                
-                if (gpuSlots >= 3) {
-                    warnings.push({
-                        type: 'gpu_slots',
-                        severity: 'info',
-                        component: gpu.name,
-                        message: `ℹ️ ${gpu.name} occupies ${gpuSlots} PCIe slots - may block adjacent slots`,
-                        solution: 'Ensure motherboard has adequate PCIe slot spacing'
-                    });
-                }
-            }
+            this._checkGpuClearance(gpu, pcCase, issues, warnings, checks);
+            this._checkCoolerClearance(cooler, pcCase, cpu, issues, warnings, checks);
+            this._checkMotherboardClearance(motherboard, pcCase, issues, checks);
+            this._checkRamClearance(cooler, ram, issues, checks);
+            this._checkPsuLengthClearance(psu, pcCase, issues, checks);
+            this._checkGpuSlotWidth(gpu, warnings);
 
             const allCompatible = issues.length === 0;
             const criticalIssues = issues.filter(i => i.severity === 'critical');
@@ -419,8 +288,7 @@ class AdvancedCompatibilityService {
             const result = {
                 compatible: allCompatible,
                 status: allCompatible ? 'all_fit' : 'clearance_issues',
-                severity: criticalIssues.length > 0 ? 'critical' : 
-                         warnings.length > 0 ? 'warning' : 'success',
+                severity: this._determineSeverity(criticalIssues.length, warnings.length),
                 message: allCompatible ? 
                     '✅ All components fit physically (using real dimension data)' :
                     `❌ ${criticalIssues.length} clearance issue(s) found`,
@@ -441,12 +309,93 @@ class AdvancedCompatibilityService {
         } catch (error) {
             logger.error('❌ [CLEARANCE] Physical clearance analysis failed:', error);
             return {
-                compatible: true, // Don't block on analysis failure
+                compatible: true,
                 status: 'error',
                 severity: 'error',
                 message: 'Clearance analysis failed',
                 error: error.message
             };
+        }
+    }
+
+    _checkGpuClearance(gpu, pcCase, issues, warnings, checks) {
+        if (!gpu || !pcCase) return;
+        const gpuResult = physicalClearanceService.validateGPUClearance(gpu, pcCase);
+        checks.gpu_clearance = {
+            gpu_length: gpuResult.gpu_length_mm || 0,
+            case_max: gpuResult.case_max_mm || 0,
+            fits: gpuResult.compatible,
+            clearance: gpuResult.clearance_mm || 0,
+            using_real_data: gpuResult.using_real_data || false
+        };
+        if (!gpuResult.compatible) {
+            issues.push({ type: 'gpu_clearance', severity: 'critical', component: gpu.name, message: gpuResult.issue || '❌ GPU clearance issue detected', solution: gpuResult.recommendation || 'Select compatible GPU or larger case' });
+        } else if (gpuResult.warning) {
+            warnings.push({ type: 'gpu_clearance', severity: 'warning', component: gpu.name, message: gpuResult.warning, solution: gpuResult.recommendation || 'Verify case clearance' });
+        }
+        logger.info(`✅ [CLEARANCE] GPU: ${gpuResult.using_real_data ? 'Real dimensions' : 'Fallback'}`);
+    }
+
+    _checkCoolerClearance(cooler, pcCase, cpu, issues, warnings, checks) {
+        if (!cooler || !pcCase) return;
+        const coolerResult = physicalClearanceService.validateCoolerClearance(cooler, pcCase, cpu);
+        checks.cooler_clearance = {
+            cooler_height: coolerResult.cooler_height_mm || 0,
+            case_max: coolerResult.case_max_mm || 0,
+            fits: coolerResult.compatible,
+            clearance: coolerResult.clearance_mm || 0,
+            socket_compatible: coolerResult.socket_compatible,
+            tdp_adequate: coolerResult.tdp_adequate,
+            using_real_data: coolerResult.using_real_data || false
+        };
+        if (!coolerResult.compatible) {
+            issues.push({ type: 'cooler_clearance', severity: 'critical', component: cooler.name, message: coolerResult.issue || '❌ Cooler clearance issue detected', solution: coolerResult.recommendation || 'Select compatible cooler or larger case' });
+        } else if (coolerResult.warning) {
+            warnings.push({ type: 'cooler_clearance', severity: 'warning', component: cooler.name, message: coolerResult.warning, solution: coolerResult.recommendation || 'Verify cooler compatibility' });
+        }
+        logger.info(`✅ [CLEARANCE] Cooler: ${coolerResult.using_real_data ? 'Real dimensions' : 'Fallback'}`);
+    }
+
+    _checkMotherboardClearance(motherboard, pcCase, issues, checks) {
+        if (!motherboard || !pcCase) return;
+        const mbResult = physicalClearanceService.validateMotherboardFormFactor(motherboard, pcCase);
+        checks.motherboard_clearance = {
+            motherboard_form_factor: mbResult.motherboard_form_factor,
+            case_form_factor: mbResult.case_form_factor,
+            fits: mbResult.compatible,
+            using_real_data: mbResult.using_real_data || false
+        };
+        if (!mbResult.compatible) {
+            issues.push({ type: 'motherboard_clearance', severity: 'critical', component: motherboard.name, message: mbResult.issue || '❌ Motherboard form factor incompatible', solution: mbResult.recommendation || 'Select compatible motherboard or case' });
+        }
+        logger.info(`✅ [CLEARANCE] Motherboard: ${mbResult.using_real_data ? 'Real form factor' : 'Fallback'}`);
+    }
+
+    _checkRamClearance(cooler, ram, issues, checks) {
+        if (!cooler || !ram) return;
+        const coolerRamClearance = this.extractDimension(cooler, 'ram_clearance', 999);
+        const ramHeight = this.extractDimension(ram, 'height', 32);
+        checks.ram_clearance = { ram_height: ramHeight, cooler_clearance: coolerRamClearance, fits: ramHeight <= coolerRamClearance, margin: coolerRamClearance - ramHeight };
+        if (ramHeight > coolerRamClearance) {
+            issues.push({ type: 'ram_clearance', severity: 'critical', component: `${cooler.name} + ${ram.name}`, message: `❌ RAM too tall for cooler! ${ram.name} (${ramHeight}mm) blocked by ${cooler.name} (${coolerRamClearance}mm clearance)`, solution: `Use low-profile RAM (≤ ${coolerRamClearance}mm) or different cooler` });
+        }
+    }
+
+    _checkPsuLengthClearance(psu, pcCase, issues, checks) {
+        if (!psu || !pcCase) return;
+        const psuLength = this.extractDimension(psu, 'length', 140);
+        const caseMaxPsu = this.extractDimension(pcCase, 'max_psu_length', 999);
+        checks.psu_length = { psu_length: psuLength, case_max: caseMaxPsu, fits: psuLength <= caseMaxPsu, clearance: caseMaxPsu - psuLength };
+        if (psuLength > caseMaxPsu) {
+            issues.push({ type: 'psu_length', severity: 'critical', component: psu.name, message: `❌ PSU too long! ${psu.name} (${psuLength}mm) exceeds case PSU bay (${caseMaxPsu}mm)`, solution: `Select shorter PSU or case with ${psuLength}mm+ PSU clearance` });
+        }
+    }
+
+    _checkGpuSlotWidth(gpu, warnings) {
+        if (!gpu) return;
+        const gpuSlots = this.extractGpuSlots(gpu);
+        if (gpuSlots >= 3) {
+            warnings.push({ type: 'gpu_slots', severity: 'info', component: gpu.name, message: `ℹ️ ${gpu.name} occupies ${gpuSlots} PCIe slots - may block adjacent slots`, solution: 'Ensure motherboard has adequate PCIe slot spacing' });
         }
     }
 
@@ -506,8 +455,7 @@ class AdvancedCompatibilityService {
             const result = {
                 compatible: allCompatible,
                 status: allCompatible ? 'all_pairs_compatible' : 'pair_conflicts',
-                severity: issues.length > 0 ? 'critical' : 
-                warnings.length > 0 ? 'warning' : 'success',
+                severity: this._determineSeverity(issues.length, warnings.length),
                 message: allCompatible ?
                     `✅ All ${pairs.length} component pairs compatible` :
                     `❌ ${issues.length} compatibility issue(s) found in component pairs`,
@@ -564,41 +512,41 @@ class AdvancedCompatibilityService {
             const gpus = this.normalizeToArray(components.gpu || components.GPU);
 
             // Motherboard budgets - 🔥 CRITICAL FIX: Database uses capitalized field names
-            const mbRamSlots = parseInt(
+            const mbRamSlots = Number.parseInt(
                 motherboard.specifications?.ram_slots || 
                 motherboard.specifications?.memory_slots || 
                 motherboard.specifications?.['Ram Slots'] || 
                 motherboard.specifications?.['RAM Slots'] || 
                 0
-            ) || 0;
-            const mbMaxRam = parseInt(
+            , 10) || 0;
+            const mbMaxRam = Number.parseInt(
                 motherboard.specifications?.max_ram || 
                 motherboard.specifications?.maximum_memory || 
                 motherboard.specifications?.['Max RAM'] || 
                 motherboard.specifications?.['Maximum Memory'] || 
                 0
-            ) || 0;
-            const mbM2Slots = parseInt(
+            , 10) || 0;
+            const mbM2Slots = Number.parseInt(
                 motherboard.specifications?.m2_slots || 
                 motherboard.specifications?.m_2_slots || 
                 motherboard.specifications?.['M2 Slots'] || 
                 motherboard.specifications?.['M.2 Slots'] || 
                 0
-            ) || 0;
-            const mbSataPorts = parseInt(
+            , 10) || 0;
+            const mbSataPorts = Number.parseInt(
                 motherboard.specifications?.sata_ports || 
                 motherboard.specifications?.sata_slots || 
                 motherboard.specifications?.['SATA Ports'] || 
                 motherboard.specifications?.['SATA ports'] || 
                 motherboard.specifications?.['sata ports'] || 
                 0
-            ) || 0;
-            const mbPcieX16 = parseInt(
+            , 10) || 0;
+            const mbPcieX16 = Number.parseInt(
                 motherboard.specifications?.pcie_x16_slots || 
                 motherboard.specifications?.['PCIe x16 Slots'] || 
                 motherboard.specifications?.['PCIE x16 Slots'] || 
                 0
-            ) || 1;
+            , 10) || 1;
 
             // RAM sticks / capacity
             const totalRamSticks = ramModules.reduce((sum, mod) => sum + this.extractRamSticks(mod), 0);
@@ -614,8 +562,8 @@ class AdvancedCompatibilityService {
                     severity: 'critical',
                     message: `RAM sticks (${totalRamSticks}) exceed motherboard slots (${mbRamSlots})`,
                     component1: ramNames,
-                    component2: normalizedComponents.motherboard?.name || 'Motherboard',
-                    details: `RAM: ${ramNames} require ${totalRamSticks} slot(s), but motherboard ${normalizedComponents.motherboard?.name || 'Unknown'} only has ${mbRamSlots} slot(s)`
+                    component2: motherboard?.name || 'Motherboard',
+                    details: `RAM: ${ramNames} require ${totalRamSticks} slot(s), but motherboard ${motherboard?.name || 'Unknown'} only has ${mbRamSlots} slot(s)`
                 });
             }
 
@@ -626,8 +574,8 @@ class AdvancedCompatibilityService {
                     severity: 'critical',
                     message: `RAM capacity ${totalRamCapacity}GB exceeds motherboard max ${mbMaxRam}GB`,
                     component1: ramNames,
-                    component2: normalizedComponents.motherboard?.name || 'Motherboard',
-                    details: `RAM: ${ramNames} total capacity is ${totalRamCapacity}GB, but motherboard ${normalizedComponents.motherboard?.name || 'Unknown'} max is ${mbMaxRam}GB`
+                    component2: motherboard?.name || 'Motherboard',
+                    details: `RAM: ${ramNames} total capacity is ${totalRamCapacity}GB, but motherboard ${motherboard?.name || 'Unknown'} max is ${mbMaxRam}GB`
                 });
             }
 
@@ -654,8 +602,8 @@ class AdvancedCompatibilityService {
                     severity: 'critical',
                     message: `M.2 drives (${m2Count}) exceed motherboard M.2 slots (${mbM2Slots})`,
                     component1: m2Names,
-                    component2: normalizedComponents.motherboard?.name || 'Motherboard',
-                    details: `M.2 Drives: ${m2Names} require ${m2Count} M.2 slot(s), but motherboard ${normalizedComponents.motherboard?.name || 'Unknown'} only has ${mbM2Slots} slot(s)`
+                    component2: motherboard?.name || 'Motherboard',
+                    details: `M.2 Drives: ${m2Names} require ${m2Count} M.2 slot(s), but motherboard ${motherboard?.name || 'Unknown'} only has ${mbM2Slots} slot(s)`
                 });
             }
 
@@ -670,8 +618,8 @@ class AdvancedCompatibilityService {
                     severity: 'critical',
                     message: `SATA drives (${sataCount}) exceed motherboard SATA ports (${mbSataPorts})`,
                     component1: sataNames,
-                    component2: normalizedComponents.motherboard?.name || 'Motherboard',
-                    details: `SATA Drives: ${sataNames} require ${sataCount} SATA port(s), but motherboard ${normalizedComponents.motherboard?.name || 'Unknown'} only has ${mbSataPorts} port(s)`
+                    component2: motherboard?.name || 'Motherboard',
+                    details: `SATA Drives: ${sataNames} require ${sataCount} SATA port(s), but motherboard ${motherboard?.name || 'Unknown'} only has ${mbSataPorts} port(s)`
                 });
             }
 
@@ -686,8 +634,8 @@ class AdvancedCompatibilityService {
                     severity: 'critical',
                     message: `GPU slot demand (${totalGpuSlots}) exceeds motherboard PCIe x16 slots (${mbPcieX16})`,
                     component1: gpuNames,
-                    component2: normalizedComponents.motherboard?.name || 'Motherboard',
-                    details: `GPUs: ${gpuNames} require ${totalGpuSlots} PCIe x16 slot(s), but motherboard ${normalizedComponents.motherboard?.name || 'Unknown'} only has ${mbPcieX16} slot(s)`
+                    component2: motherboard?.name || 'Motherboard',
+                    details: `GPUs: ${gpuNames} require ${totalGpuSlots} PCIe x16 slot(s), but motherboard ${motherboard?.name || 'Unknown'} only has ${mbPcieX16} slot(s)`
                 });
             }
 
@@ -696,7 +644,7 @@ class AdvancedCompatibilityService {
             return {
                 compatible,
                 status: compatible ? 'budget_ok' : 'budget_exceeded',
-                severity: compatible ? (warnings.length ? 'warning' : 'success') : 'critical',
+                severity: this._determineSeverity(compatible ? 0 : 1, warnings.length),
                 message: compatible ? '✅ Slot and port budgets within limits' : '❌ Slot/port budgets exceeded',
                 critical_issues: issues,
                 warnings,
@@ -746,102 +694,13 @@ class AdvancedCompatibilityService {
             const warnings = [];
 
             // CPU-GPU TIER MATCHING
-            if (cpu && gpu) {
-                const cpuTierData = await this.extractTier(cpu);
-                const gpuTierData = await this.extractTier(gpu);
-
-                if (cpuTierData && gpuTierData) {
-                    const cpuTier = cpuTierData.tier;
-                    const gpuTier = gpuTierData.tier;
-                    const cpuRank = cpuTierData.score;
-                    const gpuRank = gpuTierData.score;
-                    const difference = Math.abs(cpuRank - gpuRank);
-
-                    logger.debug(`🎯 [BOTTLENECK] CPU: ${cpu.name} (${cpuTier}, rank ${cpuRank})`);
-                    logger.debug(`🎯 [BOTTLENECK] GPU: ${gpu.name} (${gpuTier}, rank ${gpuRank})`);
-                    logger.debug(`🎯 [BOTTLENECK] Tier difference: ${difference}`);
-
-                    if (difference >= 2) {
-                        const bottleneck = cpuRank < gpuRank ? 'CPU' : 'GPU';
-                        const stronger = cpuRank < gpuRank ? 'GPU' : 'CPU';
-                        const weaker = bottleneck;
-                        const performanceLoss = 10 + (difference * 10);
-
-                        bottlenecks.push({
-                            type: 'cpu_gpu_mismatch',
-                            severity: difference >= 3 ? 'critical' : 'warning',
-                            component: bottleneck.toLowerCase(), // 🔥 ADD: Component identifier (cpu or gpu)
-                            component_name: bottleneck === 'CPU' ? cpu.name : gpu.name, // 🔥 ADD: Specific component name
-                            related_component: bottleneck === 'CPU' ? 'gpu' : 'cpu', // 🔥 ADD: Related component
-                            related_component_name: bottleneck === 'CPU' ? gpu.name : cpu.name, // 🔥 ADD: Related component name
-                            bottleneck: bottleneck,
-                            message: `⚠️ ${bottleneck} Bottleneck Detected! ${cpu.name} (${cpuTier}) + ${gpu.name} (${gpuTier})`,
-                            impact: `~${performanceLoss}% performance loss - ${stronger} underutilized`,
-                            recommendation: `Upgrade ${weaker} to ${gpuTier} tier for balanced performance`,
-                            analysis: {
-                                cpu_tier: cpuTier,
-                                gpu_tier: gpuTier,
-                                cpu_rank: cpuRank,
-                                gpu_rank: gpuRank,
-                                tier_difference: difference,
-                                estimated_loss: `${performanceLoss}%`
-                            }
-                        });
-                    } else if (difference === 1) {
-                        warnings.push({
-                            type: 'minor_mismatch',
-                            severity: 'info',
-                            message: `ℹ️ Minor tier mismatch: ${cpu.name} (${cpuTier}) + ${gpu.name} (${gpuTier})`,
-                            impact: 'Minimal (~5-10%) performance impact',
-                            recommendation: 'Acceptable for most users'
-                        });
-                    }
-                } else {
-                    logger.warn(`⚠️ [BOTTLENECK] Could not determine tier for CPU or GPU`);
-                }
-            }
+            await this._analyzeCpuGpuBalance(cpu, gpu, bottlenecks, warnings);
 
             // RAM SPEED VS CPU SUPPORT
-            if (cpu && ram) {
-                const cpuMaxRamSpeed = this.extractMaxRamSpeed(cpu);
-                const ramSpeed = this.extractRamSpeed(ram);
-
-                if (cpuMaxRamSpeed && ramSpeed && ramSpeed > cpuMaxRamSpeed) {
-                    warnings.push({
-                        type: 'ram_speed_limited',
-                        severity: 'info',
-                        component: 'ram', // 🔥 ADD: Component identifier
-                        component_name: ram.name, // 🔥 ADD: Specific component name
-                        message: `ℹ️ RAM speed limited: ${ram.name} (${ramSpeed}MHz) will run at ${cpuMaxRamSpeed}MHz (CPU limit)`,
-                        impact: 'RAM will downclock to CPU maximum',
-                        recommendation: `Save money with ${cpuMaxRamSpeed}MHz RAM or upgrade CPU for faster RAM support`
-                    });
-                }
-            }
+            this._analyzeRamSpeed(cpu, ram, warnings);
 
             // STORAGE INTERFACE BOTTLENECK
-            // 🔥 FIX: Handle both single storage object and array of storage drives
-            const storageInput = components.storage || components.Storage;
-            const storageDevices = Array.isArray(storageInput) ? storageInput : (storageInput ? [storageInput] : []);
-            
-            storageDevices.forEach(storage => {
-                if (storage && storage.name) {
-                    const storageType = this.extractStorageType(storage);
-                    const storageInterface = this.extractStorageInterface(storage);
-
-                    if (storageType === 'SSD' && storageInterface === 'SATA') {
-                        warnings.push({
-                            type: 'storage_interface',
-                            severity: 'info',
-                            component: 'storage', // 🔥 ADD: Component identifier
-                            component_name: storage.name, // 🔥 ADD: Specific component name
-                            message: `ℹ️ ${storage.name} uses SATA (limited to ~550MB/s)`,
-                            impact: 'Consider NVMe for 3-7x faster speeds',
-                            recommendation: 'Upgrade to NVMe M.2 SSD for better performance'
-                        });
-                    }
-                }
-            });
+            this._analyzeStorageInterface(components, warnings);
 
             const hasBottlenecks = bottlenecks.length > 0;
             const criticalBottlenecks = bottlenecks.filter(b => b.severity === 'critical');
@@ -849,9 +708,7 @@ class AdvancedCompatibilityService {
             const result = {
                 balanced: !hasBottlenecks,
                 status: hasBottlenecks ? 'bottlenecks_detected' : 'balanced',
-                severity: criticalBottlenecks.length > 0 ? 'critical' :
-                         bottlenecks.length > 0 ? 'warning' :
-                         warnings.length > 0 ? 'info' : 'success',
+                severity: this._determineSeverity(criticalBottlenecks.length, bottlenecks.length, warnings.length),
                 message: hasBottlenecks ?
                     `⚠️ ${bottlenecks.length} bottleneck(s) detected` :
                     '✅ Build is balanced - no major bottlenecks',
@@ -879,6 +736,88 @@ class AdvancedCompatibilityService {
         }
     }
 
+    async _analyzeCpuGpuBalance(cpu, gpu, bottlenecks, warnings) {
+        if (!cpu || !gpu) return;
+        const cpuTierData = await this.extractTier(cpu);
+        const gpuTierData = await this.extractTier(gpu);
+        if (!cpuTierData || !gpuTierData) {
+            logger.warn('⚠️ [BOTTLENECK] Could not determine tier for CPU or GPU');
+            return;
+        }
+        const cpuTier = cpuTierData.tier;
+        const gpuTier = gpuTierData.tier;
+        const cpuRank = cpuTierData.score;
+        const gpuRank = gpuTierData.score;
+        const difference = Math.abs(cpuRank - gpuRank);
+
+        logger.debug(`🎯 [BOTTLENECK] CPU: ${cpu.name} (${cpuTier}, rank ${cpuRank})`);
+        logger.debug(`🎯 [BOTTLENECK] GPU: ${gpu.name} (${gpuTier}, rank ${gpuRank})`);
+        logger.debug(`🎯 [BOTTLENECK] Tier difference: ${difference}`);
+
+        if (difference >= 2) {
+            bottlenecks.push(this._buildCpuGpuBottleneck(cpu, gpu, cpuTier, gpuTier, cpuRank, gpuRank, difference));
+        } else if (difference === 1) {
+            warnings.push({
+                type: 'minor_mismatch', severity: 'info',
+                message: `ℹ️ Minor tier mismatch: ${cpu.name} (${cpuTier}) + ${gpu.name} (${gpuTier})`,
+                impact: 'Minimal (~5-10%) performance impact', recommendation: 'Acceptable for most users'
+            });
+        }
+    }
+
+    _buildCpuGpuBottleneck(cpu, gpu, cpuTier, gpuTier, cpuRank, gpuRank, difference) {
+        const bottleneck = cpuRank < gpuRank ? 'CPU' : 'GPU';
+        const stronger = cpuRank < gpuRank ? 'GPU' : 'CPU';
+        const performanceLoss = 10 + (difference * 10);
+        return {
+            type: 'cpu_gpu_mismatch',
+            severity: difference >= 3 ? 'critical' : 'warning',
+            component: bottleneck.toLowerCase(),
+            component_name: bottleneck === 'CPU' ? cpu.name : gpu.name,
+            related_component: bottleneck === 'CPU' ? 'gpu' : 'cpu',
+            related_component_name: bottleneck === 'CPU' ? gpu.name : cpu.name,
+            bottleneck: bottleneck,
+            message: `⚠️ ${bottleneck} Bottleneck Detected! ${cpu.name} (${cpuTier}) + ${gpu.name} (${gpuTier})`,
+            impact: `~${performanceLoss}% performance loss - ${stronger} underutilized`,
+            recommendation: `Upgrade ${bottleneck} to ${gpuTier} tier for balanced performance`,
+            analysis: { cpu_tier: cpuTier, gpu_tier: gpuTier, cpu_rank: cpuRank, gpu_rank: gpuRank, tier_difference: difference, estimated_loss: `${performanceLoss}%` }
+        };
+    }
+
+    _analyzeRamSpeed(cpu, ram, warnings) {
+        if (!cpu || !ram) return;
+        const cpuMaxRamSpeed = this.extractMaxRamSpeed(cpu);
+        const ramSpeed = this.extractRamSpeed(ram);
+        if (cpuMaxRamSpeed && ramSpeed && ramSpeed > cpuMaxRamSpeed) {
+            warnings.push({
+                type: 'ram_speed_limited', severity: 'info',
+                component: 'ram', component_name: ram.name,
+                message: `ℹ️ RAM speed limited: ${ram.name} (${ramSpeed}MHz) will run at ${cpuMaxRamSpeed}MHz (CPU limit)`,
+                impact: 'RAM will downclock to CPU maximum',
+                recommendation: `Save money with ${cpuMaxRamSpeed}MHz RAM or upgrade CPU for faster RAM support`
+            });
+        }
+    }
+
+    _analyzeStorageInterface(components, warnings) {
+        const storageInput = components.storage || components.Storage;
+        const storageDevices = this.normalizeToArray(storageInput);
+        storageDevices.forEach(storage => {
+            if (!storage?.name) return;
+            const storageType = this.extractStorageType(storage);
+            const storageInterface = this.extractStorageInterface(storage);
+            if (storageType === 'SSD' && storageInterface === 'SATA') {
+                warnings.push({
+                    type: 'storage_interface', severity: 'info',
+                    component: 'storage', component_name: storage.name,
+                    message: `ℹ️ ${storage.name} uses SATA (limited to ~550MB/s)`,
+                    impact: 'Consider NVMe for 3-7x faster speeds',
+                    recommendation: 'Upgrade to NVMe M.2 SSD for better performance'
+                });
+            }
+        });
+    }
+
     /**
      * LAYER 5: THERMAL ANALYSIS
      * Analyzes thermal performance and cooling adequacy
@@ -901,133 +840,29 @@ class AdvancedCompatibilityService {
 
             // CPU COOLING ANALYSIS
             if (cpu) {
-                const cpuTdp = this.extractPowerSpec(cpu, 'tdp', 65);
-                logger.debug(`🌡️ [THERMAL] CPU TDP: ${cpuTdp}W`);
-
-                if (cooler) {
-                    const coolerRating = await this.extractCoolerRating(cooler);
-                    const isAIO = this.isAIOCooler(cooler);
-                    
-                    logger.debug(`🌡️ [THERMAL] Cooler rating: ${coolerRating}W, AIO: ${isAIO}`);
-
-                    // Check if cooler can handle CPU TDP
-                    if (coolerRating) {
-                        const headroom = coolerRating - cpuTdp;
-                        const ratio = cpuTdp / coolerRating;
-
-                        if (ratio > 1.0) {
-                            // Cooler insufficient
-                            warnings.push({
-                                type: 'inadequate_cooling',
-                                severity: 'critical',
-                                component: 'CPU Cooler',
-                                message: `❌ CPU cooler insufficient! ${cooler.name} (${coolerRating}W) cannot handle ${cpu.name} (${cpuTdp}W TDP)`,
-                                impact: 'CPU will thermal throttle under load, reducing performance by 20-40%',
-                                recommendation: `Upgrade to cooler rated for ${Math.ceil(cpuTdp * 1.2 / 10) * 10}W+ TDP`
-                            });
-                            thermalStatus = 'critical';
-                            severity = 'critical';
-                        } else if (ratio > 0.9) {
-                            // Cooler barely adequate
-                            warnings.push({
-                                type: 'marginal_cooling',
-                                severity: 'warning',
-                                component: 'CPU Cooler',
-                                message: `⚠️ CPU cooler marginal. ${cooler.name} (${coolerRating}W) has minimal headroom for ${cpu.name} (${cpuTdp}W)`,
-                                impact: 'May run hot under sustained load, higher fan noise',
-                                recommendation: `Consider ${Math.ceil(cpuTdp * 1.3 / 10) * 10}W+ cooler for better thermals and quieter operation`
-                            });
-                            if (severity !== 'critical') {
-                                thermalStatus = 'marginal';
-                                severity = 'warning';
-                            }
-                        } else if (headroom >= 30) {
-                            // Good cooling headroom
-                            recommendations.push({
-                                type: 'good_cooling',
-                                severity: 'success',
-                                message: `✅ CPU cooling adequate: ${coolerRating}W cooler for ${cpuTdp}W CPU (+${headroom}W headroom)`
-                            });
-                        }
-
-                        // AIO Clearance Check
-                        if (isAIO && caseComponent) {
-                            const radiatorSize = this.extractRadiatorSize(cooler);
-                            const caseSupport = await this.checkAIOSupport(caseComponent, radiatorSize);
-                            
-                            if (!caseSupport.compatible) {
-                                warnings.push({
-                                    type: 'aio_clearance',
-                                    severity: 'critical',
-                                    component: 'Case',
-                                    message: `❌ AIO incompatible! ${caseComponent.name} does not support ${radiatorSize}mm radiator`,
-                                    impact: 'AIO will not fit in case',
-                                    recommendation: caseSupport.recommendation || `Choose case supporting ${radiatorSize}mm radiators`
-                                });
-                                thermalStatus = 'critical';
-                                severity = 'critical';
-                            }
-                        }
-                    }
-                } else {
-                    // No cooler selected
-                    warnings.push({
-                        type: 'no_cooler',
-                        severity: 'critical',
-                        component: 'CPU Cooler',
-                        message: `❌ No CPU cooler selected! ${cpu.name} (${cpuTdp}W TDP) requires cooling`,
-                        impact: 'System cannot operate without CPU cooler',
-                        recommendation: cpuTdp > 95 
-                            ? `Select AIO cooler (240mm+) or high-end tower cooler (${Math.ceil(cpuTdp * 1.2 / 10) * 10}W+ rated)`
-                            : `Select tower cooler (${Math.ceil(cpuTdp * 1.2 / 10) * 10}W+ rated) or AIO`
-                    });
-                    thermalStatus = 'critical';
-                    severity = 'critical';
-                }
+                const cpuResult = await this._analyzeCpuCooling(cpu, cooler, caseComponent);
+                warnings.push(...cpuResult.warnings);
+                recommendations.push(...cpuResult.recommendations);
+                if (cpuResult.severity === 'critical') { thermalStatus = 'critical'; severity = 'critical'; }
+                else if (cpuResult.severity === 'warning' && severity !== 'critical') { thermalStatus = 'marginal'; severity = 'warning'; }
             }
 
             // GPU THERMAL ANALYSIS
             if (gpu && caseComponent) {
-                const gpuTdp = this.extractPowerSpec(gpu, 'tdp', 0);
-                const gpuLength = this.extractGPULength(gpu);
-                const caseAirflow = await this.assessCaseAirflow(caseComponent);
-
-                logger.debug(`🌡️ [THERMAL] GPU TDP: ${gpuTdp}W, Airflow: ${caseAirflow.rating}`);
-
-                // High-power GPU in poor airflow case
-                if (gpuTdp > 250 && caseAirflow.rating === 'poor') {
-                    warnings.push({
-                        type: 'gpu_thermal_concern',
-                        severity: 'warning',
-                        component: 'GPU/Case',
-                        message: `⚠️ High-power GPU (${gpuTdp}W) in case with limited airflow`,
-                        impact: 'GPU may run hot, increased fan noise, potential thermal throttling',
-                        recommendation: 'Ensure adequate case fans (3+ intake, 2+ exhaust) or consider case with better airflow'
-                    });
-                    if (severity === 'success') {
-                        thermalStatus = 'warning';
-                        severity = 'warning';
-                    }
-                }
-
-                // Very high-power GPU (300W+)
-                if (gpuTdp >= 300) {
-                    recommendations.push({
-                        type: 'high_power_gpu',
-                        severity: 'info',
-                        message: `ℹ️ ${gpu.name} is a high-power GPU (${gpuTdp}W). Ensure excellent case airflow and PSU quality.`
-                    });
-                }
+                const gpuResult = await this._analyzeGpuThermal(gpu, caseComponent);
+                warnings.push(...gpuResult.warnings);
+                recommendations.push(...gpuResult.recommendations);
+                if (gpuResult.severity === 'warning' && severity === 'success') { thermalStatus = 'warning'; severity = 'warning'; }
             }
 
             const result = {
                 thermal_status: thermalStatus,
                 severity: severity,
-                message: severity === 'critical' 
-                    ? `❌ Critical thermal issues detected (${warnings.filter(w => w.severity === 'critical').length})` 
-                    : severity === 'warning'
-                    ? `⚠️ Thermal concerns detected (${warnings.length})`
-                    : '✅ Thermal performance adequate',
+                message: (() => {
+                    if (severity === 'critical') return `❌ Critical thermal issues detected (${warnings.filter(w => w.severity === 'critical').length})`;
+                    if (severity === 'warning') return `⚠️ Thermal concerns detected (${warnings.length})`;
+                    return '✅ Thermal performance adequate';
+                })(),
                 warnings: warnings,
                 recommendations: recommendations,
                 summary: {
@@ -1051,6 +886,80 @@ class AdvancedCompatibilityService {
                 error: error.message
             };
         }
+    }
+
+    async _analyzeCpuCooling(cpu, cooler, caseComponent) {
+        const warnings = [];
+        const recommendations = [];
+        let severity = 'success';
+        const cpuTdp = this.extractPowerSpec(cpu, 'tdp', 65);
+        logger.debug(`🌡️ [THERMAL] CPU TDP: ${cpuTdp}W`);
+
+        if (!cooler) {
+            warnings.push({ type: 'no_cooler', severity: 'critical', component: 'CPU Cooler', message: `❌ No CPU cooler selected! ${cpu.name} (${cpuTdp}W TDP) requires cooling`, impact: 'System cannot operate without CPU cooler', recommendation: cpuTdp > 95 ? `Select AIO cooler (240mm+) or high-end tower cooler (${Math.ceil(cpuTdp * 1.2 / 10) * 10}W+ rated)` : `Select tower cooler (${Math.ceil(cpuTdp * 1.2 / 10) * 10}W+ rated) or AIO` });
+            return { warnings, recommendations, severity: 'critical' };
+        }
+
+        const coolerRating = await this.extractCoolerRating(cooler);
+        const isAIO = this.isAIOCooler(cooler);
+        logger.debug(`🌡️ [THERMAL] Cooler rating: ${coolerRating}W, AIO: ${isAIO}`);
+
+        if (coolerRating) {
+            const ratingResult = this._assessCoolerRating(cpu, cooler, cpuTdp, coolerRating);
+            warnings.push(...ratingResult.warnings);
+            recommendations.push(...ratingResult.recommendations);
+            if (ratingResult.severity === 'critical') severity = 'critical';
+            else if (ratingResult.severity === 'warning' && severity !== 'critical') severity = 'warning';
+
+            if (isAIO && caseComponent) {
+                const radiatorSize = this.extractRadiatorSize(cooler);
+                const caseSupport = await this.checkAIOSupport(caseComponent, radiatorSize);
+                if (!caseSupport.compatible) {
+                    warnings.push({ type: 'aio_clearance', severity: 'critical', component: 'Case', message: `❌ AIO incompatible! ${caseComponent.name} does not support ${radiatorSize}mm radiator`, impact: 'AIO will not fit in case', recommendation: caseSupport.recommendation || `Choose case supporting ${radiatorSize}mm radiators` });
+                    severity = 'critical';
+                }
+            }
+        }
+
+        return { warnings, recommendations, severity };
+    }
+
+    _assessCoolerRating(cpu, cooler, cpuTdp, coolerRating) {
+        const warnings = [];
+        const recommendations = [];
+        let severity = 'success';
+        const headroom = coolerRating - cpuTdp;
+        const ratio = cpuTdp / coolerRating;
+
+        if (ratio > 1) {
+            warnings.push({ type: 'inadequate_cooling', severity: 'critical', component: 'CPU Cooler', message: `❌ CPU cooler insufficient! ${cooler.name} (${coolerRating}W) cannot handle ${cpu.name} (${cpuTdp}W TDP)`, impact: 'CPU will thermal throttle under load, reducing performance by 20-40%', recommendation: `Upgrade to cooler rated for ${Math.ceil(cpuTdp * 1.2 / 10) * 10}W+ TDP` });
+            severity = 'critical';
+        } else if (ratio > 0.9) {
+            warnings.push({ type: 'marginal_cooling', severity: 'warning', component: 'CPU Cooler', message: `⚠️ CPU cooler marginal. ${cooler.name} (${coolerRating}W) has minimal headroom for ${cpu.name} (${cpuTdp}W)`, impact: 'May run hot under sustained load, higher fan noise', recommendation: `Consider ${Math.ceil(cpuTdp * 1.3 / 10) * 10}W+ cooler for better thermals and quieter operation` });
+            severity = 'warning';
+        } else if (headroom >= 30) {
+            recommendations.push({ type: 'good_cooling', severity: 'success', message: `✅ CPU cooling adequate: ${coolerRating}W cooler for ${cpuTdp}W CPU (+${headroom}W headroom)` });
+        }
+
+        return { warnings, recommendations, severity };
+    }
+
+    async _analyzeGpuThermal(gpu, caseComponent) {
+        const warnings = [];
+        const recommendations = [];
+        let severity = 'success';
+        const gpuTdp = this.extractPowerSpec(gpu, 'tdp', 0);
+        const caseAirflow = await this.assessCaseAirflow(caseComponent);
+        logger.debug(`🌡️ [THERMAL] GPU TDP: ${gpuTdp}W, Airflow: ${caseAirflow.rating}`);
+
+        if (gpuTdp > 250 && caseAirflow.rating === 'poor') {
+            warnings.push({ type: 'gpu_thermal_concern', severity: 'warning', component: 'GPU/Case', message: `⚠️ High-power GPU (${gpuTdp}W) in case with limited airflow`, impact: 'GPU may run hot, increased fan noise, potential thermal throttling', recommendation: 'Ensure adequate case fans (3+ intake, 2+ exhaust) or consider case with better airflow' });
+            severity = 'warning';
+        }
+        if (gpuTdp >= 300) {
+            recommendations.push({ type: 'high_power_gpu', severity: 'info', message: `ℹ️ ${gpu.name} is a high-power GPU (${gpuTdp}W). Ensure excellent case airflow and PSU quality.` });
+        }
+        return { warnings, recommendations, severity };
     }
 
     /**
@@ -1083,18 +992,18 @@ class AdvancedCompatibilityService {
 
             // 🔥 PHASE 11: Added comprehensive 23-rule validation system as Layer 6
             const [powerAnalysis, clearanceAnalysis, pairwiseAnalysis, bottleneckAnalysis, thermalAnalysis, comprehensiveRulesAnalysis, resourceBudgetAnalysis] = await Promise.all([
-                this.analyzePowerBudget(normalizedComponents),
-                this.analyzePhysicalClearances(normalizedComponents),
-                this.analyzePairwiseCompatibility(normalizedComponents),
-                this.analyzeBottlenecks(normalizedComponents),
-                this.analyzeThermalPerformance(normalizedComponents),
-                this.runComprehensiveRulesValidation(normalizedComponents), // 🔥 NEW: 23-rule system with PHASE 3/4 enhancements
+                this.analyzePowerBudget(normalizedComponents), // NOSONAR - async method returns Promise
+                this.analyzePhysicalClearances(normalizedComponents), // NOSONAR - async method returns Promise
+                this.analyzePairwiseCompatibility(normalizedComponents), // NOSONAR - async method returns Promise
+                this.analyzeBottlenecks(normalizedComponents), // NOSONAR - async method returns Promise
+                this.analyzeThermalPerformance(normalizedComponents), // NOSONAR - async method returns Promise
+                this.runComprehensiveRulesValidation(normalizedComponents), // NOSONAR - async method returns Promise
                 this.analyzeResourceBudgets(normalizedComponents)
             ]);
 
             // PRIORITY 3: Check real-world compatibility data
             const componentIds = Object.values(normalizedComponents)
-                .filter(c => c && c.id)
+                .filter(c => c?.id)
                 .map(c => c.id);
             
             const realWorldData = await realWorldDataService.getRealWorldCompatibilityConfidence(componentIds);
@@ -1125,8 +1034,7 @@ class AdvancedCompatibilityService {
             ];
 
             const overallCompatible = allCriticalIssues.length === 0;
-            const overallSeverity = allCriticalIssues.length > 0 ? 'critical' :
-                                   allWarnings.length > 0 ? 'warning' : 'success';
+            const overallSeverity = this._determineSeverity(allCriticalIssues.length, allWarnings.length);
 
             // Calculate compatibility score (0-100)
             // Scoring logic:
@@ -1139,7 +1047,7 @@ class AdvancedCompatibilityService {
             compatibilityScore -= (allWarnings.length * 10);
             
             // Factor in real-world confidence (weight: 20%)
-            const confidencePenalty = (100 - parseFloat(realWorldData.confidence)) * 0.2;
+            const confidencePenalty = (100 - Number.parseFloat(realWorldData.confidence)) * 0.2;
             compatibilityScore -= confidencePenalty;
             
             // Ensure score stays within 0-100 range
@@ -1160,13 +1068,15 @@ class AdvancedCompatibilityService {
                     thermal: thermalAnalysis, // 🔥 FIX #5: Add thermal layer
                     comprehensive_rules: comprehensiveRulesAnalysis, // 🔥 PHASE 11: Add 23-rule validation system
                     real_world: {
-                        status: realWorldData.confidence >= 70 ? 'high_confidence' :
-                               realWorldData.confidence >= 50 ? 'medium_confidence' : 'low_confidence',
-                        severity: realWorldData.critical_issues > 0 ? 'critical' :
-                                 realWorldData.major_issues > 0 ? 'warning' : 'success',
+                        status: (() => {
+                            if (realWorldData.confidence >= 70) return 'high_confidence';
+                            if (realWorldData.confidence >= 50) return 'medium_confidence';
+                            return 'low_confidence';
+                        })(),
+                        severity: this._determineSeverity(realWorldData.critical_issues, realWorldData.major_issues),
                         message: `Real-world confidence: ${realWorldData.confidence}% (${realWorldData.similar_builds} similar builds)`,
                         compatible: realWorldData.critical_issues === 0,
-                        confidence: parseFloat(realWorldData.confidence),
+                        confidence: Number.parseFloat(realWorldData.confidence),
                         known_issues: realWorldData.known_issues,
                         critical_issues: realWorldData.critical_issues,
                         major_issues: realWorldData.major_issues,
@@ -1186,7 +1096,7 @@ class AdvancedCompatibilityService {
                     bottleneck_status: bottleneckAnalysis.status,
                     thermal_status: thermalAnalysis.thermal_status, // 🔥 FIX #5: Add thermal status
                     comprehensive_rules_status: comprehensiveRulesAnalysis.status, // 🔥 PHASE 11
-                    real_world_confidence: parseFloat(realWorldData.confidence)
+                    real_world_confidence: Number.parseFloat(realWorldData.confidence)
                 },
                 critical_issues: allCriticalIssues,
                 warnings: allWarnings,
@@ -1234,11 +1144,11 @@ class AdvancedCompatibilityService {
         if (key === 'wattage' || key === 'power' || key === 'tdp') {
             // Match patterns like "650W", "650 W", "650 Watts"
             const wattMatch = name.match(/(\d+)\s*w(?:att(?:s)?)?/i);
-            if (wattMatch) return parseInt(wattMatch[1]);
+            if (wattMatch) return Number.parseInt(wattMatch[1], 10);
             
             // Match TDP patterns like "TDP: 125W", "125W TDP"
             const tdpMatch = name.match(/(?:tdp:?\s*)?(\d+)\s*w/i);
-            if (tdpMatch) return parseInt(tdpMatch[1]);
+            if (tdpMatch) return Number.parseInt(tdpMatch[1], 10);
         }
         
         return defaultValue;
@@ -1274,64 +1184,57 @@ class AdvancedCompatibilityService {
     async validatePowerConnectors(gpu, psu) {
         if (!gpu || !psu) return { valid: true, message: 'N/A' };
 
+        const { gpuNeeds8pin, gpuNeeds12vhpwr } = this._extractGpuPowerNeeds(gpu);
+        const { psuHas8pin, psuHas12vhpwr } = this._extractPsuPowerCapabilities(psu);
+
+        if (gpuNeeds12vhpwr && !psuHas12vhpwr) {
+            return { valid: false, severity: 'critical', message: `❌ ${gpu.name} requires 12VHPWR connector - ${psu.name} lacks this connector` };
+        }
+        if (gpuNeeds8pin > psuHas8pin) {
+            return { valid: false, severity: 'critical', message: `❌ ${gpu.name} needs ${gpuNeeds8pin}x 8-pin, ${psu.name} has only ${psuHas8pin}x 8-pin` };
+        }
+        return { valid: true, message: `✅ Power connectors OK (${gpuNeeds12vhpwr ? '12VHPWR' : gpuNeeds8pin + 'x 8-pin'})` };
+    }
+
+    _extractGpuPowerNeeds(gpu) {
         const gpuSpecs = gpu.specifications || {};
         const gpuDims = gpu.dimensions || {};
-        const psuSpecs = psu.specifications || {};
         const gpuName = (gpu.name || '').toUpperCase();
-
-        // Extract GPU power connectors needed
         let gpuNeeds8pin = 0;
         let gpuNeeds12vhpwr = false;
 
-        // 🔥 FIX: Check BOTH specifications AND dimensions for power_connectors
         const gpuPowerConnectors = gpuSpecs.power_connectors || gpuDims.power_connectors || '';
-        
         if (gpuPowerConnectors && typeof gpuPowerConnectors === 'object') {
             gpuNeeds8pin = gpuPowerConnectors.pcie_8pin || 0;
             gpuNeeds12vhpwr = gpuPowerConnectors['12vhpwr'] || false;
         } else if (typeof gpuPowerConnectors === 'string') {
-            // 🔥 FIX: Parse string power_connectors like "1x 16-pin (12VHPWR)"
             const connStr = gpuPowerConnectors.toUpperCase();
             if (connStr.includes('12VHPWR') || connStr.includes('16-PIN') || connStr.includes('16PIN')) {
                 gpuNeeds12vhpwr = true;
             }
-            const match8pin = connStr.match(/(\d+)\s*[Xx×]?\s*8-?PIN/i);
-            if (match8pin) gpuNeeds8pin = parseInt(match8pin[1]);
+            const match8pin = /(?<count>\d+)\s*[x×]?\s*8-?PIN/i.exec(connStr);
+            if (match8pin) gpuNeeds8pin = Number.parseInt(match8pin.groups.count, 10);
         }
-        
-        // 🔥 FIX: Only HIGH-END RTX 4000 series require 12VHPWR (4070 Ti and above)
-        // RTX 4060, 4060 Ti, 4070 (non-Ti) use standard 8-pin connectors
-        const gpuNameUpper = gpuName.toUpperCase();
-        const isRTX4000HighEnd = gpuNameUpper.includes('RTX 4090') || 
-                                  gpuNameUpper.includes('RTX 4080') || 
-                                  gpuNameUpper.includes('RTX 4070 TI') ||
-                                  gpuNameUpper.includes('RTX4070TI') ||
-                                  gpuNameUpper.includes('4070TI') ||
-                                  gpuNameUpper.includes('4080') ||
-                                  gpuNameUpper.includes('4090');
-        
-        // RTX 4060/4060 Ti/4070 (non-Ti) do NOT need 12VHPWR - they use 8-pin
-        const isRTX4000LowMid = gpuNameUpper.includes('RTX 4060') || 
-                                 gpuNameUpper.includes('RTX4060') ||
-                                 gpuNameUpper.includes('4060') ||
-                                 (gpuNameUpper.includes('RTX 4070') && !gpuNameUpper.includes('TI'));
-        
+
+        const isRTX4000HighEnd = gpuName.includes('RTX 4090') || gpuName.includes('RTX 4080') || gpuName.includes('RTX 4070 TI') || gpuName.includes('RTX4070TI') || gpuName.includes('4070TI') || gpuName.includes('4080') || gpuName.includes('4090');
+        const isRTX4000LowMid = gpuName.includes('RTX 4060') || gpuName.includes('RTX4060') || gpuName.includes('4060') || (gpuName.includes('RTX 4070') && !gpuName.includes('TI'));
+
         if (isRTX4000HighEnd && !isRTX4000LowMid) {
             gpuNeeds12vhpwr = true;
         } else if (!gpuNeeds12vhpwr && gpuNeeds8pin === 0) {
-            // Infer from name/TDP for older GPUs
             if (gpuName.includes('RTX') || gpuName.includes('RX 7')) {
-                gpuNeeds8pin = 2; // Most modern GPUs need 1-2x 8-pin
+                gpuNeeds8pin = 2;
             } else if (gpuName.includes('GTX 16') || gpuName.includes('RX 6500')) {
                 gpuNeeds8pin = 1;
             }
         }
+        return { gpuNeeds8pin, gpuNeeds12vhpwr };
+    }
 
-        // 🔥 FIX: Extract PSU connectors from CORRECT fields
+    _extractPsuPowerCapabilities(psu) {
+        const psuSpecs = psu.specifications || {};
         const psuPcieConnectors = psuSpecs.pcie_connectors || psuSpecs['Power Connectors'] || '';
-        const psuHas8pin = parseInt(psuSpecs.pcie_8pin_connectors) || psuSpecs.pcie_8pin || psuSpecs.pcie_connectors || 2;
-        
-        // 🔥 FIX: Check ALL possible 12VHPWR indicators
+        const psuHas8pin = Number.parseInt(psuSpecs.pcie_8pin_connectors, 10) || psuSpecs.pcie_8pin || psuSpecs.pcie_connectors || 2;
         const psuHas12vhpwr = psuSpecs.has_12vhpwr_connector === true ||
                              psuSpecs.has_12vhpwr === true ||
                              psuSpecs['12vhpwr'] === true || 
@@ -1339,28 +1242,7 @@ class AdvancedCompatibilityService {
                              String(psuPcieConnectors).toUpperCase().includes('12VHPWR') ||
                              String(psuPcieConnectors).toUpperCase().includes('16-PIN') ||
                              String(psuPcieConnectors).toUpperCase().includes('16PIN');
-
-        // Validate
-        if (gpuNeeds12vhpwr && !psuHas12vhpwr) {
-            return {
-                valid: false,
-                severity: 'critical',
-                message: `❌ ${gpu.name} requires 12VHPWR connector - ${psu.name} lacks this connector`
-            };
-        }
-
-        if (gpuNeeds8pin > psuHas8pin) {
-            return {
-                valid: false,
-                severity: 'critical',
-                message: `❌ ${gpu.name} needs ${gpuNeeds8pin}x 8-pin, ${psu.name} has only ${psuHas8pin}x 8-pin`
-            };
-        }
-
-        return {
-            valid: true,
-            message: `✅ Power connectors OK (${gpuNeeds12vhpwr ? '12VHPWR' : gpuNeeds8pin + 'x 8-pin'})`
-        };
+        return { psuHas8pin, psuHas12vhpwr };
     }
 
     async validate12vRail(psu, peakPower) {
@@ -1420,8 +1302,8 @@ class AdvancedCompatibilityService {
         const raw = dims[`${key}_mm`] || dims[key] || specs[`${key}_mm`] || specs[key] || defaultValue;
         // Parse numeric value from string if needed (e.g., "250mm" -> 250, "320" -> 320)
         if (typeof raw === 'string') {
-            const parsed = parseInt(raw.replace(/[^\d]/g, ''), 10);
-            return isNaN(parsed) ? defaultValue : parsed;
+            const parsed = Number.parseInt(raw.replaceAll(/[^\d]/g, ''), 10);
+            return Number.isNaN(parsed) ? defaultValue : parsed;
         }
         return raw;
     }
@@ -1468,7 +1350,7 @@ class AdvancedCompatibilityService {
                 };
             }
         } catch (error) {
-            logger.warn(`⚠️ [TIER] Database lookup failed for component ${component.id}, falling back to inference`);
+            logger.warn(`⚠️ [TIER] Database lookup failed for component ${component.id}, falling back to inference:`, error.message);
         }
         
         // Fallback: Check specifications object
@@ -1538,7 +1420,7 @@ class AdvancedCompatibilityService {
         
         // Extract from name (e.g., "DDR4 3200MHz")
         const match = name.match(/(\d{4,5})\s*MHz/i);
-        return match ? parseInt(match[1]) : null;
+        return match ? Number.parseInt(match[1], 10) : null;
     }
 
     extractStorageType(storage) {
@@ -1667,8 +1549,8 @@ class AdvancedCompatibilityService {
 
     checkChipset(compA, compB, typeA, typeB) {
         // Identify CPU and motherboard regardless of ordering
-        const cpu = [typeA, typeB].includes('cpu') ? (typeA === 'cpu' ? compA : compB) : null;
-        const motherboard = [typeA, typeB].includes('motherboard') ? (typeA === 'motherboard' ? compA : compB) : null;
+        const cpu = this._getComponent(compA, compB, typeA, typeB, 'cpu');
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
 
         if (!cpu || !motherboard) {
             return { compatible: true, check: 'chipset', message: 'Chipset check not applicable' };
@@ -1751,7 +1633,7 @@ class AdvancedCompatibilityService {
             return { compatible: true, check: 'channels', message: 'Memory channel check not applicable' };
         }
 
-        const cpuChannels = parseInt(cpu.specifications?.memory_channels || cpu.specifications?.channels || 2);
+        const cpuChannels = Number.parseInt(cpu.specifications?.memory_channels || cpu.specifications?.channels || 2, 10);
         const ramSticks = this.extractRamSticks(ram);
 
         const compatible = ramSticks >= cpuChannels || cpuChannels <= 2; // treat single-stick on dual-channel as warning
@@ -1771,7 +1653,7 @@ class AdvancedCompatibilityService {
             return { compatible: true, check: 'slots', message: 'RAM slot check not applicable' };
         }
 
-        const mbSlots = parseInt(motherboard.specifications?.ram_slots || motherboard.specifications?.memory_slots || 0);
+        const mbSlots = Number.parseInt(motherboard.specifications?.ram_slots || motherboard.specifications?.memory_slots || 0, 10);
         const ramSticks = this.extractRamSticks(ram);
 
         if (!mbSlots) {
@@ -1794,7 +1676,7 @@ class AdvancedCompatibilityService {
             return { compatible: true, check: 'capacity', message: 'RAM capacity check not applicable' };
         }
 
-        const mbMax = parseInt(motherboard.specifications?.max_ram || motherboard.specifications?.maximum_memory || 0);
+        const mbMax = Number.parseInt(motherboard.specifications?.max_ram || motherboard.specifications?.maximum_memory || 0, 10);
         const ramCapacity = this.extractRamCapacity(ram);
 
         if (!mbMax || !ramCapacity) {
@@ -1812,8 +1694,8 @@ class AdvancedCompatibilityService {
     }
 
     checkStoragePorts(compA, compB, typeA, typeB, mode) {
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
-        const storage = typeA === 'storage' ? compA : typeB === 'storage' ? compB : null;
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
+        const storage = this._getComponent(compA, compB, typeA, typeB, 'storage');
         if (!motherboard || !storage) {
             return { compatible: true, check: `${mode}_slots`, message: 'Storage port check not applicable' };
         }
@@ -1823,21 +1705,21 @@ class AdvancedCompatibilityService {
         const isSataDrive = storageInterface.includes('sata');
 
         // 🔥 CRITICAL FIX: Database uses "SATA Ports" (capitalized) not "sata_ports"
-        const mbM2 = parseInt(
+        const mbM2 = Number.parseInt(
             motherboard.specifications?.m2_slots || 
             motherboard.specifications?.m_2_slots || 
             motherboard.specifications?.['M2 Slots'] || 
             motherboard.specifications?.['M.2 Slots'] || 
             0
-        );
-        const mbSata = parseInt(
+        , 10);
+        const mbSata = Number.parseInt(
             motherboard.specifications?.sata_ports || 
             motherboard.specifications?.sata_slots || 
             motherboard.specifications?.['SATA Ports'] ||  // 🔥 FIX: Database field name
             motherboard.specifications?.['SATA ports'] || 
             motherboard.specifications?.['sata ports'] || 
             0
-        );
+        , 10);
 
         if (mode === 'm2' && isM2Drive) {
             const compatible = mbM2 > 0;
@@ -1867,8 +1749,8 @@ class AdvancedCompatibilityService {
     }
 
     checkPcieVersion(compA, compB, typeA, typeB) {
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
-        const gpu = typeA === 'gpu' ? compA : typeB === 'gpu' ? compB : null;
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
+        const gpu = this._getComponent(compA, compB, typeA, typeB, 'gpu');
         if (!motherboard || !gpu) {
             return { compatible: true, check: 'pcie_version', message: 'PCIe version check not applicable' };
         }
@@ -1880,7 +1762,7 @@ class AdvancedCompatibilityService {
             return { compatible: true, check: 'pcie_version', message: 'PCIe version data missing' };
         }
 
-        const compatible = parseFloat(mbVersion) >= parseFloat(gpuVersion);
+        const compatible = Number.parseFloat(mbVersion) >= Number.parseFloat(gpuVersion);
         return {
             compatible,
             check: 'pcie_version',
@@ -1890,19 +1772,19 @@ class AdvancedCompatibilityService {
     }
 
     checkPcieLanes(compA, compB, typeA, typeB) {
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
-        const gpu = typeA === 'gpu' ? compA : typeB === 'gpu' ? compB : null;
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
+        const gpu = this._getComponent(compA, compB, typeA, typeB, 'gpu');
         if (!motherboard || !gpu) {
             return { compatible: true, check: 'lanes', message: 'PCIe lane check not applicable' };
         }
 
-        const mbLanes = parseInt(motherboard.specifications?.pcie_x16_slots || motherboard.specifications?.pcie_lanes || 0);
+        const mbLanes = Number.parseInt(motherboard.specifications?.pcie_x16_slots || motherboard.specifications?.pcie_lanes || 0, 10);
         const gpuSlotWidth = this.extractGpuSlots(gpu);
         const requiresFullX16 = gpuSlotWidth >= 2; // heuristic: large GPUs expect x16
 
         // Multi-GPU guard
         const multiGpuRequested = gpu.specifications?.multi_gpu === true || gpu.specifications?.sli === true || gpu.specifications?.crossfire === true;
-        const mbMultiGpu = motherboard.specifications?.multi_gpu === true || motherboard.specifications?.sli_support === true || motherboard.specifications?.crossfire_support === true || parseInt(motherboard.specifications?.pcie_x16_slots || 0) > 1;
+        const mbMultiGpu = motherboard.specifications?.multi_gpu === true || motherboard.specifications?.sli_support === true || motherboard.specifications?.crossfire_support === true || Number.parseInt(motherboard.specifications?.pcie_x16_slots || 0, 10) > 1;
 
         if (multiGpuRequested && !mbMultiGpu) {
             return {
@@ -1928,8 +1810,8 @@ class AdvancedCompatibilityService {
     }
 
     checkPsuWattage(compA, compB, typeA, typeB) {
-        const gpu = typeA === 'gpu' ? compA : typeB === 'gpu' ? compB : null;
-        const psu = typeA === 'psu' ? compA : typeB === 'psu' ? compB : null;
+        const gpu = this._getComponent(compA, compB, typeA, typeB, 'gpu');
+        const psu = this._getComponent(compA, compB, typeA, typeB, 'psu');
         if (!gpu || !psu) {
             return { compatible: true, check: 'wattage', message: 'PSU wattage check not applicable' };
         }
@@ -1948,9 +1830,9 @@ class AdvancedCompatibilityService {
     }
 
     async checkPsuConnectors(compA, compB, typeA, typeB) {
-        const gpu = typeA === 'gpu' ? compA : typeB === 'gpu' ? compB : null;
-        const psu = typeA === 'psu' ? compA : typeB === 'psu' ? compB : null;
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
+        const gpu = this._getComponent(compA, compB, typeA, typeB, 'gpu');
+        const psu = this._getComponent(compA, compB, typeA, typeB, 'psu');
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
 
         if (!psu) {
             return { compatible: true, check: 'connectors', message: 'PSU connector check not applicable' };
@@ -1969,8 +1851,8 @@ class AdvancedCompatibilityService {
 
         // Motherboard EPS/CPU power connectors
         if (motherboard) {
-            const requiredRaw = parseInt(motherboard.specifications?.eps_8pin || motherboard.specifications?.cpu_power_connectors || motherboard.specifications?.cpu_8pin_connectors || 1);
-            const psuRaw = parseInt(psu.specifications?.eps_8pin_connectors || psu.specifications?.cpu_8pin || psu.specifications?.cpu_power_connectors || psu.specifications?.eps12v || 1);
+            const requiredRaw = Number.parseInt(motherboard.specifications?.eps_8pin || motherboard.specifications?.cpu_power_connectors || motherboard.specifications?.cpu_8pin_connectors || 1, 10);
+            const psuRaw = Number.parseInt(psu.specifications?.eps_8pin_connectors || psu.specifications?.cpu_8pin || psu.specifications?.cpu_power_connectors || psu.specifications?.eps12v || 1, 10);
 
             const requiredEps = Number.isFinite(requiredRaw) && requiredRaw > 0 ? requiredRaw : 1;
             const psuEps = Number.isFinite(psuRaw) && psuRaw > 0 ? psuRaw : 1;
@@ -1988,8 +1870,8 @@ class AdvancedCompatibilityService {
     }
 
     checkCaseBays(compA, compB, typeA, typeB) {
-        const pcCase = typeA === 'case' ? compA : typeB === 'case' ? compB : null;
-        const storage = typeA === 'storage' ? compA : typeB === 'storage' ? compB : null;
+        const pcCase = this._getComponent(compA, compB, typeA, typeB, 'case');
+        const storage = this._getComponent(compA, compB, typeA, typeB, 'storage');
         if (!pcCase || !storage) {
             return { compatible: true, check: 'bays', message: 'Case bay check not applicable' };
         }
@@ -2018,21 +1900,21 @@ class AdvancedCompatibilityService {
 
         // 🔥 ENHANCED: Handle missing drive bay specifications
         // Try multiple field name variations (capitalized, lowercase, with underscores)
-        const bays35 = parseInt(
+        const bays35 = Number.parseInt(
             pcCase.specifications?.drive_bays_35 || 
             pcCase.specifications?.['3.5" Drive Bays'] ||
             pcCase.specifications?.drive_bays_35_inch ||
             pcCase.specifications?.drive_bays || 
             0
-        );
+        , 10);
         
-        const bays25 = parseInt(
+        const bays25 = Number.parseInt(
             pcCase.specifications?.drive_bays_25 || 
             pcCase.specifications?.['2.5" Drive Bays'] ||
             pcCase.specifications?.drive_bays_25_inch ||
             pcCase.specifications?.drive_bays || 
             0
-        );
+        , 10);
 
         // 🔥 CRITICAL FIX: If case has NO bay specifications at all, assume it's a typical case
         // Most mid-tower and full-tower cases support at least 2x 2.5" and 2x 3.5" drives
@@ -2083,46 +1965,34 @@ class AdvancedCompatibilityService {
 
     checkLengthFit(compA, compB, typeA, typeB) {
         // GPU ↔ Case, PSU ↔ Case length checks
-        const gpu = typeA === 'gpu' ? compA : typeB === 'gpu' ? compB : null;
-        const psu = typeA === 'psu' ? compA : typeB === 'psu' ? compB : null;
-        const pcCase = typeA === 'case' ? compA : typeB === 'case' ? compB : null;
+        const gpu = this._getComponent(compA, compB, typeA, typeB, 'gpu');
+        const psu = this._getComponent(compA, compB, typeA, typeB, 'psu');
+        const pcCase = this._getComponent(compA, compB, typeA, typeB, 'case');
 
-        if (gpu && pcCase) {
-            const gpuLength = this.extractGPULength(gpu) || 0;
-            const caseMax = this.extractDimension(pcCase, 'max_gpu_length', 0);
-            if (!gpuLength || !caseMax) {
-                return { compatible: true, check: 'length', message: 'GPU/case length data missing' };
-            }
-            const compatible = gpuLength <= caseMax;
-            return {
-                compatible,
-                check: 'length',
-                severity: compatible ? 'success' : 'critical',
-                message: compatible ? `✅ GPU length ${gpuLength}mm within case limit ${caseMax}mm` : `❌ GPU length ${gpuLength}mm exceeds case limit ${caseMax}mm`
-            };
-        }
-
-        if (psu && pcCase) {
-            const psuLength = this.extractDimension(psu, 'length', 0);
-            const caseMaxPsu = this.extractDimension(pcCase, 'max_psu_length', 0);
-            if (!psuLength || !caseMaxPsu) {
-                return { compatible: true, check: 'length', message: 'PSU/case length data missing' };
-            }
-            const compatible = psuLength <= caseMaxPsu;
-            return {
-                compatible,
-                check: 'length',
-                severity: compatible ? 'success' : 'critical',
-                message: compatible ? `✅ PSU length ${psuLength}mm within case bay ${caseMaxPsu}mm` : `❌ PSU length ${psuLength}mm exceeds case bay ${caseMaxPsu}mm`
-            };
-        }
-
+        if (gpu && pcCase) return this._checkGpuLengthFit(gpu, pcCase);
+        if (psu && pcCase) return this._checkPsuLengthFit(psu, pcCase);
         return { compatible: true, check: 'length', message: 'Length check not applicable' };
     }
 
+    _checkGpuLengthFit(gpu, pcCase) {
+        const gpuLength = this.extractGPULength(gpu) || 0;
+        const caseMax = this.extractDimension(pcCase, 'max_gpu_length', 0);
+        if (!gpuLength || !caseMax) return { compatible: true, check: 'length', message: 'GPU/case length data missing' };
+        const compatible = gpuLength <= caseMax;
+        return { compatible, check: 'length', severity: compatible ? 'success' : 'critical', message: compatible ? `✅ GPU length ${gpuLength}mm within case limit ${caseMax}mm` : `❌ GPU length ${gpuLength}mm exceeds case limit ${caseMax}mm` };
+    }
+
+    _checkPsuLengthFit(psu, pcCase) {
+        const psuLength = this.extractDimension(psu, 'length', 0);
+        const caseMaxPsu = this.extractDimension(pcCase, 'max_psu_length', 0);
+        if (!psuLength || !caseMaxPsu) return { compatible: true, check: 'length', message: 'PSU/case length data missing' };
+        const compatible = psuLength <= caseMaxPsu;
+        return { compatible, check: 'length', severity: compatible ? 'success' : 'critical', message: compatible ? `✅ PSU length ${psuLength}mm within case bay ${caseMaxPsu}mm` : `❌ PSU length ${psuLength}mm exceeds case bay ${caseMaxPsu}mm` };
+    }
+
     checkCoolerHeightFit(compA, compB, typeA, typeB) {
-        const cooler = typeA === 'cooler' ? compA : typeB === 'cooler' ? compB : null;
-        const pcCase = typeA === 'case' ? compA : typeB === 'case' ? compB : null;
+        const cooler = this._getComponent(compA, compB, typeA, typeB, 'cooler');
+        const pcCase = this._getComponent(compA, compB, typeA, typeB, 'case');
         if (!cooler || !pcCase) {
             return { compatible: true, check: 'height', message: 'Cooler height check not applicable' };
         }
@@ -2144,15 +2014,15 @@ class AdvancedCompatibilityService {
 
     checkVrmSupport(compA, compB, typeA, typeB) {
         // Lightweight VRM adequacy check based on CPU TDP vs motherboard rated TDP if present
-        const cpu = typeA === 'cpu' ? compA : typeB === 'cpu' ? compB : null;
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
+        const cpu = this._getComponent(compA, compB, typeA, typeB, 'cpu');
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
 
         if (!cpu || !motherboard) {
             return { compatible: true, check: 'vrm', message: 'VRM check not applicable' };
         }
 
         const cpuTdp = this.extractPowerSpec(cpu, 'tdp', 65);
-        const vrmRating = parseInt(motherboard.specifications?.vrm_tdp || motherboard.specifications?.max_cpu_tdp || 0);
+        const vrmRating = Number.parseInt(motherboard.specifications?.vrm_tdp || motherboard.specifications?.max_cpu_tdp || 0, 10);
         if (!vrmRating) {
             return { compatible: true, check: 'vrm', message: 'VRM rating not provided' };
         }
@@ -2167,8 +2037,8 @@ class AdvancedCompatibilityService {
     }
 
     checkBiosSupport(compA, compB, typeA, typeB) {
-        const cpu = typeA === 'cpu' ? compA : typeB === 'cpu' ? compB : null;
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
+        const cpu = this._getComponent(compA, compB, typeA, typeB, 'cpu');
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
 
         if (!cpu || !motherboard) {
             return { compatible: true, check: 'bios', message: 'BIOS check not applicable' };
@@ -2198,8 +2068,8 @@ class AdvancedCompatibilityService {
     }
 
     checkPsuCaseFormFactor(compA, compB, typeA, typeB) {
-        const psu = typeA === 'psu' ? compA : typeB === 'psu' ? compB : null;
-        const pcCase = typeA === 'case' ? compA : typeB === 'case' ? compB : null;
+        const psu = this._getComponent(compA, compB, typeA, typeB, 'psu');
+        const pcCase = this._getComponent(compA, compB, typeA, typeB, 'case');
         if (!psu || !pcCase) {
             return { compatible: true, check: 'form_factor', message: 'PSU form factor check not applicable' };
         }
@@ -2218,9 +2088,9 @@ class AdvancedCompatibilityService {
     }
 
     identifyCpuRamMobo(compA, compB, typeA, typeB) {
-        const cpu = typeA === 'cpu' ? compA : typeB === 'cpu' ? compB : null;
-        const ram = typeA === 'ram' ? compA : typeB === 'ram' ? compB : null;
-        const motherboard = typeA === 'motherboard' ? compA : typeB === 'motherboard' ? compB : null;
+        const cpu = this._getComponent(compA, compB, typeA, typeB, 'cpu');
+        const ram = this._getComponent(compA, compB, typeA, typeB, 'ram');
+        const motherboard = this._getComponent(compA, compB, typeA, typeB, 'motherboard');
         return { cpu, ram, motherboard };
     }
 
@@ -2230,8 +2100,8 @@ class AdvancedCompatibilityService {
         const capacity = specs.capacity || specs.kit_capacity || specs.total_capacity;
         if (typeof capacity === 'number') return capacity;
         if (typeof capacity === 'string') {
-            const match = capacity.match(/(\d+)/);
-            if (match) return parseInt(match[1]);
+            const match = /(?<num>\d+)/.exec(capacity);
+            if (match) return Number.parseInt(match.groups.num, 10);
         }
         return null;
     }
@@ -2291,7 +2161,7 @@ class AdvancedCompatibilityService {
         };
 
         // Normalize form factors (remove spaces, hyphens, lowercase)
-        const normalize = (ff) => ff.toLowerCase().replace(/[-\s]/g, '');
+        const normalize = (ff) => ff.toLowerCase().replaceAll(/[-\s]/g, '');
         
         // Check if formFactorB is an array (case supports multiple form factors)
         if (Array.isArray(formFactorB)) {
@@ -2348,13 +2218,17 @@ class AdvancedCompatibilityService {
 
         logger.info(`   ✅ Final result: ${compatible ? 'COMPATIBLE' : 'INCOMPATIBLE'}`);
 
+        const displayFactorA = Array.isArray(formFactorA) ? formFactorA[0] : formFactorA;
+        const displayFactorB = Array.isArray(formFactorB) ? formFactorB.join(', ') : formFactorB;
+        const formFactorMsg = compatible
+            ? `✅ Form factor compatible: ${displayFactorA}`
+            : `❌ Form factor incompatible: ${nameA} (${formFactorA}) not supported by ${nameB} (${displayFactorB})`;
+
         return {
             compatible: compatible,
             check: 'form_factor',
             severity: compatible ? 'success' : 'critical',
-            message: compatible ?
-                `✅ Form factor compatible: ${Array.isArray(formFactorA) ? formFactorA[0] : formFactorA}` :
-                `❌ Form factor incompatible: ${nameA} (${formFactorA}) not supported by ${nameB} (${Array.isArray(formFactorB) ? formFactorB.join(', ') : formFactorB})`
+            message: formFactorMsg
         };
     }
 
@@ -2409,25 +2283,30 @@ class AdvancedCompatibilityService {
         
         // Extract from name (e.g., "Arctic Freezer 34 (150W TDP)")
         const tdpMatch = name.match(/(\d+)\s*w(?:\s+tdp)?/i);
-        if (tdpMatch) return parseInt(tdpMatch[1]);
+        if (tdpMatch) return Number.parseInt(tdpMatch[1], 10);
         
-        // Estimate based on cooler type
+        return this._estimateCoolerRating(name);
+    }
+
+    _estimateCoolerRating(name) {
+        // AIO/liquid cooler estimates by radiator size
+        const aioPatterns = [
+            { pattern: '360', rating: 250 },
+            { pattern: '280', rating: 220 },
+            { pattern: '240', rating: 180 },
+            { pattern: '120', rating: 120 },
+        ];
         if (name.includes('aio') || name.includes('liquid')) {
-            if (name.includes('360mm') || name.includes('360')) return 250;
-            if (name.includes('280mm') || name.includes('280')) return 220;
-            if (name.includes('240mm') || name.includes('240')) return 180;
-            if (name.includes('120mm') || name.includes('120')) return 120;
+            for (const { pattern, rating } of aioPatterns) {
+                if (name.includes(pattern)) return rating;
+            }
         }
-        
         // Tower coolers
         if (name.includes('tower') || name.includes('cooler')) {
-            if (name.includes('dual') || name.includes('double')) return 180;
-            return 130; // Single tower estimate
+            return (name.includes('dual') || name.includes('double')) ? 180 : 130;
         }
-        
-        // Stock cooler estimate
+        // Stock cooler
         if (name.includes('stock') || name.includes('included')) return 65;
-        
         return 100; // Conservative default
     }
 
@@ -2476,46 +2355,10 @@ class AdvancedCompatibilityService {
             return { compatible: true, recommendation: null };
         }
         
-        const specs = caseComponent.specifications || {};
-        const dims = caseComponent.dimensions || {};
-        const name = (caseComponent.name || '').toLowerCase();
-        
-        // 🔥 FIX: Check ALL possible field names for radiator support
-        // Priority: specifications fields first, then dimensions, then parse strings
-        let maxRadiatorSize = null;
-        
-        // Check specifications fields (primary source)
-        if (specs.front_radiator_support) {
-            maxRadiatorSize = parseInt(specs.front_radiator_support);
-        } else if (specs.top_radiator_support) {
-            maxRadiatorSize = parseInt(specs.top_radiator_support);
-        } else if (specs.max_radiator_size) {
-            maxRadiatorSize = parseInt(specs.max_radiator_size);
-        } else if (specs.radiator_support) {
-            const radMatch = String(specs.radiator_support).match(/(\d{3})/);
-            if (radMatch) maxRadiatorSize = parseInt(radMatch[1]);
-        }
-        
-        // Check dimensions fields (fallback)
-        if (!maxRadiatorSize) {
-            if (dims.front_radiator_support) {
-                maxRadiatorSize = parseInt(dims.front_radiator_support);
-            } else if (dims.top_radiator_support) {
-                maxRadiatorSize = parseInt(dims.top_radiator_support);
-            } else if (dims.max_radiator_size) {
-                maxRadiatorSize = parseInt(dims.max_radiator_size);
-            } else if (dims.radiator_support) {
-                // Parse "280mm front, 120mm rear" format - get the largest value
-                const radMatches = String(dims.radiator_support).match(/(\d{2,3})mm/g);
-                if (radMatches && radMatches.length > 0) {
-                    const sizes = radMatches.map(m => parseInt(m.replace('mm', '')));
-                    maxRadiatorSize = Math.max(...sizes);
-                }
-            }
-        }
+        const maxRadiatorSize = this._extractMaxRadiatorSize(caseComponent);
         
         // If we found a max size from specs/dims, use it
-        if (maxRadiatorSize && !isNaN(maxRadiatorSize)) {
+        if (maxRadiatorSize && !Number.isNaN(maxRadiatorSize)) {
             logger.debug(`🧊 [AIO CHECK] Case: ${caseComponent.name}, Max Radiator: ${maxRadiatorSize}mm, Requested: ${radiatorSize}mm`);
             return {
                 compatible: radiatorSize <= maxRadiatorSize,
@@ -2526,32 +2369,55 @@ class AdvancedCompatibilityService {
             };
         }
         
-        // Infer from name/description (last resort)
+        return this._inferAIOSupportFromName(caseComponent, radiatorSize);
+    }
+
+    _extractMaxRadiatorSize(caseComponent) {
+        const specs = caseComponent.specifications || {};
+        const dims = caseComponent.dimensions || {};
+        
+        // Check specifications fields (primary source)
+        const specFields = ['front_radiator_support', 'top_radiator_support', 'max_radiator_size'];
+        for (const field of specFields) {
+            if (specs[field]) return Number.parseInt(specs[field], 10);
+        }
+        if (specs.radiator_support) {
+            const radMatch = /(?<size>\d{3})/.exec(String(specs.radiator_support));
+            if (radMatch) return Number.parseInt(radMatch.groups.size, 10);
+        }
+        
+        // Check dimensions fields (fallback)
+        for (const field of specFields) {
+            if (dims[field]) return Number.parseInt(dims[field], 10);
+        }
+        if (dims.radiator_support) {
+            const radMatches = String(dims.radiator_support).match(/(\d{2,3})mm/g);
+            if (radMatches && radMatches.length > 0) {
+                const sizes = radMatches.map(m => Number.parseInt(m.replace('mm', ''), 10));
+                return Math.max(...sizes);
+            }
+        }
+        return null;
+    }
+
+    _inferAIOSupportFromName(caseComponent, radiatorSize) {
+        const name = (caseComponent.name || '').toLowerCase();
         const supports360 = name.includes('360mm') || name.includes('360') || name.includes('full tower');
         const supports280 = supports360 || name.includes('280mm') || name.includes('280');
         const supports240 = supports280 || name.includes('240mm') || name.includes('240') || name.includes('mid tower');
         
         logger.debug(`🧊 [AIO CHECK] Case: ${caseComponent.name}, Inferred support - 360: ${supports360}, 280: ${supports280}, 240: ${supports240}`);
         
-        if (radiatorSize === 360 && !supports360) {
-            return {
-                compatible: false,
-                recommendation: 'Select full tower case or case explicitly supporting 360mm radiators'
-            };
+        const sizeRequirements = [
+            { size: 360, supported: supports360, rec: 'Select full tower case or case explicitly supporting 360mm radiators' },
+            { size: 280, supported: supports280, rec: 'Select case supporting 280mm radiators' },
+            { size: 240, supported: supports240, rec: 'Select mid tower or larger case' },
+        ];
+        for (const { size, supported, rec } of sizeRequirements) {
+            if (radiatorSize === size && !supported) {
+                return { compatible: false, recommendation: rec };
+            }
         }
-        if (radiatorSize === 280 && !supports280) {
-            return {
-                compatible: false,
-                recommendation: 'Select case supporting 280mm radiators'
-            };
-        }
-        if (radiatorSize === 240 && !supports240) {
-            return {
-                compatible: false,
-                recommendation: 'Select mid tower or larger case'
-            };
-        }
-        
         return { compatible: true, recommendation: null };
     }
 
@@ -2567,16 +2433,16 @@ class AdvancedCompatibilityService {
         const name = (gpu.name || '').toLowerCase();
         
         // 🔥 FIX: Check dimensions FIRST (most accurate from database)
-        if (dims.length_mm) return parseInt(dims.length_mm);
-        if (dims.length) return parseInt(dims.length);
-        if (specs.length_mm) return parseInt(specs.length_mm);
-        if (specs.length) return parseInt(specs.length);
-        if (specs.card_length) return parseInt(specs.card_length);
-        if (specs.Length) return parseInt(specs.Length); // Handle "320mm" string
+        if (dims.length_mm) return Number.parseInt(dims.length_mm, 10);
+        if (dims.length) return Number.parseInt(dims.length, 10);
+        if (specs.length_mm) return Number.parseInt(specs.length_mm, 10);
+        if (specs.length) return Number.parseInt(specs.length, 10);
+        if (specs.card_length) return Number.parseInt(specs.card_length, 10);
+        if (specs.Length) return Number.parseInt(specs.Length, 10); // Handle "320mm" string
         
         // Extract from name (e.g., "RTX 4090 (335mm)")
         const lengthMatch = name.match(/(\d{3})\s*mm/);
-        if (lengthMatch) return parseInt(lengthMatch[1]);
+        if (lengthMatch) return Number.parseInt(lengthMatch[1], 10);
         
         return null;
     }
@@ -2683,12 +2549,16 @@ class AdvancedCompatibilityService {
             score = Math.max(0, score - (ruleEngineWarnings.length * 5)); // -5 per warning
         }
         
+        const rulesVerifiedSuffix = ruleEngineResult ? ` (${ruleEngineResult.rulesApplied?.length || 0} rules verified)` : '';
+        const ruleIssuesSuffix = ruleEngineIssues.length > 0 ? ` + ${ruleEngineIssues.length} rule issue(s)` : '';
+        const socketMsg = compatible
+            ? `✓ Socket match: ${cpuSocket}${rulesVerifiedSuffix}`
+            : `✗ Socket mismatch: CPU ${cpuSocket} ≠ MB ${mbSocket}${ruleIssuesSuffix}`;
+
         return {
             status: compatible ? 'pass' : 'fail',
             compatible,
-            message: compatible 
-                ? `✓ Socket match: ${cpuSocket}${ruleEngineResult ? ` (${ruleEngineResult.rulesApplied?.length || 0} rules verified)` : ''}` 
-                : `✗ Socket mismatch: CPU ${cpuSocket} ≠ MB ${mbSocket}${ruleEngineIssues.length > 0 ? ` + ${ruleEngineIssues.length} rule issue(s)` : ''}`,
+            message: socketMsg,
             score,
             details: {
                 cpu_socket: cpuSocket,
@@ -2766,12 +2636,16 @@ class AdvancedCompatibilityService {
             score = Math.max(0, score - (ruleEngineWarnings.length * 5)); // -5 per warning
         }
         
+        const memRulesVerifiedSuffix = ruleEngineResult ? ` (${ruleEngineResult.rulesApplied?.length || 0} rules verified)` : '';
+        const memRuleIssuesSuffix = ruleEngineIssues.length > 0 ? ` + ${ruleEngineIssues.length} rule issue(s)` : '';
+        const memMsg = compatible
+            ? `✓ Memory type match: ${ramType}${memRulesVerifiedSuffix}`
+            : `✗ Memory type mismatch: RAM ${ramType} ≠ MB ${mbType}${memRuleIssuesSuffix}`;
+
         return {
             status: compatible ? 'pass' : 'fail',
             compatible,
-            message: compatible 
-                ? `✓ Memory type match: ${ramType}${ruleEngineResult ? ` (${ruleEngineResult.rulesApplied?.length || 0} rules verified)` : ''}` 
-                : `✗ Memory type mismatch: RAM ${ramType} ≠ MB ${mbType}${ruleEngineIssues.length > 0 ? ` + ${ruleEngineIssues.length} rule issue(s)` : ''}`,
+            message: memMsg,
             score,
             details: {
                 ram_type: ramType,
@@ -2792,93 +2666,59 @@ class AdvancedCompatibilityService {
     async checkPowerCompatibility(psu, components) {
         logger.info('🔍 [Layer 3] Checking power compatibility...');
         
-        const psuWattage = parseInt(psu?.specifications?.wattage || psu?.specifications?.max_power || psu?.wattage) || 0;
-        
-        let totalTDP = 0;
-        const breakdown = {
-            cpu: 0,
-            gpu: 0,
-            other: 50 // Motherboard, RAM, Storage, fans
-        };
-        
+        const psuWattage = Number.parseInt(psu?.specifications?.wattage || psu?.specifications?.max_power || psu?.wattage, 10) || 0;
         const gpu = components.gpu || components.GPU;
         const cpu = components.cpu || components.CPU;
         
         // Rule engine validation for PSU-GPU pair (most critical)
-        let ruleEngineResult = null;
-        let ruleEngineIssues = [];
-        let ruleEngineWarnings = [];
-        if (psu && gpu) {
-            try {
-                ruleEngineResult = await ruleEngine.checkComponentPair(gpu, psu);
-                logger.info(`✅ Rule engine checked GPU↔PSU: ${ruleEngineResult.rulesApplied?.length || 0} rules applied, Compatible: ${ruleEngineResult.compatible}`);
-                
-                if (ruleEngineResult.issues && ruleEngineResult.issues.length > 0) {
-                    ruleEngineIssues = ruleEngineResult.issues;
-                    logger.warn(`⚠️ Rule engine found ${ruleEngineIssues.length} power issue(s)`);
-                }
-                if (ruleEngineResult.warnings && ruleEngineResult.warnings.length > 0) {
-                    ruleEngineWarnings = ruleEngineResult.warnings;
-                    logger.info(`📋 Rule engine found ${ruleEngineWarnings.length} power warning(s)`);
-                }
-            } catch (error) {
-                logger.warn('⚠️ Rule engine check failed for power, continuing with deterministic check:', error.message);
-            }
-        }
+        const ruleResult = await this._checkPowerRulesEngine(psu, gpu);
         
-        if (cpu) {
-            breakdown.cpu = parseInt(cpu?.specifications?.tdp || cpu?.tdp) || 65;
-            totalTDP += breakdown.cpu;
-        }
+        const breakdown = { cpu: 0, gpu: 0, other: 50 };
+        let totalTDP = breakdown.other;
+        if (cpu) { breakdown.cpu = Number.parseInt(cpu?.specifications?.tdp || cpu?.tdp, 10) || 65; totalTDP += breakdown.cpu; }
+        if (gpu) { breakdown.gpu = Number.parseInt(gpu?.specifications?.tdp || gpu?.specifications?.power_consumption || gpu?.tdp, 10) || 150; totalTDP += breakdown.gpu; }
         
-        if (gpu) {
-            breakdown.gpu = parseInt(gpu?.specifications?.tdp || gpu?.specifications?.power_consumption || gpu?.tdp) || 150;
-            totalTDP += breakdown.gpu;
-        }
-        
-        totalTDP += breakdown.other;
-        
-        // Add 20% headroom for safety
         const recommendedWattage = Math.ceil(totalTDP * 1.2);
         const deterministicCompatible = psuWattage >= recommendedWattage;
-        const ruleEngineCompatible = ruleEngineResult ? ruleEngineResult.compatible : true;
+        const ruleEngineCompatible = ruleResult.result ? ruleResult.result.compatible : true;
         const compatible = deterministicCompatible && ruleEngineCompatible;
         const efficiency = (psuWattage / recommendedWattage) * 100;
         
-        // Calculate score: base on wattage, reduce for rule issues
         let score = Math.min(100, Math.round(efficiency));
-        if (ruleEngineIssues.length > 0) {
-            score = Math.max(0, score - (ruleEngineIssues.length * 20)); // -20 per critical issue
-        }
-        if (ruleEngineWarnings.length > 0) {
-            score = Math.max(0, score - (ruleEngineWarnings.length * 5)); // -5 per warning
-        }
+        if (ruleResult.issues.length > 0) score = Math.max(0, score - (ruleResult.issues.length * 20));
+        if (ruleResult.warnings.length > 0) score = Math.max(0, score - (ruleResult.warnings.length * 5));
         
         logger.info(`   PSU Wattage: ${psuWattage}W`);
         logger.info(`   Total TDP: ${totalTDP}W`);
         logger.info(`   Recommended: ${recommendedWattage}W`);
         logger.info(`   Efficiency: ${efficiency.toFixed(1)}%`);
         
+        const psuRulesVerifiedSuffix = ruleResult.result ? ` (${ruleResult.result.rulesApplied?.length || 0} rules verified)` : '';
+        const psuRuleIssuesSuffix = ruleResult.issues.length > 0 ? ` + ${ruleResult.issues.length} rule issue(s)` : '';
+        const psuMsg = compatible
+            ? `✓ PSU sufficient: ${psuWattage}W ≥ ${recommendedWattage}W${psuRulesVerifiedSuffix}`
+            : `✗ PSU insufficient: ${psuWattage}W < ${recommendedWattage}W${psuRuleIssuesSuffix}`;
+
         return {
-            status: compatible ? 'pass' : 'fail',
-            compatible,
-            message: compatible 
-                ? `✓ PSU sufficient: ${psuWattage}W ≥ ${recommendedWattage}W${ruleEngineResult ? ` (${ruleEngineResult.rulesApplied?.length || 0} rules verified)` : ''}` 
-                : `✗ PSU insufficient: ${psuWattage}W < ${recommendedWattage}W${ruleEngineIssues.length > 0 ? ` + ${ruleEngineIssues.length} rule issue(s)` : ''}`,
-            score,
-            details: {
-                psu_wattage: psuWattage,
-                total_tdp: totalTDP,
-                recommended_wattage: recommendedWattage,
-                efficiency_percent: Math.round(efficiency),
-                breakdown,
-                rules_applied: ruleEngineResult?.rulesApplied?.length || 0,
-                rule_compatible: ruleEngineCompatible,
-                rule_issues: ruleEngineIssues,
-                rule_warnings: ruleEngineWarnings,
-                rule_info: ruleEngineResult?.info || []
-            }
+            status: compatible ? 'pass' : 'fail', compatible, message: psuMsg, score,
+            details: { psu_wattage: psuWattage, total_tdp: totalTDP, recommended_wattage: recommendedWattage, efficiency_percent: Math.round(efficiency), breakdown, rules_applied: ruleResult.result?.rulesApplied?.length || 0, rule_compatible: ruleEngineCompatible, rule_issues: ruleResult.issues, rule_warnings: ruleResult.warnings, rule_info: ruleResult.result?.info || [] }
         };
+    }
+
+    async _checkPowerRulesEngine(psu, gpu) {
+        let result = null;
+        let issues = [];
+        let warnings = [];
+        if (!psu || !gpu) return { result, issues, warnings };
+        try {
+            result = await ruleEngine.checkComponentPair(gpu, psu);
+            logger.info(`✅ Rule engine checked GPU↔PSU: ${result.rulesApplied?.length || 0} rules applied, Compatible: ${result.compatible}`);
+            if (result.issues?.length > 0) { issues = result.issues; logger.warn(`⚠️ Rule engine found ${issues.length} power issue(s)`); }
+            if (result.warnings?.length > 0) { warnings = result.warnings; logger.info(`📋 Rule engine found ${warnings.length} power warning(s)`); }
+        } catch (error) {
+            logger.warn('⚠️ Rule engine check failed for power, continuing with deterministic check:', error.message);
+        }
+        return { result, issues, warnings };
     }
 
     /**
@@ -2892,87 +2732,67 @@ class AdvancedCompatibilityService {
         
         // Check motherboard form factor
         const motherboard = components.motherboard || components.Motherboard;
-        if (motherboard && caseComponent?.specifications?.max_motherboard_size) {
-            const mbFormFactor = motherboard?.specifications?.form_factor || motherboard?.form_factor;
-            const caseMaxSize = caseComponent.specifications.max_motherboard_size;
-            
-            const formFactorSizes = {
-                'E-ATX': 4,
-                'ATX': 3,
-                'Micro-ATX': 2,
-                'mATX': 2,
-                'Mini-ITX': 1
-            };
-            
-            const mbSize = formFactorSizes[mbFormFactor] || 3;
-            const caseSize = formFactorSizes[caseMaxSize] || 3;
-            
-            if (mbSize > caseSize) {
-                issues.push({
-                    severity: 'error',
-                    component: 'Motherboard',
-                    message: `Motherboard ${mbFormFactor} too large for ${caseMaxSize} case`
-                });
-                score -= 50;
-            }
-        }
+        score -= this._checkMoboFormFactor(motherboard, caseComponent, issues);
         
         // Check GPU length
-        // 🔥 FIX: Check dimensions FIRST (most accurate), then specifications for both GPU and Case
         const gpu = components.gpu || components.GPU;
-        const caseDims = caseComponent?.dimensions || {};
-        const caseSpecs = caseComponent?.specifications || {};
-        const caseMaxLength = parseInt(caseDims.max_gpu_length_mm || caseSpecs.max_gpu_length_mm || caseSpecs.max_gpu_length) || 999;
-        
-        if (gpu && caseMaxLength < 999) {
-            const gpuDims = gpu.dimensions || {};
-            const gpuSpecs = gpu.specifications || {};
-            const gpuLength = parseInt(gpuDims.length_mm || gpuSpecs.length_mm || gpuSpecs.length || gpu.length) || 0;
-            
-            if (gpuLength > 0 && gpuLength > caseMaxLength) {
-                issues.push({
-                    severity: 'error',
-                    component: 'GPU',
-                    message: `GPU ${gpuLength}mm exceeds case limit ${caseMaxLength}mm`
-                });
-                score -= 30;
-            }
-        }
+        score -= this._checkGpuFitInCase(gpu, caseComponent, issues);
         
         // Check CPU cooler height
-        // 🔥 FIX: Check dimensions FIRST (most accurate), then specifications for both Cooler and Case
         const cooling = components.cooling || components.Cooling;
-        const caseMaxHeight = parseInt(caseDims.max_cooler_height_mm || caseSpecs.max_cooler_height_mm || caseSpecs.max_cooler_height) || 999;
-        
-        if (cooling && caseMaxHeight < 999) {
-            const coolerDims = cooling.dimensions || {};
-            const coolerSpecs = cooling.specifications || {};
-            const coolerHeight = parseInt(coolerDims.height_mm || coolerSpecs.height_mm || coolerSpecs.height || cooling.height) || 0;
-            
-            if (coolerHeight > 0 && coolerHeight > caseMaxHeight) {
-                issues.push({
-                    severity: 'error',
-                    component: 'Cooling',
-                    message: `Cooler ${coolerHeight}mm exceeds case limit ${caseMaxHeight}mm`
-                });
-                score -= 20;
-            }
-        }
+        score -= this._checkCoolerFitInCase(cooling, caseComponent, issues);
         
         const compatible = issues.filter(i => i.severity === 'error').length === 0;
-        
         return {
-            status: compatible ? 'pass' : 'fail',
-            compatible,
-            message: compatible 
-                ? '✓ All components fit in case' 
-                : `✗ ${issues.length} clearance issues detected`,
+            status: compatible ? 'pass' : 'fail', compatible,
+            message: compatible ? '✓ All components fit in case' : `✗ ${issues.length} clearance issues detected`,
             score: Math.max(0, score),
-            details: {
-                issues,
-                checks_performed: 3
-            }
+            details: { issues, checks_performed: 3 }
         };
+    }
+
+    _checkMoboFormFactor(motherboard, caseComponent, issues) {
+        if (!motherboard || !caseComponent?.specifications?.max_motherboard_size) return 0;
+        const mbFormFactor = motherboard?.specifications?.form_factor || motherboard?.form_factor;
+        const caseMaxSize = caseComponent.specifications.max_motherboard_size;
+        const formFactorSizes = { 'E-ATX': 4, 'ATX': 3, 'Micro-ATX': 2, 'mATX': 2, 'Mini-ITX': 1 };
+        const mbSize = formFactorSizes[mbFormFactor] || 3;
+        const caseSize = formFactorSizes[caseMaxSize] || 3;
+        if (mbSize > caseSize) {
+            issues.push({ severity: 'error', component: 'Motherboard', message: `Motherboard ${mbFormFactor} too large for ${caseMaxSize} case` });
+            return 50;
+        }
+        return 0;
+    }
+
+    _checkGpuFitInCase(gpu, caseComponent, issues) {
+        const caseDims = caseComponent?.dimensions || {};
+        const caseSpecs = caseComponent?.specifications || {};
+        const caseMaxLength = Number.parseInt(caseDims.max_gpu_length_mm || caseSpecs.max_gpu_length_mm || caseSpecs.max_gpu_length, 10) || 999;
+        if (!gpu || caseMaxLength >= 999) return 0;
+        const gpuDims = gpu.dimensions || {};
+        const gpuSpecs = gpu.specifications || {};
+        const gpuLength = Number.parseInt(gpuDims.length_mm || gpuSpecs.length_mm || gpuSpecs.length || gpu.length, 10) || 0;
+        if (gpuLength > 0 && gpuLength > caseMaxLength) {
+            issues.push({ severity: 'error', component: 'GPU', message: `GPU ${gpuLength}mm exceeds case limit ${caseMaxLength}mm` });
+            return 30;
+        }
+        return 0;
+    }
+
+    _checkCoolerFitInCase(cooling, caseComponent, issues) {
+        const caseDims = caseComponent?.dimensions || {};
+        const caseSpecs = caseComponent?.specifications || {};
+        const caseMaxHeight = Number.parseInt(caseDims.max_cooler_height_mm || caseSpecs.max_cooler_height_mm || caseSpecs.max_cooler_height, 10) || 999;
+        if (!cooling || caseMaxHeight >= 999) return 0;
+        const coolerDims = cooling.dimensions || {};
+        const coolerSpecs = cooling.specifications || {};
+        const coolerHeight = Number.parseInt(coolerDims.height_mm || coolerSpecs.height_mm || coolerSpecs.height || cooling.height, 10) || 0;
+        if (coolerHeight > 0 && coolerHeight > caseMaxHeight) {
+            issues.push({ severity: 'error', component: 'Cooling', message: `Cooler ${coolerHeight}mm exceeds case limit ${caseMaxHeight}mm` });
+            return 20;
+        }
+        return 0;
     }
 
     /**
@@ -2988,87 +2808,70 @@ class AdvancedCompatibilityService {
         const cooling = components.cooling || components.Cooling;
         
         // Rule engine validation
-        let ruleEngineResult = null;
-        let ruleEngineIssues = [];
-        let ruleEngineWarnings = [];
-        if (cpu && cooling) {
-            try {
-                ruleEngineResult = await ruleEngine.checkComponentPair(cpu, cooling);
-                logger.info(`✅ Rule engine checked CPU↔Cooling: ${ruleEngineResult.rulesApplied?.length || 0} rules applied, Compatible: ${ruleEngineResult.compatible}`);
-                
-                if (ruleEngineResult.issues && ruleEngineResult.issues.length > 0) {
-                    ruleEngineIssues = ruleEngineResult.issues;
-                    logger.warn(`⚠️ Rule engine found ${ruleEngineIssues.length} thermal issue(s)`);
-                    // Add rule engine issues to main issues array
-                    issues.push(...ruleEngineIssues.map(issue => ({
-                        severity: 'error',
-                        component: 'Thermal',
-                        message: issue
-                    })));
-                    score -= ruleEngineIssues.length * 20;
-                }
-                if (ruleEngineResult.warnings && ruleEngineResult.warnings.length > 0) {
-                    ruleEngineWarnings = ruleEngineResult.warnings;
-                    logger.info(`📋 Rule engine found ${ruleEngineWarnings.length} thermal warning(s)`);
-                    issues.push(...ruleEngineWarnings.map(warning => ({
-                        severity: 'warning',
-                        component: 'Thermal',
-                        message: warning
-                    })));
-                    score -= ruleEngineWarnings.length * 5;
-                }
-            } catch (error) {
-                logger.warn('⚠️ Rule engine check failed for thermal, continuing with deterministic check:', error.message);
-            }
-        }
+        const ruleResult = await this._checkThermalRulesEngine(cpu, cooling, issues);
+        score -= ruleResult.penalty;
         
         if (cpu) {
-            const cpuTDP = parseInt(cpu?.specifications?.tdp || cpu?.tdp) || 65;
-            
+            const cpuTDP = Number.parseInt(cpu?.specifications?.tdp || cpu?.tdp, 10) || 65;
             if (cooling) {
-                const coolerTDP = parseInt(cooling?.specifications?.tdp_rating || cooling?.specifications?.max_tdp || cooling?.tdp_rating) || 150;
-                
+                const coolerTDP = Number.parseInt(cooling?.specifications?.tdp_rating || cooling?.specifications?.max_tdp || cooling?.tdp_rating, 10) || 150;
                 if (coolerTDP < cpuTDP) {
-                    issues.push({
-                        severity: 'warning',
-                        component: 'Cooling',
-                        message: `Cooler rated ${coolerTDP}W, CPU TDP ${cpuTDP}W`
-                    });
+                    issues.push({ severity: 'warning', component: 'Cooling', message: `Cooler rated ${coolerTDP}W, CPU TDP ${cpuTDP}W` });
                     score -= 30;
                 }
-            } else {
-                // No aftermarket cooler selected, assume stock cooler
-                if (cpuTDP > 95) {
-                    issues.push({
-                        severity: 'warning',
-                        component: 'Cooling',
-                        message: `High TDP CPU (${cpuTDP}W) may need better cooling`
-                    });
-                    score -= 20;
-                }
+            } else if (cpuTDP > 95) {
+                issues.push({ severity: 'warning', component: 'Cooling', message: `High TDP CPU (${cpuTDP}W) may need better cooling` });
+                score -= 20;
             }
         }
         
         const compatible = issues.filter(i => i.severity === 'error').length === 0;
-        
+        const hasIssues = issues.length > 0;
+        let thermalStatus = compatible ? 'pass' : (hasIssues ? 'warning' : 'pass'); // NOSONAR
+        const thermalRulesSuffix = ruleResult.result ? ` (${ruleResult.result.rulesApplied?.length || 0} rules verified)` : '';
+        const thermalIssuesSuffix = ruleResult.issues.length > 0 ? ` (${ruleResult.issues.length} from rules)` : '';
+        const thermalMsg = compatible
+            ? `✓ Cooling adequate for components${thermalRulesSuffix}`
+            : `⚠ ${issues.length} thermal concerns${thermalIssuesSuffix}`;
+
         return {
-            status: compatible ? 'pass' : issues.length > 0 ? 'warning' : 'pass',
-            compatible,
-            message: compatible 
-                ? `✓ Cooling adequate for components${ruleEngineResult ? ` (${ruleEngineResult.rulesApplied?.length || 0} rules verified)` : ''}` 
-                : `⚠ ${issues.length} thermal concerns${ruleEngineIssues.length > 0 ? ` (${ruleEngineIssues.length} from rules)` : ''}`,
-            score: Math.max(50, score),
+            status: thermalStatus, compatible, message: thermalMsg, score: Math.max(50, score),
             details: {
-                issues,
-                cpu_tdp: cpu ? parseInt(cpu?.specifications?.tdp || cpu?.tdp) || 65 : 0,
-                cooler_rating: cooling ? parseInt(cooling?.specifications?.tdp_rating || cooling?.tdp_rating) || 150 : 0,
-                rules_applied: ruleEngineResult?.rulesApplied?.length || 0,
-                rule_compatible: ruleEngineResult?.compatible !== false,
-                rule_issues: ruleEngineIssues,
-                rule_warnings: ruleEngineWarnings,
-                rule_info: ruleEngineResult?.info || []
+                issues, cpu_tdp: cpu ? Number.parseInt(cpu?.specifications?.tdp || cpu?.tdp, 10) || 65 : 0,
+                cooler_rating: cooling ? Number.parseInt(cooling?.specifications?.tdp_rating || cooling?.tdp_rating, 10) || 150 : 0,
+                rules_applied: ruleResult.result?.rulesApplied?.length || 0,
+                rule_compatible: ruleResult.result?.compatible !== false,
+                rule_issues: ruleResult.issues, rule_warnings: ruleResult.warnings,
+                rule_info: ruleResult.result?.info || []
             }
         };
+    }
+
+    async _checkThermalRulesEngine(cpu, cooling, issues) {
+        let result = null;
+        let ruleIssues = [];
+        let ruleWarnings = [];
+        let penalty = 0;
+        if (!cpu || !cooling) return { result, issues: ruleIssues, warnings: ruleWarnings, penalty };
+        try {
+            result = await ruleEngine.checkComponentPair(cpu, cooling);
+            logger.info(`✅ Rule engine checked CPU↔Cooling: ${result.rulesApplied?.length || 0} rules applied, Compatible: ${result.compatible}`);
+            if (result.issues?.length > 0) {
+                ruleIssues = result.issues;
+                logger.warn(`⚠️ Rule engine found ${ruleIssues.length} thermal issue(s)`);
+                issues.push(...ruleIssues.map(issue => ({ severity: 'error', component: 'Thermal', message: issue })));
+                penalty += ruleIssues.length * 20;
+            }
+            if (result.warnings?.length > 0) {
+                ruleWarnings = result.warnings;
+                logger.info(`📋 Rule engine found ${ruleWarnings.length} thermal warning(s)`);
+                issues.push(...ruleWarnings.map(warning => ({ severity: 'warning', component: 'Thermal', message: warning })));
+                penalty += ruleWarnings.length * 5;
+            }
+        } catch (error) {
+            logger.warn('⚠️ Rule engine check failed for thermal, continuing with deterministic check:', error.message);
+        }
+        return { result, issues: ruleIssues, warnings: ruleWarnings, penalty };
     }
 
     /**
@@ -3080,7 +2883,6 @@ class AdvancedCompatibilityService {
         // Simple tier matching (can be enhanced with actual benchmarks)
         const getTier = (product) => {
             const name = (product?.name || '').toLowerCase();
-            const price = product?.price || 0;
             
             if (name.includes('i9') || name.includes('9900') || name.includes('9950') || name.includes('rtx 4090') || name.includes('rtx 4080')) {
                 return 'high-end';
@@ -3101,8 +2903,8 @@ class AdvancedCompatibilityService {
         const gpuLevel = tierMap[gpuTier] || 2;
         
         const difference = Math.abs(cpuLevel - gpuLevel);
-        let score = 100;
-        let message = '✓ Balanced configuration';
+        let score;
+        let message;
         let bottleneck = 'none';
         
         if (difference === 0) {
@@ -3143,150 +2945,143 @@ class AdvancedCompatibilityService {
         logger.info('🔍 [FULL BUILD SIMPLE] Starting 6-layer compatibility analysis...');
         
         const analysis = {
-            compatibility_score: 0,
-            overall_status: 'checking',
-            issues: [],
-            warnings: [],
-            socket_compatibility: null,
-            memory_compatibility: null,
-            power_compatibility: null,
-            physical_compatibility: null,
-            thermal_compatibility: null,
-            performance_compatibility: null
+            compatibility_score: 0, overall_status: 'checking',
+            issues: [], warnings: [],
+            socket_compatibility: null, memory_compatibility: null,
+            power_compatibility: null, physical_compatibility: null,
+            thermal_compatibility: null, performance_compatibility: null
         };
 
         try {
             let totalScore = 0;
             let layersChecked = 0;
             
-            // Layer 1: Socket Compatibility (CPU ↔ Motherboard)
             const cpu = components.cpu || components.CPU;
             const motherboard = components.motherboard || components.Motherboard;
-            
-            if (cpu && motherboard) {
-                logger.info('[FULL BUILD] Running Layer 1: Socket');
-                analysis.socket_compatibility = await this.checkSocketCompatibility(cpu, motherboard);
-                totalScore += analysis.socket_compatibility.score;
-                layersChecked++;
-                
-                if (!analysis.socket_compatibility.compatible) {
-                    analysis.issues.push({
-                        layer: 'socket',
-                        severity: 'critical',
-                        message: analysis.socket_compatibility.message
-                    });
-                }
-            }
-
-            // Layer 2: Memory Compatibility (RAM ↔ Motherboard)
             const ram = components.ram || components.RAM;
-            if (ram && motherboard) {
-                logger.info('[FULL BUILD] Running Layer 2: Memory');
-                analysis.memory_compatibility = await this.checkMemoryCompatibility(ram, motherboard);
-                totalScore += analysis.memory_compatibility.score;
-                layersChecked++;
-                
-                if (!analysis.memory_compatibility.compatible) {
-                    analysis.issues.push({
-                        layer: 'memory',
-                        severity: 'critical',
-                        message: analysis.memory_compatibility.message
-                    });
-                }
-            }
-
-            // Layer 3: Power Compatibility (PSU ↔ All Components)
             const psu = components.psu || components.PSU;
-            if (psu) {
-                logger.info('[FULL BUILD] Running Layer 3: Power');
-                analysis.power_compatibility = await this.checkPowerCompatibility(psu, components);
-                totalScore += analysis.power_compatibility.score;
-                layersChecked++;
-                
-                if (!analysis.power_compatibility.compatible) {
-                    analysis.issues.push({
-                        layer: 'power',
-                        severity: 'critical',
-                        message: analysis.power_compatibility.message
-                    });
-                }
-            }
-
-            // Layer 4: Physical Compatibility (Case clearances)
             const caseComp = components.case || components.Case;
-            if (caseComp) {
-                logger.info('[FULL BUILD] Running Layer 4: Physical');
-                analysis.physical_compatibility = await this.checkPhysicalCompatibility(caseComp, components);
-                totalScore += analysis.physical_compatibility.score;
-                layersChecked++;
-                
-                if (!analysis.physical_compatibility.compatible) {
-                    analysis.issues.push({
-                        layer: 'physical',
-                        severity: 'critical',
-                        message: analysis.physical_compatibility.message
-                    });
-                }
-            }
-
-            // Layer 5: Thermal Compatibility (Cooling ↔ CPU/GPU)
-            if (cpu) {
-                logger.info('[FULL BUILD] Running Layer 5: Thermal');
-                analysis.thermal_compatibility = await this.checkThermalCompatibility(components);
-                totalScore += analysis.thermal_compatibility.score;
-                layersChecked++;
-                
-                if (analysis.thermal_compatibility.status === 'warning') {
-                    analysis.warnings.push({
-                        layer: 'thermal',
-                        severity: 'warning',
-                        message: analysis.thermal_compatibility.message
-                    });
-                }
-            }
-
-            // Layer 6: Performance Compatibility (Bottleneck detection)
             const gpu = components.gpu || components.GPU;
-            if (cpu && gpu) {
-                logger.info('[FULL BUILD] Running Layer 6: Performance');
-                analysis.performance_compatibility = await this.checkPerformanceCompatibility(cpu, gpu);
-                totalScore += analysis.performance_compatibility.score;
+
+            // Define layers as data-driven checks
+            const layers = [
+                { key: 'socket_compatibility', label: 'Socket', condition: cpu && motherboard, run: () => this.checkSocketCompatibility(cpu, motherboard), isCritical: true },
+                { key: 'memory_compatibility', label: 'Memory', condition: ram && motherboard, run: () => this.checkMemoryCompatibility(ram, motherboard), isCritical: true },
+                { key: 'power_compatibility', label: 'Power', condition: !!psu, run: () => this.checkPowerCompatibility(psu, components), isCritical: true },
+                { key: 'physical_compatibility', label: 'Physical', condition: !!caseComp, run: () => this.checkPhysicalCompatibility(caseComp, components), isCritical: true },
+                { key: 'thermal_compatibility', label: 'Thermal', condition: !!cpu, run: () => this.checkThermalCompatibility(components), isCritical: false },
+                { key: 'performance_compatibility', label: 'Performance', condition: cpu && gpu, run: () => this.checkPerformanceCompatibility(cpu, gpu), isCritical: false },
+            ];
+
+            for (const layer of layers) {
+                if (!layer.condition) continue;
+                logger.info(`[FULL BUILD] Running Layer: ${layer.label}`);
+                const result = await layer.run();
+                analysis[layer.key] = result;
+                totalScore += result.score;
                 layersChecked++;
-                
-                if (analysis.performance_compatibility.status === 'warning') {
-                    analysis.warnings.push({
-                        layer: 'performance',
-                        severity: 'warning',
-                        message: analysis.performance_compatibility.message
-                    });
-                }
+                this._collectLayerIssues(result, layer, analysis);
             }
 
-            // Calculate overall score
-            analysis.compatibility_score = layersChecked > 0 
-                ? Math.round(totalScore / layersChecked) 
-                : 0;
-                
-            analysis.overall_status = analysis.compatibility_score >= 70 
-                ? 'compatible' 
-                : 'incompatible';
+            analysis.compatibility_score = layersChecked > 0 ? Math.round(totalScore / layersChecked) : 0;
+            analysis.overall_status = analysis.compatibility_score >= 70 ? 'compatible' : 'incompatible';
 
             logger.info(`✅ [FULL BUILD SIMPLE] Analysis complete: ${analysis.compatibility_score}/100`);
-            logger.info(`   Layers checked: ${layersChecked}`);
-            logger.info(`   Issues: ${analysis.issues.length}`);
-            logger.info(`   Warnings: ${analysis.warnings.length}`);
+            logger.info(`   Layers checked: ${layersChecked}, Issues: ${analysis.issues.length}, Warnings: ${analysis.warnings.length}`);
 
         } catch (error) {
             logger.error('❌ [FULL BUILD SIMPLE] Analysis failed:', error);
             analysis.overall_status = 'error';
-            analysis.issues.push({
-                layer: 'system',
-                severity: 'critical',
-                message: 'Analysis engine error: ' + error.message
-            });
+            analysis.issues.push({ layer: 'system', severity: 'critical', message: 'Analysis engine error: ' + error.message });
         }
 
         return analysis;
+    }
+
+    _collectLayerIssues(result, layer, analysis) {
+        if (layer.isCritical && !result.compatible) {
+            analysis.issues.push({ layer: layer.label.toLowerCase(), severity: 'critical', message: result.message });
+        }
+        if (!layer.isCritical && result.status === 'warning') {
+            analysis.warnings.push({ layer: layer.label.toLowerCase(), severity: 'warning', message: result.message });
+        }
+    }
+
+    _extractRulesResultIssues(category, result, criticalIssuesRaw, warningsRaw) {
+        // Extract critical issues
+        if (Array.isArray(result.issues)) {
+            for (const issue of result.issues) {
+                if (issue.severity === 'critical') {
+                    criticalIssuesRaw.push({
+                        component: category, severity: 'critical',
+                        rule: issue.rule || 'compatibility_check',
+                        message: issue.message || issue.details || 'Compatibility issue detected',
+                        details: issue.details || issue.message, penalty: issue.penalty || 0
+                    });
+                }
+            }
+        }
+
+        // Extract warnings
+        if (Array.isArray(result.warnings)) {
+            warningsRaw.push(...result.warnings.map(warning => ({
+                component: category, severity: 'warning',
+                rule: warning.rule || 'compatibility_check',
+                message: warning.message || warning.details || warning,
+                penalty: warning.penalty || 0
+            })));
+        }
+
+        // Extract recommendations — socket-related ones become critical issues
+        if (Array.isArray(result.recommendations)) {
+            for (const rec of result.recommendations) {
+                const message = rec.message || rec.details || rec;
+                const isSocketIssue = message.toLowerCase().includes('socket');
+                if (isSocketIssue) {
+                    criticalIssuesRaw.push({
+                        component: category, severity: 'critical',
+                        rule: rec.rule || 'compatibility_check',
+                        message, details: rec.details || rec.message || message, penalty: 0
+                    });
+                } else {
+                    warningsRaw.push({
+                        component: category, severity: rec.severity || 'warning',
+                        rule: rec.rule || 'compatibility_check', message, penalty: 0
+                    });
+                }
+            }
+        }
+    }
+
+    async _buildComponentContext(components) {
+        const buildContext = {};
+        for (const [category, component] of Object.entries(components)) {
+            if (!component || Array.isArray(component)) continue;
+            if (component.id) {
+                const specs = await compatibilityRules.loadNormalizedSpecs(component.id);
+                buildContext[category] = { ...component, specs, dimensions: component.dimensions || {} };
+            }
+        }
+        // Handle storage array — use first storage for comprehensive rules
+        const storageInput = components.storage || components.Storage;
+        if (storageInput) {
+            const primaryStorage = Array.isArray(storageInput) ? storageInput[0] : storageInput;
+            if (primaryStorage?.id) {
+                const specs = await compatibilityRules.loadNormalizedSpecs(primaryStorage.id);
+                buildContext.storage = { ...primaryStorage, specs, dimensions: primaryStorage.dimensions || {} };
+            }
+        }
+        return buildContext;
+    }
+
+    _deduplicateIssues(issues) {
+        const seen = new Set();
+        return issues.filter(issue => {
+            const sig = (issue.message || '').toLowerCase().replaceAll(/\s+/g, ' ').trim();
+            if (seen.has(sig)) return false;
+            seen.add(sig);
+            return true;
+        });
     }
 
     /**
@@ -3310,52 +3105,16 @@ class AdvancedCompatibilityService {
             let maxPossibleScore = 0;
             let rulesChecked = 0;
 
-            // Build context with loaded specs for each component
-            // 🔥 FIX: Handle storage arrays - process each storage device individually
-            const buildContext = {};
-            for (const [category, component] of Object.entries(components)) {
-                // Skip if component is missing or is an array (arrays handled separately)
-                if (!component || Array.isArray(component)) continue;
-                
-                if (component.id) {
-                    const specs = await compatibilityRules.loadNormalizedSpecs(component.id);
-                    // 🔥 FIX: Also preserve original dimensions from component
-                    buildContext[category] = {
-                        ...component,
-                        specs: specs,
-                        // Merge dimensions into specs for compatibility functions
-                        dimensions: component.dimensions || {}
-                    };
-                }
-            }
-            
-            // 🔥 FIX: Handle storage array separately - only use FIRST storage for comprehensive rules
-            // (Multi-storage validation is handled in resource budget analysis)
-            const storageInput = components.storage || components.Storage;
-            if (storageInput) {
-                const primaryStorage = Array.isArray(storageInput) ? storageInput[0] : storageInput;
-                if (primaryStorage && primaryStorage.id) {
-                    const specs = await compatibilityRules.loadNormalizedSpecs(primaryStorage.id);
-                    buildContext.storage = {
-                        ...primaryStorage,
-                        specs: specs,
-                        dimensions: primaryStorage.dimensions || {}
-                    };
-                }
-            }
+            const buildContext = await this._buildComponentContext(components);
 
-            // 🔥 KEY FIX: Call computeCompatibilityScore for EACH component against the FULL build
-            // This ensures all pairwise relationships are checked (GPU ↔ Case, CPU ↔ MB, etc.)
             const componentCategories = Object.keys(buildContext);
             
             for (const category of componentCategories) {
                 const candidate = buildContext[category];
-                
-                if (!candidate || !candidate.specs) continue;
+                if (!candidate?.specs) continue;
 
-                // Run compatibility rules for this candidate against the full build
                 try {
-                    const result = await compatibilityRules.computeCompatibilityScore(
+                    const result = await compatibilityRules.computeCompatibilityScore( // NOSONAR - computeCompatibilityScore is async
                         buildContext,
                         candidate
                     );
@@ -3364,100 +3123,25 @@ class AdvancedCompatibilityService {
                         totalScore += result.score;
                         maxPossibleScore += result.maxScore || 0;
                         rulesChecked++;
-
-                        // Extract critical issues
-                        if (result.issues && Array.isArray(result.issues)) {
-                            result.issues.forEach(issue => {
-                                if (issue.severity === 'critical') {
-                                    criticalIssuesRaw.push({
-                                        component: category,
-                                        severity: 'critical',
-                                        rule: issue.rule || 'compatibility_check',
-                                        message: issue.message || issue.details || 'Compatibility issue detected',
-                                        details: issue.details || issue.message,
-                                        penalty: issue.penalty || 0
-                                    });
-                                }
-                            });
-                        }
-
-                        // Extract warnings
-                        if (result.warnings && Array.isArray(result.warnings)) {
-                            warningsRaw.push(...result.warnings.map(warning => ({
-                                component: category,
-                                severity: 'warning',
-                                rule: warning.rule || 'compatibility_check',
-                                message: warning.message || warning.details || warning,
-                                penalty: warning.penalty || 0
-                            })));
-                        }
-
-                        // Extract recommendations as warnings
-                        if (result.recommendations && Array.isArray(result.recommendations)) {
-                            result.recommendations.forEach(rec => {
-                                // CRITICAL FIX: Socket-related recommendations must be critical issues, not optimization warnings
-                                const message = rec.message || rec.details || rec;
-                                const isSocketIssue = message.toLowerCase().includes('socket');
-                                
-                                // Socket issues go to critical_issues, not warnings
-                                if (isSocketIssue) {
-                                    criticalIssuesRaw.push({
-                                        component: category,
-                                        severity: 'critical',
-                                        rule: rec.rule || 'compatibility_check',
-                                        message: message,
-                                        details: rec.details || rec.message || message,
-                                        penalty: 0
-                                    });
-                                } else {
-                                    // Non-socket recommendations remain as warnings
-                                    warningsRaw.push({
-                                        component: category,
-                                        severity: rec.severity || 'warning',
-                                        rule: rec.rule || 'compatibility_check', // Changed from 'optimization'
-                                        message: message,
-                                        penalty: 0
-                                    });
-                                }
-                            });
-                        }
+                        this._extractRulesResultIssues(category, result, criticalIssuesRaw, warningsRaw);
                     }
                 } catch (error) {
-                    // 🔥 FIX: Add detailed error logging to identify root cause
                     logger.error(`❌ [COMPREHENSIVE RULES] Error checking ${category}:`, {
                         error: error.message,
                         stack: error.stack,
                         component: candidate?.name || 'unknown',
                         hasSpecs: !!candidate?.specs
                     });
-                    // Don't fail the entire validation, just skip this component
                 }
             }
 
-            // 🔥 CRITICAL FIX: Deduplicate issues BEFORE returning
-            // computeCompatibilityScore is called for each component, so the same issue
-            // (e.g., "PSU wattage not specified") gets added multiple times
-            const deduplicateIssues = (issues) => {
-                const seen = new Set();
-                return issues.filter(issue => {
-                    // Create signature from message only (ignore component, since same issue can be detected from multiple components)
-                    const sig = (issue.message || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                    if (seen.has(sig)) {
-                        return false;
-                    }
-                    seen.add(sig);
-                    return true;
-                });
-            };
-
-            const criticalIssues = deduplicateIssues(criticalIssuesRaw);
-            const warnings = deduplicateIssues(warningsRaw);
+            const criticalIssues = this._deduplicateIssues(criticalIssuesRaw);
+            const warnings = this._deduplicateIssues(warningsRaw);
 
             const averageScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 435) : 100;
             const compatible = criticalIssues.length === 0;
             const status = compatible ? 'compatible' : 'incompatible';
-            const severity = criticalIssues.length > 0 ? 'critical' : 
-                           warnings.length > 0 ? 'warning' : 'success';
+            const severity = this._determineSeverity(criticalIssues.length, warnings.length);
 
             logger.info(`📋 [COMPREHENSIVE RULES] Validation complete:`);
             logger.info(`   Component categories checked: ${rulesChecked}`);

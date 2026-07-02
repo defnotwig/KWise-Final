@@ -6,7 +6,7 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 class AICompatibilityService {
     constructor() {

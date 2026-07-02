@@ -1,10 +1,19 @@
 require('dotenv').config();
 
+const isLoadTestMode = process.env.LOAD_TEST_MODE === 'true';
+const isLiveStackLatencyTest = process.env.LIVE_STACK_LATENCY_TEST === 'true';
+
+if (isLiveStackLatencyTest && process.env.LIVE_STACK_VERBOSE_LOGS !== 'true') {
+    console.log = () => {};
+    console.debug = () => {};
+}
+
 console.log('🚀 Starting K-Wise Backend Server...');
 console.log('📂 Current directory:', process.cwd());
 console.log('📋 Node version:', process.version);
 
 const express = require('express');
+const http = require('node:http');
 
 // ==========================================
 // 🔍 STEP 1: ROUTE DEBUGGER - FIND UNDEFINED HANDLERS
@@ -51,12 +60,56 @@ console.log('\n🔍 Installing Route Debugger...');
 
 console.log('✅ Route Debugger installed - Will catch undefined handlers!\n');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+const cookieParser = require('cookie-parser');
+const path = require('node:path');
+const fs = require('node:fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const cron = require('node-cron');
+const compression = require('compression');
+const { csrfProtection } = require('./middleware/csrfProtection');
+const { createHotReadCache } = require('./middleware/hotReadCache');
+
+const isLocalAddress = (value) => {
+    if (!value) return false;
+    return value === '127.0.0.1'
+        || value === '::1'
+        || value === 'localhost'
+        || value.endsWith(':127.0.0.1');
+};
+
+const isLocalRequest = (req) => [
+    req.ip,
+    req.connection?.remoteAddress,
+    req.socket?.remoteAddress
+].some(isLocalAddress);
+const isControlledStressHeader = (req) => (
+    typeof req.headers['x-kwise-stress-phase'] === 'string'
+    && isLocalRequest(req)
+);
+const isLocalKioskHotPath = (req) => {
+    if (!isLocalRequest(req)) return false;
+
+    const requestPath = req.path || '';
+    if (requestPath.startsWith('/assets/') || requestPath.startsWith('/uploads/')) {
+        return true;
+    }
+
+    if (requestPath === '/api/ip/check' || requestPath.startsWith('/api/health')) {
+        return true;
+    }
+
+    if (req.method === 'GET' && /^\/api\/(kiosk|stock)(\/|$)/.test(requestPath)) {
+        return true;
+    }
+
+    return req.method === 'POST'
+        && /^\/api\/compatibility\/(analyze|batch|batch-analyze|ram-slots|storage-slots|matrix\/quick-check)(\/|$)/.test(requestPath);
+};
+const skipControlledStressRateLimit = (req) => (
+    isLiveStackLatencyTest || isControlledStressHeader(req) || isLocalKioskHotPath(req) || (isLoadTestMode && isLocalRequest(req))
+);
 
 // Safe database import with fallback
 let connectDB, query, closePool;
@@ -94,22 +147,111 @@ try {
     };
 }
 
+const DIRECT_ALLOWED_ORIGINS = new Set([
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+    process.env.FRONTEND_URL
+].filter(Boolean));
+
+const NETWORK_ALLOWED_ORIGIN_PATTERNS = [
+    /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001|5000)$/,
+    /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}:(3000|3001|5000)$/,
+    /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:(3000|3001|5000)$/
+];
+
+const DEFAULT_CORS_METHODS = 'GET,POST,PUT,DELETE,PATCH,OPTIONS';
+const DEFAULT_CORS_HEADERS = 'Content-Type,Authorization,X-CSRF-Token,X-Requested-With,X-KWise-Idempotency-Key,X-KWise-Stress-Phase,Cache-Control,Accept,Accept-Language,Accept-Encoding';
+
+const isAllowedOrigin = (origin) => {
+    if (!origin) {
+        return true;
+    }
+
+    return DIRECT_ALLOWED_ORIGINS.has(origin)
+        || NETWORK_ALLOWED_ORIGIN_PATTERNS.some(pattern => pattern.test(origin));
+};
+
+const getAllowedOriginFromRequest = (req) => {
+    const origin = req.headers.origin;
+    if (typeof origin === 'string' && isAllowedOrigin(origin)) {
+        return origin;
+    }
+
+    const referer = req.headers.referer;
+    if (typeof referer !== 'string') {
+        return null;
+    }
+
+    try {
+        const refererOrigin = new URL(referer).origin;
+        return isAllowedOrigin(refererOrigin) ? refererOrigin : null;
+    } catch (error) {
+        logger.warn('Invalid referer header received', { referer, error: error.message });
+        return null;
+    }
+};
+
+const applyCorsHeaders = (res, origin, methods = DEFAULT_CORS_METHODS, headers = DEFAULT_CORS_HEADERS) => {
+    if (origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Vary', 'Origin');
+    }
+
+    res.header('Access-Control-Allow-Methods', methods);
+    res.header('Access-Control-Allow-Headers', headers);
+};
+
+const sanitizeSocketMessage = (value) => value
+    .replaceAll(/<[^>]*>/g, '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .trim();
+
+const describeUnhandledReason = (reason) => {
+    if (reason instanceof Error) {
+        return {
+            message: reason.message,
+            stack: reason.stack
+        };
+    }
+
+    if (typeof reason === 'string') {
+        return { message: reason };
+    }
+
+    try {
+        return { message: JSON.stringify(reason) };
+    } catch (error) {
+        return { message: String(reason), serializationError: error.message };
+    }
+};
+
 const app = express();
+const { installLatencyTrace, getLatencyTraceBuffer } = require('./middleware/latencyTrace');
+const { getDbQueryTraceBuffer } = require('./utils/dbQueryTrace');
+installLatencyTrace(app, logger);
 
 // Security headers
 app.use(helmet({
     crossOriginResourcePolicy: false,
 })
 );
+app.use(compression({ threshold: 1024 }));
 // HTTP request logging (skip in test)
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !isLiveStackLatencyTest) {
     app.use(morgan('dev'));
 }
 
 // Comprehensive Activity Logging Middleware
 const { autoLogActivity, logUIInteraction } = require('./middleware/activityLogger');
 // Auth middleware for protecting routes
-const { protect } = require('./middleware/auth');
+const { protect, restrictTo } = require('./middleware/auth');
 
 // =====================================================
 // 🔒 IP FIREWALL - MUST RUN BEFORE ALL OTHER MIDDLEWARE
@@ -119,11 +261,9 @@ const { ipFirewall } = require('./middleware/ipFirewall');
 
 // Enhanced rate limiting with route-specific configurations
 // Load testing mode: Set LOAD_TEST_MODE=true in .env to disable rate limiting
-const isLoadTestMode = process.env.LOAD_TEST_MODE === 'true';
-
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isLoadTestMode ? 1000000 : 1000, // Effectively unlimited in load test mode
+    max: (isLoadTestMode || isLiveStackLatencyTest) ? 1000000 : 1000, // Effectively unlimited in controlled local stress mode
     standardHeaders: true,
     legacyHeaders: false,
     validate: { trustProxy: false }, // Disable validation, we handle proxy manually
@@ -131,7 +271,33 @@ const globalLimiter = rateLimit({
         error: 'Too many requests from this IP, please try again later',
         retryAfter: '15 minutes'
     },
-    skip: (req) => isLoadTestMode && req.ip === '::1' || req.ip === '127.0.0.1' // Skip rate limiting for localhost in load test mode
+    skip: skipControlledStressRateLimit
+});
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: (isLoadTestMode || isLiveStackLatencyTest) ? 1000000 : 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false },
+    message: {
+        error: 'Too many authentication requests from this IP, please try again later',
+        retryAfter: '15 minutes'
+    },
+    skip: skipControlledStressRateLimit
+});
+
+const adminLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: (isLoadTestMode || isLiveStackLatencyTest) ? 1000000 : 240,
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false },
+    message: {
+        error: 'Admin request rate limit exceeded',
+        retryAfter: '1 minute'
+    },
+    skip: skipControlledStressRateLimit
 });
 
 // Very permissive limiter for real-time endpoints (messaging, notifications)
@@ -144,7 +310,8 @@ const realtimeLimiter = rateLimit({
     message: {
         error: 'Rate limit exceeded for real-time features',
         retryAfter: '1 minute'
-    }
+    },
+    skip: skipControlledStressRateLimit
 });
 
 // Ultra-permissive limiter for frequent polling endpoints
@@ -157,45 +324,46 @@ const pollingLimiter = rateLimit({
     message: {
         error: 'Polling rate limit exceeded',
         retryAfter: '1 minute'
-    }
+    },
+    skip: skipControlledStressRateLimit
 });
 
 // Ultra-permissive limiter for kiosk endpoints (users switching categories rapidly)
 const kioskLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 5000, // 5000 requests per minute (very permissive for fast UI interactions)
+    max: (isLoadTestMode || isLiveStackLatencyTest) ? 1000000 : 1200,
     standardHeaders: true,
     legacyHeaders: false,
     validate: { trustProxy: false }, // Disable validation, we handle proxy manually
     skipSuccessfulRequests: true, // Don't count successful requests against limit
+    skip: skipControlledStressRateLimit,
     message: {
         error: 'Kiosk rate limit exceeded',
         retryAfter: '1 minute'
     }
 });
 
+// =====================================================
+// 🌐 TRUST PROXY - Essential for IP detection
+// =====================================================
+// FIX #7: MUST be set BEFORE rate limiter and CORS — was incorrectly placed after them
+app.set('trust proxy', 'loopback');
+console.log('✅ Trust proxy enabled - will detect real client IPs');
+
 // Enhanced CORS configuration - BEFORE rate limiting to handle preflight requests
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+        if (!origin) {
+            callback(null, true);
+            return;
+        }
 
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'http://localhost:3001',
-            'http://127.0.0.1:3001'
-        ];
-
-        // Check if origin is allowed or matches local network pattern (support ALL 192.168.x.x)
-        // PHASE 3.1: Added ZeroTier network support (172.16-31.x.x range)
-        const isAllowed = allowedOrigins.includes(origin) ||
-            /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001|5000)$/.test(origin) ||  // Local network
-            /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}:(3000|3001|5000)$/.test(origin) ||  // ZeroTier range
-            /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:(3000|3001|5000)$/.test(origin);  // Private 10.x.x.x range
-
-        if (isAllowed) {
-            console.log(`✅ CORS allowed for origin: ${origin}`);
+        if (isAllowedOrigin(origin)) {
+            // FIX #8: Only log CORS in dev to prevent production log pollution
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`✅ CORS allowed for origin: ${origin}`);
+            }
             callback(null, true);
         } else {
             console.log(`⚠️ CORS denied for origin: ${origin}`);
@@ -207,7 +375,10 @@ app.use(cors({
     allowedHeaders: [
         'Content-Type',
         'Authorization',
+        'X-CSRF-Token',
         'X-Requested-With',
+        'X-KWise-Idempotency-Key',
+        'X-KWise-Stress-Phase',
         'Cache-Control',
         'Accept',
         'Accept-Language',
@@ -218,28 +389,31 @@ app.use(cors({
 
 // Handle preflight OPTIONS requests before rate limiting
 app.options('*', (req, res) => {
-    const origin = req.headers.origin;
-    if (origin) {
-        res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Cache-Control,Accept,Accept-Language,Accept-Encoding');
-    res.header('Access-Control-Allow-Credentials', 'true');
+    applyCorsHeaders(res, getAllowedOriginFromRequest(req));
     res.sendStatus(200);
 });
 
+if (isLiveStackLatencyTest) {
+    app.get('/api/_debug/live-stack-trace', (req, res) => {
+        if (!isLocalRequest(req)) {
+            return res.status(404).json({ success: false, message: 'Not found' });
+        }
+
+        return res.json({
+            success: true,
+            requests: getLatencyTraceBuffer(),
+            dbQueries: getDbQueryTraceBuffer(),
+            timestamp: new Date().toISOString()
+        });
+    });
+}
+
 app.use(globalLimiter); // Re-enabled after fixing infinite loop
 
-// =====================================================
-// 🌐 TRUST PROXY - Essential for IP detection
-// =====================================================
-// CRITICAL: Must be set BEFORE any IP-dependent middleware
-// This allows Express to properly detect client IPs when behind proxies
-app.set('trust proxy', true);
-console.log('✅ Trust proxy enabled - will detect real client IPs');
-
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(csrfProtection);
 
 // =====================================================
 // 🔒 IP FIREWALL MIDDLEWARE - Network-level security
@@ -258,7 +432,7 @@ try {
     // Add request tracking middleware
     app.use((req, res, next) => {
         const startTime = Date.now();
-        const requestSize = parseInt(req.headers['content-length'] || '0');
+        const requestSize = Number.parseInt(req.headers['content-length'] || '0', 10);
 
         // Track response
         const originalSend = res.send;
@@ -283,7 +457,7 @@ try {
     });
 
     // Make prometheus metrics globally available
-    global.prometheusMetrics = prometheusMetrics;
+    globalThis.prometheusMetrics = prometheusMetrics;
 
     console.log('✅ Prometheus metrics middleware initialized');
 } catch (metricsError) {
@@ -291,48 +465,72 @@ try {
     console.warn('📊 Metrics collection will be disabled');
 }
 
+const kioskHotReadCacheMs = Number.parseInt(process.env.KIOSK_HOT_READ_CACHE_MS || '30000', 10);
+const stockHotReadCacheMs = Number.parseInt(process.env.STOCK_HOT_READ_CACHE_MS || '15000', 10);
+const healthHotReadCacheMs = Number.parseInt(process.env.HEALTH_HOT_READ_CACHE_MS || '30000', 10);
+app.use('/api/health', createHotReadCache({
+    ttlMs: healthHotReadCacheMs,
+    maxEntries: 16
+}));
+app.use('/api/kiosk', createHotReadCache({
+    ttlMs: kioskHotReadCacheMs,
+    maxEntries: 256
+}));
+app.use('/api/stock', createHotReadCache({
+    ttlMs: stockHotReadCacheMs,
+    maxEntries: 512
+}));
+
+const healthDependencyCache = {
+    expiresAt: 0,
+    value: null
+};
+
+async function getHealthDependencySnapshot() {
+    const ttlMs = Number.parseInt(process.env.HEALTH_CHECK_CACHE_MS || '1000', 10);
+    const now = Date.now();
+    if (healthDependencyCache.value && healthDependencyCache.expiresAt > now) {
+        return healthDependencyCache.value;
+    }
+
+    let databaseStatus = 'Unknown';
+    try {
+        const dbResult = await query('SELECT NOW() as current_time');
+        databaseStatus = dbResult.rows && dbResult.rows.length > 0 ? 'Connected' : 'Error';
+    } catch (dbError) {
+        databaseStatus = 'Disconnected';
+        logger.error('Database health check failed:', dbError.message);
+    }
+
+    let cacheStatus = { status: 'Not available' };
+    try {
+        const cacheResult = await query('SELECT COUNT(*) as count FROM compatibility_cache WHERE expires_at > NOW()');
+        cacheStatus = {
+            status: 'warmed',
+            entries: Number.parseInt(cacheResult.rows[0].count, 10)
+        };
+    } catch (cacheError) {
+        logger.debug('Cache health check skipped:', cacheError.message);
+        cacheStatus = { status: 'Unknown' };
+    }
+
+    healthDependencyCache.value = { databaseStatus, cacheStatus };
+    healthDependencyCache.expiresAt = now + ttlMs;
+    return healthDependencyCache.value;
+}
+
 // Health endpoint with polling limiter for frequent health checks
 app.get('/api/health', pollingLimiter, async (req, res) => {
     try {
-        // Check database connection
-        let databaseStatus = 'Unknown';
-        try {
-            // Use the query function from db config
-            const dbResult = await query('SELECT NOW() as current_time');
-            databaseStatus = dbResult.rows && dbResult.rows.length > 0 ? 'Connected' : 'Error';
-        } catch (dbError) {
-            databaseStatus = 'Disconnected';
-            logger.error('Database health check failed:', dbError.message);
-        }
+        const { databaseStatus, cacheStatus } = await getHealthDependencySnapshot();
 
-        // Check AI model status
-        let aiStatus = { status: 'Not available' };
-        try {
-            const enhancedAIService = require('./services/enhancedAIService');
-            const circuitStatus = enhancedAIService.getCircuitBreakerStatus();
-            const cacheStats = enhancedAIService.getCacheStats();
-
-            aiStatus = {
-                model: circuitStatus.healthy ? 'Loaded' : 'Unavailable',
-                status: circuitStatus.healthy ? 'healthy' : (circuitStatus.degraded ? 'degraded' : 'unhealthy'),
-                cache: cacheStats.size || 0
-            };
-        } catch (aiError) {
-            // AI not initialized or unavailable
-            aiStatus = { status: 'Not available' };
-        }
-
-        // Check cache status
-        let cacheStatus = { status: 'Not available' };
-        try {
-            const cacheResult = await query('SELECT COUNT(*) as count FROM compatibility_cache WHERE expires_at > NOW()');
-            cacheStatus = {
-                status: 'warmed',
-                entries: parseInt(cacheResult.rows[0].count)
-            };
-        } catch (cacheError) {
-            cacheStatus = { status: 'Unknown' };
-        }
+        const aiStatus = {
+            status: 'disabled',
+            source: 'offline_kiosk',
+            aiEnabled: false,
+            engine: 'deterministic',
+            message: 'AI, ML, embeddings, and Ollama checks are disabled'
+        };
 
         res.json({
             status: 'success',
@@ -340,6 +538,8 @@ app.get('/api/health', pollingLimiter, async (req, res) => {
             timestamp: new Date().toISOString(),
             server: 'server.js',
             database: databaseStatus,
+            aiEnabled: false,
+            engine: 'deterministic',
             ai: aiStatus,
             cache: cacheStatus
         });
@@ -353,36 +553,23 @@ app.get('/api/health', pollingLimiter, async (req, res) => {
     }
 });
 
-// Enhanced AI health endpoint
+// Disabled AI health endpoint
 app.get('/api/health/ai', pollingLimiter, async (req, res) => {
-    try {
-        const enhancedAIService = require('./services/enhancedAIService');
-        const circuitStatus = enhancedAIService.getCircuitBreakerStatus();
-        const cacheStats = enhancedAIService.getCacheStats();
-
-        const status = circuitStatus.healthy ? 'healthy' : (circuitStatus.degraded ? 'degraded' : 'unhealthy');
-
-        res.json({
-            status,
-            circuit: circuitStatus,
-            cache: cacheStats,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        logger.error('AI health check failed:', error);
-        res.status(500).json({
-            status: 'error',
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
+    res.status(410).json({
+        success: false,
+        code: 'AI_REMOVED',
+        source: 'deterministic',
+        aiEnabled: false,
+        message: 'AI health checks are disabled in offline kiosk mode',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Health metrics endpoint (JSON format)
 app.get('/api/health/metrics', pollingLimiter, async (req, res) => {
     try {
-        if (global.prometheusMetrics) {
-            const metrics = await global.prometheusMetrics.getMetricsJSON();
+        if (globalThis.prometheusMetrics) {
+            const metrics = await globalThis.prometheusMetrics.getMetricsJSON();
             res.json({
                 success: true,
                 data: metrics,
@@ -405,10 +592,10 @@ app.get('/api/health/metrics', pollingLimiter, async (req, res) => {
 });
 
 // PHASE 3.2 WEEK 2: Prometheus metrics endpoint for scraping
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
-        if (global.prometheusMetrics) {
-            const metrics = await global.prometheusMetrics.getMetrics();
+        if (globalThis.prometheusMetrics) {
+            const metrics = await globalThis.prometheusMetrics.getMetrics();
             res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
             res.send(metrics);
         } else {
@@ -426,10 +613,10 @@ app.get('/metrics', async (req, res) => {
 });
 
 // Prometheus metrics endpoint (JSON format for admin dashboard)
-app.get('/api/metrics/json', async (req, res) => {
+app.get('/api/metrics/json', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
-        if (global.prometheusMetrics) {
-            const metrics = await global.prometheusMetrics.getMetricsJSON();
+        if (globalThis.prometheusMetrics) {
+            const metrics = await globalThis.prometheusMetrics.getMetricsJSON();
             res.json({
                 success: true,
                 data: metrics,
@@ -471,55 +658,19 @@ if (!fs.existsSync(PUBLIC_ASSETS_DIR)) {
 }
 
 app.use('/assets', (req, res, next) => {
-    // Allowed origins for static files - Including network access
-    const allowedOrigins = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3001',
-        // Allow any local network IP for development
-        /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001)$/
-    ];
+    const allowedOrigin = getAllowedOriginFromRequest(req);
 
-    const origin = req.headers.origin;
-    const referer = req.headers.referer;
-    const requestedFile = path.join(PUBLIC_ASSETS_DIR, req.path);
-
-    console.log(`🖼️ Static file request: ${req.path}`);
-    console.log(`📡 Origin: ${origin}`);
-    console.log(`📁 Looking for: ${requestedFile}`);
-    console.log(`📄 File exists: ${fs.existsSync(requestedFile)}`);
-
-    // Set CORS headers for static files - Enhanced network access
-    const isOriginAllowed = origin && (
-        allowedOrigins.includes(origin) ||
-        allowedOrigins.some(pattern => pattern instanceof RegExp && pattern.test(origin))
-    );
-
-    if (isOriginAllowed) {
-        res.header('Access-Control-Allow-Origin', origin);
-        console.log(`✅ CORS allowed for origin: ${origin}`);
-    } else if (referer) {
-        // Try to extract origin from referer
-        const refererOrigin = new URL(referer).origin;
-        const isRefererAllowed = allowedOrigins.includes(refererOrigin) ||
-            allowedOrigins.some(pattern => pattern instanceof RegExp && pattern.test(refererOrigin));
-
-        if (isRefererAllowed) {
-            res.header('Access-Control-Allow-Origin', refererOrigin);
-            console.log(`✅ CORS allowed for referer origin: ${refererOrigin}`);
-        } else {
-            console.log(`⚠️ CORS denied for referer: ${refererOrigin}`);
-        }
+    // FIX #8: Removed verbose CORS logging for static assets
+    if (allowedOrigin) {
+        applyCorsHeaders(res, allowedOrigin, 'GET, HEAD, OPTIONS', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
     } else {
-        console.log(`⚠️ CORS: no origin or referer for assets request`);
+        applyCorsHeaders(res, null, 'GET, HEAD, OPTIONS', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
     }
 
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
     res.header('Cache-Control', 'public, max-age=31536000'); // Cache images for 1 year
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('Content-Security-Policy', "default-src 'none'; img-src 'self' data: blob:; media-src 'self'; style-src 'none'; script-src 'none'");
 
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
@@ -532,43 +683,12 @@ app.use('/assets', (req, res, next) => {
 
 // Serve uploads directory for profile images and other uploads
 app.use('/uploads', (req, res, next) => {
-    // Allowed origins for uploads - Including network access
-    const allowedOrigins = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3001',
-        // Allow any local network IP for development
-        /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001)$/
-    ];
+    const allowedOrigin = getAllowedOriginFromRequest(req);
 
-    const origin = req.headers.origin;
-    const referer = req.headers.referer;
-
-    console.log(`📁 Upload file request: ${req.path}`);
-    console.log(`📡 Origin: ${origin}`);
-
-    // Set CORS headers for uploads - Enhanced network access
-    const isOriginAllowed = origin && (
-        allowedOrigins.includes(origin) ||
-        allowedOrigins.some(pattern => pattern instanceof RegExp && pattern.test(origin))
-    );
-
-    if (isOriginAllowed) {
-        res.header('Access-Control-Allow-Origin', origin);
-    } else if (referer) {
-        const refererOrigin = new URL(referer).origin;
-        const isRefererAllowed = allowedOrigins.includes(refererOrigin) ||
-            allowedOrigins.some(pattern => pattern instanceof RegExp && pattern.test(refererOrigin));
-
-        if (isRefererAllowed) {
-            res.header('Access-Control-Allow-Origin', refererOrigin);
-        }
-    }
-
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    applyCorsHeaders(res, allowedOrigin, 'GET, HEAD, OPTIONS', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
     res.header('Cache-Control', 'public, max-age=86400'); // Cache uploads for 24 hours
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('Content-Security-Policy', "default-src 'none'; img-src 'self' data: blob:; media-src 'self'; style-src 'none'; script-src 'none'");
 
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
@@ -605,6 +725,20 @@ const safeRequireRoute = (routePath, routeName) => {
     }
 };
 
+const createDisabledAIRouter = (featureName) => {
+    const router = express.Router();
+    router.use((req, res) => {
+        res.status(410).json({
+            success: false,
+            code: 'AI_REMOVED',
+            source: 'deterministic',
+            feature: featureName,
+            message: `${featureName} is disabled in offline kiosk mode`
+        });
+    });
+    return router;
+};
+
 // Load core routes
 console.log('🔧 Loading core routes...');
 const authRoutes = safeRequireRoute('./routes/auths', 'Auth routes');
@@ -619,7 +753,7 @@ const queueRoutes = safeRequireRoute('./routes/queue', 'Queue management routes'
 
 // Load additional routes
 console.log('🔧 Loading additional routes...');
-const healthRoutes = safeRequireRoute('./routes/health', 'Health monitoring routes'); // ROOT CAUSE FIX #7
+const healthRoutes = express.Router(); // Offline health endpoints are defined inline without Ollama.
 const auditLogs = safeRequireRoute('./routes/audit-logs', 'Audit logs');
 const adminRoutes = safeRequireRoute('./routes/admin', 'Admin routes');
 const imageRoutes = safeRequireRoute('./routes/images', 'Image routes');
@@ -632,15 +766,15 @@ const assistanceRoutes = safeRequireRoute('./routes/assistanceRoutes', 'Assistan
 
 // Load AI routes
 console.log('🔧 Loading AI integration routes...');
-const aiRoutes = safeRequireRoute('./ai/routes/aiRoutes', 'AI integration routes');
+const aiRoutes = createDisabledAIRouter('AI runtime');
 
 // Load PC Upgrade Parameters routes
 console.log('🔧 Loading PC Upgrade Parameters routes...');
 const pcUpgradeParametersRoutes = safeRequireRoute('./routes/pcUpgradeParameters', 'PC Upgrade Parameters routes');
 
-// Load PC Customized AI Reference Builds routes
-console.log('🤖 Loading PC Customized AI Reference Builds routes...');
-const pcCustomizedAIBuildsRoutes = safeRequireRoute('./routes/pcCustomizedAIBuilds', 'PC Customized AI Builds routes');
+// Legacy PC Customized AI reference-build routes stay mounted as disabled responses.
+console.log('Loading disabled PC Customized AI Reference Builds routes...');
+const pcCustomizedAIBuildsRoutes = createDisabledAIRouter('PC Customized AI reference builds');
 
 // Load Reference Builds routes
 console.log('🔧 Loading Reference Builds routes...');
@@ -648,7 +782,7 @@ const referenceBuildsRoutes = safeRequireRoute('./routes/referenceBuilds', 'Refe
 
 // PHASE 4 & 5: Load AI Metrics routes
 console.log('📊 Loading AI Metrics routes...');
-const aiMetricsRoutes = safeRequireRoute('./routes/aiMetrics', 'AI Metrics routes');
+const aiMetricsRoutes = createDisabledAIRouter('AI metrics');
 
 // PHASE 2.2: Load Cache Management routes
 console.log('🗄️ Loading Cache Management routes...');
@@ -671,7 +805,7 @@ const PORT = process.env.PORT || 5000;
 
 // Start server
 const startServer = async (options = {}) => {
-    const requestedListen = options.listen !== undefined ? options.listen : true;
+    const requestedListen = options.listen === undefined ? true : options.listen;
     // Force no network listener under test to avoid port conflicts across suites
     const listen = process.env.NODE_ENV === 'test' ? false : requestedListen;
     try {
@@ -690,7 +824,6 @@ const startServer = async (options = {}) => {
 
         const safeMountRoute = (path, ...handlers) => {
             try {
-                const routeName = path.replace('/api/', '');
                 console.log(`  → Mounting ${path}...`);
                 app.use(path, ...handlers);
                 console.log(`  ✅ ${path} mounted`);
@@ -705,7 +838,7 @@ const startServer = async (options = {}) => {
 
         // Mount routes with appropriate rate limiting
         safeMountRoute('/api/health', pollingLimiter, healthRoutes);
-        safeMountRoute('/api/auth', authRoutes);
+        safeMountRoute('/api/auth', authLimiter, authRoutes);
         safeMountRoute('/api/users', userRoutes);
         safeMountRoute('/api/stock', kioskLimiter, stockRoutes);
         safeMountRoute('/api/builder', builderRoutes);
@@ -719,21 +852,25 @@ const startServer = async (options = {}) => {
         // Apply kiosk rate limiter to all kiosk endpoints
         app.use('/api/kiosk*', kioskLimiter);
 
+        // Legacy inline kiosk browse handlers are disabled by default so
+        // KWise-Backend/routes/kiosk.js remains the single kiosk API source.
+        if (process.env.KWISE_ENABLE_INLINE_KIOSK_ROUTES === 'true') {
+
         // Categories endpoint with peripherals consolidation
         app.get('/api/kiosk/categories', async (req, res) => {
             try {
                 console.log('📊 Fetching kiosk categories...');
 
                 const result = await query(`
-                    SELECT 
+                    SELECT
                         category,
                         COUNT(*) as product_count,
                         MIN(price) as min_price,
                         MAX(price) as max_price,
                         SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) as in_stock_count,
                         COALESCE(kiosk_category_order, 999) as kiosk_category_order
-                    FROM pc_parts 
-                    WHERE is_active = true 
+                    FROM pc_parts
+                    WHERE is_active = true
                     AND (kiosk_visible IS NULL OR kiosk_visible = true)
                     AND stock > 0
                     GROUP BY category, kiosk_category_order
@@ -743,7 +880,7 @@ const startServer = async (options = {}) => {
                 console.log(`📈 Found ${result.rows.length} categories`);
 
                 // Consolidate peripherals
-                const peripheralCategories = ['Monitor', 'Keyboard', 'Mouse', 'Headphones', 'Speakers', 'Webcam'];
+                const peripheralCategories = new Set(['Monitor', 'Keyboard', 'Mouse', 'Headphones', 'Speakers', 'Webcam']);
                 let peripheralData = {
                     category: 'Peripherals',
                     name: 'Peripherals',
@@ -758,30 +895,30 @@ const startServer = async (options = {}) => {
                 const regularCategories = [];
 
                 result.rows.forEach(row => {
-                    if (peripheralCategories.includes(row.category)) {
-                        peripheralData.productCount += parseInt(row.product_count);
-                        peripheralData.minPrice = Math.min(peripheralData.minPrice, parseFloat(row.min_price));
-                        peripheralData.maxPrice = Math.max(peripheralData.maxPrice, parseFloat(row.max_price));
-                        peripheralData.inStockCount += parseInt(row.in_stock_count);
+                    if (peripheralCategories.has(row.category)) {
+                        peripheralData.productCount += Number.parseInt(row.product_count, 10);
+                        peripheralData.minPrice = Math.min(peripheralData.minPrice, Number.parseFloat(row.min_price));
+                        peripheralData.maxPrice = Math.max(peripheralData.maxPrice, Number.parseFloat(row.max_price));
+                        peripheralData.inStockCount += Number.parseInt(row.in_stock_count, 10);
 
                         peripheralData.subCategories.push({
                             category: row.category,
                             name: row.category,
-                            productCount: parseInt(row.product_count),
-                            minPrice: parseFloat(row.min_price),
-                            maxPrice: parseFloat(row.max_price),
-                            inStockCount: parseInt(row.in_stock_count),
-                            order: parseInt(row.kiosk_category_order)
+                            productCount: Number.parseInt(row.product_count, 10),
+                            minPrice: Number.parseFloat(row.min_price),
+                            maxPrice: Number.parseFloat(row.max_price),
+                            inStockCount: Number.parseInt(row.in_stock_count, 10),
+                            order: Number.parseInt(row.kiosk_category_order, 10)
                         });
                     } else {
                         regularCategories.push({
                             category: row.category,
                             name: row.category,
-                            productCount: parseInt(row.product_count),
-                            minPrice: parseFloat(row.min_price),
-                            maxPrice: parseFloat(row.max_price),
-                            inStockCount: parseInt(row.in_stock_count),
-                            order: parseInt(row.kiosk_category_order)
+                            productCount: Number.parseInt(row.product_count, 10),
+                            minPrice: Number.parseFloat(row.min_price),
+                            maxPrice: Number.parseFloat(row.max_price),
+                            inStockCount: Number.parseInt(row.in_stock_count, 10),
+                            order: Number.parseInt(row.kiosk_category_order, 10)
                         });
                     }
                 });
@@ -822,35 +959,50 @@ const startServer = async (options = {}) => {
 
                 console.log(`📦 Fetching products for category: ${category}`);
 
-                const offset = (parseInt(page) - 1) * parseInt(limit);
-                const validSortBy = ['name', 'price', 'brand', 'stock'].includes(sortBy) ? sortBy : 'name';
+                const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+                const parsedLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+                const offset = (parsedPage - 1) * parsedLimit;
+                const kioskSortMap = { 'name': 'name', 'price': 'price', 'brand': 'brand', 'stock': 'stock' };
+                const validSortBy = kioskSortMap[sortBy] || 'name';
                 const validSortOrder = ['asc', 'desc'].includes(sortOrder.toLowerCase()) ? sortOrder.toUpperCase() : 'ASC';
 
+                // FIX #5: Get total count BEFORE pagination for correct totalPages/totalItems
+                const countResult = await query(`
+                    SELECT COUNT(*) as total
+                    FROM pc_parts
+                    WHERE is_active = true
+                    AND (kiosk_visible IS NULL OR kiosk_visible = true)
+                    AND LOWER(category) = LOWER($1)
+                    AND stock > 0
+                `, [category]);
+                const totalItems = Number.parseInt(countResult.rows[0].total, 10);
+                const totalPages = Math.ceil(totalItems / parsedLimit);
+
                 const result = await query(`
-                    SELECT 
+                    SELECT
                         id, name, category, brand, price, stock,
                         COALESCE(image_url, image_path) AS image_url,
                         specifications, dimensions, description,
                         COALESCE(on_sale, false) as on_sale,
                         sale_price, sale_start_date, sale_end_date
-                    FROM pc_parts 
-                    WHERE is_active = true 
+                    FROM pc_parts
+                    WHERE is_active = true
                     AND (kiosk_visible IS NULL OR kiosk_visible = true)
                     AND LOWER(category) = LOWER($1)
                     AND stock > 0
                     ORDER BY ${validSortBy} ${validSortOrder}
                     LIMIT $2 OFFSET $3
-                `, [category, parseInt(limit), offset]);
+                `, [category, parsedLimit, offset]);
 
                 const products = result.rows.map(row => ({
                     id: row.id,
                     name: row.name,
                     category: row.category,
                     brand: row.brand,
-                    price: parseFloat(row.price),
-                    salePrice: row.sale_price ? parseFloat(row.sale_price) : null,
-                    effectivePrice: row.on_sale && row.sale_price ? parseFloat(row.sale_price) : parseFloat(row.price),
-                    stock: parseInt(row.stock),
+                    price: Number.parseFloat(row.price),
+                    salePrice: row.sale_price ? Number.parseFloat(row.sale_price) : null,
+                    effectivePrice: row.on_sale && row.sale_price ? Number.parseFloat(row.sale_price) : Number.parseFloat(row.price),
+                    stock: Number.parseInt(row.stock, 10),
                     imageUrl: row.image_url,
                     specifications: row.specifications,
                     dimensions: row.dimensions,
@@ -859,21 +1011,20 @@ const startServer = async (options = {}) => {
                     available: true // Only in-stock items are returned
                 }));
 
-                console.log(`✅ Returning ${products.length} products for ${category}`);
+                console.log(`✅ Returning ${products.length} products for ${category} (${totalItems} total)`);
 
-                // 🔥 FIX: Match the proper API response structure from kioskController
-                // Return nested structure: {success, data: {items: [], pagination: {}}}
+                // FIX #5: Use totalItems from COUNT query, not filtered array length
                 res.json({
                     success: true,
                     data: {
                         items: products,
                         pagination: {
-                            currentPage: parseInt(page),
-                            totalPages: Math.ceil(products.length / parseInt(limit)),
-                            totalItems: products.length,
-                            itemsPerPage: parseInt(limit),
-                            hasNext: false, // Simple pagination for now
-                            hasPrev: parseInt(page) > 1
+                            currentPage: parsedPage,
+                            totalPages: totalPages,
+                            totalItems: totalItems,
+                            itemsPerPage: parsedLimit,
+                            hasNext: parsedPage < totalPages,
+                            hasPrev: parsedPage > 1
                         },
                         filters: {
                             category,
@@ -894,21 +1045,22 @@ const startServer = async (options = {}) => {
         });
 
         // Featured products endpoint
+        // OPTIMIZED: TABLESAMPLE instead of ORDER BY RANDOM() (avoids full table scan)
         app.get('/api/kiosk/featured', async (req, res) => {
             try {
                 console.log('🔥 Fetching featured products...');
 
                 const result = await query(`
-                    SELECT 
+                    SELECT
                         id, name, category, brand, price, stock,
                         COALESCE(image_url, image_path) AS image_url,
                         specifications, dimensions, description,
                         COALESCE(on_sale, false) as on_sale,
                         sale_price
-                    FROM pc_parts 
-                    WHERE is_active = true 
-                    AND (kiosk_visible IS NULL OR kiosk_visible = true)
-                    AND stock > 0
+                    FROM pc_parts TABLESAMPLE SYSTEM(10)
+                    WHERE is_active = true
+                      AND (kiosk_visible IS NULL OR kiosk_visible = true)
+                      AND stock > 0
                     ORDER BY RANDOM()
                     LIMIT 25
                 `);
@@ -918,10 +1070,10 @@ const startServer = async (options = {}) => {
                     name: row.name,
                     category: row.category,
                     brand: row.brand,
-                    price: parseFloat(row.price),
-                    salePrice: row.sale_price ? parseFloat(row.sale_price) : null,
-                    effectivePrice: row.on_sale && row.sale_price ? parseFloat(row.sale_price) : parseFloat(row.price),
-                    stock: parseInt(row.stock),
+                    price: Number.parseFloat(row.price),
+                    salePrice: row.sale_price ? Number.parseFloat(row.sale_price) : null,
+                    effectivePrice: row.on_sale && row.sale_price ? Number.parseFloat(row.sale_price) : Number.parseFloat(row.price),
+                    stock: Number.parseInt(row.stock, 10),
                     imageUrl: row.image_url,
                     specifications: row.specifications,
                     dimensions: row.dimensions,
@@ -954,12 +1106,12 @@ const startServer = async (options = {}) => {
                 console.log('💰 Fetching on-sale products...');
 
                 const result = await query(`
-                    SELECT 
+                    SELECT
                         id, name, category, brand, price, sale_price, stock,
                         COALESCE(image_url, image_path) AS image_url,
                         specifications, dimensions, description, on_sale
-                    FROM pc_parts 
-                    WHERE is_active = true 
+                    FROM pc_parts
+                    WHERE is_active = true
                     AND (kiosk_visible IS NULL OR kiosk_visible = true)
                     AND on_sale = true
                     AND stock > 0
@@ -972,10 +1124,10 @@ const startServer = async (options = {}) => {
                     name: row.name,
                     category: row.category,
                     brand: row.brand,
-                    price: parseFloat(row.price),
-                    salePrice: parseFloat(row.sale_price),
-                    effectivePrice: parseFloat(row.sale_price),
-                    stock: parseInt(row.stock),
+                    price: Number.parseFloat(row.price),
+                    salePrice: Number.parseFloat(row.sale_price),
+                    effectivePrice: Number.parseFloat(row.sale_price),
+                    stock: Number.parseInt(row.stock, 10),
                     imageUrl: row.image_url,
                     specifications: row.specifications,
                     dimensions: row.dimensions,
@@ -1003,51 +1155,52 @@ const startServer = async (options = {}) => {
         });
 
         // Build components endpoint for PC customization
+        // OPTIMIZED: Single query with ANY() instead of 8 sequential queries (N+1 → 1)
         app.get('/api/kiosk/build-components', async (req, res) => {
             try {
-                console.log('🔧 Fetching build components...');
-
                 const buildCategories = ['CPU', 'GPU', 'Motherboard', 'RAM', 'Storage', 'PSU', 'Case', 'Cooling'];
+
+                // Single query fetches all categories at once
+                const result = await query(`
+                    SELECT
+                        id, name, category, brand, price, stock,
+                        COALESCE(image_url, image_path) AS image_url,
+                        specifications, dimensions, description
+                    FROM pc_parts
+                    WHERE is_active = true
+                      AND (kiosk_visible IS NULL OR kiosk_visible = true)
+                      AND LOWER(category) = ANY($1::text[])
+                      AND stock > 0
+                    ORDER BY category, price ASC
+                `, [buildCategories.map(c => c.toLowerCase())]);
+
+                // Group results by category in memory
                 const buildComponents = {};
-
                 for (const category of buildCategories) {
-                    const result = await query(`
-                        SELECT 
-                            id, name, category, brand, price, stock,
-                            COALESCE(image_url, image_path) AS image_url,
-                            specifications, dimensions, description
-                        FROM pc_parts 
-                        WHERE is_active = true 
-                        AND (kiosk_visible IS NULL OR kiosk_visible = true)
-                        AND LOWER(category) = LOWER($1)
-                        AND stock > 0
-                        ORDER BY price ASC
-                        LIMIT 10
-                    `, [category]);
+                    buildComponents[category.toLowerCase()] = { products: [], brands: [] };
+                }
 
-                    if (result.rows.length > 0) {
-                        const products = result.rows.map(row => ({
+                for (const row of result.rows) {
+                    const catKey = row.category.toLowerCase();
+                    if (buildComponents[catKey] && buildComponents[catKey].products.length < 10) {
+                        buildComponents[catKey].products.push({
                             id: row.id,
                             name: row.name,
                             category: row.category,
                             brand: row.brand,
-                            price: parseFloat(row.price),
-                            stock: parseInt(row.stock),
+                            price: Number.parseFloat(row.price),
+                            stock: Number.parseInt(row.stock, 10),
                             imageUrl: row.image_url,
                             specifications: row.specifications,
                             dimensions: row.dimensions,
                             description: row.description,
                             available: true
-                        }));
-
-                        buildComponents[category.toLowerCase()] = {
-                            products: products,
-                            brands: [...new Set(products.map(p => p.brand).filter(Boolean))]
-                        };
+                        });
+                        if (row.brand && !buildComponents[catKey].brands.includes(row.brand)) {
+                            buildComponents[catKey].brands.push(row.brand);
+                        }
                     }
                 }
-
-                console.log(`✅ Build components loaded for ${Object.keys(buildComponents).length} categories`);
 
                 res.json({
                     success: true,
@@ -1065,8 +1218,11 @@ const startServer = async (options = {}) => {
             }
         });
 
+        }
+
         // Admin sale management endpoint - THIS IS WHERE THE MAKE ON SALE FUNCTIONALITY IS
-        app.put('/api/stock/:id/sale', async (req, res) => {
+        // SECURITY FIX: Requires authentication + admin role
+        app.put('/api/stock/:id/sale', protect, require('./middleware/roleCheck').isAdmin, async (req, res) => {
             try {
                 const { id } = req.params;
                 const { on_sale, sale_price, sale_start_date, sale_end_date } = req.body;
@@ -1074,13 +1230,13 @@ const startServer = async (options = {}) => {
                 console.log(`💰 Admin: Updating sale status for product ${id}:`, { on_sale, sale_price });
 
                 const result = await query(`
-                    UPDATE pc_parts 
-                    SET on_sale = $1, 
-                        sale_price = $2, 
-                        sale_start_date = $3, 
+                    UPDATE pc_parts
+                    SET on_sale = $1,
+                        sale_price = $2,
+                        sale_start_date = $3,
                         sale_end_date = $4,
                         updated_at = NOW()
-                    WHERE id = $5 
+                    WHERE id = $5
                     RETURNING id, name, price, on_sale, sale_price
                 `, [
                     on_sale || false,
@@ -1123,8 +1279,9 @@ const startServer = async (options = {}) => {
             logger.info('🔍 DEBUG - Kiosk order middleware check:');
             logger.info('Method:', req.method);
             logger.info('Content-Type:', req.headers['content-type']);
-            logger.info('Body keys:', Object.keys(req.body));
-            logger.info('Body:', JSON.stringify(req.body, null, 2));
+            logger.info('Body keys:', Object.keys(req.body || {}));
+            logger.info('Item count:', Array.isArray(req.body?.items) ? req.body.items.length : 0);
+            logger.info('Selected part count:', Array.isArray(req.body?.selectedParts) ? req.body.selectedParts.length : 0);
             next();
         });
 
@@ -1150,10 +1307,6 @@ const startServer = async (options = {}) => {
         const prebuiltRoutes = require('./routes/prebuilt');
         safeMountRoute('/api/prebuilt', kioskLimiter, prebuiltRoutes);
 
-        // TEMPORARY DEBUG ENDPOINT
-        const { testGetBuildComponents } = require('./debug-controller');
-        safeMountRoute('/api/debug/build-components', testGetBuildComponents);
-
         safeMountRoute('/api/orders', ordersRoutes);
         safeMountRoute('/api/queue', realtimeLimiter, queueRoutes); // Queue management with real-time updates
         safeMountRoute('/api/settings', settingsRoutes);
@@ -1161,7 +1314,7 @@ const startServer = async (options = {}) => {
         safeMountRoute('/api/logs', logsRoutes);
         safeMountRoute('/api/dev', devToolsRoutes);
         safeMountRoute('/api/audit-logs', auditLogs);
-        safeMountRoute('/api/admin', adminRoutes);
+        safeMountRoute('/api/admin', adminLimiter, adminRoutes);
         safeMountRoute('/api/images', imageRoutes);
 
         // Real-time SSE routes for live updates
@@ -1170,9 +1323,8 @@ const startServer = async (options = {}) => {
         safeMountRoute('/api/realtime', pollingLimiter, realtimeRoutes);
         console.log('✅ Real-time SSE routes mounted');
 
-        // Global Search routes
+        // FIX #9: Global Search routes (removed duplicate — already loaded at startup as searchRoutes)
         console.log('🔍 Mounting Global Search routes...');
-        const searchRoutes = safeRequireRoute('./routes/search', 'Global Search routes');
         safeMountRoute('/api/search', searchRoutes);
         console.log('✅ Global Search routes mounted');
 
@@ -1216,13 +1368,14 @@ const startServer = async (options = {}) => {
         console.log('✅ Phase 3.2 Price Tracking routes mounted');
         safeMountRoute('/api/messages', pollingLimiter, messagesRoutes); // Ultra-permissive for frequent chat polling
         safeMountRoute('/api/notifications', pollingLimiter, notificationsRoutes); // Ultra-permissive for notifications
-        safeMountRoute('/api/search', searchRoutes);
+        // NOTE: /api/search already mounted above (line ~1190)
         safeMountRoute('/api/profile', profileRoutes);
 
         // Mount Admin Feedback routes (AI review and correction system)
         console.log('📊 Mounting Admin Feedback routes...');
         const adminFeedbackRoutes = require('./routes/adminFeedback');
-        safeMountRoute('/api/admin', adminFeedbackRoutes);
+        // NOTE: /api/admin already mounted above; mount feedback under a distinct path
+        safeMountRoute('/api/admin/feedback', adminFeedbackRoutes);
 
         // PRIORITY 3: Mount Real-World Data Feedback routes (User feedback, known issues, successful builds)
         console.log(' Mounting Real-World Data Feedback routes...');
@@ -1231,24 +1384,24 @@ const startServer = async (options = {}) => {
 
         // Mount PC Upgrade Parameters routes
         console.log('⚙️ Mounting PC Upgrade Parameters routes...');
-        safeMountRoute('/api/admin/pc-upgrade-parameters', pcUpgradeParametersRoutes);
+        safeMountRoute('/api/admin/pc-upgrade-parameters', adminLimiter, pcUpgradeParametersRoutes);
 
-        // Mount PC Customized AI Reference Builds routes (both admin and kiosk access)
-        console.log('🤖 Mounting PC Customized AI Reference Builds routes...');
+        // Mount disabled PC Customized AI Reference Builds routes (both admin and kiosk access)
+        console.log('Mounting disabled PC Customized AI Reference Builds routes...');
         safeMountRoute('/api/pc-customized-ai-builds', pcCustomizedAIBuildsRoutes); // Public for kiosk
         safeMountRoute('/api/admin/pc-customized-ai-builds', pcCustomizedAIBuildsRoutes); // Admin access
 
         // Mount Reference Builds routes (both admin and kiosk access)
         console.log('🏗️ Mounting Reference Builds routes...');
         safeMountRoute('/api/reference-builds', referenceBuildsRoutes); // Public for kiosk
-        safeMountRoute('/api/admin/reference-builds', referenceBuildsRoutes); // Admin access
+        safeMountRoute('/api/admin/reference-builds', adminLimiter, referenceBuildsRoutes); // Admin access
 
         // Mount AI integration routes
         console.log('🤖 Mounting AI integration routes...');
         try {
             console.log('  → Loading aiRoutes module...');
             // Test if aiRoutes loads correctly
-            const testRouter = require('./ai/routes/aiRoutes');
+            const testRouter = aiRoutes;
             console.log('  → aiRoutes module loaded, checking router type:', typeof testRouter);
             console.log('  → Mounting to /api/ai...');
             safeMountRoute('/api/ai', aiRoutes);
@@ -1270,36 +1423,36 @@ const startServer = async (options = {}) => {
 
         // PHASE 2.2: Mount Cache Management routes
         console.log('🗄️ Mounting Cache Management routes...');
-        safeMountRoute('/api/cache', cacheRoutes);
+        safeMountRoute('/api/cache', adminLimiter, cacheRoutes);
 
         // PHASE 4: Mount System Performance Metrics routes
         console.log('📊 Mounting System Performance Metrics routes...');
         const systemMetricsRoutes = require('./routes/systemMetricsRoutes');
-        safeMountRoute('/api/system', systemMetricsRoutes);
+        safeMountRoute('/api/system', adminLimiter, systemMetricsRoutes);
 
         // PHASE 4: Mount Visual Rule Builder routes
         console.log('🔧 Mounting Visual Rule Builder routes...');
         const ruleBuilderRoutes = require('./routes/ruleBuilderRoutes');
-        safeMountRoute('/api/rules', ruleBuilderRoutes);
+        safeMountRoute('/api/rules', adminLimiter, ruleBuilderRoutes);
 
         // PHASE 3: Mount Machine Learning routes
         console.log('🤖 Mounting Machine Learning routes...');
-        const mlRoutes = require('./ml/routes/mlRoutes');
+        const mlRoutes = createDisabledAIRouter('ML routes');
         safeMountRoute('/api/ml', mlRoutes);
 
         // Mount AI training routes
         console.log('🎓 Mounting AI training routes...');
-        const trainingRoutes = require('./ai/routes/trainingRoutes');
+        const trainingRoutes = createDisabledAIRouter('AI training');
         safeMountRoute('/api/ai/training', trainingRoutes);
 
         // PHASE 2.3: Mount Prompt Optimization routes
         console.log('📝 Mounting Prompt Optimization routes...');
-        const promptRoutes = require('./ai/routes/promptRoutes');
+        const promptRoutes = createDisabledAIRouter('Prompt optimization');
         safeMountRoute('/api/prompts', promptRoutes);
 
         // PHASE 2.4: Mount Performance Prediction routes
         console.log('🎮 Mounting Performance Prediction routes...');
-        const performanceRoutes = require('./ai/routes/performanceRoutes');
+        const performanceRoutes = createDisabledAIRouter('Performance prediction');
         safeMountRoute('/api/ai/build', performanceRoutes);
 
         // Mount compatibility analysis routes
@@ -1331,15 +1484,15 @@ const startServer = async (options = {}) => {
         // Receipt generation endpoints
         const { generateReceiptHTML, generateReceiptText } = require('./utils/receiptGenerator');
 
-        // Generate HTML receipt
-        app.get('/api/receipts/html/:orderId', async (req, res) => {
+        // Generate HTML receipt (SECURITY FIX: Requires authentication)
+        app.get('/api/receipts/html/:orderId', protect, async (req, res) => {
             try {
                 const { orderId } = req.params;
                 const { print } = req.query;
 
                 // Get order data with items
                 const orderResult = await query(`
-                    SELECT 
+                    SELECT
                         o.*,
                         COALESCE(
                             json_agg(
@@ -1388,14 +1541,14 @@ const startServer = async (options = {}) => {
             }
         });
 
-        // Generate text receipt for thermal printers
-        app.get('/api/receipts/text/:orderId', async (req, res) => {
+        // Generate text receipt for thermal printers (SECURITY FIX: Requires authentication)
+        app.get('/api/receipts/text/:orderId', protect, async (req, res) => {
             try {
                 const { orderId } = req.params;
 
                 // Get order data with items
                 const orderResult = await query(`
-                    SELECT 
+                    SELECT
                         o.*,
                         COALESCE(
                             json_agg(
@@ -1441,7 +1594,7 @@ const startServer = async (options = {}) => {
         // Generate thermal printer receipt (ESC/POS commands)
         const { generateThermalReceipt, generateThermalReceiptBytes } = require('./utils/thermalPrinter');
 
-        app.post('/api/receipts/thermal', async (req, res) => {
+        app.post('/api/receipts/thermal', protect, async (req, res) => {
             try {
                 const { orderId, orderData, items, format = 'text' } = req.body;
 
@@ -1451,7 +1604,7 @@ const startServer = async (options = {}) => {
 
                 if (orderId && !orderData) {
                     const orderResult = await query(`
-                        SELECT 
+                        SELECT
                             o.*,
                             COALESCE(
                                 json_agg(
@@ -1542,41 +1695,33 @@ const startServer = async (options = {}) => {
             app.set('sseClients', sseClients);
         }
 
-        // Register SSE clients with manager for broadcasting (OPTIONAL)
-        try {
-            // const { registerClients } = require('./services/sseManager');
-            // registerClients(sseClients);
-            // console.log('✅ SSE Manager registered with client sets');
-        } catch (error) {
-            console.error('⚠️ Failed to register SSE Manager:', error.message);
-        }
+        const releaseSseClient = (set, client, heartbeat, reason = null) => {
+            client.connected = false;
+            clearInterval(heartbeat);
+            set.delete(client);
+
+            if (reason) {
+                logger.warn('SSE client disconnected unexpectedly', { reason });
+            }
+        };
 
         const sseHandler = (set, req, res) => {
             // Enhanced SSE handler with proper CORS and error handling
-            const origin = req.headers.origin;
-            const allowedOrigins = [
-                'http://localhost:3001',
-                'http://127.0.0.1:3001',
-                'http://localhost:3000',
-                'http://127.0.0.1:3000'
-            ];
-
-            // Determine CORS origin
-            let corsOrigin = '*';
-            if (origin && allowedOrigins.includes(origin)) {
-                corsOrigin = origin;
-            } else if (origin && /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001)$/.test(origin)) {
-                corsOrigin = origin;
-            }
-
-            res.writeHead(200, {
+            const corsOrigin = getAllowedOriginFromRequest(req);
+            const headers = {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
-                'Access-Control-Allow-Origin': corsOrigin,
-                'Access-Control-Allow-Credentials': 'true',
                 'Access-Control-Allow-Headers': 'Cache-Control'
-            });
+            };
+
+            if (corsOrigin) {
+                headers['Access-Control-Allow-Origin'] = corsOrigin;
+                headers['Access-Control-Allow-Credentials'] = 'true';
+                headers.Vary = 'Origin';
+            }
+
+            res.writeHead(200, headers);
 
             // Send initial heartbeat
             res.write(`event: heartbeat\ndata: {"ts":"${new Date().toISOString()}","status":"connected"}\n\n`);
@@ -1594,24 +1739,18 @@ const startServer = async (options = {}) => {
                     try {
                         res.write(`event: heartbeat\ndata: {"ts":"${new Date().toISOString()}"}\n\n`);
                     } catch (error) {
-                        client.connected = false;
-                        clearInterval(heartbeat);
-                        set.delete(client);
+                        releaseSseClient(set, client, heartbeat, error.message);
                     }
                 }
             }, 30000); // 30 seconds
 
             // Handle client disconnect
             req.on('close', () => {
-                client.connected = false;
-                clearInterval(heartbeat);
-                set.delete(client);
+                releaseSseClient(set, client, heartbeat);
             });
 
-            req.on('error', () => {
-                client.connected = false;
-                clearInterval(heartbeat);
-                set.delete(client);
+            req.on('error', (error) => {
+                releaseSseClient(set, client, heartbeat, error.message);
             });
         };
 
@@ -1684,15 +1823,9 @@ const startServer = async (options = {}) => {
             });
         });
 
-        // Global error handler
-        app.use((err, req, res, next) => {
-            console.error('🚨 Global error handler caught:', err);
-            if (res.headersSent) return next(err);
-            res.status(err.status || 500).json({
-                status: 'error',
-                message: err.message || 'Internal server error'
-            });
-        });
+        // Global error handler — uses imported errorHandler for PG/JWT-specific error handling
+        const errorHandler = require('./middleware/errorHandler');
+        app.use(errorHandler);
 
         // Lightweight periodic broadcast (will be replaced by real change triggers later)
         if (!app.get('broadcastUserStats')) { // guard so we don't duplicate under repeated startServer in tests
@@ -1709,7 +1842,7 @@ const startServer = async (options = {}) => {
                                                     FROM users
                                                     WHERE is_active = true
                                                 )
-                                                SELECT 
+                                                SELECT
                                                     COUNT(*) AS total,
                                                     COUNT(CASE WHEN COALESCE(last_activity, last_login, NOW() - INTERVAL '100 years') >= NOW() - INTERVAL '15 minutes' THEN 1 END) AS active_15,
                                                     COUNT(CASE WHEN COALESCE(last_activity, last_login, NOW() - INTERVAL '100 years') >= NOW() - INTERVAL '2 minutes' THEN 1 END) AS online_2
@@ -1717,9 +1850,9 @@ const startServer = async (options = {}) => {
                                         `);
                     let totalUsers = 0, activeUsers = 0, online = 0;
                     if (presenceQ?.rows?.[0]) {
-                        totalUsers = parseInt(presenceQ.rows[0].total || 0);
-                        activeUsers = parseInt(presenceQ.rows[0].active_15 || 0);
-                        online = parseInt(presenceQ.rows[0].online_2 || 0);
+                        totalUsers = Number.parseInt(presenceQ.rows[0].total || 0, 10);
+                        activeUsers = Number.parseInt(presenceQ.rows[0].active_15 || 0, 10);
+                        online = Number.parseInt(presenceQ.rows[0].online_2 || 0, 10);
                     }
 
                     // Fallback sanity check: if activeUsers seems suspiciously low but audit_logs show more, refresh last_activity lazily
@@ -1729,10 +1862,10 @@ const startServer = async (options = {}) => {
                     if (totalUsers && activeUsers === 0) {
                         // Minimal fallback sample (cheap) - check audit_logs only if zero active yet we have users
                         const auditFallback = await query(`SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE created_at >= NOW() - INTERVAL '15 minutes'`);
-                        const af = parseInt(auditFallback?.rows?.[0]?.count || 0);
+                        const af = Number.parseInt(auditFallback?.rows?.[0]?.count || 0, 10);
                         if (af > activeUsers) activeUsers = af;
                         const auditOnlineFallback = await query(`SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE created_at >= NOW() - INTERVAL '2 minutes'`);
-                        const aof = parseInt(auditOnlineFallback?.rows?.[0]?.count || 0);
+                        const aof = Number.parseInt(auditOnlineFallback?.rows?.[0]?.count || 0, 10);
                         if (aof > online) online = aof;
                     }
 
@@ -1763,7 +1896,6 @@ const startServer = async (options = {}) => {
         }
 
         // Create HTTP server first (but don't listen yet)
-        const http = require('http');
         const server = http.createServer(app);
 
         // Register error handler BEFORE listening
@@ -1772,13 +1904,9 @@ const startServer = async (options = {}) => {
                 logger.error(`❌ Port ${PORT} is already in use`);
                 logger.error(`   Try running: Get-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess | Stop-Process -Force`);
                 logger.error(`   Server will attempt graceful recovery...`);
-                // Don't crash - log error and continue with degraded functionality
-                return;
             } else {
                 logger.error('❌ Server error:', error);
                 logger.error('   Server will attempt graceful recovery...');
-                // Don't crash - log error and continue
-                return;
             }
         });
 
@@ -1824,17 +1952,29 @@ const startServer = async (options = {}) => {
                 console.warn('⚠️  Could not schedule reference builds:', error.message);
             }
 
+            try {
+                console.log('Initializing deterministic compatibility service...');
+                const { compatibilityService } = require('./services/compatibilityService');
+                await compatibilityService.initialize();
+                globalThis.compatibilityService = compatibilityService;
+                console.log('Deterministic compatibility service initialized for offline kiosk mode');
+            } catch (compatibilityError) {
+                console.warn('Deterministic compatibility service initialization failed:', compatibilityError.message);
+            }
+
+            const legacyAIStartupEnabled = false;
+            if (legacyAIStartupEnabled) {
             // PHASE 4 & 5: Initialize AI enhancement services
             try {
                 console.log('🤖 Initializing AI enhancement services...');
-                const enhancedAIService = require('./services/enhancedAIService');
+                const enhancedAIService = null;
                 const { compatibilityService } = require('./services/compatibilityService');
-                const PrecomputeManager = require('./services/precomputeManager');
-                const CacheWarmingService = require('./services/cacheWarmingService');
-                const aiLogger = require('./services/aiLogger');
+                const PrecomputeManager = null;
+                const CacheWarmingService = null;
 
                 // Initialize enhanced AI service
                 await enhancedAIService.initialize();
+                await compatibilityService.initialize();
 
                 // 🔥 WEEK 3 PHASE 4: Intelligent Cache Warmup on Startup
                 // Pre-populates cache with 100+ most common queries
@@ -1843,26 +1983,26 @@ const startServer = async (options = {}) => {
                     const cacheWarmupService = require('./services/cacheWarmup');
                     const warmupResult = await cacheWarmupService.warmupCache();
                     console.log(`🔥 Cache warmup complete: ${warmupResult.entriesWarmed} entries warmed`);
-                    global.cacheWarmupService = cacheWarmupService; // Make it globally accessible
+                    globalThis.cacheWarmupService = cacheWarmupService; // Make it globally accessible
                 } catch (warmupError) {
                     console.warn('⚠️ Cache warmup failed (non-critical):', warmupError.message);
                 }
 
                 // Initialize precompute manager with AI services
                 const precomputeManager = new PrecomputeManager(enhancedAIService, compatibilityService);
-                global.precomputeManager = precomputeManager; // Make it globally accessible
+                globalThis.precomputeManager = precomputeManager; // Make it globally accessible
 
                 // PHASE A.1: Initialize cache warming service (boosts cache hit rate from 10% to 60%+)
                 const cacheWarming = new CacheWarmingService(compatibilityService);
                 cacheWarming.schedulePeriodic(); // Warms cache on startup and every 6 hours
-                global.cacheWarming = cacheWarming; // Make it globally accessible
+                globalThis.cacheWarming = cacheWarming; // Make it globally accessible
 
                 console.log('✅ AI enhancement services initialized successfully');
                 console.log('  📊 AI Logger: Real-time metrics tracking enabled');
                 console.log('  🔄 Precompute Manager: Background optimization ready');
                 console.log('  🔥 Cache Warming: Scheduled for popular products (every 6 hours)');
                 console.log('  📈 Feedback Processor: Monthly analysis scheduled');
-                console.log('  🧠 Embedding Service: Semantic search enabled');
+                console.log('  🧠 Legacy semantic service disabled');
                 console.log('  🧪 Experiment Manager: A/B testing framework ready');
             } catch (aiError) {
                 console.warn('⚠️ AI enhancement services initialization failed:', aiError.message);
@@ -1873,23 +2013,26 @@ const startServer = async (options = {}) => {
             // MOVED OUTSIDE try-catch to ensure it always initializes even if AI enhancement fails
             try {
                 console.log('🔄 Initializing Auto-Restart Service...');
-                const autoRestartService = require('./services/autoRestartService');
-                const aiCircuitBreaker = require('./services/aiCircuitBreaker');
-                const ollamaService = require('./ai/services/ollamaService');
-                
+                const autoRestartService = null;
+                const aiCircuitBreaker = null;
+                const ollamaService = null;
+
                 // Start monitoring circuit breaker and Ollama health
                 autoRestartService.startMonitoring(aiCircuitBreaker, ollamaService);
-                
+
                 console.log('✅ Auto-Restart Service initialized');
                 console.log('  🎯 Restart triggers: Circuit Breaker OPEN/HALF_OPEN states ONLY');
-                console.log('  📊 Ollama monitoring: Enabled (health tracking, no auto-restart)');
+                console.log('  📊 Legacy model monitoring disabled');
                 console.log('  ⚡ Instant backend restart on AI Circuit Breaker failures');
                 console.log('  🛡️ Restart loop protection: Max 10 restarts/hour, 30s cooldown');
-                
-                global.autoRestartService = autoRestartService; // Make globally accessible
+
+                globalThis.autoRestartService = autoRestartService; // Make globally accessible
             } catch (restartError) {
                 console.error('❌ Auto-Restart Service initialization failed:', restartError.message);
                 console.warn('  ⚠️ Backend will NOT auto-restart on AI failures - manual intervention required');
+            }
+            } else {
+                console.log('Legacy AI startup and Ollama monitoring disabled for offline kiosk mode');
             }
         });
 
@@ -1900,41 +2043,48 @@ const startServer = async (options = {}) => {
                 cors: {
                     origin: function (origin, callback) {
                         // Allow requests with no origin (like mobile apps)
-                        if (!origin) return callback(null, true);
+                        if (!origin) {
+                            callback(null, true);
+                            return;
+                        }
 
-                        const allowedOrigins = [
-                            process.env.FRONTEND_URL || "http://localhost:3000",
-                            "http://localhost:3000",
-                            "http://127.0.0.1:3000",
-                            "http://localhost:3001",
-                            "http://127.0.0.1:3001"
-                        ];
-
-                        // Check if origin is allowed or matches local network pattern
-                        const isAllowed = allowedOrigins.includes(origin) ||
-                            /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:(3000|3001)$/.test(origin);
-
-                        callback(null, isAllowed);
+                        callback(null, isAllowedOrigin(origin));
                     },
                     methods: ["GET", "POST"],
                     credentials: true
                 }
             });
+            const parseSocketCookies = (cookieHeader = '') => cookieHeader
+                .split(';')
+                .map((entry) => entry.trim())
+                .filter(Boolean)
+                .reduce((cookies, entry) => {
+                    const separatorIndex = entry.indexOf('=');
+                    if (separatorIndex > -1) {
+                        cookies[entry.slice(0, separatorIndex)] = decodeURIComponent(entry.slice(separatorIndex + 1));
+                    }
+                    return cookies;
+                }, {});
 
-            // Socket.io authentication middleware
+            // Socket.io authentication middleware uses the same HttpOnly cookie model as HTTP admin routes.
             io.use(async (socket, next) => {
                 try {
-                    const token = socket.handshake.auth.token;
+                    const cookies = parseSocketCookies(socket.handshake.headers.cookie || '');
+                    const token = cookies.jwt;
                     if (!token) {
-                        return next(new Error('Authentication error: No token provided'));
+                        return next(new Error('Authentication error: No auth cookie provided'));
                     }
 
-                    // Verify JWT token
                     const jwt = require('jsonwebtoken');
-                    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                    const jwtSecret = process.env.JWT_SECRET || require('./config/config').jwt.secret;
+                    const decoded = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
 
-                    // Get user from database
-                    const userResult = await query('SELECT * FROM users WHERE id = $1 AND is_active = true', [decoded.id]);
+                    const userResult = await query(`
+                        SELECT id, name, email, role, display_name, profile_image, birth_date,
+                               last_login, is_online, online_status, last_activity, last_active_at
+                        FROM users
+                        WHERE id = $1 AND is_active = true
+                    `, [decoded.id]);
                     if (userResult.rows.length === 0) {
                         return next(new Error('Authentication error: User not found'));
                     }
@@ -1943,7 +2093,11 @@ const startServer = async (options = {}) => {
                     socket.user = userResult.rows[0];
                     next();
                 } catch (error) {
-                    next(new Error('Authentication error: Invalid token'));
+                    logger.warn('Socket authentication failed', {
+                        error: error.message,
+                        address: socket.handshake.address
+                    });
+                    next(new Error('Authentication error: Invalid session'));
                 }
             });
 
@@ -2028,21 +2182,54 @@ const startServer = async (options = {}) => {
 
                 // Real-time chat events
                 socket.on('joinConversation', (conversationUserId) => {
+                    if (typeof conversationUserId !== 'number' || !Number.isInteger(conversationUserId) || conversationUserId <= 0) return;
                     socket.join(`conversation_${Math.min(userId, conversationUserId)}_${Math.max(userId, conversationUserId)}`);
                 });
 
                 socket.on('leaveConversation', (conversationUserId) => {
+                    if (typeof conversationUserId !== 'number' || !Number.isInteger(conversationUserId) || conversationUserId <= 0) return;
                     socket.leave(`conversation_${Math.min(userId, conversationUserId)}_${Math.max(userId, conversationUserId)}`);
                 });
 
+                // PHASE 6: Per-user rate limiting for socket events
+                const socketRateLimit = { count: 0, resetTime: Date.now() + 1000 };
+                const SOCKET_RATE_LIMIT = 10; // max 10 messages per second
+
                 socket.on('sendMessage', async (data) => {
                     try {
+                        // PHASE 6: Rate limit check (10 msg/sec per user)
+                        const now = Date.now();
+                        if (now > socketRateLimit.resetTime) {
+                            socketRateLimit.count = 0;
+                            socketRateLimit.resetTime = now + 1000;
+                        }
+                        socketRateLimit.count++;
+                        if (socketRateLimit.count > SOCKET_RATE_LIMIT) {
+                            return socket.emit('messageError', { error: 'Rate limit exceeded. Please slow down.' });
+                        }
+
+                        // PHASE 6: Input validation
+                        if (!data || typeof data.recipientId !== 'number' || !Number.isInteger(data.recipientId) || data.recipientId <= 0) {
+                            return socket.emit('messageError', { error: 'Invalid recipient' });
+                        }
+                        if (!data.content || typeof data.content !== 'string') {
+                            return socket.emit('messageError', { error: 'Message content required' });
+                        }
+
+                        // PHASE 6: Sanitize content — strip HTML tags, enforce max length
+                        const sanitizedContent = sanitizeSocketMessage(data.content)
+                            .slice(0, 5000); // Max 5000 chars
+
+                        if (sanitizedContent.length === 0) {
+                            return socket.emit('messageError', { error: 'Message cannot be empty' });
+                        }
+
                         // Save message to database
                         const messageResult = await query(`
-                            INSERT INTO messages (sender_id, recipient_id, content, created_at) 
-                            VALUES ($1, $2, $3, NOW()) 
+                            INSERT INTO messages (sender_id, recipient_id, content, created_at)
+                            VALUES ($1, $2, $3, NOW())
                             RETURNING id, content, created_at
-                        `, [userId, data.recipientId, data.content]);
+                        `, [userId, data.recipientId, sanitizedContent]);
 
                         const message = messageResult.rows[0];
                         const conversationRoom = `conversation_${Math.min(userId, data.recipientId)}_${Math.max(userId, data.recipientId)}`;
@@ -2073,6 +2260,9 @@ const startServer = async (options = {}) => {
 
                 // Typing indicators
                 socket.on('typing', (data) => {
+                    // PHASE 6: Validate typing event data
+                    if (!data || typeof data.conversationUserId !== 'number' || !Number.isInteger(data.conversationUserId) || data.conversationUserId <= 0) return;
+                    if (typeof data.isTyping !== 'boolean') return;
                     const conversationRoom = `conversation_${Math.min(userId, data.conversationUserId)}_${Math.max(userId, data.conversationUserId)}`;
                     socket.to(conversationRoom).emit('userTyping', {
                         userId: userId,
@@ -2084,7 +2274,7 @@ const startServer = async (options = {}) => {
 
             // Make io available to routes (both methods for compatibility)
             app.set('io', io);
-            global.io = io; // Make globally available for assistance routes
+            globalThis.io = io; // Make globally available for assistance routes
             console.log('✅ Socket.io initialized for real-time features');
 
             // PHASE 3.2 WEEK 2: Initialize WebSocket Service for real-time stock/price updates
@@ -2093,7 +2283,7 @@ const startServer = async (options = {}) => {
                 websocketService.initialize(io);
 
                 // Make websocket service globally available for route handlers
-                global.websocketService = websocketService;
+                globalThis.websocketService = websocketService;
 
                 console.log('✅ WebSocket Service initialized for real-time updates');
                 console.log('  📦 Stock update broadcasting enabled');
@@ -2123,17 +2313,17 @@ const startServer = async (options = {}) => {
 const stopServer = async () => {
     try {
         console.log('🔄 Shutting down server and closing resources...');
-        
+
         // Stop auto-restart service first to prevent restart during shutdown
         try {
-            if (global.autoRestartService) {
-                global.autoRestartService.stopMonitoring();
+            if (globalThis.autoRestartService) {
+                globalThis.autoRestartService.stopMonitoring();
                 console.log('✅ Auto-restart service stopped');
             }
         } catch (e) {
             console.error('⚠️ Error stopping auto-restart service:', e.message);
         }
-        
+
         try {
             const interval = app.get('usersStatsInterval');
             if (interval) {
@@ -2145,7 +2335,11 @@ const stopServer = async () => {
                 ['users', 'logs', 'orders', 'queue', 'stock', 'notifications'].forEach(k => {
                     if (sseClients[k]) {
                         sseClients[k].forEach(c => {
-                            try { c.res.end(); } catch (_) { }
+                            try {
+                                c.res.end();
+                            } catch (error) {
+                                logger.warn('Failed to close SSE response during shutdown', { channel: k, error: error.message });
+                            }
                         });
                         sseClients[k].clear();
                     }
@@ -2174,18 +2368,41 @@ process.on('SIGINT', async () => {
 });
 
 // Global safety-net error handlers
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
     console.error('⚠️ Uncaught Exception:', err.message);
     console.error(err.stack);
-    // Log to file if logger is available
-    try { require('./utils/logger').error('Uncaught Exception:', err.message, { stack: err.stack }); } catch (_) {}
+    logger.error('Uncaught Exception', { message: err.message, stack: err.stack });
+    // PHASE 6: Graceful shutdown on fatal error to prevent zombie processes
+    try {
+        await stopServer();
+    } catch (error) {
+        logger.error('Failed to stop server after uncaught exception', { error: error.message });
+    }
+    process.exit(1);
 });
 
-process.on('unhandledRejection', (reason) => {
-    const msg = reason instanceof Error ? reason.message : String(reason);
-    console.error('⚠️ Unhandled Rejection:', msg);
-    // Log to file if logger is available
-    try { require('./utils/logger').error('Unhandled Rejection:', msg); } catch (_) {}
+// FIX #6 (v3 per code review): Graceful shutdown with re-entrancy guard.
+// Original code crashed immediately on ANY stray promise (e.g. Redis timeout).
+// v3: Added isShuttingDown flag to prevent infinite recursion if stopServer()
+// itself triggers an unhandled rejection during the shutdown sequence.
+let isShuttingDown = false;
+process.on('unhandledRejection', async (reason) => {
+    const reasonDetails = describeUnhandledReason(reason);
+    console.error('⚠️ Unhandled Rejection (graceful shutdown):', reasonDetails.message);
+    logger.error('Unhandled Rejection - initiating graceful shutdown', reasonDetails);
+    if (isShuttingDown) {
+        // Already shutting down — don't recurse, just log and let the pending exit complete
+        logger.error('Rejection during shutdown — ignoring to prevent recursion');
+        return;
+    }
+    isShuttingDown = true;
+    try {
+        await stopServer();
+    } catch (error) {
+        logger.error('Failed to stop server after unhandled rejection', { error: error.message });
+    }
+    // Delay exit to allow PM2 to detect clean shutdown vs crash loop
+    setTimeout(() => process.exit(1), 1500);
 });
 
 // Export for testing; auto-start unless in test environment
@@ -2199,4 +2416,3 @@ app.stopServer = stopServer;
 app.app = app; // maintain compatibility with destructured { app }
 
 module.exports = app;
-
