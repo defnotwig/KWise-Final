@@ -43,18 +43,31 @@ const categories = [
 	},
 ];
 
+const readStoredJson = (key, fallback) => {
+	try {
+		const raw = localStorage.getItem(key);
+		return raw ? JSON.parse(raw) : fallback;
+	} catch {
+		return fallback;
+	}
+};
+
 function ReviewSelectedIssues() {
 	const navigate = useNavigate();
 	const [selected, setSelected] = React.useState(
-		JSON.parse(localStorage.getItem("diagnosticIssues")) || []
+		readStoredJson("diagnosticIssues", [])
 	);
+	const storedCategories = React.useMemo(() => {
+		const fromStorage = readStoredJson("diagnosticCategories", []);
+		return Array.isArray(fromStorage) && fromStorage.length ? fromStorage : categories;
+	}, []);
 	const [modalSelected, setModalSelected] = React.useState([]);
 	const [showModal, setShowModal] = React.useState(false);
 	const [modalCategory, setModalCategory] = React.useState(null);
 
 	const selectedFirst = [
-		...categories.filter((cat) => cat.options.some((opt) => selected.includes(opt))),
-		...categories.filter((cat) => !cat.options.some((opt) => selected.includes(opt))),
+		...storedCategories.filter((cat) => (cat.options || []).some((opt) => selected.includes(opt))),
+		...storedCategories.filter((cat) => !(cat.options || []).some((opt) => selected.includes(opt))),
 	];
 
 
@@ -81,10 +94,10 @@ function ReviewSelectedIssues() {
 		}
 		
 		// Prepare diagnostic issues for order creation
-		const diagnosticIssues = categories
-			.filter(cat => cat.options.some(opt => selected.includes(opt)))
+		const diagnosticIssues = storedCategories
+			.filter(cat => (cat.options || []).some(opt => selected.includes(opt)))
 			.flatMap(cat => 
-				cat.options
+				(cat.options || [])
 					.filter(opt => selected.includes(opt))
 					.map(issue => ({
 						id: null, // Diagnostic issues don't have product IDs
@@ -123,8 +136,9 @@ function ReviewSelectedIssues() {
 			<div className="pc-checkup-content">
 				<div className="pc-checkup-scrollable">
 					{selectedFirst.map((cat) => {
-						const selectedOptions = cat.options.filter((opt) => selected.includes(opt));
-						const allSelected = selectedOptions.length === cat.options.length;
+						const options = cat.options || [];
+						const selectedOptions = options.filter((opt) => selected.includes(opt));
+						const allSelected = selectedOptions.length === options.length;
 						const noneSelected = selectedOptions.length === 0;
 
 						return (

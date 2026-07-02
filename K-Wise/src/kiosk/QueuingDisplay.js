@@ -3,20 +3,37 @@ import { useNavigate, useLocation } from "react-router-dom";
 import ArrowDown from "../assets/ArrowDown.webp";
 import "./QueuingDisplay.css";
 import thermalPrinter from "../services/thermalPrinter";
+import kioskAPI from "../api/kioskAPI";
 import queuepcwiselogo from "../assets/QueuingDisplay/queuepcwiselogo.svg";
 import queuenumber from "../assets/QueuingDisplay/queuenumber.svg";
 
+const baseConsole = globalThis.console || { log: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
+const verboseQueueLogs = process.env.VITE_KWISE_VERBOSE_LOGS === "true"
+  || process.env.REACT_APP_KWISE_VERBOSE_LOGS === "true";
+const console = {
+  ...baseConsole,
+  log: (...args) => {
+    if (verboseQueueLogs) baseConsole.log(...args);
+  },
+  debug: (...args) => {
+    if (verboseQueueLogs) baseConsole.debug(...args);
+  },
+  warn: (...args) => {
+    if (verboseQueueLogs) baseConsole.warn(...args);
+  }
+};
+
 // Helper functions moved outside component to prevent recreation on every render
 const getPrice = (item) => {
-  if (!item || item.price == null) return 0;
+  if (!item?.price) return 0;
   if (typeof item.price === "number") return item.price;
   if (typeof item.price === "string") {
     const cleaned = item.price
       .toString()
-      .replace(/[^0-9.,]/g, "") // keep digits, dot, comma
-      .replace(/,/g, "");        // remove thousands separators
-    const n = parseFloat(cleaned);
-    return isNaN(n) ? 0 : n;
+      .replaceAll(/[^0-9.,]/g, "") // keep digits, dot, comma
+      .replaceAll(',', "");        // remove thousands separators
+    const n = Number.parseFloat(cleaned);
+    return Number.isNaN(n) ? 0 : n;
   }
   return 0;
 };
@@ -43,19 +60,25 @@ const calculateTotal = (data) => {
   
   // Calculate from items
   return items.reduce((sum, item) => {
-    const price = parseFloat(item.price || item.totalPrice || 0);
+    const price = Number.parseFloat(item.price || item.totalPrice || 0);
     const quantity = item.quantity || 1;
     return sum + (price * quantity);
   }, 0);
 };
 
-// Play notification sound
+const getFooterMessage = (txType) => {
+  if (txType.includes('Diagnostic')) return 'Please wait for your diagnosis results';
+  if (txType.includes('Cleaning')) return 'Service will be completed shortly';
+  return 'Thank you for choosing PC-Wise!';
+};
+
 const playNotificationSound = () => {
   try {
     const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-    audio.play().catch(() => {
+    audio.play().catch((playError) => {
+      console.debug('Audio play failed, using Web Audio API fallback:', playError.message);
       // Fallback beep using Web Audio API
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -72,7 +95,7 @@ const playNotificationSound = () => {
       oscillator.stop(audioContext.currentTime + 0.5);
     });
   } catch (error) {
-    console.log('Audio notification not available');
+    console.warn('Audio notification not available:', error.message);
   }
 };
 
@@ -167,20 +190,18 @@ const generateCleaningReceipt = (data) => {
 
   // Calculate total from items
   const calculatedTotal = items.reduce((sum, entry) => {
-    const hasTier = entry && entry.tier;
+    const hasTier = entry?.tier;
     let price = 0;
     if (hasTier) {
       if (entry.tier.priceNumeric) {
-        price = parseFloat(entry.tier.priceNumeric);
+        price = Number.parseFloat(entry.tier.priceNumeric);
       } else if (entry.tier.price) {
-        price = parseFloat(String(entry.tier.price).replace(/[₱,]/g, ''));
+        price = Number.parseFloat(String(entry.tier.price).replaceAll(/[₱,]/g, ''));
       }
-    } else {
-      if (entry.priceNumeric) {
-        price = parseFloat(entry.priceNumeric);
-      } else if (entry.price) {
-        price = parseFloat(String(entry.price).replace(/[₱,]/g, ''));
-      }
+    } else if (entry.priceNumeric) {
+      price = Number.parseFloat(entry.priceNumeric);
+    } else if (entry.price) {
+      price = Number.parseFloat(String(entry.price).replaceAll(/[₱,]/g, ''));
     }
     const qty = entry?.quantity || 1;
     return sum + (price * qty);
@@ -194,7 +215,7 @@ const generateCleaningReceipt = (data) => {
     <h4>Cleaning Services:</h4>
     ${items.map(entry => {
     // Check multiple possible data structures
-    const hasTier = entry && entry.tier;
+    const hasTier = entry?.tier;
 
     // Extract tier name
     let name = 'PC Cleaning';
@@ -208,17 +229,15 @@ const generateCleaningReceipt = (data) => {
     let price = 0;
     if (hasTier) {
       if (entry.tier.priceNumeric) {
-        price = parseFloat(entry.tier.priceNumeric);
+        price = Number.parseFloat(entry.tier.priceNumeric);
       } else if (entry.tier.price) {
         // Handle formatted price strings like "₱1,000.00"
-        price = parseFloat(String(entry.tier.price).replace(/[₱,]/g, ''));
+        price = Number.parseFloat(String(entry.tier.price).replaceAll(/[₱,]/g, ''));
       }
-    } else {
-      if (entry.priceNumeric) {
-        price = parseFloat(entry.priceNumeric);
-      } else if (entry.price) {
-        price = parseFloat(String(entry.price).replace(/[₱,]/g, ''));
-      }
+    } else if (entry.priceNumeric) {
+      price = Number.parseFloat(entry.priceNumeric);
+    } else if (entry.price) {
+      price = Number.parseFloat(String(entry.price).replaceAll(/[₱,]/g, ''));
     }
 
     const qty = entry?.quantity || 1;
@@ -341,7 +360,7 @@ const generateUpgradeReceipt = (data) => {
     // Items are already flattened from PaymentWindow
     // Group them as a single upgrade package
     const totalCalculated = items.reduce((sum, item) => {
-      const price = parseFloat(item.price || 0);
+      const price = Number.parseFloat(item.price || 0);
       const quantity = item.quantity || 1;
       const itemTotal = price * quantity;
       console.log(`  - Item: ${item.name}, price: ${price}, qty: ${quantity}, total: ${itemTotal}`);
@@ -361,7 +380,7 @@ const generateUpgradeReceipt = (data) => {
             <ul style="margin: 6px 0 8px 16px;">
               ${items.map(item => {
                 const itemName = item.name || item.component || 'Upgrade Component';
-                const itemPrice = parseFloat(item.price || 0);
+                const itemPrice = Number.parseFloat(item.price || 0);
                 const itemQty = item.quantity || 1;
                 const itemTotal = itemPrice * itemQty;
                 return `<li>${itemName} - ₱${formatCurrency(itemPrice)} × ${itemQty} = ₱${formatCurrency(itemTotal)}</li>`;
@@ -426,7 +445,7 @@ const generatePrebuiltReceipt = (data) => {
     const mainProductItem = data.find(item => item.isMainProduct || item.category === 'prebuilt');
 
     // Find addon (has isAddon flag or category includes 'addon')
-    const addonItem = data.find(item => item.isAddon || (item.category && item.category.includes('addon')));
+    const addonItem = data.find(item => item.isAddon || item.category?.includes('addon'));
 
     // Find components (category==='prebuilt-component')
     const componentItems = data.filter(item => item.category === 'prebuilt-component');
@@ -490,7 +509,7 @@ const generatePrebuiltReceipt = (data) => {
     const items = data.items || [];
     
     const mainProductItem = items.find(item => item.isMainProduct || item.category === 'prebuilt');
-    const addonItem = items.find(item => item.isAddon || (item.category && item.category.includes('addon')));
+    const addonItem = items.find(item => item.isAddon || item.category?.includes('addon'));
     const componentItems = items.filter(item => item.category === 'prebuilt-component');
 
     if (mainProductItem) {
@@ -534,7 +553,7 @@ const generatePrebuiltReceipt = (data) => {
             <div style="margin: 8px 0; padding-left: 10px;">
               <p><em>Components:</em></p>
               ${order.product.components
-        .filter(comp => comp && comp.value && typeof comp.value === 'string' && comp.value.trim())
+        .filter(comp => comp?.value && typeof comp.value === 'string' && comp.value.trim())
         .map(component => `<p style="font-size: 12px; margin: 2px 0;">• ${component.name}: ${component.value}</p>`)
         .join('')}
             </div>
@@ -590,7 +609,7 @@ const generatePcPartsReceipt = (data, orderWrapper = null) => {
   // Use backend total if available, otherwise calculate
   const calculatedTotal = items.reduce((sum, item) => {
     const quantity = item.quantity || 1;
-    const price = parseFloat(item.price || item.totalPrice || 0);
+    const price = Number.parseFloat(item.price || item.totalPrice || 0);
     return sum + (price * quantity);
   }, 0);
   
@@ -603,7 +622,7 @@ const generatePcPartsReceipt = (data, orderWrapper = null) => {
       <h4>Items Ordered:</h4>
       ${items.map((item, index) => {
     const quantity = item.quantity || 1;
-    const price = parseFloat(item.price || item.totalPrice || 0);
+    const price = Number.parseFloat(item.price || item.totalPrice || 0);
     const subtotal = item.totalPrice || (price * quantity);
     const itemName = item.name || item.item_name || item.component_name || `Component ${index + 1}`;
 
@@ -630,6 +649,284 @@ const generatePcPartsReceipt = (data, orderWrapper = null) => {
 };
 /* eslint-enable no-unused-vars */
 
+const parsePrebuiltComponent = (comp) => {
+  let componentType = comp.componentType || '';
+  let componentValue = comp.componentValue || '';
+  if (!componentType && comp.name) {
+    let cleanName = comp.name.replace(/^\[.*?\]\s*/, '');
+    if (cleanName.includes(':')) {
+      const parts = cleanName.split(':');
+      componentType = parts[0].trim();
+      componentValue = parts.slice(1).join(':').trim();
+    } else {
+      componentType = cleanName;
+    }
+  }
+  return { name: componentType, value: componentValue };
+};
+
+// eslint-disable-next-line no-unused-vars
+const reconstructPrebuiltOrder = (items) => {
+  const mainProductItem = items.find(item => item.isMainProduct || item.category === 'prebuilt');
+  const addonItem = items.find(item => item.isAddon || item.category?.includes('addon'));
+  const componentItems = items.filter(item => item.category === 'prebuilt-component');
+  if (!mainProductItem) return [];
+  const productPrice = getPrice({ price: mainProductItem.price });
+  const addonPrice = addonItem ? getPrice({ price: addonItem.price }) : 0;
+  const quantity = mainProductItem.quantity || 1;
+  const totalPrice = (productPrice + addonPrice) * quantity;
+  const components = componentItems.map(parsePrebuiltComponent);
+  return [{
+    product: { name: mainProductItem.name, price: productPrice, components },
+    addon: addonItem ? { name: addonItem.name, price: addonPrice } : null,
+    quantity,
+    totalPrice
+  }];
+};
+
+const originToLabel = (origin) => {
+  switch (origin) {
+    case "pc-diagnostic":
+      return "PC Diagnostic Service";
+    case "pc-cleaning":
+      return "PC Cleaning Service";
+    case "pc-upgrade":
+      return "PC Upgrade Service";
+    case "pc-customized":
+      return "PC Customized Build";
+    case "prebuilt-pc":
+      return "PreBuilt PC Order";
+    case "pc-parts":
+      return "PC Parts Order";
+    default:
+      return (typeof origin === 'string' && origin.toLowerCase().includes('pc')) ? origin : "PC Order";
+  }
+};
+
+const normalizeOriginSlug = (origin) => {
+  switch (origin) {
+    case "PC Diagnostic Service":
+      return "pc-diagnostic";
+    case "PC Cleaning Service":
+      return "pc-cleaning";
+    case "PC Upgrade Service":
+      return "pc-upgrade";
+    case "PC Customized Build":
+      return "pc-customized";
+    case "PreBuilt PC Order":
+      return "prebuilt-pc";
+    case "PC Parts Order":
+      return "pc-parts";
+    default:
+      if (typeof origin === 'string' && origin.startsWith('pc-')) return origin;
+      if (origin === 'PreBuilt PC' || origin === 'Pre-Built PC') return 'prebuilt-pc';
+      return 'pc-parts';
+  }
+};
+
+const receiptModelToOrderWrapper = (receipt, fallback = {}) => {
+  if (!receipt) return null;
+
+  return [{
+    orderIdFormatted: receipt.orderIdFormatted || receipt.orderNumber || fallback.orderIdFormatted || '',
+    transactionIdFormatted: receipt.transactionIdFormatted || fallback.transactionIdFormatted || '',
+    queueNumber: receipt.queueNumber || fallback.queueNumber || '',
+    customerName: receipt.customerName || '',
+    totalAmount: receipt.totalAmount || 0,
+    items: (receipt.items || []).map((item) => ({
+      id: item.id,
+      name: item.name || item.componentName || 'Order Item',
+      component_name: item.componentName || item.name || 'Order Item',
+      category: item.category || '',
+      price: item.price || item.amount || 0,
+      quantity: item.quantity || 1,
+      amount: item.amount,
+      status: item.status,
+      description: item.description
+    })),
+    paymentMethod: receipt.paymentMethod || fallback.paymentMethod || '',
+    transactionOrigin: normalizeOriginSlug(receipt.serviceType || fallback.transactionType || fallback.from || 'pc-parts'),
+    backendOrder: receipt
+  }];
+};
+
+// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line no-unused-vars
+const initFromBackendData = (state) => {
+  const lastOrderData = JSON.parse(localStorage.getItem("lastOrder")) || [];
+  const result = {
+    queueNumber: state.queueNumber.toString(),
+    orderIdFormatted: state.orderIdFormatted,
+    transactionIdFormatted: state.transactionIdFormatted || '',
+    transactionType: originToLabel(state.from || 'pc-parts'),
+    orderData: [],
+    paymentMethod: ''
+  };
+
+  if (lastOrderData && lastOrderData.length > 0 && lastOrderData[0]) {
+    console.log('📦 Extracted order wrapper from localStorage:', lastOrderData[0]);
+    result.orderData = lastOrderData;
+    if (lastOrderData[0].paymentMethod) {
+      result.paymentMethod = lastOrderData[0].paymentMethod;
+    }
+  } else {
+    console.warn('⚠️ No order data found in localStorage, using empty array');
+  }
+
+  console.log('QueueingDisplay: Using backend queue data:', {
+    queueNumber: state.queueNumber,
+    orderIdFormatted: state.orderIdFormatted,
+    transactionIdFormatted: state.transactionIdFormatted,
+    hasOrderData: lastOrderData && lastOrderData.length > 0
+  });
+
+  return result;
+};
+
+// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line no-unused-vars
+const loadLegacyQueueInfo = () => {
+  const storedQueueNumber = localStorage.getItem("queueNumber");
+  const storedOrderId = localStorage.getItem("orderIdFormatted");
+  const storedTransactionId = localStorage.getItem("transactionIdFormatted");
+  if (storedQueueNumber && storedOrderId) {
+    return {
+      queueNumber: storedQueueNumber,
+      orderIdFormatted: storedOrderId,
+      transactionIdFormatted: storedTransactionId || ''
+    };
+  }
+  console.warn('QueueingDisplay: Using legacy queue generation - this should not happen with new backend integration');
+  const lastQueueNumber = Number.parseInt(localStorage.getItem("lastQueueNumber") || "0", 10);
+  const newQueueNumber = lastQueueNumber + 1;
+  localStorage.setItem("lastQueueNumber", newQueueNumber);
+  localStorage.setItem("queueNumber", String(newQueueNumber));
+  return {
+    queueNumber: String(newQueueNumber),
+    orderIdFormatted: '',
+    transactionIdFormatted: ''
+  };
+};
+
+// eslint-disable-next-line no-unused-vars
+const determineTransactionFromState = (stateFrom, sources) => {
+  const { cartItems, customOrders, cleaningOrders, cleaningOrder, upgradeOrders, diagnosticIssues, lastOrder } = sources;
+  let transactionData = null;
+  let transactionOrigin = "";
+  const originSlug = stateFrom;
+  switch (stateFrom) {
+    case "pc-parts":
+      transactionData = cartItems;
+      transactionOrigin = "PC Parts Order";
+      break;
+    case "pc-customized":
+      transactionData = customOrders.length > 0 ? customOrders : cartItems;
+      transactionOrigin = "PC Customized Build";
+      break;
+    case "prebuilt-pc":
+      transactionData = cartItems;
+      transactionOrigin = "PreBuilt PC Order";
+      break;
+    case "pc-cleaning":
+      transactionData = cleaningOrders.length > 0 ? cleaningOrders : cleaningOrder;
+      transactionOrigin = "PC Cleaning Service";
+      break;
+    case "pc-upgrade":
+      transactionData = lastOrder.length > 0 ? lastOrder : upgradeOrders;
+      transactionOrigin = "PC Upgrade Service";
+      break;
+    case "pc-diagnostic":
+      transactionData = lastOrder.length > 0 ? lastOrder : diagnosticIssues;
+      transactionOrigin = "PC Diagnostic Service";
+      break;
+    default:
+      transactionData = cartItems;
+      transactionOrigin = "PC Order";
+  }
+  return { transactionData, transactionOrigin, originSlug };
+};
+
+// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line no-unused-vars
+const determineTransactionFromStorage = (sources) => {
+  const { cartItems, customOrders, cleaningOrders, cleaningOrder, upgradeOrders, diagnosticIssues, lastOrder } = sources;
+  let transactionData = null;
+  let transactionOrigin = "";
+  let originSlug = "";
+  if (cartItems.length > 0 && cartItems[0]?.product) {
+    transactionData = cartItems;
+    transactionOrigin = "PreBuilt PC Order";
+    originSlug = "prebuilt-pc";
+  } else if (cartItems.length > 0) {
+    transactionData = cartItems;
+    transactionOrigin = "PC Parts Order";
+    originSlug = "pc-parts";
+  } else if (customOrders.length > 0) {
+    transactionData = customOrders;
+    transactionOrigin = "PC Customized Build";
+    originSlug = "pc-customized";
+  } else if (cleaningOrders.length > 0) {
+    transactionData = cleaningOrders;
+    transactionOrigin = "PC Cleaning Service";
+    originSlug = "pc-cleaning";
+  } else if (cleaningOrder.length > 0) {
+    transactionData = cleaningOrder;
+    transactionOrigin = "PC Cleaning Service";
+    originSlug = "pc-cleaning";
+  } else if (upgradeOrders.length > 0) {
+    transactionData = upgradeOrders;
+    transactionOrigin = "PC Upgrade Service";
+    originSlug = "pc-upgrade";
+  } else if (diagnosticIssues.length > 0) {
+    transactionData = diagnosticIssues;
+    transactionOrigin = "PC Diagnostic Service";
+    originSlug = "pc-diagnostic";
+  } else if (lastOrder.length > 0) {
+    transactionData = lastOrder;
+    const storedOrigin = localStorage.getItem("orderOrigin") || "";
+    transactionOrigin = originToLabel(storedOrigin);
+    originSlug = normalizeOriginSlug(storedOrigin);
+  }
+  return { transactionData, transactionOrigin, originSlug };
+};
+
+// eslint-disable-next-line no-unused-vars
+const printViaIframe = (printContent) => {
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+    
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(printContent);
+    iframeDoc.close();
+    
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        iframe.remove();
+        playNotificationSound();
+      }, 1000);
+    }, 500);
+  } catch (iframeError) {
+    console.error('❌ Iframe print also failed:', iframeError);
+    alert('Unable to print receipt. Please allow popups or use thermal printer.');
+  }
+};
+
+// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line no-unused-vars
+const attemptPrinterConnection = async () => {
+  try {
+    await thermalPrinter.autoConnect();
+  } catch (autoConnectError) {
+    console.warn('Auto-connect failed, attempting manual connect:', autoConnectError.message);
+    await thermalPrinter.connect();
+  }
+};
+
 function QueuingDisplay() {
   const [queueNumber, setQueueNumber] = useState("");
   const [orderData, setOrderData] = useState(null);
@@ -638,54 +935,11 @@ function QueuingDisplay() {
   const [transactionIdFormatted, setTransactionIdFormatted] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(""); // NEW: Track payment method for receipt
   const [isLoadingData, setIsLoadingData] = useState(true); // NEW: Track loading state
-  // eslint-disable-next-line no-unused-vars
-  const [countdown, setCountdown] = useState(10); // 10 second timer for redirect (used internally)
+  const [receiptPreviewHtml, setReceiptPreviewHtml] = useState("");
+  const [_countdown, setCountdown] = useState(10); // eslint-disable-line no-unused-vars
   const navigate = useNavigate();
   const location = useLocation();
   const printedRef = useRef(false);
-
-  // Map origin slug or label to a standardized display label
-  const originToLabel = (origin) => {
-    switch (origin) {
-      case "pc-diagnostic":
-        return "PC Diagnostic Service";
-      case "pc-cleaning":
-        return "PC Cleaning Service";
-      case "pc-upgrade":
-        return "PC Upgrade Service";
-      case "pc-customized":
-        return "PC Customized Build";
-      case "prebuilt-pc":
-        return "PreBuilt PC Order";
-      case "pc-parts":
-        return "PC Parts Order";
-      default:
-        return (typeof origin === 'string' && origin.toLowerCase().includes('pc')) ? origin : "PC Order";
-    }
-  };
-
-  // Normalize any origin string (slug or legacy label) to a slug
-  const normalizeOriginSlug = (origin) => {
-    switch (origin) {
-      case "PC Diagnostic Service":
-        return "pc-diagnostic";
-      case "PC Cleaning Service":
-        return "pc-cleaning";
-      case "PC Upgrade Service":
-        return "pc-upgrade";
-      case "PC Customized Build":
-        return "pc-customized";
-      case "PreBuilt PC Order":
-        return "prebuilt-pc";
-      case "PC Parts Order":
-        return "pc-parts";
-      default:
-        // If already a known slug, keep it; else use 'pc-parts' as safe default
-        if (typeof origin === 'string' && origin.startsWith('pc-')) return origin;
-        if (origin === 'PreBuilt PC' || origin === 'Pre-Built PC') return 'prebuilt-pc';
-        return 'pc-parts';
-    }
-  };
 
   // Initialize queue display with backend data
   useEffect(() => {
@@ -742,7 +996,7 @@ function QueuingDisplay() {
     } else {
       // Legacy queue number generation (for backward compatibility)
       console.warn('QueueingDisplay: Using legacy queue generation - this should not happen with new backend integration');
-      const lastQueueNumber = parseInt(localStorage.getItem("lastQueueNumber") || "0", 10);
+      const lastQueueNumber = Number.parseInt(localStorage.getItem("lastQueueNumber") || "0", 10);
       const newQueueNumber = lastQueueNumber + 1;
       localStorage.setItem("lastQueueNumber", newQueueNumber);
       localStorage.setItem("queueNumber", String(newQueueNumber));
@@ -798,9 +1052,7 @@ function QueuingDisplay() {
           transactionData = cartItems;
           transactionOrigin = "PC Order";
       }
-    } else {
-      // Fallback to localStorage detection
-      if (cartItems.length > 0 && cartItems[0].product) {
+    } else if (cartItems.length > 0 && cartItems[0]?.product) {
         // PreBuilt PC has grouped structure with product property
         transactionData = cartItems;
         transactionOrigin = "PreBuilt PC Order";
@@ -836,7 +1088,6 @@ function QueuingDisplay() {
         transactionOrigin = originToLabel(storedOrigin);
         originSlug = normalizeOriginSlug(storedOrigin);
       }
-    }
 
     setOrderData(transactionData);
     setTransactionType(transactionOrigin);
@@ -859,6 +1110,50 @@ function QueuingDisplay() {
 
   }, [location.state]);
 
+  useEffect(() => {
+    const receiptLookupId = orderIdFormatted || location.state?.orderIdFormatted;
+    if (!receiptLookupId) return undefined;
+
+    let cancelled = false;
+    const loadBackendReceipt = async () => {
+      try {
+        const receipt = await kioskAPI.getOrderReceipt(receiptLookupId);
+        if (cancelled || !receipt) return;
+
+        const wrappedOrder = receiptModelToOrderWrapper(receipt, {
+          queueNumber,
+          orderIdFormatted,
+          transactionIdFormatted,
+          paymentMethod,
+          from: location.state?.from,
+          transactionType
+        });
+
+        if (!wrappedOrder) return;
+
+        setOrderData(wrappedOrder);
+        if (receipt.queueNumber) setQueueNumber(String(receipt.queueNumber));
+        if (receipt.orderIdFormatted || receipt.orderNumber) {
+          setOrderIdFormatted(receipt.orderIdFormatted || receipt.orderNumber);
+        }
+        if (receipt.transactionIdFormatted) setTransactionIdFormatted(receipt.transactionIdFormatted);
+        if (receipt.paymentMethod) setPaymentMethod(receipt.paymentMethod);
+        if (receipt.serviceType) setTransactionType(originToLabel(receipt.serviceType));
+        setReceiptPreviewHtml("");
+      } catch (error) {
+        console.warn('Backend receipt fetch failed; using local receipt data:', error.message);
+      } finally {
+        if (!cancelled) setIsLoadingData(false);
+      }
+    };
+
+    loadBackendReceipt();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderIdFormatted, location.state, queueNumber, paymentMethod, transactionIdFormatted, transactionType]);
+
   // Single unified countdown timer to redirect to kiosk start
   useEffect(() => {
     const timer = setInterval(() => {
@@ -879,7 +1174,7 @@ function QueuingDisplay() {
   }, [navigate]);
 
   // Popup receipt fallback when thermal printer fails
-  const handlePopupReceipt = useCallback(() => {
+  const handlePopupReceipt = useCallback((options = {}) => {
     if (!orderData || orderData.length === 0) {
       console.error('❌ Cannot print receipt: orderData is empty or null');
       return;
@@ -966,11 +1261,7 @@ function QueuingDisplay() {
               ${getReceiptContentByType()}
             </div>
             <div class="footer">
-              <p>${transactionType.includes("Diagnostic")
-        ? 'Please wait for your diagnosis results'
-        : transactionType.includes("Cleaning")
-          ? 'Service will be completed shortly'
-          : 'Thank you for choosing PC-Wise!'}</p>
+              <p>${getFooterMessage(transactionType)}</p>
               <p style="font-size: 10px; margin-top: 10px;">
                 Keep this receipt for your records
               </p>
@@ -989,6 +1280,10 @@ function QueuingDisplay() {
     `;
 
     // ✅ FIX: Open print window IMMEDIATELY (before async operations) to avoid popup blockers
+    setReceiptPreviewHtml(printContent);
+    if (options.print === false) {
+      return;
+    }
     const printWindow = window.open('', '_blank', 'width=400,height=600');
 
     if (!printWindow) {
@@ -1008,7 +1303,7 @@ function QueuingDisplay() {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
           setTimeout(() => {
-            document.body.removeChild(iframe);
+            iframe.remove();
             playNotificationSound();
           }, 1000);
         }, 500);
@@ -1037,7 +1332,7 @@ function QueuingDisplay() {
   }, [orderData, transactionType, queueNumber, orderIdFormatted, transactionIdFormatted, paymentMethod]);
 
   // Manual print receipt function - NOW USES THERMAL PRINTER WITH POPUP FALLBACK
-  const handlePrintReceipt = useCallback(async () => {
+  const handlePrintReceipt = useCallback(async ({ allowManualConnect = true } = {}) => {
     if (!orderData || orderData.length === 0) {
       console.error('❌ Cannot print receipt: orderData is empty or null');
       return;
@@ -1052,11 +1347,21 @@ function QueuingDisplay() {
 
       // Try to auto-connect if not connected
       if (!printerStatus.isConnected) {
+        if (!allowManualConnect) {
+          console.log('Printer is not connected; showing receipt fallback instead of prompting from auto-print.');
+          handlePopupReceipt();
+          return;
+        }
         console.log('🔄 Printer not connected, attempting auto-connect...');
         try {
           await thermalPrinter.autoConnect();
         } catch (autoConnectError) {
-          console.log('⚠️ Auto-connect failed, attempting manual connect...');
+          console.warn('Auto-connect failed, attempting manual connect:', autoConnectError.message);
+          if (!allowManualConnect) {
+            console.log('Printer is not pre-authorized; falling back to popup receipt.');
+            handlePopupReceipt();
+            return;
+          }
           try {
             await thermalPrinter.connect();
           } catch (connectError) {
@@ -1110,6 +1415,11 @@ function QueuingDisplay() {
     }
   }, [orderData, transactionType, queueNumber, orderIdFormatted, transactionIdFormatted, paymentMethod, handlePopupReceipt]);
 
+  useEffect(() => {
+    if (!orderData || orderData.length === 0 || receiptPreviewHtml) return;
+    handlePopupReceipt({ print: false });
+  }, [orderData, receiptPreviewHtml, handlePopupReceipt]);
+
   // Auto-print receipt on load
   useEffect(() => {
     if (printedRef.current) return;
@@ -1117,7 +1427,7 @@ function QueuingDisplay() {
     // Auto-print immediately after component loads once data is available
     printedRef.current = true;
     const id = setTimeout(() => {
-      handlePrintReceipt();
+      handlePrintReceipt({ allowManualConnect: false });
     }, 1000);
     return () => clearTimeout(id);
   }, [orderData, handlePrintReceipt]);
@@ -1138,7 +1448,7 @@ function QueuingDisplay() {
       localStorage.setItem("cartTotal", "0.00");
 
       // Dispatch reset event
-      window.dispatchEvent(new Event("cartReset"));
+      globalThis.dispatchEvent(new Event("cartReset"));
 
       // Keep lastOrder and orderOrigin for potential reprints
       // These will be cleared on next transaction
@@ -1169,6 +1479,20 @@ function QueuingDisplay() {
         <h1 className="waiting-turn">
           {isLoadingData ? "Processing your order..." : "Wait for your turn"}
         </h1>
+
+        {receiptPreviewHtml && (
+          <iframe
+            title="Receipt preview"
+            srcDoc={receiptPreviewHtml}
+            style={{
+              width: "260px",
+              height: "320px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "#ffffff",
+              marginTop: "12px"
+            }}
+          />
+        )}
 
         <div className="getting-content">
           <h1>GET YOUR NO.</h1>

@@ -1,8 +1,8 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
-import { FiCode, FiDatabase, FiTerminal, FiSettings, FiActivity, FiRefreshCw, FiPlay, FiStop, FiClock } from 'react-icons/fi';
+import { FiCode, FiDatabase, FiTerminal, FiActivity, FiRefreshCw } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
-import { devToolsAPI, logsAPI, handleAPIError } from '../../services/api';
+import { handleAPIError } from '../../services/api';
 import { getApiBaseUrl } from '../../utils/networkConfig'; // Network-aware API URLs
 import './DeveloperTools.css';
 
@@ -15,12 +15,11 @@ const DeveloperTools = () => {
     const [logs, setLogs] = useState([]);
     const [databaseStats, setDatabaseStats] = useState({});
     const [error, setError] = useState('');
-    const [lastUpdated, setLastUpdated] = useState(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [_lastUpdated, setLastUpdated] = useState(null); // NOSONAR - only setter is used
 
     // RBAC check
     const getUserRole = () => {
-        return currentUser?.role || localStorage.getItem('userRole') || 'developer';
+        return currentUser?.role || null;
     };
 
     const canAccessDeveloperTools = () => {
@@ -30,7 +29,7 @@ const DeveloperTools = () => {
 
     useEffect(() => {
         if (!canAccessDeveloperTools()) {
-            window.location.href = '/admin/dashboard';
+            globalThis.location.href = '/admin/dashboard';
             return;
         }
         loadSystemStatus();
@@ -50,7 +49,6 @@ const DeveloperTools = () => {
             setError('');
             const response = await fetch(`${getApiBaseUrl()}/dev/system-status`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -104,7 +102,6 @@ const DeveloperTools = () => {
         try {
             const response = await fetch(`${getApiBaseUrl()}/dev/database`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -141,7 +138,6 @@ const DeveloperTools = () => {
         try {
             const response = await fetch(`${getApiBaseUrl()}/dev/system-logs?limit=50`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -166,21 +162,6 @@ const DeveloperTools = () => {
         }
     };
 
-    const handleRefresh = async () => {
-        setIsRefreshing(true);
-        setIsLoading(true);
-        try {
-            await Promise.all([
-                loadSystemStatus(),
-                loadDatabaseStats(),
-                loadRecentLogs()
-            ]);
-        } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
-        }
-    };
-
     // Phase 6: Test API endpoint with real endpoint listing
     const testApiEndpoint = async (endpoint) => {
         setIsLoading(true);
@@ -193,9 +174,8 @@ const DeveloperTools = () => {
             if (endpoint === '/api/dev/api-docs') {
                 const response = await fetch(`${getApiBaseUrl()}/dev/api-docs`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                        'Content-Type': 'application/json'
-                    }
+                    'Content-Type': 'application/json'
+                }
                 });
 
                 const endTime = performance.now();
@@ -211,9 +191,8 @@ const DeveloperTools = () => {
                 // Test other endpoints
                 const response = await fetch(`${getApiBaseUrl().replace('/api', '')}${endpoint}`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                        'Content-Type': 'application/json'
-                    }
+                    'Content-Type': 'application/json'
+                }
                 });
 
                 const endTime = performance.now();

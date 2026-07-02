@@ -92,7 +92,6 @@ const Dashboard = () => {
             try {
                 const summaryRes = await fetch(`${getApiBaseUrl()}/admin/stats/summary`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -105,7 +104,6 @@ const Dashboard = () => {
             // Detailed stats endpoint
             const response = await fetch(`${getApiBaseUrl()}/admin/stats`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -127,7 +125,6 @@ const Dashboard = () => {
             try {
                 const userStatsResp = await fetch(`${getApiBaseUrl()}/users/stats/overview`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -177,7 +174,6 @@ const Dashboard = () => {
             // Fetch recent activity
             const activityResponse = await fetch(`${getApiBaseUrl()}/dashboard-enhanced/activity?limit=10`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -193,7 +189,6 @@ const Dashboard = () => {
             if (data.data.hasOrders) {
                 const ordersResponse = await fetch(`${getApiBaseUrl()}/orders/recent?limit=5`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -269,7 +264,7 @@ const Dashboard = () => {
                         orderNumber: order.order_number || order.orderNumber,
                         customer: order.customer_name || order.customer || order.customerName,
                         email: order.customer_email || order.email,
-                        amount: parseFloat(order.total_amount || order.amount || 0),
+                        amount: Number.parseFloat(order.total_amount || order.amount || 0),
                         status: order.status,
                         paymentMethod: order.payment_method || order.paymentMethod,
                         createdAt: order.created_at || order.createdAt,
@@ -390,7 +385,6 @@ const Dashboard = () => {
             // Fetch low stock items
             const response = await fetch(`${getApiBaseUrl()}/stock/low-stock`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -406,7 +400,6 @@ const Dashboard = () => {
             const aiResponse = await fetch(`${getApiBaseUrl()}/admin/ai/low-stock-recommendations`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ lowStockItems })
@@ -741,20 +734,20 @@ const Dashboard = () => {
             </div>
 
             {/* =====================================================
-                🤖 LOW STOCK ANALYTICS MODAL WITH AI RECOMMENDATIONS
+                LOW STOCK ANALYTICS MODAL WITH RULE-BASED RECOMMENDATIONS
                 ===================================================== */}
             {showLowStockAnalytics && (
                 <div className="modal-overlay" onClick={() => setShowLowStockAnalytics(false)}>
                     <div className="modal-content" style={{maxWidth: '900px', maxHeight: '80vh', overflow: 'auto'}} onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>📊 Low Stock Analytics & AI Recommendations</h2>
+                            <h2>📊 Low Stock Analytics & Stock Recommendations</h2>
                             <button className="close-btn" onClick={() => setShowLowStockAnalytics(false)}>×</button>
                         </div>
                         <div className="modal-body">
                             {aiAnalyzing ? (
                                 <div style={{textAlign: 'center', padding: '40px'}}>
                                     <div className="spinner"></div>
-                                    <p>🤖 AI is analyzing your inventory and sales data...</p>
+                                    <p>Analyzing your inventory and sales data...</p>
                                 </div>
                             ) : lowStockData ? (
                                 <div>
@@ -762,7 +755,7 @@ const Dashboard = () => {
                                         <p style={{margin: 0}}>
                                             <strong>📅 Analysis Date:</strong> {new Date(lowStockData.timestamp).toLocaleString()}<br/>
                                             <strong>📦 Low Stock Items:</strong> {lowStockData.items.length}<br/>
-                                            <strong>🤖 AI Model:</strong> Ollama Deepseek R1
+                                            <strong>Engine:</strong> Offline stock velocity rules
                                         </p>
                                     </div>
 
@@ -777,7 +770,7 @@ const Dashboard = () => {
                                                     <th>Product</th>
                                                     <th>Current Stock</th>
                                                     <th>Sales (30d)</th>
-                                                    <th>🤖 AI Recommendation</th>
+                                                    <th>Recommendation</th>
                                                     <th>Suggested Sale %</th>
                                                 </tr>
                                             </thead>

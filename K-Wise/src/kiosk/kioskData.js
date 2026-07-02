@@ -31,9 +31,11 @@ export const getProductById = (id, category) => {
 };
 
 // Export empty object to prevent app crashes during migration
-export default {
+const deprecatedKioskData = {
     menuItems: [],
     updateCartIcon: () => console.error('❌ Deprecated function called'),
     defaultCategoryImages: {},
     getProductById: () => null
 };
+
+export default deprecatedKioskData;

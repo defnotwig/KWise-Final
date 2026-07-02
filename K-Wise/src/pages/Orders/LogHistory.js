@@ -92,7 +92,7 @@ const LogHistory = () => {
 
             setLogs(mapped);
             setFilteredLogs(mapped); // server already filtered
-            const total = parseInt(result?.pagination?.total || mapped.length, 10);
+            const total = Number.parseInt(result?.pagination?.total || mapped.length, 10);
             setTotalLogs(total);
             setTotalPages(result?.pagination?.pages || Math.ceil(total / logsPerPage));
             setLastUpdated(new Date());

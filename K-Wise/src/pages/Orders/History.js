@@ -1,16 +1,14 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FiFilter, FiDownload, FiSearch, FiRefreshCw, FiHash, FiUser } from 'react-icons/fi';
-import { useAuth } from '../../contexts/AuthContext';
-import { ordersAPI, queueAPI, sseAPI, handleAPIError } from '../../services/api';
-import { formatCurrency, formatDate, exportToCSV } from '../../utils/formatters';
+import { FiDownload, FiSearch, FiRefreshCw } from 'react-icons/fi';
+import { ordersAPI, handleAPIError } from '../../services/api';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 import './History.css';
 import '../../styles/pagination.css';
 
 const History = () => {
     console.log("History component rendering");
-    const { currentUser } = useAuth();
     const location = useLocation();
     const [transactions, setTransactions] = useState([]);
     const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -120,7 +118,7 @@ const History = () => {
                     order_id_formatted: t.order_id_formatted || `OID-${String(t.order_id || t.orderId || t.id).padStart(4, '0')}`,
                     orderId: t.order_id_formatted || t.order_number || t.orderId || t.id,
                     customer: t.customer_name || t.customer || t.user_name || 'Unknown',
-                    amount: parseFloat(t.total_amount || t.amount || 0),
+                    amount: Number.parseFloat(t.total_amount || t.amount || 0),
                     status: t.status || t.payment_status || 'pending',
                     paymentMethod: t.payment_method || t.paymentMethod || 'N/A',
                     date: t.created_at || t.date || new Date().toISOString(), // Keep for backward compatibility
@@ -234,7 +232,7 @@ const History = () => {
 
         const printWindow = window.open('', '_blank', 'width=500,height=700');
         if (printWindow) {
-            printWindow.document.write(printContent);
+            printWindow.document.write(printContent); // NOSONAR - required for print window content injection
             printWindow.document.close();
             printWindow.focus();
             printWindow.print();
@@ -262,14 +260,14 @@ const History = () => {
 
             // Create and download CSV file
             const blob = new Blob([response.data], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
+            const url = globalThis.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            a.remove();
+            globalThis.URL.revokeObjectURL(url);
 
             console.log("Export completed successfully");
         } catch (error) {
@@ -372,8 +370,9 @@ const History = () => {
                     </div>
                     <div className="filter-options">
                         <div className="filter-group">
-                            <label>Filter by Status:</label>
+                            <label htmlFor="filter-status">Filter by Status:</label>
                             <select
+                                id="filter-status"
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value)}
                                 className="filter-select"
@@ -386,8 +385,9 @@ const History = () => {
                             </select>
                         </div>
                         <div className="filter-group">
-                            <label>Assisted By:</label>
+                            <label htmlFor="filter-assisted-by">Assisted By:</label>
                             <select
+                                id="filter-assisted-by"
                                 value={assistedBy}
                                 onChange={(e) => setAssistedBy(e.target.value)}
                                 className="filter-select"
@@ -400,8 +400,9 @@ const History = () => {
                         </div>
 
                         <div className="filter-group">
-                            <label>Start Date:</label>
+                            <label htmlFor="filter-start-date">Start Date:</label>
                             <input
+                                id="filter-start-date"
                                 type="date"
                                 value={dateRange.start}
                                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
@@ -410,8 +411,9 @@ const History = () => {
                         </div>
 
                         <div className="filter-group">
-                            <label>End Date:</label>
+                            <label htmlFor="filter-end-date">End Date:</label>
                             <input
+                                id="filter-end-date"
                                 type="date"
                                 value={dateRange.end}
                                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
@@ -594,7 +596,7 @@ const History = () => {
                                             <h4>Order Items</h4>
                                             <div className="items-list">
                                                 {selectedTransaction.order_items.map((item, index) => (
-                                                    <div key={index} className="item-row">
+                                                    <div key={`${item.item_name || item.name}-${index}`} className="item-row">
                                                         <div className="item-info">
                                                             <span className="item-name">{item.item_name || item.name}</span>
                                                             <span className="item-component">({item.component_name || item.category})</span>

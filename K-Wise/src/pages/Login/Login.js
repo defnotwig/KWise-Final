@@ -155,22 +155,21 @@ const LoginEnhanced = () => {
         setCreatePasswordRequirements(requirements);
     }, [createAccountData.password]);
 
-    // Load saved credentials and accounts on component mount
+    // Load remembered email and saved accounts on component mount
     useEffect(() => {
-        // Load saved credentials
+        // Migrate any legacy saved credentials to email-only data.
         const savedCredentials = localStorage.getItem('kwise_credentials');
         if (savedCredentials) {
             try {
-                const { email: savedEmail, password: savedPassword, rememberMe: savedRememberMe } = JSON.parse(savedCredentials);
-                if (savedRememberMe && savedEmail && savedPassword) {
+                const { email: savedEmail, rememberMe: savedRememberMe } = JSON.parse(savedCredentials);
+                if (savedRememberMe && savedEmail) {
                     setEmail(savedEmail);
-                    setPassword(savedPassword);
                     setRememberMe(true);
-                    console.log('Loaded saved credentials for:', savedEmail);
+                    console.log('Loaded remembered email for:', savedEmail);
                 }
             } catch (error) {
-                console.error('Error loading saved credentials:', error);
-                // Clear corrupted data
+                console.error('Error loading remembered email:', error);
+            } finally {
                 localStorage.removeItem('kwise_credentials');
             }
         }
@@ -180,7 +179,11 @@ const LoginEnhanced = () => {
             const savedAccountsData = localStorage.getItem('kwise_saved_accounts');
             if (savedAccountsData) {
                 const accounts = JSON.parse(savedAccountsData);
-                setSavedAccounts(accounts);
+                const safeAccounts = accounts
+                    .filter((account) => account?.email)
+                    .map(({ email, rememberMe, savedAt }) => ({ email, rememberMe: Boolean(rememberMe), savedAt }));
+                localStorage.setItem('kwise_saved_accounts', JSON.stringify(safeAccounts));
+                setSavedAccounts(safeAccounts);
             }
         } catch (error) {
             console.error('Error loading saved accounts:', error);
@@ -195,14 +198,8 @@ const LoginEnhanced = () => {
     // Function to handle selection of saved account
     const selectSavedAccount = (account) => {
         setEmail(account.email);
-        setPassword(account.password);
+        setPassword('');
         setRememberMe(true);
-        
-        // If auto login is enabled, automatically attempt login
-        if (autoLogin) {
-            // We'll handle login in a separate function
-            loginWithSavedCredentials(account.email, account.password);
-        }
     };
     
     // Function to remove a saved account
@@ -230,16 +227,15 @@ const LoginEnhanced = () => {
     const handleRememberMeChange = (checked) => {
         setRememberMe(checked);
         if (!checked) {
-            // Clear saved credentials if user unchecks remember me
+            // Clear saved login preference if user unchecks remember me
             localStorage.removeItem('kwise_credentials');
-            console.log('Remember me disabled - credentials cleared');
+            console.log('Remember me disabled - saved login preference cleared');
         } else if (email) {
-            // Save current credentials to saved accounts list
+            // Save email-only account metadata. Passwords are never persisted.
             const accountExists = savedAccounts.some(account => account.email === email);
             if (!accountExists && email) {
                 const newAccount = {
                     email,
-                    password,
                     rememberMe: true,
                     savedAt: new Date().toISOString()
                 };
@@ -251,27 +247,11 @@ const LoginEnhanced = () => {
         }
     };
     
-    // Function to login with saved credentials
-    const loginWithSavedCredentials = async (savedEmail, savedPassword) => {
-        try {
-            setIsLoading(true);
-            await login(savedEmail, savedPassword);
-            console.log('Auto-login successful');
-            localStorage.removeItem('kwise_current_view');
-        } catch (error) {
-            console.error('Auto-login failed:', error);
-            setError('Auto-login failed. Please enter your password and try again.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const navigate = useNavigate();
 
     // Redirect if already logged in
     useEffect(() => {
-        const storedUser = localStorage.getItem('currentUser');
-        if (currentUser || storedUser) {
+        if (currentUser) {
             console.log('User already logged in, redirecting');
             const redirectPath = sessionStorage.getItem('redirectPath') || '/admin/dashboard';
             console.log('Redirecting to:', redirectPath);
@@ -362,15 +342,11 @@ const LoginEnhanced = () => {
         try {
             const response = await login(email, password);
             // CRITICAL FIX: Check if login was successful
-            if (response && response.success && response.user && response.token) {
-                // Store token and user in localStorage
-                localStorage.setItem('token', response.token);
-                localStorage.setItem('user', JSON.stringify(response.user));
-                // Save credentials if remember me is checked
+            if (response?.id || response?.email || response?.user) {
+                // Save email-only account metadata if remember me is checked
                 if (rememberMe && email && password) {
                     const credentials = {
                         email,
-                        password,
                         rememberMe: true,
                         savedAt: new Date().toISOString()
                     };
@@ -383,7 +359,7 @@ const LoginEnhanced = () => {
                         setSavedAccounts(updatedAccounts);
                     }
                 } else {
-                    // Clear saved credentials if remember me is unchecked
+                    // Clear saved login preference if remember me is unchecked
                     localStorage.removeItem('kwise_credentials');
                 }
                 // Clear the saved view state on successful login
@@ -798,10 +774,9 @@ const LoginEnhanced = () => {
             });
 
             // Handle successful 2FA login
-            if (response.data?.token) {
-                localStorage.setItem('token', response.data.token);
-                localStorage.setItem('currentUser', JSON.stringify(response.data.data.user));
-                updateCurrentUser(response.data.data.user);
+            const verifiedUser = response.data?.data?.user || response.data?.user;
+            if (verifiedUser) {
+                updateCurrentUser(verifiedUser);
             }
 
             const redirectPath = sessionStorage.getItem('redirectPath') || '/admin/dashboard';
@@ -855,11 +830,8 @@ const LoginEnhanced = () => {
             });
 
             // Handle successful registration (auto-login + redirect)
-            const token = response.token || response?.data?.token;
             const user = response.user || response?.data?.user;
-            if (token && user) {
-                localStorage.setItem('token', token);
-                localStorage.setItem('currentUser', JSON.stringify(user));
+            if (user) {
                 // Clear the saved view state on successful account creation
                 localStorage.removeItem('kwise_current_view');
                 updateCurrentUser(user);

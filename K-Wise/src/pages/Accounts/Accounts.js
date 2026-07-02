@@ -8,7 +8,7 @@ import { Notyf } from 'notyf';
 import 'notyf/notyf.min.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { usersAPI } from '../../services/api';
-import { getApiBaseUrl, getFullImageUrl } from '../../utils/networkConfig'; // Network-aware URLs
+import { getApiBaseUrl } from '../../utils/networkConfig'; // Network-aware URLs
 import './Accounts.css';
 
 const Accounts = () => {
@@ -77,20 +77,14 @@ const Accounts = () => {
         return currentUser?.role === 'superadmin';
     };
 
-    const canViewAllUserDetails = () => {
-        // Superadmin and Admin can view all user details
-        return currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
-    };
+    // canViewAllUserDetails removed — was unused
 
     // Phase 3: Enhanced permission functions
     const canViewOnlineStatus = useCallback(() => {
         return currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
     }, [currentUser?.role]);
 
-    // const canViewLimitedUserDetails = () => {
-    //     // Developer can only see limited user details (username, role), no personal info
-    //     return currentUser?.role === 'developer';
-    // };
+
 
     const getAvailableRoles = () => {
         if (currentUser?.role === 'superadmin') {
@@ -119,11 +113,9 @@ const Accounts = () => {
 
     // Phase 3: Enhanced API functions
     const apiCall = async (url, options = {}) => {
-        const token = localStorage.getItem('token');
         const response = await fetch(`${getApiBaseUrl().replace('/api', '')}${url}`, {
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
                 ...options.headers
             },
             ...options
@@ -140,7 +132,7 @@ const Accounts = () => {
     // Centralized API error normalization
     const handleAPIError = (err) => {
         if (!err) return { message: 'Unknown error' };
-        if (err.response && err.response.data && err.response.data.message) {
+        if (err.response?.data?.message) {
             return { message: err.response.data.message };
         }
         if (err.message) return { message: err.message };
@@ -251,13 +243,13 @@ const Accounts = () => {
             console.log('👥 Users data type:', typeof usersData, Array.isArray(usersData));
             console.log('👥 Users data:', usersData);
 
-            if (!Array.isArray(usersData)) {
+            if (Array.isArray(usersData)) {
+                console.log('✅ Setting users data:', usersData.length, 'users');
+                setUsers(usersData);
+            } else {
                 console.error('❌ API returned non-array users data:', usersData);
                 setUsers([]);
                 setError('Invalid data format received from server');
-            } else {
-                console.log('✅ Setting users data:', usersData.length, 'users');
-                setUsers(usersData);
             }
 
             // Handle pagination data
@@ -318,7 +310,7 @@ const Accounts = () => {
         // Optional: future SSE subscription for real-time user stats
         const evt = new EventSource(`${getApiBaseUrl()}/realtime/users`);
         evt.addEventListener('users', (e) => {
-            try { const data = JSON.parse(e.data); setManagementStats(ms => ({ ...(ms||{}), activeUsers: data.activeUsers, totalUsers: data.totalUsers })); } catch {}
+            try { const data = JSON.parse(e.data); setManagementStats(ms => ({ ...ms, activeUsers: data.activeUsers, totalUsers: data.totalUsers })); } catch (_e) { console.debug('SSE parse error', _e); }
         });
         return () => evt.close();
     }, []);
@@ -474,17 +466,7 @@ const Accounts = () => {
         setShowEditModal(true);
     };
 
-    const handleSearch = (e) => {
-        const term = e.target.value;
-        setSearchTerm(term);
-        setPagination({ ...pagination, page: 1 }); // Reset to first page
-
-        // Debounce search
-        clearTimeout(window.searchTimeout);
-        window.searchTimeout = setTimeout(() => {
-            fetchUsers();
-        }, 500);
-    };
+    // handleSearch removed — was unused (search handled inline)
 
     const handlePageChange = (newPage) => {
         setPagination({ ...pagination, page: newPage });
@@ -747,7 +729,7 @@ const Accounts = () => {
                         Previous
                     </button>
 
-                    {[...Array(pagination.pages)].map((_, index) => (
+                    {Array.from({ length: pagination.pages }).map((_, index) => (
                         <button
                             key={index + 1}
                             className={`page-btn ${pagination.page === index + 1 ? 'active' : ''}`}
