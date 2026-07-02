@@ -74,8 +74,8 @@ async function fetchTransactions(req) {
         search
     } = req.query;
 
-    const pageNum = Math.max(parseInt(page), 1);
-    const limitNum = Math.min(Math.max(parseInt(limit), 1), 50); // Reduced max limit from 100 to 50
+    const pageNum = Math.max(Number.parseInt(page, 10), 1);
+    const limitNum = Math.min(Math.max(Number.parseInt(limit, 10), 1), 50); // Reduced max limit from 100 to 50
     const offset = (pageNum - 1) * limitNum;
 
     logger.info('Fetching transactions with filters:', { from, to, method, status, page: pageNum, limit: limitNum });
@@ -162,7 +162,7 @@ async function fetchTransactions(req) {
 
     if (assistedBy) {
         baseQuery += ` AND o.assisted_by = $${paramCount}`;
-        queryParams.push(parseInt(assistedBy));
+        queryParams.push(Number.parseInt(assistedBy, 10));
         paramCount++;
     }
 
@@ -199,7 +199,7 @@ async function fetchTransactions(req) {
     }
     if (assistedBy) {
         countQuery += ` AND o.assisted_by = $${countIndex}`;
-        countParams.push(parseInt(assistedBy));
+        countParams.push(Number.parseInt(assistedBy, 10));
         countIndex++;
     }
     if (search) {
@@ -208,7 +208,7 @@ async function fetchTransactions(req) {
     }
 
     const countResult = await query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0]?.count || 0);
+    const total = Number.parseInt(countResult.rows[0]?.count || 0, 10);
 
     // Add GROUP BY for JSON_AGG, then sorting and pagination
     baseQuery += ` GROUP BY o.id, o.order_number, o.customer_name, o.customer_email, o.total_amount, 
@@ -286,7 +286,7 @@ router.get('/transactions/:id', restrictTo('admin', 'superadmin', 'developer'), 
 router.get('/queue/current', restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const { status = 'pending', limit = 50 } = req.query;
-        const limitNum = Math.min(parseInt(limit), 100);
+        const limitNum = Math.min(Number.parseInt(limit, 10), 100);
 
         logger.info(`Fetching order queue with status: ${status}, limit: ${limitNum}`);
 
@@ -477,7 +477,7 @@ router.get('/export/csv', restrictTo('admin', 'superadmin', 'developer'), async 
         if (to) { sql += ` AND o.created_at <= $${idx++}`; params.push(new Date(to)); }
         if (status) { sql += ` AND o.status = $${idx++}`; params.push(status); }
         if (method) { sql += ` AND o.payment_method ILIKE $${idx++}`; params.push(`%${method}%`); }
-        if (assistedBy) { sql += ` AND o.assisted_by = $${idx++}`; params.push(parseInt(assistedBy)); }
+        if (assistedBy) { sql += ` AND o.assisted_by = $${idx++}`; params.push(Number.parseInt(assistedBy, 10)); }
         sql += ' ORDER BY o.created_at DESC LIMIT 5000';
         const result = await query(sql, params);
 
@@ -539,7 +539,7 @@ router.get('/history/transactions', restrictTo('admin', 'superadmin', 'developer
 router.get('/recent', restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const { limit = 5 } = req.query;
-        const limitNum = Math.min(parseInt(limit), 20); // Max 20 for performance
+        const limitNum = Math.min(Number.parseInt(limit, 10), 20); // Max 20 for performance
 
         logger.info(`Fetching ${limitNum} recent orders for dashboard`);
 
@@ -570,7 +570,7 @@ router.get('/recent', restrictTo('admin', 'superadmin', 'developer'), async (req
             orderNumber: order.order_number,
             customer: order.customer_name_display,
             email: order.customer_email,
-            amount: parseFloat(order.total_amount || 0),
+            amount: Number.parseFloat(order.total_amount || 0),
             status: order.status,
             paymentMethod: order.payment_method,
             createdAt: order.created_at,

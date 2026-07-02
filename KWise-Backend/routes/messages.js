@@ -125,9 +125,9 @@ router.get('/available-users', protect, restrictTo('admin', 'superadmin', 'devel
 router.get('/conversation/:userId', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const currentUserId = req.user.id;
-        const otherUserId = parseInt(req.params.userId);
-        const limit = parseInt(req.query.limit) || 50;
-        const offset = parseInt(req.query.offset) || 0;
+        const otherUserId = Number.parseInt(req.params.userId, 10);
+        const limit = Number.parseInt(req.query.limit, 10) || 50;
+        const offset = Number.parseInt(req.query.offset, 10) || 0;
 
         // Validate other user exists and is active
         const otherUser = await query('SELECT id, name, role FROM users WHERE id = $1 AND is_active = true', [otherUserId]);
@@ -207,7 +207,7 @@ router.post('/send', protect, restrictTo('admin', 'superadmin', 'developer'), as
         }
 
         // Cannot send message to self
-        if (fromUserId === parseInt(to_user_id)) {
+        if (fromUserId === Number.parseInt(to_user_id, 10)) {
             return res.status(400).json({
                 success: false,
                 message: 'Cannot send message to yourself'
@@ -265,7 +265,7 @@ router.post('/send', protect, restrictTo('admin', 'superadmin', 'developer'), as
 router.put('/read/:conversationUserId', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const currentUserId = req.user.id;
-        const conversationUserId = parseInt(req.params.conversationUserId);
+        const conversationUserId = Number.parseInt(req.params.conversationUserId, 10);
 
         await query(`
             UPDATE messages 
@@ -318,7 +318,7 @@ router.get('/unread-count', protect, restrictTo('admin', 'superadmin', 'develope
 router.delete('/:messageId', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const userId = req.user.id;
-        const messageId = parseInt(req.params.messageId);
+        const messageId = Number.parseInt(req.params.messageId, 10);
 
         // Only allow deletion of own messages
         const result = await query(`

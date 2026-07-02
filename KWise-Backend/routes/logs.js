@@ -84,8 +84,8 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), validateLogsQuer
     try {
         // Normalized query params with aliases
         const raw = req.query;
-        const page = Math.max(parseInt(raw.page || '1'), 1);
-        const limit = Math.min(Math.max(parseInt(raw.limit || '50'), 1), 200);
+        const page = Math.max(Number.parseInt(raw.page || '1', 10), 1);
+        const limit = Math.min(Math.max(Number.parseInt(raw.limit || '50', 10), 1), 200);
         const offset = (page - 1) * limit;
 
         const severity = raw.severity || raw.level || null; // alias support
@@ -121,7 +121,7 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), validateLogsQuer
         // Count query
         const countSql = `SELECT COUNT(*) as count ${sql}`;
         const countResult = await query(countSql, params);
-        const total = parseInt(countResult.rows[0].count || 0);
+        const total = Number.parseInt(countResult.rows[0].count || 0, 10);
         const pages = Math.max(Math.ceil(total / limit), 1);
 
         // Main data query
@@ -197,11 +197,11 @@ router.get('/stats/summary', restrictTo('admin', 'superadmin', 'developer'), asy
         ]);
 
         const stats = {
-            total: parseInt(totalLogs.rows[0]?.count || 0),
-            success: parseInt(successLogs.rows[0]?.count || 0),
-            failed: parseInt(failedLogs.rows[0]?.count || 0),
-            warnings: parseInt(warnLogs.rows[0]?.count || 0),
-            errors: parseInt(errorLogs.rows[0]?.count || 0)
+            total: Number.parseInt(totalLogs.rows[0]?.count || 0, 10),
+            success: Number.parseInt(successLogs.rows[0]?.count || 0, 10),
+            failed: Number.parseInt(failedLogs.rows[0]?.count || 0, 10),
+            warnings: Number.parseInt(warnLogs.rows[0]?.count || 0, 10),
+            errors: Number.parseInt(errorLogs.rows[0]?.count || 0, 10)
         };
 
         res.json({

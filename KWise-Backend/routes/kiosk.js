@@ -5,8 +5,14 @@ const { kioskGeneralLimit, kioskSearchLimit, kioskBrowseLimit, kioskOrderLimit }
 const { validateFilter, validateUpgrade } = require('../middleware/validateBuild');
 const { validateFilterRequest } = require('../middleware/buildSchemas'); // Phase 9: JSON Schema validation
 const { createOrder } = require('../utils/testMemoryStore');
+const { createHotReadCache } = require('../middleware/hotReadCache');
 
 const isTestMode = process.env.NODE_ENV === 'test';
+const hotKioskReadCache = createHotReadCache({
+    ttlMs: Number.parseInt(process.env.KIOSK_HOT_READ_CACHE_TTL_MS || '30000', 10),
+    maxEntries: Number.parseInt(process.env.KIOSK_HOT_READ_CACHE_MAX_ENTRIES || '512', 10),
+    redisPrefix: 'kiosk-hot-read'
+});
 
 // Test-mode short-circuit routes to make kiosk tests deterministic without DB access
 if (isTestMode) {
@@ -46,8 +52,8 @@ if (isTestMode) {
         const { category } = req.params;
         const { page = 1, limit = 20, brand } = req.query;
         const filtered = sampleProducts.filter(p => p.category === category && (!brand || p.brand === brand));
-        const pageNum = Math.max(parseInt(page, 10), 1);
-        const limitNum = Math.max(parseInt(limit, 10), 1);
+        const pageNum = Math.max(Number.parseInt(page, 10), 1);
+        const limitNum = Math.max(Number.parseInt(limit, 10), 1);
         const start = (pageNum - 1) * limitNum;
         const items = filtered.slice(start, start + limitNum);
 
@@ -69,9 +75,91 @@ if (isTestMode) {
         });
     });
 
+    router.get('/catalog/bootstrap', (req, res) => {
+        const { category, page = 1, limit = 20 } = req.query;
+        const filtered = sampleProducts.filter(p => !category || p.category === category);
+        const pageNum = Math.max(Number.parseInt(page, 10), 1);
+        const limitNum = Math.max(Number.parseInt(limit, 10), 1);
+        const start = (pageNum - 1) * limitNum;
+        const products = filtered.slice(start, start + limitNum);
+        const brands = [...new Set(filtered.map(p => p.brand).filter(Boolean))]
+            .map(brandName => ({
+                name: brandName,
+                count: filtered.filter(p => p.brand === brandName).length
+            }));
+        const prices = filtered.map(p => p.price);
+
+        return res.json({
+            success: true,
+            data: {
+                category: category || '',
+                products,
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.max(Math.ceil(filtered.length / limitNum), 1),
+                    totalItems: filtered.length,
+                    itemsPerPage: limitNum,
+                    hasNext: start + limitNum < filtered.length,
+                    hasPrev: pageNum > 1
+                },
+                brands,
+                totalItems: filtered.length,
+                priceRange: {
+                    min: prices.length ? Math.min(...prices) : 0,
+                    max: prices.length ? Math.max(...prices) : 0
+                },
+                specFields: [],
+                specRanges: {},
+                cache: {
+                    ttlSeconds: 30,
+                    source: 'test-memory',
+                    generatedAt: new Date().toISOString()
+                }
+            },
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    router.get('/products/:id', (req, res) => {
+        const id = Number.parseInt(String(req.params.id || '').replace(/\D+/g, ''), 10);
+        const product = sampleProducts.find(p => p.id === id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
+        }
+        return res.json({
+            success: true,
+            data: {
+                ...product,
+                image: product.imageUrl,
+                image_url: product.imageUrl,
+                onSale: false,
+                salePrice: null,
+                effectivePrice: product.price,
+                specifications: product.specifications || {},
+                dimensions: product.dimensions || {}
+            },
+            timestamp: new Date().toISOString()
+        });
+    });
+
     router.get('/featured', (req, res) => {
-        const limit = Math.max(parseInt(req.query.limit || '6', 10), 1);
+        const limit = Math.max(Number.parseInt(req.query.limit || '6', 10), 1);
         return res.json({ success: true, data: sampleProducts.slice(0, limit).map(p => ({ ...p, effectivePrice: p.price })) });
+    });
+
+    router.get('/homepage', (req, res) => {
+        const limit = Math.max(Number.parseInt(req.query.limit || '8', 10), 1);
+        const data = sampleProducts.slice(0, limit).map(p => ({ ...p, effectivePrice: p.price }));
+        return res.json({
+            success: true,
+            data: {
+                onSale: data.map(p => ({ ...p, onSale: true })),
+                hotPicks: data,
+                valueForMoney: data
+            },
+            cache: { source: 'test', ttlSeconds: 30 },
+            timestamp: new Date().toISOString()
+        });
     });
 
     const componentsPayload = {
@@ -122,6 +210,36 @@ if (isTestMode) {
             }
         });
     });
+
+    router.get('/orders/:orderId/receipt', (req, res) => {
+        return res.json({
+            success: true,
+            data: {
+                orderId: req.params.orderId,
+                orderNumber: `TEST-${req.params.orderId}`,
+                orderIdFormatted: `TEST-${req.params.orderId}`,
+                transactionIdFormatted: `TXN-${req.params.orderId}`,
+                queueNumber: 'S001',
+                paymentMethod: 'Cash',
+                serviceType: 'pc-parts',
+                status: 'pending',
+                items: sampleProducts.slice(0, 1).map(product => ({
+                    id: product.id,
+                    name: product.name,
+                    componentName: product.category,
+                    quantity: 1,
+                    price: product.price,
+                    amount: product.price,
+                    description: '',
+                    status: 'pending'
+                })),
+                totalAmount: sampleProducts[0].price,
+                createdAt: new Date().toISOString(),
+                generatedAt: new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        });
+    });
 }
 
 /**
@@ -130,14 +248,31 @@ if (isTestMode) {
  * Rate limiting applied to prevent abuse and ensure fair usage
  */
 
+router.use(hotKioskReadCache);
+
 // GET /api/kiosk/categories - Get all categories with product counts
 router.get('/categories', kioskBrowseLimit, kioskController.getCategories);
+
+// GET /api/kiosk/catalog/bootstrap - Aggregate first-load catalog data
+router.get('/catalog/bootstrap', kioskBrowseLimit, kioskController.getCatalogBootstrap);
+
+// GET /api/kiosk/products/:id/compatible - Product-detail compatible products
+router.get('/products/:id/compatible', kioskBrowseLimit, kioskController.getProductCompatibleProducts);
+
+// POST /api/kiosk/compatibility/candidates - Annotate current category candidates
+router.post('/compatibility/candidates', kioskGeneralLimit, kioskController.checkCompatibilityCandidates);
+
+// GET /api/kiosk/products/:id - Stable product detail payload for kiosk routes
+router.get('/products/:id', kioskBrowseLimit, kioskController.getProductById);
 
 // GET /api/kiosk/categories/:category/products - Get products for specific category  
 router.get('/categories/:category/products', kioskBrowseLimit, kioskController.getCategoryProducts);
 
 // GET /api/kiosk/featured - Get featured products for home screen
 router.get('/featured', kioskGeneralLimit, kioskController.getFeaturedProducts);
+
+// GET /api/kiosk/homepage - Aggregated home screen sections
+router.get('/homepage', kioskGeneralLimit, kioskController.getHomepageProducts);
 
 // GET /api/kiosk/build-components - Get components organized for PC builder
 router.get('/build-components', kioskGeneralLimit, kioskController.getBuildComponents);
@@ -154,14 +289,18 @@ router.get('/on-sale', kioskGeneralLimit, kioskController.getOnSaleProducts);
 // POST /api/kiosk/orders - Create new order with queue assignment
 router.post('/orders', (req, res, next) => {
     console.log('🔍 ROUTE MIDDLEWARE - Before controller:');
-    console.log('  Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('  Body:', JSON.stringify(req.body, null, 2));
-    console.log('  Raw body type:', typeof req.body);
-    console.log('  Body keys:', Object.keys(req.body || {}));
+    if (process.env.NODE_ENV === 'development') {
+        console.log('  Body keys:', Object.keys(req.body || {}));
+        console.log('  Item count:', Array.isArray(req.body?.items) ? req.body.items.length : 0);
+        console.log('  Selected part count:', Array.isArray(req.body?.selectedParts) ? req.body.selectedParts.length : 0);
+    }
     next();
 }, kioskOrderLimit, kioskController.createOrder);
 
-// POST /api/kiosk/ai-hot-picks - Get AI-powered hot picks or upgrade recommendations
+// GET /api/kiosk/orders/:orderId/receipt - Pure receipt model for queue/reprint flows
+router.get('/orders/:orderId/receipt', kioskBrowseLimit, kioskController.getOrderReceipt);
+
+// POST /api/kiosk/ai-hot-picks - Backward-compatible deterministic hot picks alias
 router.post('/ai-hot-picks', kioskGeneralLimit, kioskController.getAIHotPicks);
 
 // POST /api/kiosk/hot-picks (ALIAS) - Backward compatibility alias for ai-hot-picks
@@ -170,7 +309,7 @@ router.post('/hot-picks', kioskGeneralLimit, kioskController.getAIHotPicks);
 // POST /api/kiosk/future-upgrade-stock - Get stock-based upgrade recommendations from database
 router.post('/future-upgrade-stock', kioskGeneralLimit, validateUpgrade, kioskController.getFutureUpgradeStock);
 
-// POST /api/kiosk/ollama-external-upgrade - Get external market recommendations via Ollama DeepSeek R1
+// POST /api/kiosk/ollama-external-upgrade - Disabled offline legacy endpoint
 router.post('/ollama-external-upgrade', kioskGeneralLimit, validateUpgrade, kioskController.getOllamaExternalUpgrade);
 
 // POST /api/kiosk/dual-upgrade - Get 1:2 ratio upgrade recommendations (1 stock + 1 external, or 2 external if best)
@@ -216,33 +355,15 @@ router.get('/pc-upgrade-parameters', kioskGeneralLimit, async (req, res) => {
     }
 });
 
-// GET /api/kiosk/pc-customized-ai-parameters - Get PC Customized AI parameters (public access for kiosk)
+// GET /api/kiosk/pc-customized-ai-parameters - Disabled offline legacy endpoint
 router.get('/pc-customized-ai-parameters', kioskGeneralLimit, async (req, res) => {
-    try {
-        const { query } = require('../config/db');
-        const [usageTypes, budgetTiers, performancePreferences, gamingPreferences] = await Promise.all([
-            query('SELECT * FROM pc_customized_ai_usage_types WHERE is_active = true ORDER BY sort_order ASC'),
-            query('SELECT * FROM pc_customized_ai_budget_tiers WHERE is_active = true ORDER BY min_budget ASC'),
-            query('SELECT * FROM pc_customized_ai_performance_preferences WHERE is_active = true ORDER BY sort_order ASC'),
-            query('SELECT * FROM pc_customized_ai_gaming_preferences WHERE is_active = true ORDER BY sort_order ASC')
-        ]);
-
-        res.json({
-            success: true,
-            data: {
-                usageTypes: usageTypes.rows,
-                budgetTiers: budgetTiers.rows,
-                performancePreferences: performancePreferences.rows,
-                gamingPreferences: gamingPreferences.rows
-            }
-        });
-    } catch (error) {
-        console.error('Error fetching PC Customized AI parameters:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch parameters'
-        });
-    }
+    res.status(410).json({
+        success: false,
+        code: 'AI_REMOVED',
+        source: 'deterministic',
+        aiEnabled: false,
+        message: 'PC customized AI parameters are disabled in offline kiosk mode'
+    });
 });
 
 module.exports = router;

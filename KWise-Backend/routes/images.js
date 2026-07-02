@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const { protect, restrictTo } = require('../middleware/auth');
 const imageUploadController = require('../controllers/imageUploadController');
+const { validateUploadedImageMagic } = require('../middleware/secureImageUpload');
 
 const isTestMode = process.env.NODE_ENV === 'test';
 
@@ -57,6 +58,7 @@ router.post(
     restrictTo('admin', 'superadmin'),
     uploadLimiter,
     imageUploadController.single,
+    validateUploadedImageMagic,
     imageUploadController.uploadStockImage
 );
 
@@ -72,6 +74,7 @@ router.post(
         req.body.category = req.params.category;
         return imageUploadController.single(req, res, next);
     },
+    validateUploadedImageMagic,
     imageUploadController.uploadStockImage
 );
 

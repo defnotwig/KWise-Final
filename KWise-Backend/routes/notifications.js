@@ -13,8 +13,8 @@ const logger = require('../utils/logger');
 router.get('/', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const userId = req.user.id;
-        const limit = parseInt(req.query.limit) || 20;
-        const offset = parseInt(req.query.offset) || 0;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
+        const offset = Number.parseInt(req.query.offset, 10) || 0;
         const unreadOnly = req.query.unread === 'true';
 
         let whereClause = 'WHERE n.user_id = $1';
@@ -72,7 +72,7 @@ router.get('/', protect, restrictTo('admin', 'superadmin', 'developer'), async (
 router.put('/:notificationId/read', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const userId = req.user.id;
-        const notificationId = parseInt(req.params.notificationId);
+        const notificationId = Number.parseInt(req.params.notificationId, 10);
 
         const result = await query(`
             UPDATE notifications 
@@ -183,7 +183,7 @@ router.post('/', protect, restrictTo('superadmin', 'developer'), async (req, res
 router.delete('/:notificationId', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const userId = req.user.id;
-        const notificationId = parseInt(req.params.notificationId);
+        const notificationId = Number.parseInt(req.params.notificationId, 10);
 
         const result = await query(`
             DELETE FROM notifications 

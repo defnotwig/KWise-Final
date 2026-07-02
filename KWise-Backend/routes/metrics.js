@@ -17,6 +17,10 @@ const router = express.Router();
 const { query } = require('../config/db');
 const intelligentCache = require('../services/intelligentCache');
 const logger = require('../utils/logger');
+const { protect, restrictTo } = require('../middleware/auth');
+
+router.use(protect);
+router.use(restrictTo('admin', 'superadmin', 'developer'));
 
 /**
  * @route GET /api/metrics/dashboard
@@ -83,8 +87,8 @@ async function getPerformanceMetrics() {
       p99Latency: Math.round(stats.p99_latency || 0) + 'ms',
       minLatency: Math.round(stats.min_latency || 0) + 'ms',
       maxLatency: Math.round(stats.max_latency || 0) + 'ms',
-      totalRequests: parseInt(stats.total_requests || 0),
-      requestsPerSecond: (parseInt(stats.total_requests || 0) / 3600).toFixed(2)
+      totalRequests: Number.parseInt(stats.total_requests || 0, 10),
+      requestsPerSecond: (Number.parseInt(stats.total_requests || 0, 10) / 3600).toFixed(2)
     };
   } catch (error) {
     logger.error('Error getting performance metrics', { error: error.message });
@@ -120,14 +124,14 @@ async function getCacheMetrics() {
       misses: cacheStats.misses,
       totalRequests: cacheStats.hits + cacheStats.misses,
       entries: {
-        total: parseInt(dbStats.total_entries || 0),
-        active: parseInt(dbStats.active_entries || 0),
+        total: Number.parseInt(dbStats.total_entries || 0, 10),
+        active: Number.parseInt(dbStats.active_entries || 0, 10),
         hot: cacheStats.hotTier || 0,
         warm: cacheStats.warmTier || 0,
         cold: cacheStats.coldTier || 0
       },
       memoryUsage: (cacheStats.memoryMB || 0).toFixed(2) + ' MB',
-      avgConfidence: parseFloat(dbStats.avg_confidence || 0).toFixed(2),
+      avgConfidence: Number.parseFloat(dbStats.avg_confidence || 0).toFixed(2),
       evictions: cacheStats.evictions || 0
     };
   } catch (error) {
@@ -175,7 +179,7 @@ async function getDatabaseMetrics() {
       const slowResult = await query(slowQueriesQuery);
       slowQueries = slowResult.rows.map(q => ({
         query: q.query.substring(0, 100) + '...',
-        calls: parseInt(q.calls || 0),
+        calls: Number.parseInt(q.calls || 0, 10),
         avgTime: Math.round(q.avg_time_ms || 0) + 'ms'
       }));
     } catch (err) {
@@ -199,15 +203,15 @@ async function getDatabaseMetrics() {
     const indexUsage = indexResult.rows.map(row => ({
       table: row.table_name,
       indexUsage: (row.index_usage_pct || 0) + '%',
-      indexScans: parseInt(row.idx_scan || 0),
-      seqScans: parseInt(row.seq_scan || 0)
+      indexScans: Number.parseInt(row.idx_scan || 0, 10),
+      seqScans: Number.parseInt(row.seq_scan || 0, 10)
     }));
 
     return {
       connections: {
-        total: parseInt(connections.total || 0),
-        active: parseInt(connections.active || 0),
-        idle: parseInt(connections.idle || 0),
+        total: Number.parseInt(connections.total || 0, 10),
+        active: Number.parseInt(connections.active || 0, 10),
+        idle: Number.parseInt(connections.idle || 0, 10),
         maxAllowed: 20
       },
       queryPerformance: {
@@ -273,9 +277,9 @@ async function getAIMetrics() {
     const result = await query(aiStatsQuery);
     const endpointStats = result.rows.map(row => ({
       endpoint: row.endpoint,
-      requests: parseInt(row.requests || 0),
+      requests: Number.parseInt(row.requests || 0, 10),
       avgResponseTime: Math.round(row.avg_response_time || 0) + 'ms',
-      successRate: ((parseInt(row.successful_requests || 0) / parseInt(row.requests || 1)) * 100).toFixed(2) + '%'
+      successRate: ((Number.parseInt(row.successful_requests || 0, 10) / Number.parseInt(row.requests || 1, 10)) * 100).toFixed(2) + '%'
     }));
 
     // Get cache warmup stats if available
@@ -296,9 +300,9 @@ async function getAIMetrics() {
       }
     };
   } catch (error) {
-    logger.error('Error getting AI metrics', { error: error.message });
+    logger.error('Error getting legacy recommendation metrics', { error: error.message });
     return {
-      error: 'Unable to fetch AI metrics',
+      error: 'Unable to fetch legacy recommendation metrics',
       ollamaStatus: 'Unknown'
     };
   }
@@ -324,7 +328,7 @@ function getSystemResources() {
       },
       cpu: {
         usage: process.cpuUsage(),
-        loadAverage: process.platform === 'linux' ? require('os').loadavg() : [0, 0, 0]
+        loadAverage: process.platform === 'linux' ? require('node:os').loadavg() : [0, 0, 0]
       }
     };
   } catch (error) {
