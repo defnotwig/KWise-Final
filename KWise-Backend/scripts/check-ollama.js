@@ -4,9 +4,9 @@
  */
 
 const axios = require('axios');
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+const { spawn } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'deepseek-r1:1.5b';

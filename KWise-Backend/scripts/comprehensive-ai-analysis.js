@@ -6,8 +6,8 @@
 
 const axios = require('axios');
 const db = require('../config/db');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // Import all AI services
 const { compatibilityService } = require('../services/compatibilityService');
@@ -480,7 +480,7 @@ async function testReferenceBuildsAndAI() {
       SELECT COUNT(*) as count FROM pc_upgrade_reference_builds
     `);
     
-    const refBuildsCount = parseInt(buildsResult.rows[0].count);
+    const refBuildsCount = Number.parseInt(buildsResult.rows[0].count, 10);
     log.info(`Reference builds in database: ${refBuildsCount}`);
     
     const rating = refBuildsCount >= 50 ? 'EXCELLENT'
@@ -502,7 +502,7 @@ async function testReferenceBuildsAndAI() {
       SELECT COUNT(*) as count FROM pc_customized_ai_reference_builds
     `);
     
-    const aiBuildsCount = parseInt(aiBuildsResult.rows[0].count);
+    const aiBuildsCount = Number.parseInt(aiBuildsResult.rows[0].count, 10);
     log.info(`PC Customized AI builds in database: ${aiBuildsCount}`);
     
     // Check expected builds
@@ -514,7 +514,7 @@ async function testReferenceBuildsAndAI() {
     `);
     
     const params = paramsResult.rows[0];
-    const expectedBuilds = parseInt(params.usage_types) * parseInt(params.budget_ranges) * parseInt(params.perf_prefs);
+    const expectedBuilds = Number.parseInt(params.usage_types, 10) * Number.parseInt(params.budget_ranges, 10) * Number.parseInt(params.perf_prefs, 10);
     const coverage = (aiBuildsCount / expectedBuilds * 100).toFixed(1);
     
     log.info(`Expected builds: ${expectedBuilds}`);
@@ -530,7 +530,7 @@ async function testReferenceBuildsAndAI() {
     testResults.referenceBuilds.pcCustomizedAI = {
       count: aiBuildsCount,
       expected: expectedBuilds,
-      coverage: parseFloat(coverage),
+      coverage: Number.parseFloat(coverage),
       rating: aiRating
     };
 
@@ -550,7 +550,7 @@ async function testReferenceBuildsAndAI() {
         components.cpu && components.gpu && components.motherboard && 
         components.ram && components.storage && components.psu && components.case;
       
-      const totalPrice = parseFloat(build.total_price);
+      const totalPrice = Number.parseFloat(build.total_price);
       const isWithinBudget = totalPrice > 0 && totalPrice <= 150000; // Reasonable max
       
       log.info(`Sample build analysis:`);
@@ -606,7 +606,7 @@ async function testCachingPerformance() {
           log.info(`   Hits: ${stats.hits}`);
           log.info(`   Misses: ${stats.misses}`);
           
-          const hitRate = parseFloat(stats.hitRate);
+          const hitRate = Number.parseFloat(stats.hitRate);
           const rating = hitRate >= 60 ? 'EXCELLENT'
                        : hitRate >= 40 ? 'GOOD'
                        : hitRate >= 20 ? 'AVERAGE'

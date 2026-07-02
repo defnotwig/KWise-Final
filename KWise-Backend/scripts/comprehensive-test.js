@@ -75,8 +75,8 @@ async function comprehensiveTest() {
         
         // TEST 4: Image File Existence
         console.log('\n🖼️  TEST 4: Image Files\n');
-        const fs = require('fs');
-        const path = require('path');
+        const fs = require('node:fs');
+        const path = require('node:path');
         
         const prebuiltImagePath = path.join(__dirname, '../uploads/prebuilt/StarterBuildA.webp');
         test(
@@ -113,7 +113,7 @@ async function comprehensiveTest() {
         const cpuCount = await db.query('SELECT COUNT(*) FROM pc_parts WHERE category = \'CPU\' AND is_active = true');
         test(
             'Active CPU Items in DB',
-            parseInt(cpuCount.rows[0].count) > 0,
+            Number.parseInt(cpuCount.rows[0].count, 10) > 0,
             `Count: ${cpuCount.rows[0].count}`
         );
         

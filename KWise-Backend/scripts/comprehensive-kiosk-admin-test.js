@@ -1,6 +1,6 @@
 const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 
 const BASE_URL = 'http://localhost:5000/api';
 

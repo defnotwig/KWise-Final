@@ -11,8 +11,8 @@
 require('dotenv').config();
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('node:fs').promises;
+const path = require('node:path');
 
 // ANSI color codes for terminal output
 const colors = {
@@ -86,7 +86,7 @@ async function testDatabaseIntegrity() {
     
     // Check compatibility rules count
     const rulesResult = await query('SELECT COUNT(*) FROM compatibility_rules');
-    const rulesCount = parseInt(rulesResult.rows[0].count);
+    const rulesCount = Number.parseInt(rulesResult.rows[0].count, 10);
     log(`Compatibility Rules: ${rulesCount}`, rulesCount >= 2500 ? 'success' : 'warning');
     
     if (rulesCount < 2500) {
@@ -100,7 +100,7 @@ async function testDatabaseIntegrity() {
       WHERE category_id NOT IN (SELECT id FROM categories)
     `);
     
-    if (parseInt(orphanedParts.rows[0].count) > 0) {
+    if (Number.parseInt(orphanedParts.rows[0].count, 10) > 0) {
       log(`Found ${orphanedParts.rows[0].count} orphaned PC parts`, 'warning');
       warnings.push(`Orphaned PC parts without valid category`);
     }
@@ -244,7 +244,7 @@ async function testDataConsistency() {
       WHERE role IS NULL OR role = ''
     `);
     
-    if (parseInt(usersWithoutRoles.rows[0].count) > 0) {
+    if (Number.parseInt(usersWithoutRoles.rows[0].count, 10) > 0) {
       log(`Found ${usersWithoutRoles.rows[0].count} users without roles`, 'error');
       issues.push('Users exist without assigned roles');
     } else {
@@ -258,7 +258,7 @@ async function testDataConsistency() {
       WHERE status NOT IN ('pending', 'processing', 'completed', 'cancelled')
     `);
     
-    if (parseInt(invalidOrders.rows[0].count) > 0) {
+    if (Number.parseInt(invalidOrders.rows[0].count, 10) > 0) {
       log(`Found ${invalidOrders.rows[0].count} orders with invalid status`, 'error');
       issues.push('Orders with invalid status values');
     }
@@ -270,7 +270,7 @@ async function testDataConsistency() {
       WHERE price IS NULL OR price <= 0
     `);
     
-    if (parseInt(partsNoPrices.rows[0].count) > 0) {
+    if (Number.parseInt(partsNoPrices.rows[0].count, 10) > 0) {
       log(`Found ${partsNoPrices.rows[0].count} PC parts without valid prices`, 'warning');
       warnings.push('PC parts exist without valid pricing');
     }
@@ -283,7 +283,7 @@ async function testDataConsistency() {
          OR rule_type IS NULL
     `);
     
-    if (parseInt(invalidRules.rows[0].count) > 0) {
+    if (Number.parseInt(invalidRules.rows[0].count, 10) > 0) {
       log(`Found ${invalidRules.rows[0].count} invalid compatibility rules`, 'error');
       issues.push('Compatibility rules with missing required fields');
     }
@@ -374,7 +374,7 @@ async function testSecurityConfig() {
          OR password_hash = crypt('12345678', password_hash)
     `);
     
-    if (parseInt(defaultPasswords.rows[0].count) > 0) {
+    if (Number.parseInt(defaultPasswords.rows[0].count, 10) > 0) {
       log(`Found ${defaultPasswords.rows[0].count} users with default passwords!`, 'error');
       issues.push('Users with default/weak passwords detected');
     } else {

@@ -848,12 +848,12 @@ function getRating(passRate, latency, aiUsage) {
  */
 function calculateOverallRating() {
   const ratings = [
-    parseFloat(testResults.compatibility.passRate) / 20 * (testResults.compatibility.avgLatency < 3000 ? 1 : 0.8),
-    parseFloat(testResults.pcCustomizedAI.passRate) / 20 * (testResults.pcCustomizedAI.avgLatency < 5000 ? 1 : 0.8),
-    parseFloat(testResults.pcUpgrade.passRate) / 20 * (testResults.pcUpgrade.avgLatency < 3000 ? 1 : 0.8),
-    parseFloat(testResults.productCompatibleWith.passRate) / 20 * (testResults.productCompatibleWith.avgLatency < 2000 ? 1 : 0.8),
-    parseFloat(testResults.futureUpgrades.passRate) / 20 * (testResults.futureUpgrades.avgLatency < 5000 ? 1 : 0.8),
-    parseFloat(testResults.stressTests.passRate) / 20
+    Number.parseFloat(testResults.compatibility.passRate) / 20 * (testResults.compatibility.avgLatency < 3000 ? 1 : 0.8),
+    Number.parseFloat(testResults.pcCustomizedAI.passRate) / 20 * (testResults.pcCustomizedAI.avgLatency < 5000 ? 1 : 0.8),
+    Number.parseFloat(testResults.pcUpgrade.passRate) / 20 * (testResults.pcUpgrade.avgLatency < 3000 ? 1 : 0.8),
+    Number.parseFloat(testResults.productCompatibleWith.passRate) / 20 * (testResults.productCompatibleWith.avgLatency < 2000 ? 1 : 0.8),
+    Number.parseFloat(testResults.futureUpgrades.passRate) / 20 * (testResults.futureUpgrades.avgLatency < 5000 ? 1 : 0.8),
+    Number.parseFloat(testResults.stressTests.passRate) / 20
   ];
   
   const avgRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
@@ -867,27 +867,27 @@ function generateRecommendations() {
   const recommendations = [];
   
   // Check each component
-  if (parseFloat(testResults.compatibility.passRate) < 95) {
+  if (Number.parseFloat(testResults.compatibility.passRate) < 95) {
     recommendations.push('1. Improve PC Parts Compatibility filter accuracy');
   }
   
-  if (parseFloat(testResults.compatibility.avgLatency) > 3000) {
+  if (Number.parseFloat(testResults.compatibility.avgLatency) > 3000) {
     recommendations.push('2. Optimize compatibility filter latency (target <3s)');
   }
   
-  if (parseFloat(testResults.compatibility.aiUsageRate) < 80) {
+  if (Number.parseFloat(testResults.compatibility.aiUsageRate) < 80) {
     recommendations.push('3. Increase AI usage in compatibility filtering');
   }
   
-  if (parseFloat(testResults.pcCustomizedAI.avgLatency) > 5000) {
+  if (Number.parseFloat(testResults.pcCustomizedAI.avgLatency) > 5000) {
     recommendations.push('4. Optimize PC Customized AI response times');
   }
   
-  if (parseFloat(testResults.stressTests.passRate) < 95) {
+  if (Number.parseFloat(testResults.stressTests.passRate) < 95) {
     recommendations.push('5. Improve system resilience under load');
   }
   
-  if (testResults.aiQuality.cache?.hitRate && parseFloat(testResults.aiQuality.cache.hitRate) < 50) {
+  if (testResults.aiQuality.cache?.hitRate && Number.parseFloat(testResults.aiQuality.cache.hitRate) < 50) {
     recommendations.push('6. Increase cache hit rate (target >60%)');
   }
   
