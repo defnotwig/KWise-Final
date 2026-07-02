@@ -4,7 +4,7 @@
  * This script tests both new features to ensure they're working correctly
  */
 
-const http = require('http');
+const http = require('node:http');
 
 const BASE_URL = 'http://localhost:5000';
 
@@ -99,8 +99,8 @@ async function testComponentFiles() {
     console.log('\n📋 TEST 4: Component Files Verification');
     console.log('-'.repeat(80));
     
-    const fs = require('fs');
-    const path = require('path');
+    const fs = require('node:fs');
+    const path = require('node:path');
     
     const files = [
         { path: '../K-Wise/src/components/AutocompleteInput.js', name: 'AutocompleteInput Component' },

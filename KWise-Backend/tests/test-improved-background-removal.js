@@ -4,8 +4,8 @@
  */
 
 const backgroundRemovalService = require('../utils/backgroundRemovalService');
-const path = require('path');
-const fs = require('fs').promises;
+const path = require('node:path');
+const fs = require('node:fs').promises;
 
 async function testImprovedBackgroundRemoval() {
     console.log('🧪 TESTING IMPROVED BACKGROUND REMOVAL ALGORITHM');

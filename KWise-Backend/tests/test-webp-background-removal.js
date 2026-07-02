@@ -4,8 +4,8 @@
  */
 
 const BackgroundRemovalService = require('../utils/backgroundRemovalService');
-const path = require('path');
-const fs = require('fs').promises;
+const path = require('node:path');
+const fs = require('node:fs').promises;
 
 console.log('🧪 TESTING WEBP BACKGROUND REMOVAL');
 console.log('===================================\n');
