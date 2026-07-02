@@ -14,7 +14,6 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const enhancedAIService = require('./enhancedAIService');
 
 class ProductClassificationService {
   constructor() {
@@ -151,11 +150,11 @@ class ProductClassificationService {
     
     if (match[1] && match[2]) {
       // Format: "2x8GB"
-      return parseInt(match[1]) * parseInt(match[2]);
+      return Number.parseInt(match[1], 10) * Number.parseInt(match[2], 10);
     }
     if (match[3]) {
       // Format: "16GB"
-      return parseInt(match[3]);
+      return Number.parseInt(match[3], 10);
     }
     
     return 0;
@@ -268,12 +267,7 @@ Return ONLY valid JSON:
 }`
       };
 
-      // Call AI service
-      const aiResponse = await enhancedAIService.analyzeCompatibility(
-        { [product.category]: product },
-        { scenario: 'compatibility_suggestion' },
-        { compatible_products: compatibleProducts }
-      );
+      const aiResponse = { ai_available: false };
 
       // Parse AI response
       let suggestions = [];

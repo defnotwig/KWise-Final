@@ -22,8 +22,8 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('node:fs').promises;
+const path = require('node:path');
 
 // Categories that must never be considered for reference builds
 const EXCLUDED_NEW_PRODUCT_CATEGORIES = new Set([
@@ -203,7 +203,7 @@ class PCUpgradeBuildGenerator {
                 success: true,
                 totalBuilds: Object.keys(finalBuilds).length,
                 validBuilds: finalValidation.validBuilds,
-                duration: parseFloat(duration),
+                duration: Number.parseFloat(duration),
                 productDistribution: this.getProductDistribution()
             };
 
@@ -236,7 +236,7 @@ class PCUpgradeBuildGenerator {
 
             productsByCategory[standardCategory] = result.rows.map(row => ({
                 ...row,
-                price: parseFloat(row.price),
+                price: Number.parseFloat(row.price),
                 isNew: !existingProductIds.has(row.id)
             }));
             
@@ -401,7 +401,7 @@ class PCUpgradeBuildGenerator {
      * Calculate PC age from year range
      */
     static calculateAge(yearRange) {
-        const year = parseInt(yearRange.split('-')[0]);
+        const year = Number.parseInt(yearRange.split('-')[0], 10);
         const currentYear = new Date().getFullYear();
         return currentYear - year;
     }
@@ -526,7 +526,7 @@ class PCUpgradeBuildGenerator {
         let currentComponents = { ...components };
         let total = Object.values(currentComponents)
             .filter(Boolean)
-            .reduce((sum, comp) => sum + (parseFloat(comp.price) || 0), 0);
+            .reduce((sum, comp) => sum + (Number.parseFloat(comp.price) || 0), 0);
 
         const clampIterations = 12;
         let iter = 0;
@@ -534,14 +534,14 @@ class PCUpgradeBuildGenerator {
         while (total > maxBudget && iter < clampIterations) {
             const [category] = Object.entries(currentComponents)
                 .filter(([, comp]) => comp)
-                .sort((a, b) => (parseFloat(b[1].price) || 0) - (parseFloat(a[1].price) || 0))[0] || [];
+                .sort((a, b) => (Number.parseFloat(b[1].price) || 0) - (Number.parseFloat(a[1].price) || 0))[0] || [];
             if (!category) break;
 
             const options = (productsByCategory[category] || [])
                 .filter(p => p.id !== currentComponents[category].productId)
-                .sort((a, b) => (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0));
+                .sort((a, b) => (Number.parseFloat(b.price) || 0) - (Number.parseFloat(a.price) || 0));
 
-            const cheaper = options.find(p => parseFloat(p.price) < parseFloat(currentComponents[category].price));
+            const cheaper = options.find(p => Number.parseFloat(p.price) < Number.parseFloat(currentComponents[category].price));
             if (!cheaper) break;
 
             currentComponents[category] = {
@@ -558,7 +558,7 @@ class PCUpgradeBuildGenerator {
 
             total = Object.values(currentComponents)
                 .filter(Boolean)
-                .reduce((sum, comp) => sum + (parseFloat(comp.price) || 0), 0);
+                .reduce((sum, comp) => sum + (Number.parseFloat(comp.price) || 0), 0);
             iter++;
         }
 
@@ -566,14 +566,14 @@ class PCUpgradeBuildGenerator {
         while (total < minBudget && iter < clampIterations) {
             const [category] = Object.entries(currentComponents)
                 .filter(([, comp]) => comp)
-                .sort((a, b) => (parseFloat(a[1].price) || 0) - (parseFloat(b[1].price) || 0))[0] || [];
+                .sort((a, b) => (Number.parseFloat(a[1].price) || 0) - (Number.parseFloat(b[1].price) || 0))[0] || [];
             if (!category) break;
 
             const options = (productsByCategory[category] || [])
                 .filter(p => p.id !== currentComponents[category].productId)
-                .sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0));
+                .sort((a, b) => (Number.parseFloat(a.price) || 0) - (Number.parseFloat(b.price) || 0));
 
-            const pricier = options.find(p => parseFloat(p.price) > parseFloat(currentComponents[category].price));
+            const pricier = options.find(p => Number.parseFloat(p.price) > Number.parseFloat(currentComponents[category].price));
             if (!pricier) break;
 
             currentComponents[category] = {
@@ -590,7 +590,7 @@ class PCUpgradeBuildGenerator {
 
             total = Object.values(currentComponents)
                 .filter(Boolean)
-                .reduce((sum, comp) => sum + (parseFloat(comp.price) || 0), 0);
+                .reduce((sum, comp) => sum + (Number.parseFloat(comp.price) || 0), 0);
             iter++;
         }
 

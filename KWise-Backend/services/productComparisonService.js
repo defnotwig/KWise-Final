@@ -1,7 +1,7 @@
 /**
  * Product Comparison Service
- * Provides AI-powered product comparisons using Ollama DeepSeek R1
- * Max 2 products, same category, with 1-2 sentence AI summary
+ * Provides deterministic local product comparisons.
+ * Max 2 products, same category, with a legacy aiSummary field for frontend compatibility.
  */
 
 const { query } = require('../config/db');
@@ -9,24 +9,7 @@ const logger = require('../utils/logger');
 
 class ProductComparisonService {
   constructor() {
-    this.ollamaService = null;
     this.maxProducts = 2;
-  }
-
-  /**
-   * Initialize Ollama service (lazy loading)
-   */
-  getOllamaService() {
-    if (!this.ollamaService) {
-      try {
-        this.ollamaService = require('../ai/services/ollamaService');
-        logger.info('✅ Ollama service initialized for product comparison');
-      } catch (error) {
-        logger.warn('⚠️  Ollama service not available:', error.message);
-        this.ollamaService = null;
-      }
-    }
-    return this.ollamaService;
   }
 
   /**
@@ -34,7 +17,7 @@ class ProductComparisonService {
    * @param {Number} product1Id - First product ID
    * @param {Number} product2Id - Second product ID
    * @param {String} sessionId - Optional session ID for tracking
-   * @returns {Promise<Object>} - Comparison result with AI summary
+   * @returns {Promise<Object>} - Comparison result with legacy summary fields
    */
   async compareProducts(product1Id, product2Id, sessionId = null) {
     try {
@@ -54,7 +37,6 @@ class ProductComparisonService {
         throw new Error('Products must be from the same category for comparison');
       }
 
-      // Get AI comparison summary
       const aiSummary = await this._generateAIComparison(product1, product2);
 
       // Build detailed comparison
@@ -62,6 +44,7 @@ class ProductComparisonService {
         product1: this._formatProduct(product1),
         product2: this._formatProduct(product2),
         category: product1.category,
+        source: 'deterministic',
         aiSummary: aiSummary.summary,
         winner: aiSummary.winner,
         comparisonDetails: {
@@ -123,7 +106,7 @@ class ProductComparisonService {
       name: product.name,
       category: product.category,
       brand: product.brand,
-      price: parseFloat(product.price),
+      price: Number.parseFloat(product.price),
       tier: product.tier,
       stock: product.stock,
       imageUrl: product.image_url,
@@ -133,94 +116,10 @@ class ProductComparisonService {
   }
 
   /**
-   * Generate AI comparison summary (1-2 sentences)
+   * Generate deterministic comparison summary.
    */
   async _generateAIComparison(product1, product2) {
-    try {
-      const ollama = this.getOllamaService();
-
-      if (!ollama) {
-        logger.warn('⚠️  AI comparison unavailable, generating fallback');
-        return this._generateFallbackComparison(product1, product2);
-      }
-
-      // Build prompt for concise comparison
-      const prompt = this._buildComparisonPrompt(product1, product2);
-
-      // Call Ollama with timeout
-      const aiResponse = await Promise.race([
-        ollama.generateResponse(prompt, {
-          model: 'deepseek-r1:latest',
-          temperature: 0.4,
-          max_tokens: 300 // Short response
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('AI timeout')), 20000)
-        )
-      ]);
-
-      // Parse AI response
-      return this._parseComparisonResponse(aiResponse, product1, product2);
-
-    } catch (error) {
-      logger.warn('⚠️  AI comparison failed, using fallback:', error.message);
-      return this._generateFallbackComparison(product1, product2);
-    }
-  }
-
-  /**
-   * Build comparison prompt for AI
-   */
-  _buildComparisonPrompt(product1, product2) {
-    return `Compare these two ${product1.category} products. Provide a concise 1-2 sentence summary stating which is better for specifications and value for money.
-
-PRODUCT 1:
-- Name: ${product1.name}
-- Brand: ${product1.brand}
-- Price: ₱${product1.price}
-- Tier: ${product1.tier || 'unknown'}
-${product1.specifications ? `- Specs: ${JSON.stringify(product1.specifications)}` : ''}
-
-PRODUCT 2:
-- Name: ${product2.name}
-- Brand: ${product2.brand}
-- Price: ₱${product2.price}
-- Tier: ${product2.tier || 'unknown'}
-${product2.specifications ? `- Specs: ${JSON.stringify(product2.specifications)}` : ''}
-
-Respond with JSON format:
-{
-  "summary": "<1-2 sentence comparison>",
-  "winner": <1 or 2>,
-  "valueAnalysis": "<brief value assessment>"
-}
-
-Focus on: specifications quality, price-to-performance ratio, and overall value.`;
-  }
-
-  /**
-   * Parse AI comparison response
-   */
-  _parseComparisonResponse(aiResponse, product1, product2) {
-    try {
-      // Extract JSON from response
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in AI response');
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      return {
-        summary: parsed.summary || `Comparing ${product1.name} vs ${product2.name}`,
-        winner: parsed.winner === 1 ? product1.id : (parsed.winner === 2 ? product2.id : null),
-        valueAnalysis: parsed.valueAnalysis || 'Both products offer competitive value.'
-      };
-
-    } catch (error) {
-      logger.warn('⚠️  Failed to parse AI response, using fallback');
-      return this._generateFallbackComparison(product1, product2);
-    }
+    return this._generateFallbackComparison(product1, product2);
   }
 
   /**
@@ -280,10 +179,10 @@ Focus on: specifications quality, price-to-performance ratio, and overall value.
     const percentDiff = (Math.abs(diff) / Math.max(product1.price, product2.price)) * 100;
 
     return {
-      product1Price: parseFloat(product1.price),
-      product2Price: parseFloat(product2.price),
-      difference: parseFloat(diff.toFixed(2)),
-      percentDifference: parseFloat(percentDiff.toFixed(2)),
+      product1Price: Number.parseFloat(product1.price),
+      product2Price: Number.parseFloat(product2.price),
+      difference: Number.parseFloat(diff.toFixed(2)),
+      percentDifference: Number.parseFloat(percentDiff.toFixed(2)),
       cheaper: diff > 0 ? 'product2' : (diff < 0 ? 'product1' : 'equal')
     };
   }

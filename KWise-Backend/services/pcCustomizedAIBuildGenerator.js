@@ -239,7 +239,7 @@ class PCCustomizedAIBuildGenerator {
       // Calculate total price
       const totalPrice = Object.values(components)
         .filter(c => c && c.price)
-        .reduce((sum, c) => sum + parseFloat(c.price), 0);
+        .reduce((sum, c) => sum + Number.parseFloat(c.price), 0);
 
       const balanced = await this.rebalanceWithinBudget(components, minBudget, maxBudget, newProductIds);
 
@@ -371,8 +371,8 @@ class PCCustomizedAIBuildGenerator {
         : Number(budget.representative_budget || budget.max_budget || budget.min_budget);
       const minBudget = Number.isFinite(budgetLimits.minBudget) ? budgetLimits.minBudget : Number(budget.min_budget);
       const maxBudget = Number.isFinite(budgetLimits.maxBudget) ? budgetLimits.maxBudget : Number(budget.max_budget);
-      const perfWeight = parseFloat(performance.performance_weight);
-      const budgetWeight = parseFloat(performance.budget_weight);
+      const perfWeight = Number.parseFloat(performance.performance_weight);
+      const budgetWeight = Number.parseFloat(performance.budget_weight);
 
       if (!targetBudget || targetBudget <= 0) {
         logger.warn('⚠️  Skipping build due to missing target budget', { budget });
@@ -527,7 +527,7 @@ class PCCustomizedAIBuildGenerator {
     try {
       const normalize = rows => rows.map(r => ({
         ...r,
-        price: parseFloat(r.price),
+        price: Number.parseFloat(r.price),
         isNew: newProductIds.has(Number(r.id))
       }));
 
@@ -616,8 +616,8 @@ class PCCustomizedAIBuildGenerator {
         return usageA - usageB; // Least used first
       }
 
-      const priceA = parseFloat(a.price) || 0;
-      const priceB = parseFloat(b.price) || 0;
+      const priceA = Number.parseFloat(a.price) || 0;
+      const priceB = Number.parseFloat(b.price) || 0;
       if (priceA !== priceB) {
         return priceA - priceB; // Favor cheaper when usage/new are equal
       }
@@ -645,7 +645,7 @@ class PCCustomizedAIBuildGenerator {
     try {
       const normalize = rows => rows.map(r => ({
         ...r,
-        price: parseFloat(r.price),
+        price: Number.parseFloat(r.price),
         isNew: newProductIds.has(Number(r.id))
       }));
 
@@ -696,9 +696,9 @@ class PCCustomizedAIBuildGenerator {
     // Performance score based on how close we are to target budget
     const totalPrice = Object.values(components)
       .filter(c => c && c.price)
-      .reduce((sum, c) => sum + parseFloat(c.price), 0);
+      .reduce((sum, c) => sum + Number.parseFloat(c.price), 0);
     
-    const targetBudget = parseFloat(budget.representative_budget);
+    const targetBudget = Number.parseFloat(budget.representative_budget);
     const budgetUtilization = totalPrice / targetBudget;
     
     // Performance score: higher if we're closer to budget without exceeding
@@ -775,7 +775,7 @@ class PCCustomizedAIBuildGenerator {
 
     this.categoryProductCache[cacheKey] = result.rows.map(r => ({
       ...r,
-      price: parseFloat(r.price)
+      price: Number.parseFloat(r.price)
     }));
     return this.categoryProductCache[cacheKey];
   }
@@ -806,7 +806,7 @@ class PCCustomizedAIBuildGenerator {
       }
 
       const cheapest = products[0];
-      total += parseFloat(cheapest.price) || 0;
+      total += Number.parseFloat(cheapest.price) || 0;
     }
 
     return { total, missingCategories };
@@ -816,7 +816,7 @@ class PCCustomizedAIBuildGenerator {
     let currentComponents = { ...components };
     const sumTotal = comps => Object.values(comps)
       .filter(Boolean)
-      .reduce((sum, comp) => sum + (parseFloat(comp.price) || 0), 0);
+      .reduce((sum, comp) => sum + (Number.parseFloat(comp.price) || 0), 0);
 
     let total = sumTotal(currentComponents);
     const clampIterations = 20;
@@ -826,15 +826,15 @@ class PCCustomizedAIBuildGenerator {
     while (total > maxBudget * 1.05 && iter < 10) {
       const [category] = Object.entries(currentComponents)
         .filter(([, comp]) => comp)
-        .sort((a, b) => (parseFloat(b[1].price) || 0) - (parseFloat(a[1].price) || 0))[0] || [];
+        .sort((a, b) => (Number.parseFloat(b[1].price) || 0) - (Number.parseFloat(a[1].price) || 0))[0] || [];
       if (!category) break;
 
       const options = (await this.getCategoryProducts(category))
         .filter(p => p.id !== currentComponents[category].id)
-        .sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0));
+        .sort((a, b) => (Number.parseFloat(a.price) || 0) - (Number.parseFloat(b.price) || 0));
 
-      const maxAllowed = maxBudget - (total - parseFloat(currentComponents[category].price));
-      const cheaper = options.find(p => parseFloat(p.price) < Math.min(parseFloat(currentComponents[category].price), maxAllowed));
+      const maxAllowed = maxBudget - (total - Number.parseFloat(currentComponents[category].price));
+      const cheaper = options.find(p => Number.parseFloat(p.price) < Math.min(Number.parseFloat(currentComponents[category].price), maxAllowed));
       if (!cheaper) break;
 
       currentComponents[category] = this.buildComponentFromProduct(cheaper, currentComponents[category].reasoning, newProductIds);
@@ -847,14 +847,14 @@ class PCCustomizedAIBuildGenerator {
     while (total > maxBudget && iter < clampIterations) {
       const [category] = Object.entries(currentComponents)
         .filter(([, comp]) => comp)
-        .sort((a, b) => (parseFloat(b[1].price) || 0) - (parseFloat(a[1].price) || 0))[0] || [];
+        .sort((a, b) => (Number.parseFloat(b[1].price) || 0) - (Number.parseFloat(a[1].price) || 0))[0] || [];
       if (!category) break;
 
       const options = (await this.getCategoryProducts(category))
         .filter(p => p.id !== currentComponents[category].id)
-        .sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0));
+        .sort((a, b) => (Number.parseFloat(a.price) || 0) - (Number.parseFloat(b.price) || 0));
 
-      const cheaper = options.find(p => parseFloat(p.price) < parseFloat(currentComponents[category].price));
+      const cheaper = options.find(p => Number.parseFloat(p.price) < Number.parseFloat(currentComponents[category].price));
       if (!cheaper) break;
 
       currentComponents[category] = this.buildComponentFromProduct(cheaper, currentComponents[category].reasoning, newProductIds);
@@ -867,17 +867,17 @@ class PCCustomizedAIBuildGenerator {
     while (total < minBudget && iter < clampIterations) {
       const [category] = Object.entries(currentComponents)
         .filter(([, comp]) => comp)
-        .sort((a, b) => (parseFloat(a[1].price) || 0) - (parseFloat(b[1].price) || 0))[0] || [];
+        .sort((a, b) => (Number.parseFloat(a[1].price) || 0) - (Number.parseFloat(b[1].price) || 0))[0] || [];
       if (!category) break;
 
       const options = (await this.getCategoryProducts(category))
-        .filter(p => p.id !== currentComponents[category].id && parseFloat(p.price) <= maxBudget * 0.3)
-        .sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0));
+        .filter(p => p.id !== currentComponents[category].id && Number.parseFloat(p.price) <= maxBudget * 0.3)
+        .sort((a, b) => (Number.parseFloat(a.price) || 0) - (Number.parseFloat(b.price) || 0));
 
       const needed = minBudget - total;
       const pricier = options.find(p => {
-        const priceDiff = parseFloat(p.price) - parseFloat(currentComponents[category].price);
-        return priceDiff > 0 && priceDiff <= needed * 1.5 && (total - parseFloat(currentComponents[category].price) + parseFloat(p.price)) <= maxBudget;
+        const priceDiff = Number.parseFloat(p.price) - Number.parseFloat(currentComponents[category].price);
+        return priceDiff > 0 && priceDiff <= needed * 1.5 && (total - Number.parseFloat(currentComponents[category].price) + Number.parseFloat(p.price)) <= maxBudget;
       });
       if (!pricier) break;
 

@@ -354,20 +354,20 @@ class PhysicalClearanceChecker {
 
   extractGpuLength(gpu) {
     // Priority order: dimensions > specifications > compatibility_data
-    if (gpu.dimensions?.length_mm) return parseFloat(gpu.dimensions.length_mm);
-    if (gpu.specifications?.length_mm) return parseFloat(gpu.specifications.length_mm);
+    if (gpu.dimensions?.length_mm) return Number.parseFloat(gpu.dimensions.length_mm);
+    if (gpu.specifications?.length_mm) return Number.parseFloat(gpu.specifications.length_mm);
     if (gpu.specifications?.length) {
       // Handle "285mm" or "285" format
       const lengthStr = String(gpu.specifications.length).replace(/[^\d.]/g, '');
-      if (lengthStr) return parseFloat(lengthStr);
+      if (lengthStr) return Number.parseFloat(lengthStr);
     }
-    if (gpu.physical_dimensions?.length_mm) return parseFloat(gpu.physical_dimensions.length_mm);
-    if (gpu.compatibility_data?.physical?.length_mm) return parseFloat(gpu.compatibility_data.physical.length_mm);
+    if (gpu.physical_dimensions?.length_mm) return Number.parseFloat(gpu.physical_dimensions.length_mm);
+    if (gpu.compatibility_data?.physical?.length_mm) return Number.parseFloat(gpu.compatibility_data.physical.length_mm);
     
     // Parse from specifications text if available
     if (gpu.specifications?.dimensions) {
       const match = gpu.specifications.dimensions.match(/(\d+)\s*mm.*length/i);
-      if (match) return parseFloat(match[1]);
+      if (match) return Number.parseFloat(match[1]);
     }
     
     return null;
@@ -375,36 +375,36 @@ class PhysicalClearanceChecker {
 
   extractCaseMaxGpuLength(caseComponent) {
     // Priority order: dimensions > specifications > compatibility_data
-    if (caseComponent.dimensions?.max_gpu_length_mm) return parseFloat(caseComponent.dimensions.max_gpu_length_mm);
-    if (caseComponent.specifications?.max_gpu_length_mm) return parseFloat(caseComponent.specifications.max_gpu_length_mm);
+    if (caseComponent.dimensions?.max_gpu_length_mm) return Number.parseFloat(caseComponent.dimensions.max_gpu_length_mm);
+    if (caseComponent.specifications?.max_gpu_length_mm) return Number.parseFloat(caseComponent.specifications.max_gpu_length_mm);
     if (caseComponent.specifications?.max_gpu_length) {
       // Handle "250mm" or "250" format
       const lengthStr = String(caseComponent.specifications.max_gpu_length).replace(/[^\d.]/g, '');
-      if (lengthStr) return parseFloat(lengthStr);
+      if (lengthStr) return Number.parseFloat(lengthStr);
     }
-    if (caseComponent.physical_dimensions?.max_gpu_length_mm) return parseFloat(caseComponent.physical_dimensions.max_gpu_length_mm);
-    if (caseComponent.compatibility_data?.clearances?.max_gpu_length_mm) return parseFloat(caseComponent.compatibility_data.clearances.max_gpu_length_mm);
+    if (caseComponent.physical_dimensions?.max_gpu_length_mm) return Number.parseFloat(caseComponent.physical_dimensions.max_gpu_length_mm);
+    if (caseComponent.compatibility_data?.clearances?.max_gpu_length_mm) return Number.parseFloat(caseComponent.compatibility_data.clearances.max_gpu_length_mm);
     return null;
   }
 
   extractCoolerHeight(cooler) {
-    if (cooler.specifications?.height_mm) return parseFloat(cooler.specifications.height_mm);
-    if (cooler.physical_dimensions?.height_mm) return parseFloat(cooler.physical_dimensions.height_mm);
-    if (cooler.compatibility_data?.physical?.height_mm) return parseFloat(cooler.compatibility_data.physical.height_mm);
+    if (cooler.specifications?.height_mm) return Number.parseFloat(cooler.specifications.height_mm);
+    if (cooler.physical_dimensions?.height_mm) return Number.parseFloat(cooler.physical_dimensions.height_mm);
+    if (cooler.compatibility_data?.physical?.height_mm) return Number.parseFloat(cooler.compatibility_data.physical.height_mm);
     return null;
   }
 
   extractCaseMaxCoolerHeight(caseComponent) {
-    if (caseComponent.specifications?.max_cooler_height) return parseFloat(caseComponent.specifications.max_cooler_height);
-    if (caseComponent.physical_dimensions?.max_cpu_cooler_height_mm) return parseFloat(caseComponent.physical_dimensions.max_cpu_cooler_height_mm);
-    if (caseComponent.compatibility_data?.clearances?.max_cpu_cooler_height_mm) return parseFloat(caseComponent.compatibility_data.clearances.max_cpu_cooler_height_mm);
+    if (caseComponent.specifications?.max_cooler_height) return Number.parseFloat(caseComponent.specifications.max_cooler_height);
+    if (caseComponent.physical_dimensions?.max_cpu_cooler_height_mm) return Number.parseFloat(caseComponent.physical_dimensions.max_cpu_cooler_height_mm);
+    if (caseComponent.compatibility_data?.clearances?.max_cpu_cooler_height_mm) return Number.parseFloat(caseComponent.compatibility_data.clearances.max_cpu_cooler_height_mm);
     return null;
   }
 
   extractRamHeight(ram) {
-    if (ram.specifications?.height_mm) return parseFloat(ram.specifications.height_mm);
-    if (ram.physical_dimensions?.height_mm) return parseFloat(ram.physical_dimensions.height_mm);
-    if (ram.compatibility_data?.physical?.height_mm) return parseFloat(ram.compatibility_data.physical.height_mm);
+    if (ram.specifications?.height_mm) return Number.parseFloat(ram.specifications.height_mm);
+    if (ram.physical_dimensions?.height_mm) return Number.parseFloat(ram.physical_dimensions.height_mm);
+    if (ram.compatibility_data?.physical?.height_mm) return Number.parseFloat(ram.compatibility_data.physical.height_mm);
     
     // Standard RAM heights
     if (ram.name?.toLowerCase().includes('low profile') || ram.name?.toLowerCase().includes('lpx')) return 31;
@@ -414,8 +414,8 @@ class PhysicalClearanceChecker {
   }
 
   extractCoolerRamClearance(cooler) {
-    if (cooler.specifications?.ram_clearance_mm) return parseFloat(cooler.specifications.ram_clearance_mm);
-    if (cooler.compatibility_data?.clearances?.ram_clearance_mm) return parseFloat(cooler.compatibility_data.clearances.ram_clearance_mm);
+    if (cooler.specifications?.ram_clearance_mm) return Number.parseFloat(cooler.specifications.ram_clearance_mm);
+    if (cooler.compatibility_data?.clearances?.ram_clearance_mm) return Number.parseFloat(cooler.compatibility_data.clearances.ram_clearance_mm);
     
     // Defaults based on cooler type
     if (cooler.specifications?.cooler_type === 'AIO') return 100; // AIO doesn't block RAM
@@ -426,8 +426,8 @@ class PhysicalClearanceChecker {
   }
 
   extractPsuLength(psu) {
-    if (psu.specifications?.length_mm) return parseFloat(psu.specifications.length_mm);
-    if (psu.physical_dimensions?.length_mm) return parseFloat(psu.physical_dimensions.length_mm);
+    if (psu.specifications?.length_mm) return Number.parseFloat(psu.specifications.length_mm);
+    if (psu.physical_dimensions?.length_mm) return Number.parseFloat(psu.physical_dimensions.length_mm);
     
     // Standard PSU lengths by form factor
     if (psu.specifications?.form_factor === 'ATX') return 160;
@@ -438,9 +438,9 @@ class PhysicalClearanceChecker {
   }
 
   extractCaseMaxPsuLength(caseComponent) {
-    if (caseComponent.specifications?.max_psu_length) return parseFloat(caseComponent.specifications.max_psu_length);
-    if (caseComponent.physical_dimensions?.max_psu_length_mm) return parseFloat(caseComponent.physical_dimensions.max_psu_length_mm);
-    if (caseComponent.compatibility_data?.clearances?.max_psu_length_mm) return parseFloat(caseComponent.compatibility_data.clearances.max_psu_length_mm);
+    if (caseComponent.specifications?.max_psu_length) return Number.parseFloat(caseComponent.specifications.max_psu_length);
+    if (caseComponent.physical_dimensions?.max_psu_length_mm) return Number.parseFloat(caseComponent.physical_dimensions.max_psu_length_mm);
+    if (caseComponent.compatibility_data?.clearances?.max_psu_length_mm) return Number.parseFloat(caseComponent.compatibility_data.clearances.max_psu_length_mm);
     return 200; // Conservative default
   }
 

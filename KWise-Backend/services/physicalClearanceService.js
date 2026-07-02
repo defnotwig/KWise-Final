@@ -29,7 +29,7 @@ class PhysicalClearanceService {
         const caseDims = pcCase.dimensions || {};
         
         // 🔥 CRITICAL FIX: Check dimensions FIRST (most reliable), then specifications
-        const gpuLength = parseFloat(
+        const gpuLength = Number.parseFloat(
             gpuDims.length_mm || 
             gpuSpecs.length_mm || 
             gpuSpecs.length || 
@@ -39,7 +39,7 @@ class PhysicalClearanceService {
         );
         
         // 🔥 CRITICAL FIX: Check case dimensions FIRST (most reliable)
-        const caseMaxLength = parseFloat(
+        const caseMaxLength = Number.parseFloat(
             caseDims.max_gpu_length_mm || 
             caseSpecs.max_gpu_length_mm || 
             caseSpecs['Max Gpu Length'] || 
@@ -101,8 +101,8 @@ class PhysicalClearanceService {
         // ============================================================
         // CRITICAL CHECK #2: PCIe Slot Count
         // ============================================================
-        const gpuSlots = parseFloat(gpuSpecs.slots || gpuSpecs.slot_width || 2); // Default to 2-slot
-        const caseSlots = parseInt(caseSpecs.expansion_slots || caseSpecs.pcie_slots || 7); // Default to 7 slots
+        const gpuSlots = Number.parseFloat(gpuSpecs.slots || gpuSpecs.slot_width || 2); // Default to 2-slot
+        const caseSlots = Number.parseInt(caseSpecs.expansion_slots || caseSpecs.pcie_slots || 7, 10); // Default to 7 slots
         
         if (gpuSlots && caseSlots) {
 
@@ -125,7 +125,7 @@ class PhysicalClearanceService {
         // CRITICAL CHECK #3: PSU Wattage
         // ============================================================
         if (gpuSpecs.recommended_psu_watts) {
-            const recommendedWatts = parseInt(gpuSpecs.recommended_psu_watts);
+            const recommendedWatts = Number.parseInt(gpuSpecs.recommended_psu_watts, 10);
             warnings.push({
                 type: 'power_requirement',
                 severity: 'info',
@@ -158,7 +158,7 @@ class PhysicalClearanceService {
         const caseSpecs = pcCase.specifications || pcCase.dimensions || {};
         
         // Cooler height: check multiple field names
-        const coolerHeight = parseFloat(
+        const coolerHeight = Number.parseFloat(
             coolerSpecs.height_mm || 
             coolerSpecs.height || 
             coolerSpecs.cooler_height_mm || 
@@ -166,7 +166,7 @@ class PhysicalClearanceService {
         );
         
         // Case max cooler height: check multiple field names
-        const caseMaxHeight = parseFloat(
+        const caseMaxHeight = Number.parseFloat(
             caseSpecs.max_cooler_height_mm || 
             caseSpecs['Max Cpu Cooler Height'] || 
             caseSpecs.max_cpu_cooler_height || 
@@ -300,13 +300,13 @@ class PhysicalClearanceService {
         // INFO CHECK: TDP Rating
         // ============================================================
         if (cpu && coolerSpecs.tdp_rating && cpu.specifications) {
-            const coolerTDP = parseInt(coolerSpecs.tdp_rating);
+            const coolerTDP = Number.parseInt(coolerSpecs.tdp_rating, 10);
             let cpuTDP = null;
 
             if (typeof cpu.specifications === 'object') {
                 cpuTDP = cpu.specifications.tdp || cpu.specifications.TDP || cpu.specifications.tdp_watts;
                 if (typeof cpuTDP === 'string') {
-                    cpuTDP = parseInt(cpuTDP.replace(/\D/g, ''));
+                    cpuTDP = Number.parseInt(cpuTDP.replace(/\D/g, ''), 10);
                 }
             }
 
@@ -381,11 +381,11 @@ class PhysicalClearanceService {
 
         if (mbFormFactor && caseSupportedFormFactors.length > 0) {
             // Normalize motherboard form factor for comparison
-            const normalizedMB = mbFormFactor.replace(/-/g, '');
+            const normalizedMB = mbFormFactor.replaceAll('-', '');
             
             // Check if motherboard is in supported list
             const compatible = caseSupportedFormFactors.some(supported => {
-                const normalizedSupported = supported.replace(/-/g, '');
+                const normalizedSupported = supported.replaceAll('-', '');
                 return normalizedMB === normalizedSupported || 
                        normalizedMB.includes(normalizedSupported) || 
                        normalizedSupported.includes(normalizedMB);

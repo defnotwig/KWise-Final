@@ -10,7 +10,7 @@
 
 const logger = require('../utils/logger');
 const db = require('../config/db');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 class PromptExperimentManager {
   constructor() {
@@ -125,7 +125,7 @@ class PromptExperimentManager {
       .update(userId || 'anonymous')
       .digest('hex');
     
-    const hashInt = parseInt(userHash.substring(0, 8), 16);
+    const hashInt = Number.parseInt(userHash.substring(0, 8), 16);
     const variantIndex = hashInt % experiment.variants.length;
     
     const variant = experiment.variants[variantIndex];
@@ -236,7 +236,7 @@ class PromptExperimentManager {
     
     // Determine winner (highest composite score)
     const winner = results.reduce((best, current) => 
-      parseFloat(current.compositeScore) > parseFloat(best.compositeScore) ? current : best
+      Number.parseFloat(current.compositeScore) > Number.parseFloat(best.compositeScore) ? current : best
     );
     
     // Calculate statistical significance
@@ -307,14 +307,14 @@ class PromptExperimentManager {
     
     // Compare top 2 variants
     const sorted = results.sort((a, b) => 
-      parseFloat(b.compositeScore) - parseFloat(a.compositeScore)
+      Number.parseFloat(b.compositeScore) - Number.parseFloat(a.compositeScore)
     );
     
     const winner = sorted[0];
     const runnerUp = sorted[1];
     
-    const scoreDiff = parseFloat(winner.compositeScore) - parseFloat(runnerUp.compositeScore);
-    const scoreDiffPercent = (scoreDiff / parseFloat(runnerUp.compositeScore)) * 100;
+    const scoreDiff = Number.parseFloat(winner.compositeScore) - Number.parseFloat(runnerUp.compositeScore);
+    const scoreDiffPercent = (scoreDiff / Number.parseFloat(runnerUp.compositeScore)) * 100;
     
     // Consider significant if:
     // 1. Score difference > 10%
@@ -324,7 +324,7 @@ class PromptExperimentManager {
     const significant = 
       scoreDiffPercent > 10 &&
       winner.impressions >= 50 &&
-      parseFloat(winner.errorRate) <= parseFloat(runnerUp.errorRate);
+      Number.parseFloat(winner.errorRate) <= Number.parseFloat(runnerUp.errorRate);
     
     return {
       significant,
@@ -344,7 +344,7 @@ class PromptExperimentManager {
     }
     
     const scoreDiff = significance.scoreDifferencePercent;
-    const improvement = parseFloat(scoreDiff.replace('%', ''));
+    const improvement = Number.parseFloat(scoreDiff.replace('%', ''));
     
     if (improvement > 20) {
       return `🏆 Strong winner: ${winner.variantName} shows ${scoreDiff} improvement. Strongly recommend adopting this prompt variation.`;

@@ -16,6 +16,7 @@ class PrecomputeManager {
     this.compatibilityService = compatibilityService;
     this.queue = [];
     this.processing = false;
+    this.maxQueueSize = 20;
     this.stats = {
       totalPrecomputed: 0,
       successfulPrecomputes: 0,
@@ -56,6 +57,11 @@ class PrecomputeManager {
       
       // Sort queue by priority (highest first)
       this.queue.sort((a, b) => b.priority - a.priority);
+
+      if (this.queue.length > this.maxQueueSize) {
+        this.queue = this.queue.slice(0, this.maxQueueSize);
+        logger.warn(`⚠️ Precompute queue capped at ${this.maxQueueSize} items to avoid stale backlog`);
+      }
       
       // Process queue in background
       if (!this.processing) {
@@ -101,7 +107,7 @@ class PrecomputeManager {
       return result.rows.map(row => ({
         parts: JSON.parse(row.parts_json),
         context: row.user_context ? JSON.parse(row.user_context) : {},
-        frequency: parseInt(row.frequency),
+        frequency: Number(row.frequency),
         lastChecked: row.last_checked
       }));
       
@@ -138,19 +144,20 @@ class PrecomputeManager {
         precompute: true,
         persona_cluster: job.userContext?.persona_cluster || 'general'
       };
+
+      if (!job.parts || typeof job.parts !== 'object') {
+        throw new Error('Precompute job is missing a valid parts payload');
+      }
       
-      // Run compatibility analysis (will be cached automatically)
-      const result = await this.compatibilityService.analyzeCompatibility(
-        job.parts,
-        context
-      );
+      // Run compatibility analysis through the AI service using the cached parts/context contract.
+      const result = await this.aiService.analyzeCompatibility(job.parts, context);
       
       this.stats.successfulPrecomputes++;
       this.stats.totalPrecomputed++;
       
       logger.info(`✅ Precomputed ${job.scenario} analysis`, {
-        confidence: result.confidence,
-        cached: 'yes',
+        confidence: result.confidence || 'unknown',
+        source: result.source || 'fresh',
         queueRemaining: this.queue.length
       });
       
