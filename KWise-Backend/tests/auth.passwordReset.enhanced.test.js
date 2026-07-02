@@ -12,7 +12,6 @@ const { app } = require('../server');
 
 describe('Enhanced Password Reset Flow', () => {
   const testEmail = `reset_test_${Date.now()}@example.com`;
-  let createdUserId;
   let resetSessionId;
   let rawCode; // only available in test mode via testCode leak
 
@@ -20,11 +19,11 @@ describe('Enhanced Password Reset Flow', () => {
   beforeAll(async () => {
     // Try public register if exposed
     try {
-      const reg = await request(app)
+      // Registration might create a test user - we only need it to exist for the reset flow
+      await request(app)
         .post('/api/auth/register')
         .send({ name: 'Reset Test User', email: testEmail, password: 'InitPass123', role: 'admin' });
-      if (reg.body?.data?.id) createdUserId = reg.body.data.id;
-    } catch (_) {}
+    } catch (error) { /* registration may not be available */ console.debug('Registration not available:', error.message); }
   });
 
   test('Step 1: request-reset returns success and provides testCode in test env', async () => {

@@ -5,8 +5,8 @@
  * Zero-tolerance testing with Ollama DeepSeek-R1 AI validation
  */
 
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('node:fs').promises;
+const path = require('node:path');
 const testHelpers = require('./utils/test-helpers');
 const config = require('./config/brutal-test-config');
 
@@ -275,10 +275,10 @@ class BrutalTestRunner {
             totalTraps,
             passedTraps,
             failedTraps,
-            passRate: parseFloat(passRate.toFixed(1)),
+            passRate: Number.parseFloat(passRate.toFixed(1)),
             severityCounts,
             performance: performanceStats,
-            rating: parseFloat(rating.toFixed(1)),
+            rating: Number.parseFloat(rating.toFixed(1)),
             status: this.getOverallStatus(severityCounts, rating),
             sectionsRun: this.results.sections.length,
             duration: Date.now() - this.startTime
@@ -521,8 +521,8 @@ if (require.main === module) {
     if (sectionIndex >= 0 && args[sectionIndex + 1]) {
         const sectionArg = args[sectionIndex + 1];
         options.sections = sectionArg.includes(',') 
-            ? sectionArg.split(',').map(s => parseInt(s.trim()))
-            : parseInt(sectionArg);
+            ? sectionArg.split(',').map(s => Number.parseInt(s.trim(), 10))
+            : Number.parseInt(sectionArg, 10);
     }
 
     const runner = new BrutalTestRunner(options);

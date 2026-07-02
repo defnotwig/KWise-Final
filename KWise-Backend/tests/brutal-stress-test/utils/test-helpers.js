@@ -341,7 +341,7 @@ class TestHelpers {
                 total: totalTraps,
                 passed: passedTraps,
                 failed: failedTraps,
-                passRate: parseFloat(passRate),
+                passRate: Number.parseFloat(passRate),
                 catastrophic: catastrophicFailures,
                 critical: criticalFailures
             },
