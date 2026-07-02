@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
 import "./ProductList.css";
 import BuildPC from "../assets/BuildPC.webp";
 import BronzeTier from "../assets/Bronze.webp";
@@ -8,7 +7,8 @@ import SilverTier from "../assets/Silver.webp";
 import GoldTier from "../assets/Gold.webp";
 import DiamondTier from "../assets/Diamond.webp";
 import filtercategory from "../assets/ProductList/filtercategory.svg";
-import { getApiBaseUrl } from "../utils/networkConfig";
+import { stockAPI } from "../services/api";
+import { parseKioskPrice, resolveProductImage } from "../utils/kioskContracts";
 // AI service temporarily disabled - getPreBuiltRecommendations() not implemented
 // import aiService from "../api/aiService";
 
@@ -21,54 +21,143 @@ const purposeColors = {
   Multimedia: "#E05A00",
 };
 
+// Module-level helper: Get tier image based on selection
+const getTierImage = (tierName) => {
+  const tierImages = {
+    "Starter": BronzeTier,
+    "Mid Tier": SilverTier,
+    "High Tier": GoldTier,
+    "Elite": DiamondTier
+  };
+  return tierImages[tierName] || BuildPC;
+};
+
+// Module-level helper: Get tier display name for subtitle
+const getTierDisplayName = (tierName) => {
+  const tierDisplayNames = {
+    "Starter": "Bronze Tier",
+    "Mid Tier": "Silver Tier",
+    "High Tier": "Gold Tier",
+    "Elite": "Diamond Tier"
+  };
+  return tierDisplayNames[tierName] || tierName;
+};
+
+// Module-level helper: Get shuffled monitors for a tier's price range
+const getShuffledMonitorsForTier = (tier, monitors) => {
+  const priceRanges = {
+    'Starter': { min: 2000, max: 4500 },
+    'Mid Tier': { min: 3500, max: 6000 },
+    'High Tier': { min: 5000, max: 10000 },
+    'Elite': { min: 8000, max: 30000 }
+  };
+  
+  const range = priceRanges[tier] || { min: 2000, max: 10000 };
+  
+  const filteredMonitors = monitors.filter(m => 
+    m.price >= range.min && m.price <= range.max && m.stock > 0
+  );
+  
+  const shuffled = [...filteredMonitors].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3).map(monitor => ({
+    id: monitor.id,
+    name: monitor.name,
+    price: parseKioskPrice(monitor.price),
+    image: resolveProductImage(monitor),
+    stock: monitor.stock
+  }));
+};
+
+// Module-level helper: Transform backend product data to frontend format
+const transformProduct = (item, monitors) => {
+  const tier = item.tier || item.specifications?.buildType || 'Starter';
+  const image = resolveProductImage(item, BuildPC);
+  
+  return {
+    id: item.id,
+    name: item.name,
+    price: parseKioskPrice(item.price),
+    category: item.category || tier || 'Unknown',
+    tier: tier,
+    purposes: item.purposes || [],
+    image,
+    image_url: item.image_url || item.imageUrl || item.image || '',
+    stock: item.stock,
+    components: item.components || [],
+    specifications: item.specifications,
+    addonsTitle: "Gaming Monitors Addons",
+    addons: getShuffledMonitorsForTier(tier, monitors)
+  };
+};
+
+const extractResponseItems = (response) => {
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  if (Array.isArray(response?.data?.data?.items)) return response.data.data.items;
+  if (Array.isArray(response?.data?.items)) return response.data.items;
+  if (Array.isArray(response?.data)) return response.data;
+  return [];
+};
+
+// Module-level helper: Build query string for API request
+const buildQueryString = (category, purposes, source) => {
+  const params = new URLSearchParams();
+  if (category) {
+    params.append('category', category);
+  }
+  if (purposes.length > 0) {
+    params.append('purposes', purposes.join(','));
+  }
+  params.append('buildSource', source);
+  return params.toString() ? `?${params.toString()}` : '';
+};
+
+// Module-level helper: Fetch pre-built products from backend
+const fetchProductData = async (selectedCategory, selectedPurposes, buildSource) => {
+  const queryString = buildQueryString(selectedCategory, selectedPurposes, buildSource);
+  
+  const [prebuiltResponse, monitorsResponse] = await Promise.all([
+    stockAPI.get(`/kiosk/prebuilt${queryString}`),
+    stockAPI.getItems({ category: 'Monitor', page: 1, limit: 100 })
+  ]);
+
+  const monitors = extractResponseItems(monitorsResponse);
+  
+  return {
+    products: extractResponseItems(prebuiltResponse).map(item =>
+      transformProduct(item, monitors)
+    ),
+    monitorCount: monitors.length
+  };
+};
+
+// Module-level helper: Get header title based on build source
+const getHeaderTitle = (buildSource) => {
+  return buildSource === "preset" ? "PREBUILT PC'S" : "COMMUNITY";
+};
+
+// Module-level helper: Get header subtitle based on build source and category
+const getHeaderSubtitle = (buildSource, categoryName) => {
+  if (buildSource === "preset") {
+    return `${categoryName} Level PC Builds`;
+  }
+  return "Crafted by the community";
+};
+
 const ProductList = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   
   // Get tier and buildSource from navigation state
-  const tier = location.state?.tier || new URLSearchParams(location.search).get("category");
-  const buildSource = location.state?.buildSource || "preset"; // preset or community
-  
-  // Get tier image based on selection
-  const getTierImage = (tierName) => {
-    const tierImages = {
-      "Starter": BronzeTier,
-      "Mid Tier": SilverTier,
-      "High Tier": GoldTier,
-      "Elite": DiamondTier
-    };
-    return tierImages[tierName] || BuildPC;
-  };
-  
-  // Get tier display name for subtitle
-  const getTierDisplayName = (tierName) => {
-    const tierDisplayNames = {
-      "Starter": "Bronze Tier",
-      "Mid Tier": "Silver Tier",
-      "High Tier": "Gold Tier",
-      "Elite": "Diamond Tier"
-    };
-    return tierDisplayNames[tierName] || tierName;
-  };
-  
-  // Get tier price range for community subtitle
-  // eslint-disable-next-line no-unused-vars
-  const getTierPriceRange = (tierName) => {
-    const tierPriceRanges = {
-      "Starter": "₱15,000 - ₱20,000",
-      "Mid Tier": "₱21,000 - ₱30,000",
-      "High Tier": "₱31,000 - ₱50,000",
-      "Elite": "₱51,000 - ₱85,000"
-    };
-    return tierPriceRanges[tierName] || "";
-  };
-  
-  const searchParams = new URLSearchParams(location.search);
+  const tier = location.state?.tier || searchParams.get("category");
+  const buildSource = location.state?.buildSource
+    || searchParams.get("buildSource")
+    || (location.state?.from === "community" ? "community" : "preset"); // preset or community
   
   // Memoize selectedPurposes to prevent infinite loop - only recreate when URL changes
   const selectedPurposes = useMemo(() => {
     return searchParams.get("purposes")?.split(",").map(p => p.trim().toLowerCase()) || [];
-  }, [searchParams.get("purposes")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   
   const selectedCategory = tier || searchParams.get("category");
 
@@ -98,89 +187,14 @@ const ProductList = () => {
 
   // Fetch Pre-Built products from backend when filters change
   useEffect(() => {
-    const fetchPreBuiltProducts = async () => {
+    const loadProducts = async () => {
       try {
         setIsLoading(true);
         setError(null);
-
-        const apiBaseUrl = getApiBaseUrl();
-        
-        // Build query parameters for backend filtering
-        const params = new URLSearchParams();
-        if (selectedCategory) {
-          params.append('category', selectedCategory);
-        }
-        if (selectedPurposes.length > 0) {
-          params.append('purposes', selectedPurposes.join(','));
-        }
-        // Add buildSource parameter to differentiate preset vs community
-        params.append('buildSource', buildSource);
-
-        const queryString = params.toString() ? `?${params.toString()}` : '';
-        
-        // Fetch Pre-Built products and Monitors in parallel
-        const [prebuiltResponse, monitorsResponse] = await Promise.all([
-          axios.get(`${apiBaseUrl}/kiosk/prebuilt${queryString}`),
-          axios.get(`${apiBaseUrl}/stock?category=Monitor`)
-        ]);
-
-        const monitors = monitorsResponse.data.data || [];
-        
-        // Helper function to get shuffled monitors based on tier pricing
-        const getShuffledMonitorsForTier = (tier) => {
-          const priceRanges = {
-            'Starter': { min: 2000, max: 4500 },
-            'Mid Tier': { min: 3500, max: 6000 },
-            'High Tier': { min: 5000, max: 10000 },
-            'Elite': { min: 8000, max: 30000 }
-          };
-          
-          const range = priceRanges[tier] || { min: 2000, max: 10000 };
-          
-          // Filter monitors by price range
-          const filteredMonitors = monitors.filter(m => 
-            m.price >= range.min && m.price <= range.max && m.stock > 0
-          );
-          
-          // Shuffle and take 3 random monitors
-          const shuffled = [...filteredMonitors].sort(() => Math.random() - 0.5);
-          return shuffled.slice(0, 3).map(monitor => ({
-            id: monitor.id,
-            name: monitor.name,
-            price: monitor.price,
-            image: `${apiBaseUrl}${monitor.image_url || monitor.image}`,
-            stock: monitor.stock
-          }));
-        };
-
-        // Transform backend data to match expected frontend format
-        const products = prebuiltResponse.data.data.map(item => {
-          const tier = item.tier || item.specifications?.buildType || 'Starter';
-          
-          return {
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            category: item.category || tier || 'Unknown',
-            tier: tier,
-            purposes: item.purposes || [],
-            // 🔥 FIX: Use image field from backend response (already processed by backend)
-            // Backend returns 'image' field (from row.image_url in database)
-            image: item.image?.startsWith('http') 
-              ? item.image 
-              : `http://localhost:5000${item.image || '/assets/placeholder.png'}`,
-            image_url: item.image, // Keep original for reference
-            stock: item.stock,
-            components: item.components || [],
-            specifications: item.specifications,
-            addonsTitle: "Gaming Monitors Addons",
-            addons: getShuffledMonitorsForTier(tier) // Real monitors with rotation
-          };
-        });
-
+        const { products, monitorCount } = await fetchProductData(selectedCategory, selectedPurposes, buildSource);
         setPcProducts(products);
-        setFilteredProducts(products); // Initialize filtered products
-        console.log(`✅ Loaded ${products.length} Pre-Built products with ${monitors.length} monitors from backend (Category: ${selectedCategory || 'All'}, Purposes: ${selectedPurposes.join(',') || 'All'}, BuildSource: ${buildSource})`);
+        setFilteredProducts(products);
+        console.log(`✅ Loaded ${products.length} Pre-Built products with ${monitorCount} monitors from backend (Category: ${selectedCategory || 'All'}, Purposes: ${selectedPurposes.join(',') || 'All'}, BuildSource: ${buildSource})`);
       } catch (err) {
         console.error('❌ Error fetching Pre-Built products:', err);
         setError(err.message || 'Failed to load products');
@@ -189,8 +203,8 @@ const ProductList = () => {
       }
     };
 
-    fetchPreBuiltProducts();
-  }, [selectedCategory, selectedPurposes, buildSource]); // Added buildSource dependency
+    loadProducts();
+  }, [selectedCategory, selectedPurposes, buildSource]);
 
   // Filter products by purpose when filter changes
   useEffect(() => {
@@ -235,13 +249,10 @@ const ProductList = () => {
             <img src={getTierImage(tier)} alt="Loading" className="product-list-icon" />
             <div className="product-list-header-text">
               <h1 className="product-list-title">
-                {buildSource === "preset" ? "PREBUILT PC'S" : "COMMUNITY"}
-              </h1>
-              <p className="product-list-subtitle">
-                {buildSource === "preset" 
-                  ? `${getTierDisplayName(selectedCategory) || 'Loading...'} Level PC Builds`
-                  : "Crafted by the community"
-                }
+              {getHeaderTitle(buildSource)}
+            </h1>
+            <p className="product-list-subtitle">
+              {getHeaderSubtitle(buildSource, getTierDisplayName(selectedCategory) || 'Loading...')}
               </p>
             </div>
           </div>
@@ -264,13 +275,10 @@ const ProductList = () => {
             <img src={getTierImage(tier)} alt="Error" className="product-list-icon" />
             <div className="product-list-header-text">
               <h1 className="product-list-title">
-                {buildSource === "preset" ? "PREBUILT PC'S" : "COMMUNITY"}
-              </h1>
-              <p className="product-list-subtitle">
-                {buildSource === "preset" 
-                  ? `${getTierDisplayName(selectedCategory) || 'Error'} Level PC Builds`
-                  : "Crafted by the community"
-                }
+              {getHeaderTitle(buildSource)}
+            </h1>
+            <p className="product-list-subtitle">
+              {getHeaderSubtitle(buildSource, getTierDisplayName(selectedCategory) || 'Error')}
               </p>
             </div>
           </div>
@@ -281,7 +289,7 @@ const ProductList = () => {
           <p className="error-text">{error}</p>
           <button 
             className="retry-button" 
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
           >
             Retry
           </button>
@@ -290,7 +298,7 @@ const ProductList = () => {
     );
   }
 
-  if (!selectedCategory || !priceRanges[selectedCategory]) {
+  if (buildSource === "preset" && (!selectedCategory || !priceRanges[selectedCategory])) {
     return (
       <div className="error-message">
         <p>Please select a valid category from the homepage.</p>
@@ -306,14 +314,11 @@ const ProductList = () => {
           <img src={getTierImage(tier)} alt={`${tier} Tier`} className="product-list-icon" />
           <div className="product-list-header-text">
             <h1 className="product-list-title">
-              {buildSource === "preset" ? "PREBUILT PC'S" : "COMMUNITY"}
+              {getHeaderTitle(buildSource)}
               <span className="category-count">({filteredByCategoryPriceAndPurpose.length})</span>
             </h1>
             <p className="product-list-subtitle">
-              {buildSource === "preset" 
-                ? `${getTierDisplayName(selectedCategory)} Level PC Builds`
-                : `${getTierDisplayName(selectedCategory)} Level PC Builds`
-              }
+              {getHeaderSubtitle(buildSource, getTierDisplayName(selectedCategory) || 'All')}
             </p>
           </div>
         </div>
@@ -332,7 +337,7 @@ const ProductList = () => {
               {showFilterMenu && (
                 <div className="product-list-filter-menu">
                   <button 
-                    className={`product-list-filter-option ${!activePurposeFilter ? 'active' : ''}`}
+                    className={`product-list-filter-option ${activePurposeFilter ? '' : 'active'}`}
                     onClick={() => handlePurposeFilter(null)}
                   >
                     All
@@ -368,7 +373,8 @@ const ProductList = () => {
       <div className="product-build-grid">
         {filteredByCategoryPriceAndPurpose.length > 0 ? (
           filteredByCategoryPriceAndPurpose.map((product) => (
-            <div
+            <button
+              type="button"
               className="product-build-card"
               key={product.id}
               onClick={() => {
@@ -383,19 +389,19 @@ const ProductList = () => {
                 });
               }}
             >
-              {/* AI Recommendation Badge */}
+              {/* Recommendation Badge */}
               {product.isAIRecommended && (
                 <div className="ai-recommendation-badge">
-                  <span className="ai-badge">AI</span>
+                  <span className="ai-badge">LOCAL</span>
                   <span className="recommendation-text">Recommended</span>
                 </div>
               )}
               
-              {/* AI Score Display */}
+              {/* Score Display */}
               {product.aiScore && product.aiScore > 0 && (
                 <div className="ai-score-display">
                   <span className="score-value">{Math.round(product.aiScore)}</span>
-                  <span className="score-label">AI Score</span>
+                  <span className="score-label">Match Score</span>
                 </div>
               )}
 
@@ -404,7 +410,8 @@ const ProductList = () => {
                   src={product.image}
                   alt={product.name}
                   className="product-build-image"
-                  loading="eager"
+                  loading="lazy"
+                  decoding="async"
                   onError={(e) => {
                     console.error('❌ Image failed to load:', product.image);
                     e.target.onerror = null;
@@ -435,13 +442,13 @@ const ProductList = () => {
                 <h3 className="product-build-name">{product.name}</h3>
                 <p className="product-build-price">₱{product.price.toLocaleString()}</p>
                 
-                {/* AI Analysis Display */}
+                {/* Analysis Display */}
                 {product.aiAnalysis && (
                   <div className="ai-analysis">
                     <p className="ai-category">{product.aiAnalysis.category}</p>
                     <div className="ai-strengths">
                       {product.aiAnalysis.strengths.map((strength, index) => (
-                        <span key={index} className="ai-strength-tag">
+                        <span key={`strength-${index}-${strength.slice(0, 15)}`} className="ai-strength-tag">
                           {strength}
                         </span>
                       ))}
@@ -449,7 +456,7 @@ const ProductList = () => {
                   </div>
                 )}
               </div>
-            </div>
+            </button>
           ))
         ) : (
           <div className="no-products-message">

@@ -65,12 +65,12 @@ const PreBuiltDisplay = () => {
           initialComponents[category] = {
             ...comp,
             part_id: comp.part_id,
-            price: parseFloat(comp.part_price || comp.price || 0)
+            price: Number.parseFloat(comp.part_price || comp.price || 0)
           };
         }
       });
       setCustomizedComponents(initialComponents);
-      setTotalPrice(parseFloat(product.price || 0));
+      setTotalPrice(Number.parseFloat(product.price || 0));
       
       // Load options for all customizable categories (including GPU even if not present)
       CUSTOMIZABLE_CATEGORIES.forEach(category => {
@@ -176,7 +176,7 @@ const PreBuiltDisplay = () => {
         name: category,
         value: newComponent.name,
         part_id: newComponent.id,
-        price: parseFloat(newComponent.price || 0),
+        price: Number.parseFloat(newComponent.price || 0),
         part_name: newComponent.name,
         brand: newComponent.brand || ''
       }
@@ -196,14 +196,14 @@ const PreBuiltDisplay = () => {
 
   // Calculate total price based on customizations
   const calculateTotalPrice = (components) => {
-    let basePrice = parseFloat(product.price || 0);
+    let basePrice = Number.parseFloat(product.price || 0);
     
     // Get original component prices
     const originalPrices = {};
     product.components.forEach(comp => {
       const category = comp.name.toUpperCase();
       if (CUSTOMIZABLE_CATEGORIES.includes(category)) {
-        originalPrices[category] = parseFloat(comp.part_price || comp.price || 0);
+        originalPrices[category] = Number.parseFloat(comp.part_price || comp.price || 0);
       }
     });
     
@@ -251,7 +251,7 @@ const PreBuiltDisplay = () => {
             id: comp.part_id,
             name: comp.value,
             category: category,  // Use original case
-            price: parseFloat(comp.part_price || 0)
+            price: Number.parseFloat(comp.part_price || 0)
           };
         }
       });
@@ -326,7 +326,7 @@ const PreBuiltDisplay = () => {
       id: Date.now(),
       baseProduct: {
         ...product,
-        originalPrice: parseFloat(product.price || 0)
+        originalPrice: Number.parseFloat(product.price || 0)
       },
       components: allComponents,
       customizations: customizedComponents,
@@ -352,7 +352,7 @@ const PreBuiltDisplay = () => {
           id: comp.part_id,
           name: comp.value,
           category: comp.name,
-          price: parseFloat(comp.price || 0)
+          price: Number.parseFloat(comp.price || 0)
         };
       }
     });
@@ -420,9 +420,9 @@ const PreBuiltDisplay = () => {
           <h3 className="prebuilt-display-name">{product.name}</h3>
           <p className="prebuilt-display-price">
             ₱{totalPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            {totalPrice !== parseFloat(product.price || 0) && (
+            {totalPrice !== Number.parseFloat(product.price || 0) && (
               <span className="prebuilt-original-price">
-                Original: ₱{parseFloat(product.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                Original: ₱{Number.parseFloat(product.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </span>
             )}
           </p>
@@ -626,7 +626,7 @@ const PreBuiltDisplay = () => {
                     availableOptions[currentModal].map((option) => {
                       const isSelected = customizedComponents[currentModal]?.part_id === option.id;
                       const originalComponent = product.components.find(c => c.name.toUpperCase() === currentModal);
-                      const originalPrice = parseFloat(originalComponent?.part_price || originalComponent?.price || 0);
+                      const originalPrice = Number.parseFloat(originalComponent?.part_price || originalComponent?.price || 0);
                       const priceDiff = option.price - originalPrice;
                       
                       return (

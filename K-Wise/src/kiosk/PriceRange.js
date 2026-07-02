@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./PriceRange.css";// Ensure you have the correct CSS file
 import BuildPC from "../assets/BuildPC.webp";
 import BronzeTier from "../assets/Bronze.webp";
@@ -9,12 +9,14 @@ import DiamondTier from "../assets/Diamond.webp";
 
 const PriceRange = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ✅ Function to navigate to prebuilt PC pages
   const handleNavigation = (selectedCategory) => {
     // Retrieve selected purposes from URL params
     const searchParams = new URLSearchParams(window.location.search);
     const selectedPurposes = searchParams.get("purposes");
+    const buildSource = location.state?.buildSource || searchParams.get("buildSource") || "preset";
 
     if (!selectedPurposes) {
       alert("No purposes selected. Please go back and select a purpose.");
@@ -22,7 +24,9 @@ const PriceRange = () => {
     }
 
     // Navigate to ProductList with selected purposes and category
-    navigate(`/product-list?purposes=${selectedPurposes}&category=${selectedCategory}`);
+    navigate(`/product-list?purposes=${selectedPurposes}&category=${selectedCategory}&buildSource=${buildSource}`, {
+      state: { buildSource }
+    });
   };
 
 

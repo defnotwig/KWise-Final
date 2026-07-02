@@ -1,6 +1,7 @@
 // ProductPageCustom.js
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { getServerBaseUrl } from "../utils/networkConfig";
 import "./ProductPageCustom.css";
 import Stats from "../assets/Stats.webp";
 import { menuItems, updateCartIcon } from "./PCCustomized.js";
@@ -33,24 +34,23 @@ function ProductPageCustom() {
     specifications: "No specifications provided."
   };
 
-  const productPrice = parseFloat(productDetails.price.replace("₱", "").replace(",", "")) || 0;
+  const productPrice = Number.parseFloat(productDetails.price.replace("₱", "").replace(",", "")) || 0;
   const [quantity, setQuantity] = useState(1);
   const [totalPrice, setTotalPrice] = useState(productPrice);
   const [compatibleComponents, setCompatibleComponents] = useState([]);
   const [isLoadingCompatible, setIsLoadingCompatible] = useState(true);
-  const [aiCompatibilityEnabled, setAiCompatibilityEnabled] = useState(false);
+  const [localCompatibilityEnabled, setLocalCompatibilityEnabled] = useState(false);
   const [compatibilityError, setCompatibilityError] = useState(null);
 
-  // ROOT CAUSE FIX: Replace hardcoded fake AI data with real API calls
+  // Load deterministic compatibility suggestions from local APIs.
   useEffect(() => {
     const fetchCompatibleComponents = async () => {
-      console.log('🔗 Fetching AI-powered compatible components for:', productDetails.name);
+      console.log('Fetching compatible components for:', productDetails.name);
       setIsLoadingCompatible(true);
       setCompatibilityError(null);
       
       try {
-        // Call real AI compatibility API
-        const response = await fetch('http://localhost:5000/api/compatibility/analyze', {
+        const response = await fetch(`${getServerBaseUrl()}/api/compatibility/analyze`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -71,25 +71,24 @@ function ProductPageCustom() {
         }
 
         const data = await response.json();
-        console.log('✅ AI Compatibility API Response:', data);
+        console.log('Compatibility API response:', data);
 
         if (data.success && data.data && Array.isArray(data.data)) {
           // Map API response to component format
           const compatibleItems = data.data.slice(0, 6).map((product, index) => ({
             id: product.id || `compatible-${product.category}-${index}`,
             name: product.name,
-            price: `₱${parseFloat(product.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            price: `₱${Number.parseFloat(product.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             image: getCategoryImage(product.category),
             category: product.category,
             compatibilityScore: product.compatibility_score || product.score || 0,
-            aiReasoning: product.reasoning || product.ai_reasoning || ''
+            localReasoning: product.reasoning || product.ai_reasoning || ''
           }));
 
           setCompatibleComponents(compatibleItems);
-          setAiCompatibilityEnabled(data.cached === false && data.source === 'ai');
+          setLocalCompatibilityEnabled(data.source === 'deterministic' || data.data?.engine === 'deterministic');
           
-          console.log(`✅ Loaded ${compatibleItems.length} AI-powered compatible components`);
-          console.log(`   AI Enabled: ${data.source === 'ai' ? 'YES' : 'NO (fallback)'}`);
+          console.log(`Loaded ${compatibleItems.length} compatible components`);
           console.log(`   Cached: ${data.cached === true ? 'YES' : 'NO'}`);
           
         } else {
@@ -97,14 +96,14 @@ function ProductPageCustom() {
         }
         
       } catch (error) {
-        console.error('❌ AI Compatibility API failed:', error.message);
+        console.error('Compatibility API failed:', error.message);
         setCompatibilityError(error.message);
         
         // Fallback: Use basic compatibility logic
         console.log('⚠️ Using fallback compatibility logic');
         const fallbackItems = await fetchBasicCompatibility(productDetails);
         setCompatibleComponents(fallbackItems);
-        setAiCompatibilityEnabled(false);
+        setLocalCompatibilityEnabled(false);
         
       } finally {
         setIsLoadingCompatible(false);
@@ -125,7 +124,7 @@ function ProductPageCustom() {
       return imageMap[category] || CPU1;
     };
 
-    // Helper: Fallback compatibility logic (non-AI)
+    // Helper: Fallback compatibility logic
     const fetchBasicCompatibility = async (product) => {
       try {
         // Fetch products from other categories (simple approach)
@@ -135,7 +134,7 @@ function ProductPageCustom() {
         const items = [];
         for (const category of compatibleCategories.slice(0, 6)) {
           try {
-            const res = await fetch(`http://localhost:5000/api/stock?category=${category}&page=1&limit=1&sort=popularity&order=DESC`);
+            const res = await fetch(`${getServerBaseUrl()}/api/stock?category=${category}&page=1&limit=1&sort=popularity&order=DESC`);
             const stockData = await res.json();
             
             if (stockData.success && stockData.data && stockData.data.length > 0) {
@@ -143,11 +142,11 @@ function ProductPageCustom() {
               items.push({
                 id: topProduct.id,
                 name: topProduct.name,
-                price: `₱${parseFloat(topProduct.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                price: `₱${Number.parseFloat(topProduct.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                 image: getCategoryImage(category),
                 category: category,
                 compatibilityScore: 60,
-                aiReasoning: 'Basic compatibility (AI unavailable)'
+                localReasoning: 'Basic compatibility'
               });
             }
           } catch (err) {
@@ -163,7 +162,7 @@ function ProductPageCustom() {
     };
 
     // Fetch compatible components when product changes
-    if (productDetails && productDetails.id) {
+    if (productDetails?.id) {
       fetchCompatibleComponents();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,7 +215,7 @@ function ProductPageCustom() {
       <div className="productPage-compatible-section">
         <h2 className="productPage-compatible-title">
           🔗 Compatible With 
-          {aiCompatibilityEnabled && <span className="ai-badge">🤖 AI</span>}
+          {localCompatibilityEnabled && <span className="ai-badge">LOCAL</span>}
           {isLoadingCompatible && <span className="ai-loading">🔄</span>}
         </h2>
         {compatibilityError && (
@@ -229,14 +228,15 @@ function ProductPageCustom() {
             fontSize: '14px',
             border: '1px solid #ffeaa7'
           }}>
-            ⚠️ AI compatibility temporarily unavailable: {compatibilityError}
+            ⚠️ Compatibility temporarily unavailable: {compatibilityError}
             <br />
             <small>Showing basic compatibility matches</small>
           </div>
         )}
         <div className="productPage-compatible-container">
           {compatibleComponents.slice(0, 6).map((component) => (
-            <div
+            <button
+              type="button"
               key={component.id}
               className="productPage-compatible-item"
               onClick={() =>
@@ -254,12 +254,12 @@ function ProductPageCustom() {
               <img src={component.image} alt={component.name} className="productPage-compatible-image" />
               <p className="productPage-compatible-name">{component.name}</p>
               <p className="productPage-compatible-price">{component.price}</p>
-              {component.aiCompatibility && (
-                <div className="ai-compatibility-tooltip" title={component.aiCompatibility}>
-                  🤖 AI Verified
+              {component.localReasoning && (
+                <div className="ai-compatibility-tooltip" title={component.localReasoning}>
+                  Verified
                 </div>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
