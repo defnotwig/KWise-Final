@@ -258,7 +258,7 @@ class User {
   static async countAll() {
     try {
       const result = await db.query('SELECT COUNT(*) as count FROM users');
-      return parseInt(result.rows[0].count, 10);
+      return Number.parseInt(result.rows[0].count, 10);
     } catch (error) {
       logger.error('Error counting users:', error);
       throw error;
@@ -516,7 +516,7 @@ class User {
         ['superadmin']
       );
 
-      return parseInt(countResult.rows[0].count, 10) <= 1;
+      return Number.parseInt(countResult.rows[0].count, 10) <= 1;
     } catch (error) {
       logger.error('Error checking if user is last superadmin:', error);
       throw error;

@@ -1,5 +1,29 @@
 const { Pool } = require('pg');
 
+const SPEC_TABLES = {
+    'CPU': 'cpu_specs',
+    'GPU': 'gpu_specs',
+    'Motherboard': 'motherboard_specs',
+    'RAM': 'ram_specs',
+    'Storage': 'storage_specs',
+    'PSU': 'psu_specs',
+    'Case': 'case_specs',
+    'Cooling': 'cooling_specs',
+    'Monitor': 'monitor_specs',
+    'Headphones': 'headphones_specs',
+    'Keyboard': 'keyboard_specs',
+    'Mouse': 'mouse_specs',
+    'Speakers': 'speakers_specs',
+    'Webcam': 'webcam_specs'
+};
+
+const quoteIdentifier = (identifier) => {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
+        throw new Error(`Invalid SQL identifier: ${identifier}`);
+    }
+    return `"${identifier.replace(/"/g, '""')}"`;
+};
+
 class PCPartsModel {
     constructor(pool) {
         this.pool = pool;
@@ -126,13 +150,13 @@ class PCPartsModel {
         }
 
         const countResult = await this.pool.query(countQuery, countParams);
-        const total = parseInt(countResult.rows[0].total);
+        const total = Number.parseInt(countResult.rows[0].total, 10);
 
         return {
             items: result.rows,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: Number.parseInt(page, 10),
+                limit: Number.parseInt(limit, 10),
                 total,
                 pages: Math.ceil(total / limit)
             }
@@ -282,32 +306,24 @@ class PCPartsModel {
 
     // Helper method to insert specifications
     async insertSpecs(client, partId, category, specs) {
-        const specTables = {
-            'CPU': 'cpu_specs',
-            'GPU': 'gpu_specs',
-            'Motherboard': 'motherboard_specs',
-            'RAM': 'ram_specs',
-            'Storage': 'storage_specs',
-            'PSU': 'psu_specs',
-            'Case': 'case_specs',
-            'Cooling': 'cooling_specs',
-            'Monitor': 'monitor_specs',
-            'Headphones': 'headphones_specs',
-            'Keyboard': 'keyboard_specs',
-            'Mouse': 'mouse_specs',
-            'Speakers': 'speakers_specs',
-            'Webcam': 'webcam_specs'
-        };
-
-        const tableName = specTables[category];
+        const tableName = SPEC_TABLES[category];
         if (!tableName) return;
 
-        const columns = ['part_id', ...Object.keys(specs)];
-        const values = [partId, ...Object.values(specs)];
+        const allowedColumns = await this.getAllowedSpecColumns(client, tableName);
+        const entries = Object.entries(specs || {});
+        const invalidColumns = entries.map(([key]) => key).filter((key) => !allowedColumns.has(key));
+        if (invalidColumns.length > 0) {
+            throw new Error(`Invalid specification fields: ${invalidColumns.join(', ')}`);
+        }
+
+        if (entries.length === 0) return;
+
+        const columns = ['part_id', ...entries.map(([key]) => key)];
+        const values = [partId, ...entries.map(([, value]) => value)];
         const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
 
         const query = `
-            INSERT INTO ${tableName} (${columns.join(', ')})
+            INSERT INTO ${quoteIdentifier(tableName)} (${columns.map(quoteIdentifier).join(', ')})
             VALUES (${placeholders})
         `;
 
@@ -316,39 +332,41 @@ class PCPartsModel {
 
     // Helper method to update specifications
     async updateSpecs(client, partId, category, specs) {
-        const specTables = {
-            'CPU': 'cpu_specs',
-            'GPU': 'gpu_specs',
-            'Motherboard': 'motherboard_specs',
-            'RAM': 'ram_specs',
-            'Storage': 'storage_specs',
-            'PSU': 'psu_specs',
-            'Case': 'case_specs',
-            'Cooling': 'cooling_specs',
-            'Monitor': 'monitor_specs',
-            'Headphones': 'headphones_specs',
-            'Keyboard': 'keyboard_specs',
-            'Mouse': 'mouse_specs',
-            'Speakers': 'speakers_specs',
-            'Webcam': 'webcam_specs'
-        };
-
-        const tableName = specTables[category];
+        const tableName = SPEC_TABLES[category];
         if (!tableName) return;
 
-        const updates = Object.keys(specs)
-            .map((key, i) => `${key} = $${i + 2}`)
+        const allowedColumns = await this.getAllowedSpecColumns(client, tableName);
+        const entries = Object.entries(specs || {});
+        const invalidColumns = entries.map(([key]) => key).filter((key) => !allowedColumns.has(key));
+        if (invalidColumns.length > 0) {
+            throw new Error(`Invalid specification fields: ${invalidColumns.join(', ')}`);
+        }
+
+        if (entries.length === 0) return;
+
+        const updates = entries
+            .map(([key], i) => `${quoteIdentifier(key)} = $${i + 2}`)
             .join(', ');
         
-        const values = [partId, ...Object.values(specs)];
+        const values = [partId, ...entries.map(([, value]) => value)];
 
         const query = `
-            UPDATE ${tableName} 
+            UPDATE ${quoteIdentifier(tableName)} 
             SET ${updates}, updated_at = now()
             WHERE part_id = $1
         `;
 
         await client.query(query, values);
+    }
+
+    async getAllowedSpecColumns(client, tableName) {
+        const result = await client.query(`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = $1
+              AND column_name NOT IN ('part_id', 'created_at', 'updated_at')
+        `, [tableName]);
+        return new Set(result.rows.map((row) => row.column_name));
     }
 
     // Get list of categories
@@ -367,31 +385,14 @@ class PCPartsModel {
         const result = await this.pool.query(query);
         return result.rows.map(row => ({
             category: row.category,
-            count: parseInt(row.count),
-            totalValue: parseFloat(row.total_value || 0)
+            count: Number.parseInt(row.count, 10),
+            totalValue: Number.parseFloat(row.total_value || 0)
         }));
     }
 
     // Get specification fields for a category
     async getSpecFields(category) {
-        const specTables = {
-            'CPU': 'cpu_specs',
-            'GPU': 'gpu_specs',
-            'Motherboard': 'motherboard_specs',
-            'RAM': 'ram_specs',
-            'Storage': 'storage_specs',
-            'PSU': 'psu_specs',
-            'Case': 'case_specs',
-            'Cooling': 'cooling_specs',
-            'Monitor': 'monitor_specs',
-            'Headphones': 'headphones_specs',
-            'Keyboard': 'keyboard_specs',
-            'Mouse': 'mouse_specs',
-            'Speakers': 'speakers_specs',
-            'Webcam': 'webcam_specs'
-        };
-
-        const tableName = specTables[category];
+        const tableName = SPEC_TABLES[category];
         if (!tableName) return [];
 
         const query = `

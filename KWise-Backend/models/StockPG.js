@@ -51,8 +51,8 @@ class Stock {
             return result.rows.map(row => ({
                 category: row.slug,
                 name: row.name,
-                count: parseInt(row.count),
-                totalValue: parseFloat(row.total_value || 0),
+                count: Number.parseInt(row.count, 10),
+                totalValue: Number.parseFloat(row.total_value || 0),
                 icon: categoryIcons[row.slug] || 'FiPackage'
             }));
         } catch (error) {
@@ -100,7 +100,7 @@ class Stock {
                 id: row.id,
                 itemName: row.name,
                 description: row.description,
-                price: parseFloat(row.price),
+                price: Number.parseFloat(row.price),
                 quantity: row.quantity,
                 isActive: row.is_active,
                 classification: row.classification,
@@ -149,7 +149,7 @@ class Stock {
                     const parts = result.rows.map(row => ({
                         id: `${table}_${row.id}`,
                         itemName: row.name,
-                        price: parseFloat(row.price),
+                        price: Number.parseFloat(row.price),
                         category: category,
                         source: table,
                         sourceId: row.id
@@ -185,11 +185,11 @@ class Stock {
       `);
 
             return {
-                totalItems: parseInt(stats.rows[0].total_items),
-                totalQuantity: parseInt(stats.rows[0].total_quantity || 0),
-                totalValue: parseFloat(stats.rows[0].total_value || 0),
-                lowStockItems: parseInt(stats.rows[0].low_stock_items),
-                outOfStockItems: parseInt(stats.rows[0].out_of_stock_items)
+                totalItems: Number.parseInt(stats.rows[0].total_items, 10),
+                totalQuantity: Number.parseInt(stats.rows[0].total_quantity || 0, 10),
+                totalValue: Number.parseFloat(stats.rows[0].total_value || 0),
+                lowStockItems: Number.parseInt(stats.rows[0].low_stock_items, 10),
+                outOfStockItems: Number.parseInt(stats.rows[0].out_of_stock_items, 10)
             };
         } catch (error) {
             logger.error('Error getting stock statistics:', error);
@@ -219,7 +219,7 @@ class Stock {
                 id: row.id,
                 itemName: row.name,
                 quantity: row.quantity,
-                price: parseFloat(row.price),
+                price: Number.parseFloat(row.price),
                 categoryName: row.category_name
             }));
         } catch (error) {
@@ -252,7 +252,7 @@ class Stock {
                 id: row.id,
                 itemName: row.name,
                 description: row.description,
-                price: parseFloat(row.price),
+                price: Number.parseFloat(row.price),
                 quantity: row.quantity,
                 categoryName: row.category_name,
                 categorySlug: row.category_slug,
