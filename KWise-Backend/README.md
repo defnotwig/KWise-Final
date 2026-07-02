@@ -113,3 +113,11 @@ To test if the server is running correctly:
 - Authentication is handled with JWT tokens
 - Password hashing is done with bcrypt
 - Environment variables use dotenv for configuration 
+
+## Changelog
+
+### v6.1.4 — DOM Violations, Missing Assets & API Error Hardening (2026-04-06)
+- **Fixed** `Unexpected token '<'` error caused by missing `public/kiosk-scale-handler.js` (CRA served HTML 404 as JS).
+- **Fixed** `validateDOMNesting` `<button>` inside `<button>` violations in `PCCustomized.js` and `ProductPage.js` by converting outer `<button>` to accessible `<div role="button">`.
+- **Fixed** double `/api/api/` prefix in `builderAPI.js` causing all builder API calls to 404.
+- **Improved** `CustomizeAI.jsx` error handling: missing inventory products now log warnings (not errors) and produce placeholder components instead of silently dropping them.
