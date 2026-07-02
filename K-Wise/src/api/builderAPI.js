@@ -4,8 +4,9 @@
  */
 
 import axios from 'axios';
+import { getApiBaseUrl } from '../utils/networkConfig';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = getApiBaseUrl();
 const BUILDER_BASE = `${API_BASE_URL}/builder`;
 
 /**

@@ -6,21 +6,76 @@
 
 import axios from 'axios';
 import { getApiBaseUrl, getFullImageUrl } from '../utils/networkConfig';
+import { installAxiosGetCache } from '../utils/httpClientCache';
+import { canonicalCategory, normalizeKioskProduct } from '../utils/kioskContracts';
+
+const baseConsole = globalThis.window !== undefined && globalThis.console
+    ? globalThis.console
+    : { log: () => {}, warn: () => {}, error: () => {} };
+
+const env = typeof process !== 'undefined' ? process.env || {} : {};
+const VERBOSE_KIOSK_LOGS = env.VITE_KWISE_VERBOSE_LOGS === 'true'
+    || env.REACT_APP_KWISE_VERBOSE_LOGS === 'true';
+const console = env.NODE_ENV === 'test' || !VERBOSE_KIOSK_LOGS
+    ? { ...baseConsole, log: () => {}, debug: () => {} }
+    : baseConsole;
 
 // Dynamic API configuration that adapts to network environment
 const API_BASE_URL = getApiBaseUrl();
+const KIOSK_DEFAULT_TIMEOUT_MS = 10000;
+const KIOSK_COMPATIBILITY_TIMEOUT_MS = 5000;
+
+const isCanceledError = (error) => (
+    error?.code === 'ERR_CANCELED'
+    || error?.name === 'CanceledError'
+    || axios.isCancel?.(error)
+);
+
+const getResponseItems = (data) => {
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.data?.items)) return data.data.items;
+    if (Array.isArray(data?.items)) return data.items;
+    if (Array.isArray(data)) return data;
+    return [];
+};
+
+const catalogBootstrapCache = new Map();
+
+const getCatalogBootstrapCacheKey = (params = {}) => JSON.stringify({
+    category: canonicalCategory(params.category || ''),
+    page: Number.parseInt(params.page || 1, 10) || 1,
+    limit: Number.parseInt(params.limit || 100, 10) || 100,
+    sort: params.sort || params.sortBy || 'name',
+    order: params.order || params.sortOrder || 'asc',
+    includeSpecRanges: String(params.includeSpecRanges || false)
+});
+
+const normalizeApiProduct = (product = {}, options = {}) => normalizeKioskProduct(product, {
+    category: options.category || product.category,
+    fallbackImage: options.fallbackImage || null
+});
 
 // Create axios instance for kiosk API
 const kioskAxios = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000, // ✅ FIX: Increased to 30s for order creation (was 15s, caused timeouts)
+    timeout: KIOSK_DEFAULT_TIMEOUT_MS,
     headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
+        'Content-Type': 'application/json'
     }
 });
 
 console.log('🔧 KioskAPI initialized with base URL:', API_BASE_URL);
+
+installAxiosGetCache(kioskAxios, {
+    ttlMs: env.VITE_KWISE_CLIENT_CACHE_MS || 15000,
+    maxEntries: 300,
+    cacheablePath: (pathname) => (
+        pathname.startsWith('/api/kiosk/')
+        || pathname.startsWith('/kiosk/')
+        || pathname.startsWith('/api/stock')
+        || pathname.startsWith('/stock')
+    )
+});
 
 /**
  * Enhanced kioskAPI with comprehensive kiosk functionality
@@ -111,8 +166,8 @@ const kioskAPI = {
                 }
             });
 
-            console.log('📡 Response status:', response.status, response.statusText);
-            console.log('� Raw response data:', response.data);
+            console.log('Response status:', response.status, response.statusText);
+            console.log('Raw response data:', response.data);
 
             const data = response.data;
 
@@ -120,7 +175,6 @@ const kioskAPI = {
                 throw new Error(data.message || 'Failed to fetch products');
             }
 
-            // 🔥 FIX ISSUE #1: Handle both flat array and nested object response formats
             // Backend can return either:
             // Format 1: { success: true, data: [...] } (flat array)
             // Format 2: { success: true, data: { items: [...], pagination: {...} } } (nested)
@@ -141,8 +195,9 @@ const kioskAPI = {
             // Process image URLs to full URLs and map imageUrl to image
             const processedProducts = products.map(product => ({
                 ...product,
-                image: getFullImageUrl(product.imageUrl || product.image),
-                imageUrl: product.imageUrl || product.image, // Keep original field too
+                image: getFullImageUrl(product.imageUrl || product.image_url || product.image),
+                imageUrl: product.imageUrl || product.image_url || product.image, // Keep original field too
+                image_url: product.image_url || product.imageUrl || product.image,
                 // 🔥 CRITICAL: Ensure both specifications AND dimensions are available for compatibility validation
                 specifications: product.specifications || {},
                 dimensions: product.dimensions || {},
@@ -187,6 +242,64 @@ const kioskAPI = {
     },
 
     /**
+     * Get products, brands, price range, and spec metadata for a category in
+     * one cached request. This is the kiosk hot path for category screens.
+     */
+    async getCatalogBootstrap(categoryOrParams = {}, options = {}) {
+        const params = typeof categoryOrParams === 'string'
+            ? { category: categoryOrParams }
+            : { ...categoryOrParams };
+        const category = canonicalCategory(params.category || '');
+        const requestParams = {
+            category,
+            page: params.page || 1,
+            limit: params.limit || 100,
+            sort: params.sort || params.sortBy || 'name',
+            order: params.order || params.sortOrder || 'asc',
+            includeSpecRanges: params.includeSpecRanges === true || params.includeSpecRanges === 'true'
+        };
+        const cacheKey = getCatalogBootstrapCacheKey(requestParams);
+
+        if (!options.bypassCache && catalogBootstrapCache.has(cacheKey)) {
+            return catalogBootstrapCache.get(cacheKey);
+        }
+
+        const response = await kioskAxios.get('/kiosk/catalog/bootstrap', {
+            params: requestParams,
+            signal: options.signal
+        });
+        const data = response.data;
+
+        if (!data.success) {
+            throw new Error(data.message || 'Failed to fetch catalog bootstrap');
+        }
+
+        const payload = data.data || {};
+        const products = (payload.products || payload.items || []).map(product => normalizeApiProduct(product, { category }));
+        const normalizedPayload = {
+            ...payload,
+            category,
+            products,
+            brands: Array.isArray(payload.brands) ? payload.brands : [],
+            pagination: payload.pagination || {
+                currentPage: requestParams.page,
+                totalPages: Math.max(Math.ceil(products.length / requestParams.limit), 1),
+                totalItems: products.length,
+                itemsPerPage: requestParams.limit,
+                hasNext: false,
+                hasPrev: requestParams.page > 1
+            },
+            priceRange: payload.priceRange || { min: 0, max: 0 },
+            specFields: payload.specFields || [],
+            specRanges: payload.specRanges || {},
+            cache: payload.cache || null
+        };
+
+        catalogBootstrapCache.set(cacheKey, normalizedPayload);
+        return normalizedPayload;
+    },
+
+    /**
      * Get featured products for homepage display
      */
     async getFeaturedProducts(limit = 8) {
@@ -207,16 +320,19 @@ const kioskAPI = {
                 throw new Error(data.message || 'Failed to fetch featured products');
             }
 
+            const products = getResponseItems(data);
+
             // Process image URLs to full URLs
-            const processedProducts = data.data.map(product => ({
-                ...product,
-                image: getFullImageUrl(product.image)
-            }));
+            const processedProducts = products.map(product => normalizeApiProduct(product));
 
             console.log('✅ Featured products loaded successfully:', processedProducts.length, 'products');
             return processedProducts;
 
         } catch (error) {
+            if (isCanceledError(error)) {
+                return [];
+            }
+
             console.error('❌ Error fetching featured products:', error);
             console.error('❌ Error type:', error.name);
             console.error('❌ Error message:', error.message);
@@ -233,15 +349,54 @@ const kioskAPI = {
     },
 
     /**
+     * Get aggregated homepage sections in one read.
+     */
+    async getHomepageProducts(limit = 8, options = {}) {
+        try {
+            const response = await kioskAxios.get('/kiosk/homepage', {
+                params: { limit },
+                signal: options.signal
+            });
+
+            const data = response.data || {};
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to fetch homepage products');
+            }
+
+            const payload = data.data || {};
+            const normalizeList = (items = []) => (
+                Array.isArray(items)
+                    ? items.map(product => normalizeApiProduct(product))
+                    : []
+            );
+
+            return {
+                onSale: normalizeList(payload.onSale),
+                hotPicks: normalizeList(payload.hotPicks),
+                valueForMoney: normalizeList(payload.valueForMoney),
+                cache: data.cache || null
+            };
+        } catch (error) {
+            if (isCanceledError(error)) {
+                return { onSale: [], hotPicks: [], valueForMoney: [], cache: null };
+            }
+
+            console.error('Error fetching homepage products:', error);
+            return { onSale: [], hotPicks: [], valueForMoney: [], cache: null };
+        }
+    },
+
+    /**
      * Get products currently on sale
      */
-    async getOnSaleProducts(limit = 8) {
+    async getOnSaleProducts(limit = 8, options = {}) {
         try {
             console.log(`🔥 Fetching ${limit} on-sale products...`);
             console.log('🔗 Using API URL:', '/kiosk/on-sale');
 
             const response = await kioskAxios.get('/kiosk/on-sale', {
-                params: { limit }
+                params: { limit },
+                signal: options.signal
             });
 
             console.log('📡 Response status:', response.status, response.statusText);
@@ -253,16 +408,19 @@ const kioskAPI = {
                 throw new Error(data.message || 'Failed to fetch on-sale products');
             }
 
+            const products = getResponseItems(data);
+
             // Process image URLs to full URLs
-            const processedProducts = data.data.map(product => ({
-                ...product,
-                image: getFullImageUrl(product.image)
-            }));
+            const processedProducts = products.map(product => normalizeApiProduct(product));
 
             console.log('✅ On-sale products loaded successfully:', processedProducts.length, 'products');
             return processedProducts;
 
         } catch (error) {
+            if (isCanceledError(error)) {
+                return [];
+            }
+
             console.error('❌ Error fetching on-sale products:', error);
             console.error('❌ Error type:', error.name);
             console.error('❌ Error message:', error.message);
@@ -298,16 +456,7 @@ const kioskAPI = {
 
             if (category) params.category = category;
 
-            // Use stock API search since it's more reliable
-            const stockAxios = axios.create({
-                baseURL: API_BASE_URL.replace('/kiosk', ''),
-                timeout: 15000,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const response = await stockAxios.get('/stock/search', { params });
+            const response = await kioskAxios.get('/stock/search', { params });
 
             console.log('📡 Response status:', response.status, response.statusText);
             console.log('📊 Raw response data:', response.data);
@@ -319,10 +468,7 @@ const kioskAPI = {
             }
 
             // Process image URLs to full URLs
-            const processedProducts = data.data.map(product => ({
-                ...product,
-                image: getFullImageUrl(product.image)
-            }));
+            const processedProducts = data.data.map(product => normalizeApiProduct(product, { category }));
 
             console.log(`✅ Search completed for "${query}":`, processedProducts.length, 'products found');
 
@@ -360,16 +506,15 @@ const kioskAPI = {
         try {
             console.log(`📋 Fetching product details for ID: ${id}`);
 
-            // Use the stock API for individual product details since kiosk doesn't have this endpoint
-            const stockAxios = axios.create({
-                baseURL: API_BASE_URL.replace('/kiosk', ''),
-                timeout: 15000,
-                headers: {
-                    'Content-Type': 'application/json'
+            let response;
+            try {
+                response = await kioskAxios.get(`/kiosk/products/${id}`);
+            } catch (primaryError) {
+                if (primaryError.response?.status !== 404 && primaryError.response?.status !== 400) {
+                    throw primaryError;
                 }
-            });
-            
-            const response = await stockAxios.get(`/stock/${id}`);
+                response = await kioskAxios.get(`/stock/${id}`);
+            }
 
             console.log('📡 Response status:', response.status, response.statusText);
             console.log('📊 Raw response data:', response.data);
@@ -381,10 +526,7 @@ const kioskAPI = {
             }
 
             // Process image URL to full URL
-            const processedProduct = {
-                ...data.data,
-                image: getFullImageUrl(data.data.image)
-            };
+            const processedProduct = normalizeApiProduct(data.data);
 
             console.log('✅ Product details loaded successfully:', processedProduct.name);
             return processedProduct;
@@ -403,16 +545,65 @@ const kioskAPI = {
     },
 
     /**
+     * Get deterministic compatible product groups for the product detail page.
+     */
+    async getProductCompatibleProducts(id, options = {}) {
+        try {
+            const response = await kioskAxios.get(`/kiosk/products/${id}/compatible`, {
+                params: { limitPerCategory: options.limitPerCategory || 4 },
+                signal: options.signal
+            });
+            const payload = response.data?.data || {};
+            const normalizeList = (items = []) => (
+                Array.isArray(items) ? items.map(product => normalizeApiProduct(product)) : []
+            );
+            const groups = {};
+            Object.entries(payload.groups || {}).forEach(([category, items]) => {
+                groups[category] = normalizeList(items);
+            });
+
+            return {
+                ...payload,
+                product: payload.product ? normalizeApiProduct(payload.product) : null,
+                products: normalizeList(payload.products),
+                groups
+            };
+        } catch (error) {
+            if (!isCanceledError(error)) {
+                console.error('Error fetching compatible products:', error);
+            }
+            return { product: null, products: [], groups: {}, summary: null };
+        }
+    },
+
+    /**
      * Get available brands for a category (for filtering)
      */
     async getCategoryBrands(category) {
         try {
-            const response = await this.getCategoryProducts(category, { limit: 1000 });
-            const brands = [...new Set(response.data.map(product => product.brand))];
-            return brands.sort();
+            const bootstrap = await this.getCatalogBootstrap({ category, page: 1, limit: 1 });
+            const brands = (bootstrap.brands || [])
+                .map((brand) => (typeof brand === 'string' ? brand : brand.name))
+                .filter(Boolean);
+            return [...new Set(brands)].sort((a, b) => a.localeCompare(b));
         } catch (error) {
             console.error('Error fetching category brands:', error);
             return [];
+        }
+    },
+
+    async getOrderReceipt(orderId) {
+        try {
+            const response = await kioskAxios.get(`/kiosk/orders/${orderId}/receipt`);
+            if (!response.data?.success) {
+                throw new Error(response.data?.message || 'Failed to fetch order receipt');
+            }
+            return response.data.data;
+        } catch (error) {
+            if (error.response?.status !== 404) {
+                console.error('Error fetching order receipt:', error);
+            }
+            return null;
         }
     },
 
@@ -599,10 +790,10 @@ const kioskAPI = {
      * Format price to currency string with peso symbol
      */
     formatPrice(price) {
-        if (price == null || isNaN(price)) return '₱0.00';
+        if (price == null || Number.isNaN(price)) return '₱0.00';
         
-        const numericPrice = parseFloat(price);
-        if (isNaN(numericPrice)) return '₱0.00';
+        const numericPrice = Number.parseFloat(price);
+        if (Number.isNaN(numericPrice)) return '₱0.00';
         
         return `₱${numericPrice.toLocaleString('en-PH', {
             minimumFractionDigits: 2,
@@ -613,12 +804,15 @@ const kioskAPI = {
     /**
      * Get build components organized for PC customizer
      */
-    async getBuildComponents() {
+    async getBuildComponents(options = {}) {
         try {
             console.log('🔧 Fetching build components for PC customizer...');
             console.log('🔗 Using API URL:', '/kiosk/build-components');
             
-            const response = await kioskAxios.get('/kiosk/build-components');
+            const response = await kioskAxios.get('/kiosk/build-components', {
+                params: { limit: options.limit || 500 },
+                signal: options.signal
+            });
             
             console.log('📡 Response status:', response.status, response.statusText);
             console.log('📦 Raw response data:', response.data);
@@ -634,18 +828,9 @@ const kioskAPI = {
             
             Object.entries(data.data).forEach(([category, categoryData]) => {
                 processedComponents[category] = {
-                    products: categoryData.products?.map(product => ({
-                        ...product,
-                        // Map both image and imageUrl fields
-                        image: getFullImageUrl(product.imageUrl || product.image),
-                        imageUrl: getFullImageUrl(product.imageUrl || product.image),
-                        // Ensure specifications are available
-                        specifications: product.specifications || {},
-                        description: product.description || '',
-                        // Add category for fallback image handling
-                        category: product.category || category
-                    })) || [],
-                    brands: categoryData.brands || []
+                    products: categoryData.products?.map(product => normalizeApiProduct(product, { category })) || [],
+                    brands: categoryData.brands || [],
+                    count: categoryData.count || categoryData.products?.length || 0
                 };
             });
 
@@ -669,20 +854,20 @@ const kioskAPI = {
             
             // Return fallback components to prevent app crash
             return {
-                CPU: { products: [], brands: [] },
-                GPU: { products: [], brands: [] },
-                Motherboard: { products: [], brands: [] },
-                RAM: { products: [], brands: [] },
-                Storage: { products: [], brands: [] },
-                PSU: { products: [], brands: [] },
-                Case: { products: [], brands: [] },
-                Cooling: { products: [], brands: [] }
+                cpu: { products: [], brands: [], count: 0 },
+                gpu: { products: [], brands: [], count: 0 },
+                motherboard: { products: [], brands: [], count: 0 },
+                ram: { products: [], brands: [], count: 0 },
+                storage: { products: [], brands: [], count: 0 },
+                psu: { products: [], brands: [], count: 0 },
+                case: { products: [], brands: [], count: 0 },
+                cooling: { products: [], brands: [], count: 0 }
             };
         }
     },
 
     /**
-     * Check component compatibility using AI
+     * Check component compatibility using deterministic local rules
      */
     async checkCompatibility(selectedComponents, newComponent) {
         try {
@@ -697,7 +882,7 @@ const kioskAPI = {
                     componentsArray = selectedComponents;
                 } else {
                     // Convert object {CPU: {...}, Motherboard: {...}} to array
-                    componentsArray = Object.values(selectedComponents).filter(comp => comp && comp.id);
+                    componentsArray = Object.values(selectedComponents).filter(comp => comp?.id);
                 }
             }
             
@@ -751,7 +936,7 @@ const kioskAPI = {
             };
             
             // Normalize all components
-            const normalizedComponents = componentsArray.map(normalizeComponent).filter(c => c && c.name);
+            const normalizedComponents = componentsArray.map(normalizeComponent).filter(c => c?.name);
             const normalizedNewComponent = normalizeComponent(newComponent);
             
             console.log('🔄 Normalized components:', normalizedComponents);
@@ -761,6 +946,7 @@ const kioskAPI = {
             const payload = {
                 currentProduct: normalizedNewComponent,
                 selectedParts: normalizedComponents,
+                mode: 'pair_check',
                 excludeCategories: normalizedComponents.map(comp => comp.category).filter(Boolean)
             };
             
@@ -779,13 +965,16 @@ const kioskAPI = {
             console.error('❌ Error checking compatibility:', error);
             console.error('❌ Error response:', error.response?.data);
             
-            // Return basic compatibility info if AI fails
+            // Return minimal compatibility info if the local check fails
             return {
-                compatible: true,
-                confidence: 0.5,
-                issues: [],
+                compatible: false,
+                status: 'manual_check',
+                score: 0,
+                confidence: 0,
+                issues: [{ severity: 'critical', message: error.message || 'Local compatibility check failed' }],
                 warnings: [],
-                suggestions: []
+                missingSpecs: [],
+                suggestions: ['Please retry the local compatibility check before checkout.']
             };
         }
     },
@@ -800,9 +989,10 @@ const kioskAPI = {
             console.log('📦 Components to analyze:', Object.keys(components));
             
             const response = await kioskAxios.post('/compatibility/advanced/full-build', {
-                components
+                components,
+                comprehensive: true
             }, {
-                timeout: 90000 // 90s for AI analysis
+                timeout: KIOSK_COMPATIBILITY_TIMEOUT_MS
             });
             
             const data = response.data;
@@ -811,10 +1001,7 @@ const kioskAPI = {
                 throw new Error(data.message || 'Full build compatibility check failed');
             }
             
-            console.log('✅ Full build compatibility check completed');
-            console.log('📊 Compatibility Score:', data.data?.compatibility_score || 'N/A');
-            console.log('📊 Overall Status:', data.data?.overall_status || 'unknown');
-            console.log('🔍 Full response structure:', JSON.stringify(data, null, 2));
+            console.log(`✅ Full build compatibility check completed: score=${data.data?.compatibility_score || 'N/A'}, status=${data.data?.overall_status || 'unknown'}`);
             
             return data;
             
@@ -831,10 +1018,90 @@ const kioskAPI = {
                 success: false,
                 message: error.message || 'Compatibility check failed',
                 data: {
-                    compatibility_score: 50,
+                    compatibility_score: 0,
+                    status: 'manual_check',
                     layers: {},
-                    issues: []
+                    issues: [{ severity: 'critical', message: error.message || 'Full build compatibility check failed' }],
+                    warnings: [],
+                    missingSpecs: []
                 }
+            };
+        }
+    },
+
+    /**
+     * Batch-check candidate products against the current build using deterministic local rules.
+     */
+    async checkCompatibilityBatch({ contextParts = [], candidates = [], mode = 'candidate_filter', targetCategory, referenceProduct } = {}) {
+        try {
+            const response = await kioskAxios.post('/compatibility/batch', {
+                contextParts,
+                candidates,
+                mode,
+                targetCategory,
+                referenceProduct
+            }, {
+                timeout: KIOSK_COMPATIBILITY_TIMEOUT_MS
+            });
+
+            if (!response.data?.success) {
+                throw new Error(response.data?.message || 'Batch compatibility check failed');
+            }
+
+            return response.data;
+        } catch (error) {
+            console.error('Error checking compatibility batch:', error);
+            return {
+                success: false,
+                source: 'deterministic',
+                data: [],
+                results: [],
+                summary: { total: 0, compatible: 0, warnings: 0, failed: 0, manualCheck: 0 },
+                message: error.message || 'Batch compatibility check failed'
+            };
+        }
+    },
+
+    /**
+     * Annotate candidates for kiosk category screens without hiding failed/manual-check rows.
+     */
+    async checkCompatibilityCandidates({ contextParts = [], candidates = [], mode = 'candidate_filter', targetCategory, referenceProduct } = {}) {
+        try {
+            const response = await kioskAxios.post('/kiosk/compatibility/candidates', {
+                contextParts,
+                candidates,
+                mode,
+                targetCategory,
+                referenceProduct,
+                strict: false,
+                includeManual: true,
+                includeFailed: true
+            }, {
+                timeout: KIOSK_COMPATIBILITY_TIMEOUT_MS
+            });
+
+            if (!response.data?.success) {
+                throw new Error(response.data?.message || 'Candidate compatibility check failed');
+            }
+
+            const normalizeList = (items = []) => (
+                Array.isArray(items) ? items.map(product => normalizeApiProduct(product)) : []
+            );
+
+            return {
+                ...response.data,
+                data: normalizeList(response.data.data),
+                results: normalizeList(response.data.results)
+            };
+        } catch (error) {
+            console.error('Error checking compatibility candidates:', error);
+            return {
+                success: false,
+                source: 'deterministic',
+                data: [],
+                results: [],
+                summary: { total: 0, compatible: 0, warnings: 0, failed: 0, manualCheck: 0 },
+                message: error.message || 'Candidate compatibility check failed'
             };
         }
     },

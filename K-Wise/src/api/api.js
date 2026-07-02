@@ -7,11 +7,10 @@
 import kioskAPI from './kioskAPI';
 import builderAPI from './builderAPI';
 import adminAPI, { ordersAPI, productsAPI, usersAPI, analyticsAPI } from './adminAPI';
-import { getApiBaseUrl, getServerBaseUrl } from '../utils/networkConfig';
+import { getApiBaseUrl, getFullImageUrl as resolveFullImageUrl } from '../utils/networkConfig';
 
 // API base configuration - NETWORK AWARE (auto-detects LAN IP)
 const API_BASE_URL = getApiBaseUrl();
-const SERVER_BASE_URL = getServerBaseUrl();
 
 console.log('🔧 API Service initialized with base URL:', API_BASE_URL);
 
@@ -38,7 +37,7 @@ const api = {
     // General configuration
     config: {
         baseUrl: API_BASE_URL,
-        timeout: 90000 // 🔥 INCREASED: 90s for AI compatibility analysis (was 15s, caused timeouts)
+        timeout: 10000
     },
 
     // Common utilities
@@ -47,9 +46,7 @@ const api = {
          * Convert relative image URL to full URL
          */
         getFullImageUrl: (imageUrl) => {
-            if (!imageUrl) return null;
-            if (imageUrl.startsWith('http')) return imageUrl;
-            return imageUrl.startsWith('/') ? `${SERVER_BASE_URL}${imageUrl}` : `${SERVER_BASE_URL}/${imageUrl}`;
+            return resolveFullImageUrl(imageUrl);
         },
 
         /**

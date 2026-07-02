@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './IPAccessControl.css';
 
 const IPAccessControl = () => {
@@ -44,19 +45,13 @@ const IPAccessControl = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE = getServerBaseUrl();
 
   /**
    * Fetch IP statistics
    */
   const fetchStats = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+    try {      const response = await fetch(`${API_BASE}/api/ip/stats`);
       
       if (!response.ok) throw new Error('Failed to fetch stats');
       
@@ -73,10 +68,7 @@ const IPAccessControl = () => {
   const fetchIPList = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem('token');
-      // Fix: Don't pass 'logs' as status filter - it's not a valid enum value
+      setError(null);      // Fix: Don't pass 'logs' as status filter - it's not a valid enum value
       const statusFilter = (activeTab === 'all' || activeTab === 'logs') ? '' : activeTab;
       
       const params = new URLSearchParams({
@@ -88,11 +80,7 @@ const IPAccessControl = () => {
         sortOrder
       });
       
-      const response = await fetch(`${API_BASE}/api/ip/all?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await fetch(`${API_BASE}/api/ip/all?${params}`);
       
       if (!response.ok) throw new Error('Failed to fetch IP list');
       
@@ -112,13 +100,7 @@ const IPAccessControl = () => {
    * Fetch IP access logs
    */
   const fetchLogs = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/logs?limit=50`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+    try {      const response = await fetch(`${API_BASE}/api/ip/logs?limit=50`);
       
       if (!response.ok) throw new Error('Failed to fetch logs');
       
@@ -134,13 +116,9 @@ const IPAccessControl = () => {
    */
   const handleAllowIP = async (ipId) => {
     try {
-      setLoadingAction(`allow-${ipId}`);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/${ipId}/allow`, {
+      setLoadingAction(`allow-${ipId}`);      const response = await fetch(`${API_BASE}/api/ip/${ipId}/allow`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        headers: {          'Content-Type': 'application/json'
         }
       });
       
@@ -172,13 +150,9 @@ const IPAccessControl = () => {
     }
     
     try {
-      setLoadingAction(`block-${selectedIP.id}`);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/${selectedIP.id}/block`, {
+      setLoadingAction(`block-${selectedIP.id}`);      const response = await fetch(`${API_BASE}/api/ip/${selectedIP.id}/block`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        headers: {          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ reason: blockReason })
       });
@@ -209,16 +183,12 @@ const IPAccessControl = () => {
    * Delete an IP record
    */
   const handleDeleteIP = async (ipId) => {
-    if (!window.confirm('Are you sure you want to delete this IP record? This action cannot be undone.')) return;
+    if (!globalThis.confirm('Are you sure you want to delete this IP record? This action cannot be undone.')) return;
     
     try {
-      setLoadingAction(`delete-${ipId}`);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/${ipId}`, {
+      setLoadingAction(`delete-${ipId}`);      const response = await fetch(`${API_BASE}/api/ip/${ipId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: "include"
       });
       
       if (!response.ok) {
@@ -248,13 +218,9 @@ const IPAccessControl = () => {
       return;
     }
     
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/${ipId}/device-name`, {
+    try {      const response = await fetch(`${API_BASE}/api/ip/${ipId}/device-name`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        headers: {          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ deviceName: deviceNameInput })
       });
@@ -275,13 +241,7 @@ const IPAccessControl = () => {
    * View IP details
    */
   const handleViewDetails = async (ip) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/ip/${ip.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+    try {      const response = await fetch(`${API_BASE}/api/ip/${ip.id}`);
       
       if (!response.ok) throw new Error('Failed to fetch IP details');
       
@@ -343,10 +303,10 @@ const IPAccessControl = () => {
     };
 
     // Listen for custom events dispatched by socketService
-    window.addEventListener('ipAccessUpdate', handleIPAccessUpdate);
+    globalThis.addEventListener('ipAccessUpdate', handleIPAccessUpdate);
 
-    // Also listen directly to window.io if available (fallback)
-    if (window.io && window.io.connected) {
+    // Also listen directly to globalThis.io if available (fallback)
+    if (globalThis.io?.connected) {
       console.log('✅ Socket.IO available, attaching direct listeners');
       
       const handleNewIP = (data) => {
@@ -366,20 +326,20 @@ const IPAccessControl = () => {
         fetchStats();
       };
       
-      window.io.on('newIPDetected', handleNewIP);
-      window.io.on('blockedIPAttempt', handleBlockedAttempt);
-      window.io.on('ipStatusChanged', handleStatusChange);
+      globalThis.io.on('newIPDetected', handleNewIP);
+      globalThis.io.on('blockedIPAttempt', handleBlockedAttempt);
+      globalThis.io.on('ipStatusChanged', handleStatusChange);
       
       return () => {
-        window.removeEventListener('ipAccessUpdate', handleIPAccessUpdate);
-        window.io.off('newIPDetected', handleNewIP);
-        window.io.off('blockedIPAttempt', handleBlockedAttempt);
-        window.io.off('ipStatusChanged', handleStatusChange);
+        globalThis.removeEventListener('ipAccessUpdate', handleIPAccessUpdate);
+        globalThis.io.off('newIPDetected', handleNewIP);
+        globalThis.io.off('blockedIPAttempt', handleBlockedAttempt);
+        globalThis.io.off('ipStatusChanged', handleStatusChange);
       };
     }
 
     return () => {
-      window.removeEventListener('ipAccessUpdate', handleIPAccessUpdate);
+      globalThis.removeEventListener('ipAccessUpdate', handleIPAccessUpdate);
     };
   }, [fetchIPList, fetchStats, fetchLogs]);
 
@@ -435,7 +395,7 @@ const IPAccessControl = () => {
         <div className="ip-header-right">
           {/* Socket.IO connection status */}
           <div className="socket-status">
-            {window.io?.connected ? (
+            {globalThis.io?.connected ? (
               <span className="status-connected" title="Real-time updates active">
                 🟢 Real-time
               </span>
@@ -452,7 +412,7 @@ const IPAccessControl = () => {
                 type="checkbox" 
                 checked={autoRefresh}
                 onChange={(e) => setAutoRefresh(e.target.checked)}
-              />
+              />{' '}
               Auto-refresh
             </label>
             <span className="last-update">Last updated: {timeAgo(lastUpdate)}</span>
@@ -775,7 +735,7 @@ const IPAccessControl = () => {
                     </tr>
                   ) : (
                     ipLogs.map(log => (
-                      <tr key={log.id} className={!log.success ? 'log-failed' : ''}>
+                      <tr key={log.id} className={log.success ? '' : 'log-failed'}>
                         <td>{formatTimestamp(log.created_at)}</td>
                         <td><code>{log.ip_address}</code></td>
                         <td>
@@ -807,8 +767,8 @@ const IPAccessControl = () => {
 
       {/* Block Modal */}
       {showBlockModal && (
-        <div className="modal-overlay" onClick={() => setShowBlockModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <button type="button" className="modal-overlay" onClick={() => setShowBlockModal(false)}>
+          <dialog open className="modal-content">
             <div className="modal-header">
               <h2>🚫 Block IP Address</h2>
               <button 
@@ -825,9 +785,9 @@ const IPAccessControl = () => {
               </p>
               
               <div className="form-group">
-                <label>
+                <span>
                   Reason for blocking: <span style={{color: '#e53e3e'}}>*</span>
-                </label>
+                </span>
                 <textarea 
                   value={blockReason}
                   onChange={(e) => setBlockReason(e.target.value)}
@@ -864,14 +824,14 @@ const IPAccessControl = () => {
                 {loadingAction ? '⏳ Blocking...' : '🚫 Block IP'}
               </button>
             </div>
-          </div>
-        </div>
+          </dialog>
+        </button>
       )}
 
       {/* Details Modal */}
       {showDetailsModal && selectedIP && (
-        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-          <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
+        <button type="button" className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <dialog open className="modal-content modal-large">
             <div className="modal-header">
               <h2>📋 IP Details</h2>
               <button 
@@ -885,64 +845,64 @@ const IPAccessControl = () => {
             <div className="modal-body">
               <div className="details-grid">
                 <div className="detail-item">
-                  <label>IP Address:</label>
+                  <span>IP Address:</span>
                   <code>{selectedIP.ip_address}</code>
                 </div>
                 
                 <div className="detail-item">
-                  <label>Status:</label>
+                  <span>Status:</span>
                   <span className={getStatusClass(selectedIP.status)}>
                     {selectedIP.status.toUpperCase()}
                   </span>
                 </div>
                 
                 <div className="detail-item">
-                  <label>Device Name:</label>
+                  <span>Device Name:</span>
                   <span>{selectedIP.device_name || 'Unknown'}</span>
                 </div>
                 
                 <div className="detail-item">
-                  <label>User Agent:</label>
+                  <span>User Agent:</span>
                   <span className="user-agent">{selectedIP.user_agent || 'N/A'}</span>
                 </div>
                 
                 <div className="detail-item">
-                  <label>First Seen:</label>
+                  <span>First Seen:</span>
                   <span>{formatTimestamp(selectedIP.first_seen)}</span>
                 </div>
                 
                 <div className="detail-item">
-                  <label>Last Seen:</label>
+                  <span>Last Seen:</span>
                   <span>{formatTimestamp(selectedIP.last_seen)}</span>
                 </div>
                 
                 <div className="detail-item">
-                  <label>Total Requests:</label>
+                  <span>Total Requests:</span>
                   <span>{selectedIP.total_requests}</span>
                 </div>
                 
                 <div className="detail-item">
-                  <label>Failed Logins:</label>
+                  <span>Failed Logins:</span>
                   <span>{selectedIP.failed_login_attempts}</span>
                 </div>
                 
                 {selectedIP.blocked_reason && (
                   <div className="detail-item full-width">
-                    <label>Block Reason:</label>
+                    <span>Block Reason:</span>
                     <span className="block-reason">{selectedIP.blocked_reason}</span>
                   </div>
                 )}
                 
                 {selectedIP.blocked_by_name && (
                   <div className="detail-item">
-                    <label>Blocked By:</label>
+                    <span>Blocked By:</span>
                     <span>{selectedIP.blocked_by_name}</span>
                   </div>
                 )}
                 
                 {selectedIP.blocked_at && (
                   <div className="detail-item">
-                    <label>Blocked At:</label>
+                    <span>Blocked At:</span>
                     <span>{formatTimestamp(selectedIP.blocked_at)}</span>
                   </div>
                 )}
@@ -985,8 +945,8 @@ const IPAccessControl = () => {
                 Close
               </button>
             </div>
-          </div>
-        </div>
+          </dialog>
+        </button>
       )}
     </div>
   );

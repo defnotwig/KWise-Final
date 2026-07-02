@@ -1,9 +1,11 @@
 // API Configuration for K-Wise Frontend
 // Handles backend API URL resolution with robust error handling
+import { getApiBaseUrl } from '../utils/networkConfig';
+import { withCsrfHeader } from '../utils/authSecurity';
 
 const API_CONFIG = {
-    // Base URL for API calls - always use direct backend URL
-    BASE_URL: 'http://localhost:5000',
+    // Base URL for API calls - dynamically resolved
+    BASE_URL: getApiBaseUrl(),
     
     // API endpoints
     ENDPOINTS: {
@@ -39,26 +41,21 @@ export const apiRequest = async (endpoint, options = {}) => {
     const requestOptions = {
         method: 'GET',
         timeout: API_CONFIG.TIMEOUT,
+        credentials: 'include',
         ...options
     };
 
     // Only set default headers if not dealing with FormData
-    if (!(requestOptions.body instanceof FormData)) {
-        requestOptions.headers = {
-            ...API_CONFIG.DEFAULT_HEADERS,
-            ...options.headers
-        };
-    } else {
+    if (requestOptions.body instanceof FormData) {
         // For FormData, only add non-Content-Type headers
         requestOptions.headers = {
-            ...options.headers
+            ...withCsrfHeader(options.headers || {}, requestOptions.method)
         };
-    }
-
-    // Add authentication token if available
-    const token = localStorage.getItem('token');
-    if (token) {
-        requestOptions.headers.Authorization = `Bearer ${token}`;
+    } else {
+        requestOptions.headers = {
+            ...API_CONFIG.DEFAULT_HEADERS,
+            ...withCsrfHeader(options.headers || {}, requestOptions.method)
+        };
     }
 
     try {
@@ -66,6 +63,7 @@ export const apiRequest = async (endpoint, options = {}) => {
         
         const response = await fetch(url, {
             ...requestOptions,
+            credentials: 'include',
             signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
         });
         
@@ -131,7 +129,8 @@ export const stockAPI = {
             }
         });
         
-        const endpoint = `${API_CONFIG.ENDPOINTS.STOCK}${searchParams.toString() ? `?${searchParams}` : ''}`;
+        const queryString = searchParams.toString();
+        const endpoint = queryString ? `${API_CONFIG.ENDPOINTS.STOCK}?${searchParams}` : API_CONFIG.ENDPOINTS.STOCK;
         return apiRequest(endpoint);
     },
     

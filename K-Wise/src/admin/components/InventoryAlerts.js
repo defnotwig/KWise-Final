@@ -3,8 +3,9 @@
  * Displays low stock and out of stock alerts on admin dashboard
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './InventoryAlerts.css';
 
 const InventoryAlerts = () => {
@@ -12,12 +13,10 @@ const InventoryAlerts = () => {
     const [loading, setLoading] = useState(true);
     const [threshold, setThreshold] = useState(5);
 
-    const fetchAlerts = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(
-                `http://localhost:5000/api/admin/inventory/alerts?threshold=${threshold}`,
-                { headers: { Authorization: `Bearer ${token}` } }
+    const fetchAlerts = useCallback(async () => {
+        try {            const response = await axios.get(
+                `${getServerBaseUrl()}/api/admin/inventory/alerts?threshold=${threshold}`,
+                withCredentials: true
             );
             setAlerts(response.data.data);
         } catch (error) {
@@ -25,13 +24,13 @@ const InventoryAlerts = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [threshold]);
 
     useEffect(() => {
         fetchAlerts();
         const interval = setInterval(fetchAlerts, 60000); // Refresh every minute
         return () => clearInterval(interval);
-    }, [threshold]);
+    }, [fetchAlerts]);
 
     if (loading) return <div className="inventory-alerts-loading">Loading alerts...</div>;
     if (!alerts) return null;
@@ -44,7 +43,7 @@ const InventoryAlerts = () => {
                 <h3>📊 Inventory Alerts</h3>
                 <select 
                     value={threshold} 
-                    onChange={(e) => setThreshold(parseInt(e.target.value))}
+                    onChange={(e) => setThreshold(Number.parseInt(e.target.value, 10))}
                     className="threshold-select"
                 >
                     <option value="3">Threshold: 3</option>

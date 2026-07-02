@@ -1,7 +1,7 @@
 /**
- * K-Wise AI Service
- * Frontend integration for AI features
- * Provides React-ready methods for all AI endpoints with rate limiting
+ * K-Wise legacy AI service facade.
+ * Offline kiosk mode keeps this API shape but returns deterministic local results
+ * or disabled responses instead of calling AI/Ollama endpoints.
  */
 
 import axios from 'axios';
@@ -10,8 +10,56 @@ import { getApiBaseUrl } from '../utils/networkConfig';
 // Dynamic API configuration that adapts to network environment
 const BASE_URL = getApiBaseUrl();
 const AI_BASE_URL = `${BASE_URL}/ai`;
+const OFFLINE_AI_DISABLED = true;
 
-console.log('🤖 AI Service initialized with base URL:', AI_BASE_URL);
+console.log('Legacy AI facade initialized in offline deterministic mode:', AI_BASE_URL);
+
+const normalizePrice = (value) => {
+  const price = Number.parseFloat(String(value || 0).replaceAll(/[^\d.]/g, ''));
+  return Number.isFinite(price) ? price : 0;
+};
+
+const createDisabledResponse = (message, data = {}) => ({
+  success: false,
+  code: 'AI_REMOVED',
+  source: 'deterministic',
+  ai_available: false,
+  fallback: true,
+  message,
+  data
+});
+
+const buildLocalRecommendations = (parts = [], budget = 0, filters = {}) => {
+  const products = Array.isArray(parts) ? parts : [];
+  const limit = filters.maxRecommendations || filters.limit || 8;
+  const maxBudget = Number(budget) > 0 ? Number(budget) : Number.POSITIVE_INFINITY;
+
+  return products
+    .filter((product) => product && normalizePrice(product.price) <= maxBudget)
+    .map((product) => {
+      const price = normalizePrice(product.price);
+      const stock = Number.parseInt(product.stock ?? product.quantity ?? 0, 10) || 0;
+      const valueScore = Math.max(0, Math.min(100, 100 - Math.round((price / Math.max(maxBudget, 1)) * 25)));
+
+      return {
+        ...product,
+        source: 'deterministic',
+        type: filters.analysisType === 'future_upgrade_dual' ? 'stock_upgrade' : 'local_recommendation',
+        recommended: true,
+        compatibility_score: product.compatibility_score || product.compatibilityScore || 80,
+        value_score: product.value_score || valueScore,
+        availability: stock > 0 ? `In Stock (${stock})` : 'Verify stock',
+        recommendation_reason: 'Selected from local inventory using deterministic price, stock, and compatibility data.'
+      };
+    })
+    .sort((left, right) => {
+      const stockDiff = (Number.parseInt(right.stock ?? right.quantity ?? 0, 10) || 0) -
+        (Number.parseInt(left.stock ?? left.quantity ?? 0, 10) || 0);
+      if (stockDiff !== 0) return stockDiff;
+      return (right.value_score || 0) - (left.value_score || 0);
+    })
+    .slice(0, limit);
+};
 
 // Request throttling configuration - VERY conservative to prevent rate limiting
 const REQUEST_DELAY = 300; // 300ms delay between requests (increased from 100ms)
@@ -62,7 +110,7 @@ const requestQueue = new RequestQueue();
 // Create axios instance with default config
 const aiApi = axios.create({
   baseURL: AI_BASE_URL,
-  timeout: 90000, // ✅ FIX: Increased to 90 seconds for complex AI estimation
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -71,7 +119,7 @@ const aiApi = axios.create({
 // Create general API instance for kiosk endpoints
 const generalApi = axios.create({
   baseURL: BASE_URL,
-  timeout: 60000, // ✅ FIX: Increased to 60 seconds for compatibility analysis
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -79,10 +127,6 @@ const generalApi = axios.create({
 
 // Add auth token to requests
 aiApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   return config;
 });
 
@@ -117,6 +161,16 @@ class AIService {
    * @returns {Promise<Object>} Health status data
    */
   async getHealthStatus() {
+    if (OFFLINE_AI_DISABLED) {
+      return {
+        success: false,
+        code: 'AI_REMOVED',
+        source: 'deterministic',
+        data: { status: 'disabled' },
+        message: 'AI endpoints are disabled in offline kiosk mode'
+      };
+    }
+
     try {
       const response = await axios.get(`${AI_BASE_URL}/health`);
       return response.data;
@@ -137,6 +191,20 @@ class AIService {
    * @returns {Promise<Object>} Hot picks recommendations
    */
   async getKioskHotPicks(parts, budget, filters = {}) {
+    if (OFFLINE_AI_DISABLED) {
+      const recommendations = buildLocalRecommendations(parts, budget, filters);
+      return {
+        success: true,
+        source: 'deterministic',
+        data: {
+          recommendations,
+          source: 'deterministic',
+          aiEnabled: false
+        },
+        recommendations
+      };
+    }
+
     try {
       const response = await generalApi.post('/kiosk/ai-hot-picks', {
         products: parts,
@@ -158,6 +226,16 @@ class AIService {
    * @returns {Promise<Object>} Hot picks recommendations
    */
   async getHotPicks(parts, budget, filters = {}) {
+    if (OFFLINE_AI_DISABLED) {
+      const recommendations = buildLocalRecommendations(parts, budget, filters);
+      return {
+        success: true,
+        source: 'deterministic',
+        data: { recommendations },
+        recommendations
+      };
+    }
+
     try {
       const response = await aiApi.post('/hot-picks', {
         parts,
@@ -179,6 +257,18 @@ class AIService {
    * @returns {Promise<Object>} Value for money analysis
    */
   async getValueForMoney(parts, preferences = {}, maxRecommendations = 8) {
+    if (OFFLINE_AI_DISABLED) {
+      const recommendations = buildLocalRecommendations(parts, preferences.budget || 0, {
+        limit: maxRecommendations
+      });
+      return {
+        success: true,
+        source: 'deterministic',
+        data: { recommendations },
+        recommendations
+      };
+    }
+
     try {
       const response = await aiApi.post('/value-for-money', {
         products: parts,
@@ -203,6 +293,13 @@ class AIService {
    * @returns {Promise<Object>} Estimated build with matched products
    */
   async estimateCurrentBuild(estimateData) {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('PC build estimation requires manual entry in offline kiosk mode', {
+        error: 'ai_service_disabled',
+        estimateData
+      });
+    }
+
     try {
       const response = await aiApi.post('/estimate-current-build', estimateData);
       return response.data;
@@ -216,6 +313,14 @@ class AIService {
    * Uses DeepSeek R1 model to analyze build and suggest optimal upgrades
    */
   async getUpgradeRecommendations(currentBuildEstimation, userPreferences = {}) {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('Upgrade recommendations use local stock and deterministic compatibility only', {
+        currentBuild: currentBuildEstimation,
+        preferences: userPreferences,
+        recommendations: []
+      });
+    }
+
     return requestQueue.add(async () => {
       console.log('🔄 Requesting AI upgrade recommendations...');
 
@@ -234,11 +339,27 @@ class AIService {
     });
   }
 
+  async recommendUpgrade(currentBuildEstimation, budget, usage) {
+    return this.getUpgradeRecommendations(currentBuildEstimation, { budget, usage });
+  }
+
   /**
    * Get AI-powered cleaning tier recommendation based on assessment
    * Uses analysis of cleaning history to recommend best tier
    */
   async getCleaningTierRecommendation(assessmentAnswers) {
+    if (OFFLINE_AI_DISABLED) {
+      return {
+        success: true,
+        source: 'deterministic',
+        data: {
+          recommendedTier: 'Basic',
+          reason: 'Offline kiosk mode uses the selected assessment answers without AI scoring.',
+          assessmentAnswers
+        }
+      };
+    }
+
     return requestQueue.add(async () => {
       console.log('🔄 Requesting AI cleaning tier recommendation...');
       console.log('📋 Assessment answers:', assessmentAnswers);
@@ -318,6 +439,12 @@ class AIService {
    * @returns {Promise<Object>} External product suggestion
    */
   async generateExternalProductSuggestion(requestData) {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('External market suggestions are disabled in offline kiosk mode', {
+        requestData
+      });
+    }
+
     try {
       console.log('🤖 Requesting AI external product suggestion:', requestData);
       
@@ -367,6 +494,16 @@ class AIService {
    * @returns {Promise<Object>} Value analysis results
    */
   async analyzeValue(parts, budget, category = 'value_analysis') {
+    if (OFFLINE_AI_DISABLED) {
+      const recommendations = buildLocalRecommendations(parts, budget, { limit: 8 });
+      return {
+        success: true,
+        source: 'deterministic',
+        data: { category, recommendations },
+        recommendations
+      };
+    }
+
     try {
       const response = await aiApi.post('/analyze/value', {
         parts,
@@ -387,6 +524,17 @@ class AIService {
    * @returns {Promise<Object>} Compatible components list
    */
   async findCompatibleComponents(baseComponent, availableComponents, options = {}) {
+    if (OFFLINE_AI_DISABLED) {
+      return {
+        success: true,
+        source: 'deterministic',
+        data: {
+          baseComponent,
+          components: (availableComponents || []).slice(0, options.maxSuggestions || 6)
+        }
+      };
+    }
+
     try {
       const response = await aiApi.post('/compatibility/find', {
         baseComponent,
@@ -410,6 +558,12 @@ class AIService {
    * @returns {Promise<Object>} Diagnostic analysis results
    */
   async analyzeDiagnostics(diagnosticsData) {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('Diagnostic AI analysis is disabled in offline kiosk mode', {
+        diagnosticsData
+      });
+    }
+
     try {
       const response = await aiApi.post('/diagnostics/upgrade-analysis', {
         ...diagnosticsData,
@@ -439,7 +593,7 @@ class AIService {
           existingComponents.forEach(component => {
             if (component && component.category) {
               // Normalize category to lowercase for consistency
-              const categoryKey = component.category.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              const categoryKey = component.category.toLowerCase().replaceAll(/[^a-z0-9]/g, '_');
               parts[categoryKey] = component;
             }
           });
@@ -447,25 +601,26 @@ class AIService {
         
         // Add target component if provided
         if (targetComponent && targetComponent.category) {
-          const categoryKey = targetComponent.category.toLowerCase().replace(/[^a-z0-9]/g, '_');
+          const categoryKey = targetComponent.category.toLowerCase().replaceAll(/[^a-z0-9]/g, '_');
           parts[categoryKey] = targetComponent;
         }
         
-        const response = await aiApi.post('/compatibility/analyze', {
-          parts,  // ✅ FIXED: Send parts object instead of arrays
-          userContext: {
-            targetCategory: targetComponent?.category || null
-          }
+        const response = await generalApi.post('/compatibility/analyze', {
+          currentProduct: targetComponent,
+          selectedParts: Object.values(parts),
+          targetCategory: targetComponent?.category || null
         });
 
         // Transform response to match expected format
         const data = response.data?.data || response.data;
+        const bestMatch = Array.isArray(data) ? data[0] : data;
         return {
           success: true,
-          recommended: data?.compatibility?.isCompatible || false,
-          compatibility_score: data?.compatibility?.score || 75,
-          message: data?.compatibility?.summary || 'Compatibility check completed',
-          warnings: data?.compatibility?.issues || null
+          source: response.data?.source || 'deterministic',
+          recommended: bestMatch?.compatible !== false,
+          compatibility_score: bestMatch?.compatibility_score || bestMatch?.score || 75,
+          message: bestMatch?.compatibility_reason || 'Compatibility check completed',
+          warnings: bestMatch?.warnings || bestMatch?.compatibility_issues || null
         };
       } catch (error) {
         throw this.handleError(error, 'Failed to check compatibility');
@@ -480,6 +635,14 @@ class AIService {
    * @returns {Promise<Object>} Alternative recommendations
    */
   async getAlternatives(originalPart, criteria) {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('AI alternatives are disabled in offline kiosk mode', {
+        originalPart,
+        criteria,
+        alternatives: []
+      });
+    }
+
     try {
       const response = await aiApi.post('/alternatives', {
         originalPart,
@@ -503,6 +666,18 @@ class AIService {
    * @returns {Promise<Object>} Optimized build recommendations
    */
   async optimizeBuild(buildConfig, requirements, availableComponents) {
+    if (OFFLINE_AI_DISABLED) {
+      return {
+        success: true,
+        source: 'deterministic',
+        data: {
+          buildConfig,
+          requirements,
+          recommendations: buildLocalRecommendations(availableComponents, requirements?.budget || 0, { limit: 8 })
+        }
+      };
+    }
+
     try {
       // Ensure we have valid parameters
       if (!buildConfig || !requirements) {
@@ -578,6 +753,13 @@ class AIService {
    * NEW - Phase 4: Admin Dashboard Analytics
    */
   async getAIMetrics() {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('AI metrics are disabled in offline kiosk mode', {
+        status: 'disabled',
+        source: 'deterministic'
+      });
+    }
+
     try {
       const response = await aiApi.get('/admin/metrics');
       return response.data;
@@ -592,6 +774,12 @@ class AIService {
    * NEW - Phase 4: Admin Dashboard Analytics
    */
   async getTopUpgradePaths() {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('AI upgrade path metrics are disabled in offline kiosk mode', {
+        paths: []
+      });
+    }
+
     try {
       const response = await aiApi.get('/admin/top-upgrade-paths');
       return response.data;
@@ -606,6 +794,12 @@ class AIService {
    * NEW - Phase 4: Admin Dashboard Analytics
    */
   async getPopularComponents() {
+    if (OFFLINE_AI_DISABLED) {
+      return createDisabledResponse('AI popular-component metrics are disabled in offline kiosk mode', {
+        components: []
+      });
+    }
+
     try {
       const response = await aiApi.get('/admin/popular-components');
       return response.data;
@@ -652,6 +846,10 @@ class AIService {
    * @returns {Promise<boolean>} Service availability status
    */
   async isAvailable() {
+    if (OFFLINE_AI_DISABLED) {
+      return false;
+    }
+
     try {
       const health = await this.getHealthStatus();
       return health.success && health.data?.status === 'healthy';
