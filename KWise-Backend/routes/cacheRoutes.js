@@ -32,9 +32,9 @@ const logger = require('../utils/logger');
  * - Evictions count
  * - Sets count
  * 
- * Access: Public (no authentication required for monitoring)
+ * Access: Requires authentication (admin or developer role)
  */
-router.get('/stats', (req, res) => {
+router.get('/stats', authenticateToken, restrictTo('superadmin', 'admin', 'developer'), (req, res) => {
   try {
     // Try in-memory cache first, fallback to intelligent cache
     let stats;
@@ -295,12 +295,12 @@ router.post('/warm', authenticateToken, restrictTo('superadmin', 'admin'), async
  * - Hit rate
  * - Memory usage
  * 
- * Access: Public (no authentication required)
+ * Access: Requires authentication (admin or developer role)
  */
-router.get('/health', (req, res) => {
+router.get('/health', authenticateToken, restrictTo('superadmin', 'admin', 'developer'), (req, res) => {
   try {
     const stats = intelligentCache.getStats();
-    const isHealthy = stats.totalEntries < 3000 && parseFloat(stats.hitRate) > 0;
+    const isHealthy = stats.totalEntries < 3000 && Number.parseFloat(stats.hitRate) > 0;
     
     res.json({
       success: true,

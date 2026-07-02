@@ -84,7 +84,8 @@ router.get('/pending', protect, async (req, res) => {
 router.patch('/:id/acknowledge', protect, async (req, res) => {
   try {
     const { id } = req.params;
-    const { admin_id, admin_name } = req.body;
+    const admin_id = req.user.id;
+    const admin_name = req.user.name || req.user.display_name || req.user.email || 'Admin';
 
     const result = await query(`
       UPDATE assistance_requests

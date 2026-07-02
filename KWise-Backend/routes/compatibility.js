@@ -1,6 +1,6 @@
 /**
  * Compatibility Analysis Routes
- * AI-powered hardware compatibility analysis using Ollama Deepseek R1
+ * Offline deterministic hardware compatibility analysis.
  */
 
 const express = require('express');
@@ -17,7 +17,10 @@ const compatibilityRules = require('../services/compatibilityRules'); // Phase 2
 const detailedCompatibilityService = require('../services/detailedCompatibilityService'); // NEW: Detailed compatibility validation
 const { query, pool } = require('../config/db'); // Phase 3: Import both query and pool
 const logger = require('../utils/logger');
-const crypto = require('crypto'); // Phase 3: For cache key generation
+const crypto = require('node:crypto'); // Phase 3: For cache key generation
+const batchResponseCache = new Map();
+const BATCH_RESPONSE_CACHE_TTL_MS = Number.parseInt(process.env.COMPATIBILITY_BATCH_RESPONSE_CACHE_MS || '30000', 10);
+const BATCH_RESPONSE_CACHE_MAX_ENTRIES = Number.parseInt(process.env.COMPATIBILITY_BATCH_RESPONSE_CACHE_MAX_ENTRIES || '50', 10);
 
 /**
  * Phase 3: Generate cache key from build configuration
@@ -26,6 +29,313 @@ function generateCacheKey(buildParts) {
     const sortedParts = JSON.stringify(buildParts, Object.keys(buildParts).sort());
     return crypto.createHash('md5').update(sortedParts).digest('hex');
 }
+
+function stableStringify(value) {
+    if (Array.isArray(value)) {
+        return `[${value.map(stableStringify).join(',')}]`;
+    }
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+}
+
+function generateBatchResponseCacheKey(payload) {
+    return crypto.createHash('sha256').update(stableStringify(payload)).digest('hex');
+}
+
+function getCachedBatchResponse(cacheKey) {
+    if (BATCH_RESPONSE_CACHE_TTL_MS <= 0) return null;
+    const cached = batchResponseCache.get(cacheKey);
+    if (!cached || cached.expiresAt <= Date.now()) {
+        batchResponseCache.delete(cacheKey);
+        return null;
+    }
+    return cached.response;
+}
+
+function setCachedBatchResponse(cacheKey, response) {
+    if (BATCH_RESPONSE_CACHE_TTL_MS <= 0) return;
+    batchResponseCache.set(cacheKey, {
+        response,
+        expiresAt: Date.now() + BATCH_RESPONSE_CACHE_TTL_MS
+    });
+    while (batchResponseCache.size > BATCH_RESPONSE_CACHE_MAX_ENTRIES) {
+        batchResponseCache.delete(batchResponseCache.keys().next().value);
+    }
+}
+
+function toPartArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === 'object') {
+        return Object.entries(value)
+            .filter(([, part]) => part)
+            .map(([category, part]) => {
+                if (typeof part === 'object') {
+                    return {
+                        ...part,
+                        category: part.category || category
+                    };
+                }
+
+                return { id: part, category };
+            });
+    }
+
+    return [];
+}
+
+function idsNeedingHydration(parts) {
+    return [...new Set(parts
+        .map((part) => {
+            if (typeof part === 'number') return part;
+            if (typeof part === 'string' && /^\d+$/.test(part)) return Number.parseInt(part, 10);
+            if (part?.id && !part.specifications) return Number.parseInt(part.id, 10);
+            return null;
+        })
+        .filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+async function fetchProductsByIds(productIds) {
+    if (!productIds.length) return new Map();
+
+    try {
+        const result = await query(`
+            SELECT
+                pp.id, pp.name, pp.category, pp.brand, pp.price, pp.stock,
+                COALESCE(pp.image_url, pp.image_path) AS image_url,
+                pp.description, pp.dimensions, pp.kiosk_visible, pp.is_active,
+                COALESCE(
+                    pp.specifications || COALESCE((ps.normalized_specs->'specs')::jsonb, '{}'::jsonb),
+                    pp.specifications,
+                    '{}'::jsonb
+                ) AS specifications,
+                ps.normalized_specs
+            FROM pc_parts pp
+            LEFT JOIN product_specs ps ON pp.id = ps.product_id
+            WHERE pp.id = ANY($1::int[])
+        `, [productIds]);
+
+        return new Map(result.rows.map((row) => [String(row.id), row]));
+    } catch (error) {
+        logger.warn('[Compatibility] product_specs hydration skipped, falling back to pc_parts only:', error.message);
+        try {
+            const fallback = await query(`
+                SELECT id, name, category, brand, price, stock, image_url, description, specifications, dimensions, kiosk_visible, is_active
+                FROM pc_parts
+                WHERE id = ANY($1::int[])
+            `, [productIds]);
+
+            return new Map(fallback.rows.map((row) => [String(row.id), row]));
+        } catch (fallbackError) {
+            logger.warn('[Compatibility] dimensions hydration skipped, falling back to core pc_parts columns:', fallbackError.message);
+            const coreFallback = await query(`
+                SELECT id, name, category, brand, price, stock, image_url, description, specifications, kiosk_visible, is_active
+                FROM pc_parts
+                WHERE id = ANY($1::int[])
+            `, [productIds]);
+
+            return new Map(coreFallback.rows.map((row) => [String(row.id), { ...row, dimensions: {} }]));
+        }
+    }
+}
+
+async function hydrateParts(parts) {
+    const hydrationMap = await fetchProductsByIds(idsNeedingHydration(parts));
+
+    return parts
+        .map((part) => {
+            const key = String(typeof part === 'object' ? part.id : part);
+            const hydrated = hydrationMap.get(key);
+            if (!hydrated && typeof part !== 'object') return null;
+            if (!hydrated) return part;
+            if (typeof part !== 'object') return hydrated;
+
+            return {
+                ...hydrated,
+                ...part,
+                specifications: {
+                    ...(hydrated.specifications || {}),
+                    ...(part.specifications || {})
+                }
+            };
+        })
+        .filter(Boolean);
+}
+
+function toCompatibilityContract(result = {}) {
+    const issues = result.problems || result.compatibility_issues || result.deterministic_issues || result.issues || [];
+    const warnings = result.warnings || result.compatibility_warnings || [];
+    const missingSpecs = result.missingSpecs || result.manualChecks || result.manual_checks || [];
+    const score = result.score ?? result.compatibility_score ?? result.compatibilityScore ?? 0;
+    const status = result.status || result.verdict || result.compatibility_status || (result.compatible === false ? 'incompatible' : 'manual_check');
+
+    return {
+        ...result,
+        engine: 'deterministic',
+        source: 'deterministic',
+        aiEnabled: false,
+        status,
+        score,
+        compatible: result.compatible !== false,
+        issues,
+        warnings,
+        missingSpecs,
+        latencyMs: result.latencyMs ?? null
+    };
+}
+
+function summarizeResults(results = [], startedAt = Date.now()) {
+    const scoreValues = results
+        .map((result) => result.score ?? result.compatibility_score)
+        .filter((score) => Number.isFinite(score));
+    const averageScore = scoreValues.length
+        ? Math.round(scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length)
+        : 0;
+
+    return {
+        engine: 'deterministic',
+        source: 'deterministic',
+        aiEnabled: false,
+        status: results.some((product) => product.compatible === false)
+            ? 'incompatible'
+            : results.some((product) => product.verdict === 'manual_check' || product.status === 'manual_check')
+                ? 'manual_check'
+                : results.some((product) => product.verdict === 'warning' || product.status === 'warning')
+                    ? 'warning'
+                    : 'compatible',
+        score: averageScore,
+        issues: results.flatMap((product) => product.compatibility_issues || product.deterministic_issues || product.issues || []),
+        warnings: results.flatMap((product) => product.warnings || product.compatibility_warnings || []),
+        missingSpecs: results.flatMap((product) => product.missingSpecs || product.manualChecks || []),
+        latencyMs: Date.now() - startedAt
+    };
+}
+
+/**
+ * POST /api/compatibility/batch
+ * Deterministically score many candidate products against the selected local build in one request.
+ */
+router.post('/batch', kioskGeneralLimit, async (req, res) => {
+    const startedAt = Date.now();
+
+    try {
+        const {
+            contextParts = [],
+            candidates = [],
+            mode = 'candidate_filter',
+            targetCategory,
+            referenceProduct
+        } = req.body || {};
+        const candidateParts = toPartArray(candidates);
+
+        if (!Array.isArray(candidateParts) || candidateParts.length === 0) {
+            return res.json({
+                success: true,
+                source: 'deterministic',
+                engine: 'deterministic',
+                aiEnabled: false,
+                status: 'compatible',
+                score: 0,
+                issues: [],
+                warnings: [],
+                missingSpecs: [],
+                mode,
+                data: [],
+                results: [],
+                summary: { total: 0, compatible: 0, warnings: 0, failed: 0, manualCheck: 0 },
+                latencyMs: Date.now() - startedAt,
+                cache: { hit: false, key: null }
+            });
+        }
+
+        if (candidateParts.length > 500) {
+            return res.status(400).json({
+                success: false,
+                source: 'deterministic',
+                engine: 'deterministic',
+                aiEnabled: false,
+                code: 'BATCH_TOO_LARGE',
+                message: 'Batch compatibility checks are limited to 500 candidates per request'
+            });
+        }
+
+        const batchCacheKey = generateBatchResponseCacheKey({
+            contextParts,
+            candidates: candidateParts,
+            mode,
+            targetCategory,
+            referenceProduct
+        });
+        const cachedBatchResponse = getCachedBatchResponse(batchCacheKey);
+        if (cachedBatchResponse) {
+            return res.json({
+                ...cachedBatchResponse,
+                latencyMs: Date.now() - startedAt,
+                cache: {
+                    ...(cachedBatchResponse.cache || {}),
+                    hit: true,
+                    key: batchCacheKey
+                }
+            });
+        }
+
+        const [hydratedContext, hydratedCandidates] = await Promise.all([
+            hydrateParts(toPartArray(contextParts)),
+            hydrateParts(candidateParts)
+        ]);
+
+        const results = await compatibilityService.analyzeBatch(hydratedContext, hydratedCandidates, {
+            mode,
+            targetCategory,
+            referenceProduct
+        });
+        const summary = {
+            total: results.length,
+            compatible: results.filter((product) => product.compatible !== false).length,
+            warnings: results.filter((product) => product.verdict === 'warning').length,
+            failed: results.filter((product) => product.compatible === false).length,
+            manualCheck: results.filter((product) => product.verdict === 'manual_check').length
+        };
+        const contract = summarizeResults(results, startedAt);
+
+        const responseBody = {
+            success: true,
+            source: 'deterministic',
+            engine: 'deterministic',
+            aiEnabled: false,
+            status: contract.status,
+            score: contract.score,
+            issues: contract.issues,
+            warnings: contract.warnings,
+            missingSpecs: contract.missingSpecs,
+            mode,
+            targetCategory,
+            data: results,
+            results,
+            summary,
+            latencyMs: contract.latencyMs,
+            cache: {
+                hit: results.length > 0 && results.every((product) => product.cache?.hit),
+                key: batchCacheKey
+            }
+        };
+        setCachedBatchResponse(batchCacheKey, responseBody);
+
+        return res.json(responseBody);
+    } catch (error) {
+        logger.error('Deterministic batch compatibility failed:', error);
+        return res.status(500).json({
+            success: false,
+            source: 'deterministic',
+            engine: 'deterministic',
+            aiEnabled: false,
+            message: 'Batch compatibility check failed',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
 
 /**
  * POST /api/compatibility/analyze
@@ -42,12 +352,15 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
             currentBuild,       // For PC Upgrade
             upgradeCategory,
             targetCategory,
+            mode,
             excludeCategories = [],
             skipCache = false   // Phase 3: Allow cache bypass for testing
         } = req.body;
 
-        logger.info(`🔍 === ENTERING /analyze ROUTE ===`);
-        logger.info(`🔍 Request body keys: ${Object.keys(req.body).join(', ')}`);
+        if (process.env.KWISE_VERBOSE_COMPATIBILITY_LOGS === 'true') {
+            logger.info(`🔍 === ENTERING /analyze ROUTE ===`);
+            logger.info(`🔍 Request body keys: ${Object.keys(req.body).join(', ')}`);
+        }
 
         // PHASE 1 FIX: Validate at least one input method
         if (!currentProduct && !selectedParts && !currentBuild) {
@@ -56,6 +369,72 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
                 message: 'One of currentProduct, selectedParts, or currentBuild is required',
                 hint: 'Provide currentProduct for product page, selectedParts for custom build, or currentBuild for upgrade analysis'
             });
+        }
+
+        if (mode === 'pair_check' && currentProduct) {
+            const startedAt = Date.now();
+            const pairCacheKey = generateBatchResponseCacheKey({
+                route: 'compatibility-analyze-pair',
+                currentProduct,
+                selectedParts,
+                targetCategory,
+                upgradeCategory,
+                excludeCategories
+            });
+            const cachedPairResponse = !skipCache ? getCachedBatchResponse(pairCacheKey) : null;
+            if (cachedPairResponse) {
+                return res.json({
+                    ...cachedPairResponse,
+                    latencyMs: Date.now() - startedAt,
+                    data: {
+                        ...(cachedPairResponse.data || {}),
+                        latencyMs: Date.now() - startedAt,
+                        cache: {
+                            ...(cachedPairResponse.data?.cache || {}),
+                            hit: true,
+                            key: pairCacheKey
+                        }
+                    },
+                    cache: {
+                        ...(cachedPairResponse.cache || {}),
+                        hit: true,
+                        key: pairCacheKey
+                    }
+                });
+            }
+
+            const [hydratedContext, hydratedCandidateList] = await Promise.all([
+                hydrateParts(toPartArray(selectedParts)),
+                hydrateParts(toPartArray([currentProduct]))
+            ]);
+            const candidate = hydratedCandidateList[0] || currentProduct;
+            const [result] = await compatibilityService.analyzeBatch(hydratedContext, [candidate], {
+                mode: 'pair_check',
+                referenceProduct: candidate
+            });
+            const contract = toCompatibilityContract({
+                ...(result || {}),
+                latencyMs: Date.now() - startedAt
+            });
+            const responseBody = {
+                success: true,
+                ...contract,
+                cache: {
+                    hit: false,
+                    key: pairCacheKey
+                },
+                data: {
+                    ...contract,
+                    cache: {
+                        hit: false,
+                        key: pairCacheKey
+                    }
+                },
+                message: 'Deterministic compatibility check completed'
+            };
+            setCachedBatchResponse(pairCacheKey, responseBody);
+
+            return res.json(responseBody);
         }
 
         // ===================================================================
@@ -99,14 +478,18 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
                     return res.json({
                         success: true,
                         data: transformedCachedData,
-                        aiAnalysis: cached.compatibility_result.aiAnalysis || {
-                            aiEnabled: true,
-                            model: 'cached'
-                        },
                         cached: true,
-                        source: 'cache',
-                        latency: cacheDuration,
-                        cache_key: cache_key,
+                        source: 'deterministic',
+                        engine: 'deterministic',
+                        aiEnabled: false,
+                        status: Array.isArray(transformedCachedData) ? summarizeResults(transformedCachedData).status : toCompatibilityContract(transformedCachedData).status,
+                        score: Array.isArray(transformedCachedData) ? summarizeResults(transformedCachedData).score : toCompatibilityContract(transformedCachedData).score,
+                        issues: Array.isArray(transformedCachedData) ? summarizeResults(transformedCachedData).issues : toCompatibilityContract(transformedCachedData).issues,
+                        warnings: Array.isArray(transformedCachedData) ? summarizeResults(transformedCachedData).warnings : toCompatibilityContract(transformedCachedData).warnings,
+                        missingSpecs: Array.isArray(transformedCachedData) ? summarizeResults(transformedCachedData).missingSpecs : toCompatibilityContract(transformedCachedData).missingSpecs,
+                        latencyMs: cacheDuration,
+                        cache: { hit: true, key: cache_key },
+                        cache_key,
                         hit_count: cached.hit_count + 1,
                         cached_at: cached.created_at,
                         expires_at: cached.expires_at,
@@ -321,7 +704,7 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
         
         const finalRecommendations = [];
         
-        // Process each category with AI analysis
+        // Process each category with deterministic analysis
         for (const category of finalCompatibleCategories) {
             try {
                 const categoryProducts = productsByCategory[category] || [];
@@ -337,7 +720,7 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
                 const shuffledProducts = categoryProducts.sort(() => Math.random() - 0.5);
                 
                 // ROOT CAUSE FIX: For PC Customized/Upgrade, check compatibility against ALL selected parts
-                // OPTIMIZATION: Instead of iterative AI calls, pass all build parts as context
+                // OPTIMIZATION: pass all build parts as context for deterministic candidate filtering.
                 let compatibleInCategory;
                 if (allBuildParts.length > 1) {
                     // PC Customized or Upgrade: Check candidates against entire build
@@ -353,11 +736,11 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
                     
                     // PHASE 2 OPTIMIZATION: Only use rules for multi-part builds (>= 3 parts)
                     // Rules require loading specs, which is slower for single-product scenarios
-                    const shouldUseRules = allBuildParts.length >= 3;
+                    const shouldUseRules = false;
                     
                     if (shouldUseRules) {
                         // PHASE 2: Use deterministic rule-based filtering FIRST (2,513 rules)
-                        // This is MUCH faster and more accurate than AI for known compatibility issues
+                        // This is faster and more accurate for known compatibility issues.
                         logger.info(`   🎯 PHASE 2: Applying 2,513 deterministic compatibility rules`);
                         
                         const ruleBasedResults = [];
@@ -408,33 +791,33 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
                         const ruleDuration = Date.now() - startRuleCheck;
                         logger.info(`   ⚡ Rule-based check completed in ${ruleDuration}ms (${ruleBasedResults.length} compatible)`);
                         
-                        // If rules found compatible products, use them (MUCH faster than AI)
+                        // If rules found compatible products, use them.
                         if (ruleBasedResults.length > 0) {
                             compatibleInCategory = ruleBasedResults;
-                            logger.info(`   ✅ Using ${ruleBasedResults.length} rule-validated products (skipped AI)`);
+                            logger.info(`   ✅ Using ${ruleBasedResults.length} rule-validated products`);
                         } else {
-                            // Fallback to AI if rules rejected all candidates
-                            logger.info(`   🤖 Rules rejected all candidates, falling back to AI analysis`);
+                            // Fall back to deterministic candidate analysis if rules reject all candidates.
+                            logger.info(`   🤖 Rules rejected all candidates, using deterministic candidate analysis`);
                             compatibleInCategory = await compatibilityService.analyzeCompatibility(
                                 primaryPart,
                                 shuffledProducts.slice(0, 10)
                             );
-                            logger.info(`   ✅ AI found ${compatibleInCategory?.length || 0} compatible products`);
+                            logger.info(`   ✅ Deterministic analysis found ${compatibleInCategory?.length || 0} compatible products`);
                         }
                     } else {
-                        // For small builds (< 3 parts), use AI-only (faster for simple cases)
-                        logger.info(`   🤖 Using AI-only analysis for ${allBuildParts.length}-part build`);
+                        // For small builds (< 3 parts), use the deterministic service directly.
+                        logger.info(`   Using deterministic analysis for ${allBuildParts.length}-part build`);
                         compatibleInCategory = await compatibilityService.analyzeCompatibility(
                             primaryPart,
                             shuffledProducts.slice(0, 10)
                         );
-                        logger.info(`   ✅ AI found ${compatibleInCategory?.length || 0} compatible products`);
+                        logger.info(`   Deterministic analysis found ${compatibleInCategory?.length || 0} compatible products`);
                     }
                 } else {
                     // Product Page: Check compatibility with single reference product
                     compatibleInCategory = await compatibilityService.analyzeCompatibility(
                         product,
-                        shuffledProducts.slice(0, 10) // Limit to 10 for faster AI analysis
+                        shuffledProducts.slice(0, 10)
                     );
                 }
 
@@ -446,10 +829,12 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
                     finalRecommendations.push(bestInCategory);
                     logger.info(`✅ Added ${category}: ${bestInCategory.name} (Score: ${bestInCategory.compatibility_score})`);
                 } else {
-                    // AI failed, use specification-based fallback for variety
-                    logger.warn(`🔄 AI failed for ${category}, using specification-based fallback`);
+                    // Deterministic analysis rejected all candidates.
+                    logger.warn(`No deterministic-compatible products found for ${category}; skipping recommendations for this category`);
                     
                     // Get a good product for variety (not always the first one)
+                    logger.debug(`Skipped legacy fallback for ${category} because offline mode never recommends hard-incompatible products`);
+                    continue;
                     const randomIndex = Math.floor(Math.random() * Math.min(shuffledProducts.length, 3));
                     const fallbackProduct = shuffledProducts[randomIndex];
                     
@@ -488,19 +873,16 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
             });
         }
 
-        // ROOT CAUSE FIX #1: Add cache metadata from AI service
-        // Check if any recommendation has cache/AI metadata we should propagate
+        // Add deterministic cache metadata from selected candidate checks.
         const firstWithMetadata = finalRecommendations.find(r => r.source || r.cached || r.latency);
         const cacheMetadata = firstWithMetadata ? {
-            cached: firstWithMetadata.cached || firstWithMetadata.source === 'cache' || false,
-            source: firstWithMetadata.source || 'ai',
-            latency: firstWithMetadata.latency || null,
-            circuitState: firstWithMetadata.circuitState || null
-        } : {
-            cached: false,
+            cache: firstWithMetadata.cache || { hit: false, key: null },
             source: 'deterministic',
-            latency: null,
-            circuitState: null
+            latencyMs: firstWithMetadata.latencyMs || null
+        } : {
+            cache: { hit: false, key: null },
+            source: 'deterministic',
+            latencyMs: null
         };
 
         // ===================================================================
@@ -516,13 +898,11 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
 
                 const responseData = {
                     data: finalRecommendations,
-                    aiAnalysis: {
+                    deterministicAnalysis: {
                         totalCategories: finalCompatibleCategories.length,
                         productsPerCategory: 1,
                         targetCategories: 7,
-                        coreCategories: coreCategories,
-                        aiEnabled: compatibilityService.isAvailable,
-                        model: compatibilityService.model
+                        coreCategories: coreCategories
                     }
                 };
 
@@ -575,16 +955,17 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
 
         res.json({
             success: true,
+            source: 'deterministic',
+            engine: 'deterministic',
+            aiEnabled: false,
+            ...summarizeResults(transformedRecommendations),
             data: transformedRecommendations,
-            aiAnalysis: {
+            deterministicAnalysis: {
                 totalCategories: finalCompatibleCategories.length,
                 productsPerCategory: 1,
                 targetCategories: 7,
-                coreCategories: coreCategories,
-                aiEnabled: compatibilityService.isAvailable,
-                model: compatibilityService.model
+                coreCategories: coreCategories
             },
-            // ROOT CAUSE FIX #1: Propagate cache metadata to response
             ...cacheMetadata,
             message: `Found ${finalRecommendations.length} compatible products from ${finalCompatibleCategories.length} core categories`
         });
@@ -601,7 +982,7 @@ router.post('/analyze', kioskGeneralLimit, validateCompatibilityAnalysis, async 
 
 /**
  * GET /api/compatibility/status
- * Get AI service status for debugging
+ * Get deterministic compatibility service status for debugging
  */
 router.get('/status', async (req, res) => {
     try {
@@ -688,10 +1069,10 @@ router.post('/analyze-bulk', kioskGeneralLimit, validateCompatibilityAnalysis, a
                     );
 
                     if (compatibilityResults && compatibilityResults.length > 0) {
-                        logger.info(`✅ AI analyzed ${compatibilityResults.length} compatible products for ${cartItem.name}`);
+                        logger.info(`Deterministic analysis found ${compatibilityResults.length} compatible products for ${cartItem.name}`);
                         return { success: true, results: compatibilityResults, cartItem };
                     } else {
-                        logger.warn(`🔄 AI failed for ${cartItem.name}, skipping (no fallback scoring)`);
+                        logger.warn(`Deterministic analysis found no compatible products for ${cartItem.name}, skipping fallback scoring`);
                         return { success: false, cartItem };
                     }
                 } catch (error) {
@@ -721,7 +1102,7 @@ router.post('/analyze-bulk', kioskGeneralLimit, validateCompatibilityAnalysis, a
         });
 
         const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
-        const productsPerSecond = (targetProducts.length / parseFloat(elapsedTime)).toFixed(1);
+        const productsPerSecond = (targetProducts.length / Number.parseFloat(elapsedTime)).toFixed(1);
         
         logger.info(`✅ Bulk analysis complete in ${elapsedTime}s (${productsPerSecond} products/sec)`);
         logger.info(`📊 ${Object.keys(scores).length} products scored`);
@@ -739,10 +1120,10 @@ router.post('/analyze-bulk', kioskGeneralLimit, validateCompatibilityAnalysis, a
                 targetProducts: targetProducts.length,
                 scoredProducts: Object.keys(scores).length,
                 currentCategory: currentCategory,
-                aiEnabled: compatibilityService.isAvailable,
+                source: 'deterministic',
                 performance: {
                     elapsedTime: `${elapsedTime}s`,
-                    productsPerSecond: parseFloat(productsPerSecond),
+                    productsPerSecond: Number.parseFloat(productsPerSecond),
                     batchSize: BATCH_SIZE,
                     processedBatches: Math.ceil(eligibleCartItems.length / BATCH_SIZE)
                 }
@@ -819,8 +1200,8 @@ router.post('/simple', kioskGeneralLimit, async (req, res) => {
         res.json({
             success: true,
             data: compatibleProducts.slice(0, limit),
-            aiAnalysis: {
-                aiEnabled: false,
+            deterministicAnalysis: {
+                source: 'deterministic',
                 method: 'simple_category_based',
                 totalCategories: compatibleCategories.length,
                 productsPerCategory: 1
@@ -935,23 +1316,30 @@ router.post('/batch-analyze', kioskGeneralLimit, async (req, res) => {
             return res.json({ success: true, results: [] });
         }
 
-        const results = await Promise.all(
-            candidates.map(async (candidate) => {
-                const buildContext = await loadBuildContext(currentBuild);
-                const candidateSpecs = await compatibilityRules.loadNormalizedSpecs(candidate.id);
-                const candidateContext = { id: candidate.id, category: candidate.category, specs: candidateSpecs };
-                const result = await compatibilityRules.computeCompatibilityScore(buildContext, candidateContext);
+        const [hydratedContext, hydratedCandidates] = await Promise.all([
+            hydrateParts(toPartArray(currentBuild)),
+            hydrateParts(toPartArray(candidates))
+        ]);
 
-                return {
-                    productId: candidate.id,
-                    compatible: result.compatible,
-                    badge: result.badge,
-                    score: result.percentageScore,
-                    issues: result.issues,
-                    recommendations: result.recommendations
-                };
-            })
-        );
+        const ranked = await compatibilityService.analyzeBatch(hydratedContext, hydratedCandidates, {
+            mode: 'legacy_batch_analyze'
+        });
+        const results = ranked.map((product) => ({
+            productId: product.id,
+            compatible: product.compatible,
+            badge: product.compatible === false
+                ? 'Incompatible'
+                : product.verdict === 'warning'
+                    ? 'May Work'
+                    : 'Compatible',
+            score: product.compatibility_score,
+            issues: product.deterministic_issues || product.compatibility_issues || [],
+            warnings: product.warnings || [],
+            recommendations: product.manualChecks || [],
+            source: 'deterministic',
+            verdict: product.verdict,
+            rulesApplied: product.rulesApplied || []
+        }));
 
         res.json({ success: true, results: results });
     } catch (error) {
@@ -1265,6 +1653,30 @@ router.post('/advanced/full-build', kioskGeneralLimit, validateFullBuildAnalysis
             });
         }
 
+        const deterministicResult = await compatibilityService.analyzeFullBuild(components);
+        const contract = toCompatibilityContract(deterministicResult);
+        return res.json({
+            success: true,
+            source: 'deterministic',
+            engine: 'deterministic',
+            aiEnabled: false,
+            data: deterministicResult,
+            compatible: contract.compatible,
+            status: contract.status,
+            score: contract.score,
+            verdict: deterministicResult.verdict,
+            problems: deterministicResult.problems,
+            issues: contract.issues,
+            warnings: contract.warnings,
+            notes: deterministicResult.notes,
+            manualChecks: deterministicResult.manualChecks,
+            missingSpecs: contract.missingSpecs,
+            rulesApplied: deterministicResult.rulesApplied,
+            latencyMs: deterministicResult.latencyMs,
+            cache: deterministicResult.cache,
+            timestamp: new Date().toISOString()
+        });
+
         // PHASE 11: Use comprehensive analyzeFullBuild with compatibilityRules integration
         // This includes ALL 23 validation rules + PHASE 3/4 enhancements
         const analysisResult = await advancedCompatibilityService.analyzeFullBuild(components);
@@ -1414,7 +1826,7 @@ router.post('/advanced/full-build', kioskGeneralLimit, validateFullBuildAnalysis
                     // 🔥 Handle string format like "265mm" from specifications.max_gpu_length
                     if (!caseMaxGPU && caseSpecs.max_gpu_length) {
                         const parsed = String(caseSpecs.max_gpu_length).replace(/[^\d.]/g, '');
-                        caseMaxGPU = parsed ? parseFloat(parsed) : 0;
+                        caseMaxGPU = parsed ? Number.parseFloat(parsed) : 0;
                     }
                     
                     if (gpuLength && caseMaxGPU) {
@@ -1547,13 +1959,13 @@ router.post('/advanced/full-build', kioskGeneralLimit, validateFullBuildAnalysis
         const extractLengthFromName = (name) => {
             if (!name) return null;
             const match = name.match(/(\d{2,3})\s*mm/i);
-            return match ? parseInt(match[1]) : null;
+            return match ? Number.parseInt(match[1], 10) : null;
         };
         
         const extractHeightFromName = (name) => {
             if (!name) return null;
             const match = name.match(/(\d{2,3})\s*mm/i);
-            return match ? parseInt(match[1]) : null;
+            return match ? Number.parseInt(match[1], 10) : null;
         };
 
         // Merge and deduplicate issues - CROSS-SEVERITY DEDUPLICATION
@@ -2573,7 +2985,7 @@ router.post('/matrix/quick-check', kioskGeneralLimit, async (req, res) => {
             fromMatrix: matrixHits > 0,
             matrixHits,
             matrixMisses,
-            hitRate: parseFloat(hitRate),
+            hitRate: Number.parseFloat(hitRate),
             executionTime,
             timestamp: new Date().toISOString()
         });
@@ -2605,12 +3017,12 @@ router.post('/ram-slots', kioskGeneralLimit, async (req, res) => {
         }
 
         // Get total RAM slots from motherboard
-        const totalSlots = parseInt(motherboard.specifications?.ram_slots) || 4;
+        const totalSlots = Number.parseInt(motherboard.specifications?.ram_slots, 10) || 4;
 
         // Calculate used slots from existing RAM
         let usedSlots = 0;
         for (const ram of existingRAM) {
-            const sticksCount = parseInt(ram.specifications?.sticks_count) || 1;
+            const sticksCount = Number.parseInt(ram.specifications?.sticks_count, 10) || 1;
             usedSlots += sticksCount;
         }
 
@@ -2631,7 +3043,7 @@ router.post('/ram-slots', kioskGeneralLimit, async (req, res) => {
                 },
                 existingRAM: existingRAM.map(ram => ({
                     name: ram.name || ram.product_name,
-                    sticksCount: parseInt(ram.specifications?.sticks_count) || 1,
+                    sticksCount: Number.parseInt(ram.specifications?.sticks_count, 10) || 1,
                     configuration: ram.specifications?.configuration || 'Unknown'
                 }))
             }
@@ -2664,8 +3076,8 @@ router.post('/storage-slots', kioskGeneralLimit, async (req, res) => {
         }
 
         // Get total M.2 and SATA slots from motherboard
-        const totalM2Slots = parseInt(motherboard.specifications?.m2_slots) || 2;
-        const totalSATAPorts = parseInt(motherboard.specifications?.sata_ports) || 6;
+        const totalM2Slots = Number.parseInt(motherboard.specifications?.m2_slots, 10) || 2;
+        const totalSATAPorts = Number.parseInt(motherboard.specifications?.sata_ports, 10) || 6;
 
         // Calculate used slots from existing storage
         let usedM2Slots = 0;

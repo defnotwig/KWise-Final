@@ -33,6 +33,24 @@ router.post('/validate', kioskGeneralLimit, async (req, res) => {
 
         logger.info('🔍 Validating PC build:', Object.keys(build));
 
+        const deterministicResult = await compatibilityService.analyzeFullBuild(build);
+        return res.json({
+            success: true,
+            source: 'deterministic',
+            data: deterministicResult,
+            compatible: deterministicResult.compatible,
+            score: deterministicResult.score,
+            verdict: deterministicResult.verdict,
+            problems: deterministicResult.problems,
+            warnings: deterministicResult.warnings,
+            notes: deterministicResult.notes,
+            manualChecks: deterministicResult.manualChecks,
+            rulesApplied: deterministicResult.rulesApplied,
+            latencyMs: deterministicResult.latencyMs,
+            cache: deterministicResult.cache,
+            message: `Build validation complete - ${deterministicResult.overall_status}`
+        });
+
         const validation = {
             overall_status: 'compatible', // 'compatible', 'warning', 'incompatible'
             compatibility_score: 100,
@@ -126,8 +144,8 @@ router.post('/validate', kioskGeneralLimit, async (req, res) => {
             }
 
             // Check RAM speed warning
-            const ramSpeed = parseInt(ramSpecs.speed || ramSpecs.Speed || '0');
-            const mbMaxSpeed = parseInt(mbSpecs.max_memory_speed || '0');
+            const ramSpeed = Number.parseInt(ramSpecs.speed || ramSpecs.Speed || '0', 10);
+            const mbMaxSpeed = Number.parseInt(mbSpecs.max_memory_speed || '0', 10);
             
             if (ramSpeed > mbMaxSpeed && mbMaxSpeed > 0) {
                 validation.warnings.push({
@@ -146,7 +164,7 @@ router.post('/validate', kioskGeneralLimit, async (req, res) => {
         // 3. Power Supply Analysis
         if (normalizedBuild.PSU) {
             const psuSpecs = normalizedBuild.PSU.specifications || {};
-            const psuWattage = parseInt(psuSpecs.wattage || psuSpecs.Wattage || '0');
+            const psuWattage = Number.parseInt(psuSpecs.wattage || psuSpecs.Wattage || '0', 10);
 
             // Estimate power consumption
             let estimatedPower = 0;
@@ -154,14 +172,14 @@ router.post('/validate', kioskGeneralLimit, async (req, res) => {
 
             // CPU power
             if (normalizedBuild.CPU) {
-                const cpuTDP = parseInt(normalizedBuild.CPU.specifications?.tdp || '65');
+                const cpuTDP = Number.parseInt(normalizedBuild.CPU.specifications?.tdp || '65', 10);
                 estimatedPower += cpuTDP;
                 powerBreakdown.CPU = cpuTDP + 'W';
             }
 
             // GPU power
             if (normalizedBuild.GPU) {
-                const gpuPower = parseInt(normalizedBuild.GPU.specifications?.tdp || '150');
+                const gpuPower = Number.parseInt(normalizedBuild.GPU.specifications?.tdp || '150', 10);
                 estimatedPower += gpuPower;
                 powerBreakdown.GPU = gpuPower + 'W';
             }

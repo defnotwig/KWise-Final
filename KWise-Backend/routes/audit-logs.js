@@ -62,7 +62,7 @@ router.get('/',
             if (userId) {
                 paramCount++;
                 whereConditions.push(`al.user_id = $${paramCount}`);
-                queryParams.push(parseInt(userId));
+                queryParams.push(Number.parseInt(userId, 10));
             }
 
             // Date range filter
@@ -89,7 +89,7 @@ router.get('/',
             }
 
             const whereClause = whereConditions.join(' AND ');
-            const offset = (parseInt(page) - 1) * parseInt(limit);
+            const offset = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
 
             // Get total count
             const countQuery = `
@@ -99,7 +99,7 @@ router.get('/',
                 WHERE ${whereClause}
             `;
             const countResult = await query(countQuery, queryParams);
-            const total = parseInt(countResult.rows[0].total);
+            const total = Number.parseInt(countResult.rows[0].total, 10);
 
             // Get logs with pagination
             const logsQuery = `
@@ -133,17 +133,17 @@ router.get('/',
                 LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
             `;
             
-            queryParams.push(parseInt(limit), offset);
+            queryParams.push(Number.parseInt(limit, 10), offset);
             const logsResult = await query(logsQuery, queryParams);
 
             res.json({
                 success: true,
                 data: logsResult.rows,
                 pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: Number.parseInt(page, 10),
+                    limit: Number.parseInt(limit, 10),
                     total,
-                    pages: Math.ceil(total / parseInt(limit))
+                    pages: Math.ceil(total / Number.parseInt(limit, 10))
                 }
             });
 
@@ -256,13 +256,13 @@ router.get('/stats',
                 success: true,
                 data: {
                     summary: {
-                        total: parseInt(stats.total_logs),
-                        today: parseInt(stats.today_logs),
-                        week: parseInt(stats.week_logs),
-                        month: parseInt(stats.month_logs),
-                        activeUsers: parseInt(stats.active_users),
-                        uniqueActions: parseInt(stats.unique_actions),
-                        affectedTables: parseInt(stats.affected_tables)
+                        total: Number.parseInt(stats.total_logs, 10),
+                        today: Number.parseInt(stats.today_logs, 10),
+                        week: Number.parseInt(stats.week_logs, 10),
+                        month: Number.parseInt(stats.month_logs, 10),
+                        activeUsers: Number.parseInt(stats.active_users, 10),
+                        uniqueActions: Number.parseInt(stats.unique_actions, 10),
+                        affectedTables: Number.parseInt(stats.affected_tables, 10)
                     },
                     topActions: actionsResult.rows,
                     topUsers: usersResult.rows
@@ -323,7 +323,7 @@ router.get('/export',
             if (userId) {
                 paramCount++;
                 whereConditions.push(`al.user_id = $${paramCount}`);
-                queryParams.push(parseInt(userId));
+                queryParams.push(Number.parseInt(userId, 10));
             }
 
             // Date range filter
@@ -418,13 +418,14 @@ router.delete('/cleanup',
     async (req, res) => {
         try {
             const { days = 90 } = req.query;
+            const safeDays = Number.parseInt(days, 10) || 90;
             
             const cleanupQuery = `
                 DELETE FROM audit_logs 
-                WHERE created_at < NOW() - INTERVAL '${parseInt(days)} days'
+                WHERE created_at < NOW() - $1 * INTERVAL '1 day'
             `;
             
-            const result = await query(cleanupQuery);
+            const result = await query(cleanupQuery, [safeDays]);
             
             res.json({
                 success: true,

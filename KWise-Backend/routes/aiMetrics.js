@@ -73,7 +73,7 @@ router.get('/summary', async (req, res) => {
  */
 router.get('/historical', async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 7;
+    const days = Number.parseInt(req.query.days, 10) || 7;
     
     if (days < 1 || days > 90) {
       return res.status(400).json({
@@ -167,7 +167,7 @@ router.post('/precompute', async (req, res) => {
       });
     }
     
-    const limit = parseInt(req.body.limit) || 20;
+    const limit = Number.parseInt(req.body.limit, 10) || 20;
 
     if (limit < 1 || limit > 100) {
       return res.status(400).json({

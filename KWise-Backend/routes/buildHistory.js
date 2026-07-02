@@ -7,7 +7,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
+const { protect, restrictTo } = require('../middleware/auth');
 
 /**
  * Generate a unique session ID for anonymous users
@@ -15,6 +16,13 @@ const crypto = require('crypto');
 function generateSessionId() {
     return crypto.randomBytes(16).toString('hex');
 }
+
+const isAdminUser = (user = {}) => ['admin', 'superadmin', 'developer'].includes(user.role);
+const canAccessBuild = (build, user) => build.is_public || (user && (isAdminUser(user) || String(build.user_id) === String(user.id)));
+const clampLimit = (value, fallback = 20, max = 100) => {
+    const parsed = Number.parseInt(value, 10);
+    return Math.min(Math.max(Number.isFinite(parsed) ? parsed : fallback, 1), max);
+};
 
 /**
  * @route   POST /api/builds
@@ -44,8 +52,15 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Generate session_id if not provided and no user_id
-        const finalSessionId = session_id || (!user_id ? generateSessionId() : null);
+        if (user_id && (!req.user || (!isAdminUser(req.user) && String(user_id) !== String(req.user.id)))) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to save a build for this user'
+            });
+        }
+
+        const finalUserId = user_id ? (isAdminUser(req.user) ? user_id : req.user.id) : null;
+        const finalSessionId = session_id || (!finalUserId ? generateSessionId() : null);
 
         const result = await pool.query(`
             INSERT INTO build_history (
@@ -56,7 +71,7 @@ router.post('/', async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
         `, [
-            user_id, finalSessionId, build_name, build_data,
+            finalUserId, finalSessionId, build_name, build_data,
             compatibility_score, total_price, total_wattage,
             bottleneck_percentage, is_public, tags
         ]);
@@ -81,9 +96,9 @@ router.post('/', async (req, res) => {
 /**
  * @route   GET /api/builds/:id
  * @desc    Load a specific build by ID
- * @access  Public
+ * @access  Public for shared builds; owner/admin for private builds
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id(\\d+|[0-9a-fA-F-]{36})', async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -109,11 +124,11 @@ router.get('/:id', async (req, res) => {
             WHERE id = $1
         `, [id]);
 
-        // Check if build is private and user has access
-        if (!build.is_public) {
-            // TODO: Add authentication check here
-            // For now, allow access but log warning
-            logger.warn(`Private build accessed: ${id}`);
+        if (!canAccessBuild(build, req.user)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to access this build'
+            });
         }
 
         res.json({
@@ -133,9 +148,9 @@ router.get('/:id', async (req, res) => {
 /**
  * @route   PUT /api/builds/:id
  * @desc    Update a build
- * @access  Public (will add auth later)
+ * @access  Owner/Admin
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id(\\d+|[0-9a-fA-F-]{36})', protect, async (req, res) => {
     try {
         const { id } = req.params;
         const {
@@ -159,6 +174,13 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: 'Build not found'
+            });
+        }
+
+        if (!canAccessBuild(existingBuild.rows[0], req.user)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to update this build'
             });
         }
 
@@ -239,23 +261,35 @@ router.put('/:id', async (req, res) => {
 /**
  * @route   DELETE /api/builds/:id
  * @desc    Delete a build
- * @access  Public (will add auth later)
+ * @access  Owner/Admin
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id(\\d+|[0-9a-fA-F-]{36})', protect, async (req, res) => {
     try {
         const { id } = req.params;
 
-        const result = await pool.query(
-            'DELETE FROM build_history WHERE id = $1 RETURNING *',
+        const existingBuild = await pool.query(
+            'SELECT user_id, is_public FROM build_history WHERE id = $1',
             [id]
         );
 
-        if (result.rows.length === 0) {
+        if (existingBuild.rows.length === 0) {
             return res.status(404).json({
                 success: false,
                 error: 'Build not found'
             });
         }
+
+        if (!canAccessBuild(existingBuild.rows[0], req.user)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to delete this build'
+            });
+        }
+
+        const result = await pool.query(
+            'DELETE FROM build_history WHERE id = $1 RETURNING *',
+            [id]
+        );
 
         logger.info(`Build deleted: ${id}`);
 
@@ -305,11 +339,11 @@ router.get('/public/browse', async (req, res) => {
 
         if (min_price) {
             query += ` AND total_price >= $${paramCount++}`;
-            params.push(parseFloat(min_price));
+            params.push(Number.parseFloat(min_price));
         }
         if (max_price) {
             query += ` AND total_price <= $${paramCount++}`;
-            params.push(parseFloat(max_price));
+            params.push(Number.parseFloat(max_price));
         }
         if (tags) {
             query += ` AND tags && $${paramCount++}`;
@@ -328,7 +362,7 @@ router.get('/public/browse', async (req, res) => {
 
         query += ` ORDER BY ${sortOptions[sort] || sortOptions.views}`;
         query += ` LIMIT $${paramCount++} OFFSET $${paramCount++}`;
-        params.push(parseInt(limit), parseInt(offset));
+        params.push(clampLimit(limit, 20, 100), Number.parseInt(offset, 10) || 0);
 
         const result = await pool.query(query, params);
 
@@ -342,10 +376,10 @@ router.get('/public/browse', async (req, res) => {
             data: {
                 builds: result.rows,
                 pagination: {
-                    total: parseInt(countResult.rows[0].total),
-                    limit: parseInt(limit),
-                    offset: parseInt(offset),
-                    has_more: parseInt(offset) + result.rows.length < parseInt(countResult.rows[0].total)
+                    total: Number.parseInt(countResult.rows[0].total, 10),
+                    limit: Number.parseInt(limit, 10),
+                    offset: Number.parseInt(offset, 10),
+                    has_more: Number.parseInt(offset, 10) + result.rows.length < Number.parseInt(countResult.rows[0].total, 10)
                 }
             }
         });
@@ -362,9 +396,9 @@ router.get('/public/browse', async (req, res) => {
 /**
  * @route   POST /api/builds/:id/like
  * @desc    Like a build
- * @access  Public
+ * @access  Authenticated
  */
-router.post('/:id/like', async (req, res) => {
+router.post('/:id(\\d+|[0-9a-fA-F-]{36})/like', protect, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -402,20 +436,29 @@ router.post('/:id/like', async (req, res) => {
 /**
  * @route   GET /api/builds/user/:identifier
  * @desc    Get user's builds (by user_id or session_id)
- * @access  Public
+ * @access  Owner/Admin
  */
-router.get('/user/:identifier', async (req, res) => {
+router.get('/user/:identifier', protect, async (req, res) => {
     try {
         const { identifier } = req.params;
         const { limit = 50 } = req.query;
 
+        if (!isAdminUser(req.user) && String(identifier) !== String(req.user.id)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to view these builds'
+            });
+        }
+
         const result = await pool.query(`
-            SELECT *
+            SELECT id, user_id, build_name, build_data, compatibility_score, total_price,
+                   total_wattage, bottleneck_percentage, is_public, tags, views_count,
+                   likes_count, created_at, updated_at
             FROM build_history
-            WHERE user_id = $1 OR session_id = $1
+            WHERE user_id = $1
             ORDER BY updated_at DESC
             LIMIT $2
-        `, [identifier, parseInt(limit)]);
+        `, [identifier, clampLimit(limit, 50, 100)]);
 
         res.json({
             success: true,
@@ -443,7 +486,7 @@ router.get('/view/popular', async (req, res) => {
         const result = await pool.query(`
             SELECT * FROM popular_builds
             LIMIT $1
-        `, [parseInt(limit)]);
+        `, [clampLimit(limit, 10, 100)]);
 
         res.json({
             success: true,

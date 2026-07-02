@@ -29,15 +29,8 @@ if (isTest) {
     });
 }
 
-// AI Service for low-stock recommendations
-let ollamaService;
-try {
-    ollamaService = require('../ai/services/ollamaService');
-    logger.info('✅ Ollama service loaded for admin AI features');
-} catch (error) {
-    logger.warn('⚠️ Ollama service not available - AI features will be limited');
-    ollamaService = null;
-}
+// Offline kiosk mode keeps legacy recommendation runtime disabled.
+const ollamaService = null;
 
 /**
  * Admin-specific endpoints for K-Wise Dashboard
@@ -98,32 +91,32 @@ router.get('/stats', protect, restrictTo('admin', 'superadmin', 'developer'), tr
         // Build comprehensive stats object exactly matching frontend expectations
         const stats = {
             // Order statistics
-            totalOrders: parseInt(totalOrdersResult.rows[0]?.count || 0),
-            completedOrders: parseInt(completedOrdersResult.rows[0]?.count || 0),
-            pendingOrders: parseInt(pendingOrdersResult.rows[0]?.count || 0),
-            cancelledOrders: parseInt(cancelledOrdersResult.rows[0]?.count || 0),
-            todayOrders: parseInt(todayOrdersResult.rows[0]?.count || 0),
-            weekOrders: parseInt(weekOrdersResult.rows[0]?.count || 0),
-            monthOrders: parseInt(monthOrdersResult.rows[0]?.count || 0),
+            totalOrders: Number.parseInt(totalOrdersResult.rows[0]?.count || 0, 10),
+            completedOrders: Number.parseInt(completedOrdersResult.rows[0]?.count || 0, 10),
+            pendingOrders: Number.parseInt(pendingOrdersResult.rows[0]?.count || 0, 10),
+            cancelledOrders: Number.parseInt(cancelledOrdersResult.rows[0]?.count || 0, 10),
+            todayOrders: Number.parseInt(todayOrdersResult.rows[0]?.count || 0, 10),
+            weekOrders: Number.parseInt(weekOrdersResult.rows[0]?.count || 0, 10),
+            monthOrders: Number.parseInt(monthOrdersResult.rows[0]?.count || 0, 10),
             
             // Product/Stock statistics - Real-time
-            totalProducts: parseInt(totalProductsResult.rows[0]?.count || 0),
-            lowStockProducts: parseInt(lowStockResult.rows[0]?.count || 0), // FIXED: Real low stock count
-            inventoryValue: parseFloat(inventoryValueResult.rows[0]?.total_value || 0), // FIXED: Real total value
+            totalProducts: Number.parseInt(totalProductsResult.rows[0]?.count || 0, 10),
+            lowStockProducts: Number.parseInt(lowStockResult.rows[0]?.count || 0, 10), // FIXED: Real low stock count
+            inventoryValue: Number.parseFloat(inventoryValueResult.rows[0]?.total_value || 0), // FIXED: Real total value
             
             // User statistics - Real-time 
-            totalUsers: parseInt(totalUsersResult.rows[0]?.count || 0), // FIXED: Real user count
-            activeUsers: parseInt(onlineUsersResult.rows[0]?.count || 0), // FIXED: Real active users (comprehensive check)
-            onlineUsers: parseInt(onlineUsersResult.rows[0]?.count || 0), // Same as active users
+            totalUsers: Number.parseInt(totalUsersResult.rows[0]?.count || 0, 10), // FIXED: Real user count
+            activeUsers: Number.parseInt(onlineUsersResult.rows[0]?.count || 0, 10), // FIXED: Real active users (comprehensive check)
+            onlineUsers: Number.parseInt(onlineUsersResult.rows[0]?.count || 0, 10), // Same as active users
             
             // Revenue statistics
-            totalRevenue: parseFloat(totalRevenueResult.rows[0]?.total || 0),
-            monthlyRevenue: parseFloat(monthlyRevenueResult.rows[0]?.total || 0),
+            totalRevenue: Number.parseFloat(totalRevenueResult.rows[0]?.total || 0),
+            monthlyRevenue: Number.parseFloat(monthlyRevenueResult.rows[0]?.total || 0),
             
             // Additional metadata
             uptime: process.uptime(),
             timestamp: new Date().toISOString(),
-            hasOrders: parseInt(totalOrdersResult.rows[0]?.count || 0) > 0
+            hasOrders: Number.parseInt(totalOrdersResult.rows[0]?.count || 0, 10) > 0
         };
 
         logger.info('Enhanced admin stats retrieved successfully', {
@@ -173,7 +166,7 @@ router.get('/stats/summary', protect, restrictTo('admin','superadmin','developer
             totalUsers: totalUsersQ.rows[0].count,
             totalProducts: totalProductsQ.rows[0].count,
             completedOrders: completedOrdersQ.rows[0].count,
-            totalStockValue: parseFloat(totalStockValueQ.rows[0].value || 0),
+            totalStockValue: Number.parseFloat(totalStockValueQ.rows[0].value || 0),
             lowStockCount: lowStockQ.rows[0].count,
             timestamp: new Date().toISOString()
         };
@@ -316,7 +309,7 @@ router.get('/orders', protect, restrictTo('admin', 'superadmin', 'developer'), a
             search 
         } = req.query;
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const offset = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
         
         let whereConditions = [];
         let queryParams = [];
@@ -354,7 +347,7 @@ router.get('/orders', protect, restrictTo('admin', 'superadmin', 'developer'), a
         const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
         // Get orders with pagination
-        queryParams.push(parseInt(limit));
+        queryParams.push(Number.parseInt(limit, 10));
         queryParams.push(offset);
 
         const ordersResult = await query(`
@@ -388,18 +381,18 @@ router.get('/orders', protect, restrictTo('admin', 'superadmin', 'developer'), a
         `, queryParams);
 
         const orders = ordersResult.rows;
-        const totalCount = orders.length > 0 ? parseInt(orders[0].total_count) : 0;
+        const totalCount = orders.length > 0 ? Number.parseInt(orders[0].total_count, 10) : 0;
 
         res.json({
             success: true,
             data: orders,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: Number.parseInt(page, 10),
+                limit: Number.parseInt(limit, 10),
                 total: totalCount,
-                totalPages: Math.ceil(totalCount / parseInt(limit)),
-                hasNext: (parseInt(page) * parseInt(limit)) < totalCount,
-                hasPrev: parseInt(page) > 1
+                totalPages: Math.ceil(totalCount / Number.parseInt(limit, 10)),
+                hasNext: (Number.parseInt(page, 10) * Number.parseInt(limit, 10)) < totalCount,
+                hasPrev: Number.parseInt(page, 10) > 1
             },
             timestamp: new Date().toISOString()
         });
@@ -447,17 +440,17 @@ router.get('/orders/stats', protect, restrictTo('admin', 'superadmin', 'develope
         ]);
 
         const stats = {
-            totalOrders: parseInt(totalOrdersResult.rows[0]?.count || 0),
-            pendingOrders: parseInt(pendingOrdersResult.rows[0]?.count || 0),
-            processingOrders: parseInt(processingOrdersResult.rows[0]?.count || 0),
-            completedOrders: parseInt(completedOrdersResult.rows[0]?.count || 0),
-            cancelledOrders: parseInt(cancelledOrdersResult.rows[0]?.count || 0),
-            todayOrders: parseInt(todayOrdersResult.rows[0]?.count || 0),
-            weekOrders: parseInt(weekOrdersResult.rows[0]?.count || 0),
-            monthOrders: parseInt(monthOrdersResult.rows[0]?.count || 0),
-            totalRevenue: parseFloat(totalRevenueResult.rows[0]?.total || 0),
-            todayRevenue: parseFloat(todayRevenueResult.rows[0]?.total || 0),
-            avgOrderValue: parseFloat(avgOrderValueResult.rows[0]?.avg || 0),
+            totalOrders: Number.parseInt(totalOrdersResult.rows[0]?.count || 0, 10),
+            pendingOrders: Number.parseInt(pendingOrdersResult.rows[0]?.count || 0, 10),
+            processingOrders: Number.parseInt(processingOrdersResult.rows[0]?.count || 0, 10),
+            completedOrders: Number.parseInt(completedOrdersResult.rows[0]?.count || 0, 10),
+            cancelledOrders: Number.parseInt(cancelledOrdersResult.rows[0]?.count || 0, 10),
+            todayOrders: Number.parseInt(todayOrdersResult.rows[0]?.count || 0, 10),
+            weekOrders: Number.parseInt(weekOrdersResult.rows[0]?.count || 0, 10),
+            monthOrders: Number.parseInt(monthOrdersResult.rows[0]?.count || 0, 10),
+            totalRevenue: Number.parseFloat(totalRevenueResult.rows[0]?.total || 0),
+            todayRevenue: Number.parseFloat(todayRevenueResult.rows[0]?.total || 0),
+            avgOrderValue: Number.parseFloat(avgOrderValueResult.rows[0]?.avg || 0),
             timestamp: new Date().toISOString()
         };
 
@@ -531,8 +524,8 @@ router.get('/logs', protect, restrictTo('admin', 'superadmin', 'developer'), asy
         const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
         // Add pagination parameters
-        queryParams.push(parseInt(limit));
-        queryParams.push(parseInt(offset));
+        queryParams.push(Number.parseInt(limit, 10));
+        queryParams.push(Number.parseInt(offset, 10));
 
         const logsQuery = `
             SELECT 
@@ -577,16 +570,16 @@ router.get('/logs', protect, restrictTo('admin', 'superadmin', 'developer'), asy
         const countResult = await query(countQuery, queryParams.slice(0, -2)); // Remove limit and offset params
 
         const logs = logsResult.rows || [];
-        const totalCount = parseInt(countResult.rows[0]?.total || 0);
+        const totalCount = Number.parseInt(countResult.rows[0]?.total || 0, 10);
 
         res.json({
             success: true,
             data: logs,
             pagination: {
                 total: totalCount,
-                limit: parseInt(limit),
-                offset: parseInt(offset),
-                hasNext: (parseInt(offset) + parseInt(limit)) < totalCount
+                limit: Number.parseInt(limit, 10),
+                offset: Number.parseInt(offset, 10),
+                hasNext: (Number.parseInt(offset, 10) + Number.parseInt(limit, 10)) < totalCount
             },
             timestamp: new Date().toISOString()
         });
@@ -833,7 +826,7 @@ router.get('/dev/logs', protect, restrictTo('admin', 'superadmin', 'developer'),
             LEFT JOIN users u ON u.id = al.user_id
             ORDER BY al.created_at DESC
             LIMIT $1
-        `, [parseInt(limit)]);
+        `, [Number.parseInt(limit, 10)]);
 
         res.json({
             success: true,
@@ -1121,7 +1114,7 @@ router.get('/inventory/alerts', protect, restrictTo('admin', 'superadmin', 'deve
     try {
         const { threshold = 5 } = req.query;
 
-        const alerts = await inventoryAlertsService.getInventoryAlerts(parseInt(threshold));
+        const alerts = await inventoryAlertsService.getInventoryAlerts(Number.parseInt(threshold, 10));
 
         res.json({
             success: true,
@@ -1146,7 +1139,7 @@ router.get('/inventory/low-stock', protect, restrictTo('admin', 'superadmin', 'd
     try {
         const { threshold = 5 } = req.query;
 
-        const products = await inventoryAlertsService.getLowStockProducts(parseInt(threshold));
+        const products = await inventoryAlertsService.getLowStockProducts(Number.parseInt(threshold, 10));
 
         res.json({
             success: true,
@@ -1202,7 +1195,7 @@ router.get('/analytics/revenue-trends', protect, restrictTo('admin', 'superadmin
     try {
         const { period = 'daily', limit = 30 } = req.query;
 
-        const trends = await analyticsService.getRevenueTrends(period, parseInt(limit));
+        const trends = await analyticsService.getRevenueTrends(period, Number.parseInt(limit, 10));
 
         res.json({
             success: true,
@@ -1229,7 +1222,7 @@ router.get('/analytics/top-products', protect, restrictTo('admin', 'superadmin',
     try {
         const { limit = 10, timeframe = 'all' } = req.query;
 
-        const products = await analyticsService.getTopProducts(parseInt(limit), timeframe);
+        const products = await analyticsService.getTopProducts(Number.parseInt(limit, 10), timeframe);
 
         res.json({
             success: true,
@@ -1366,111 +1359,59 @@ router.get('/analytics/summary', protect, restrictTo('admin', 'superadmin', 'dev
     }
 });
 
-// ==================== AI ANALYTICS ROUTES ====================
+// ==================== DISABLED AI ANALYTICS ROUTES ====================
 
-const adminAIAnalyticsService = require('../services/adminAIAnalyticsService');
+const sendDisabledAIAdminResponse = (res, feature) => {
+    res.status(410).json({
+        success: false,
+        code: 'AI_REMOVED',
+        source: 'deterministic',
+        aiEnabled: false,
+        feature,
+        message: `${feature} is disabled in offline kiosk mode`,
+        timestamp: new Date().toISOString()
+    });
+};
 
 /**
  * GET /api/admin/ai-analytics/business-insights
- * Get AI-powered business insights
+ * Disabled offline business insights endpoint
  * RBAC: admin, superadmin, developer
  */
 router.get('/ai-analytics/business-insights', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
-    try {
-        const analyticsService = require('../services/analyticsService');
-        const basicAnalytics = await analyticsService.getAnalyticsSummary();
-        const insights = await adminAIAnalyticsService.generateBusinessInsights(basicAnalytics);
-
-        res.status(200).json({
-            success: true,
-            data: insights,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        logger.error('Error generating business insights:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to generate business insights',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
+    sendDisabledAIAdminResponse(res, 'Admin AI business insights');
 });
 
 /**
  * GET /api/admin/ai-analytics/inventory-predictions
- * Get AI-powered inventory predictions
+ * Disabled offline inventory predictions endpoint
  * RBAC: admin, superadmin, developer
  */
 router.get('/ai-analytics/inventory-predictions', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
-    try {
-        const predictions = await adminAIAnalyticsService.predictInventoryNeeds({});
-
-        res.status(200).json({
-            success: true,
-            data: predictions,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        logger.error('Error predicting inventory needs:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to predict inventory needs',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
+    sendDisabledAIAdminResponse(res, 'Admin AI inventory predictions');
 });
 
 /**
  * GET /api/admin/ai-analytics/customer-behavior
- * Get AI-powered customer behavior analysis
+ * Disabled offline customer behavior endpoint
  * RBAC: admin, superadmin, developer
  */
 router.get('/ai-analytics/customer-behavior', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
-    try {
-        const behavior = await adminAIAnalyticsService.analyzeCustomerBehavior();
-
-        res.status(200).json({
-            success: true,
-            data: behavior,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        logger.error('Error analyzing customer behavior:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to analyze customer behavior',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
+    sendDisabledAIAdminResponse(res, 'Admin AI customer behavior analysis');
 });
 
 /**
  * GET /api/admin/ai-analytics/complete
- * Get comprehensive AI analytics
+ * Disabled offline comprehensive analytics endpoint
  * RBAC: admin, superadmin, developer
  */
 router.get('/ai-analytics/complete', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
-    try {
-        const aiAnalytics = await adminAIAnalyticsService.getAdminAIAnalytics();
-
-        res.status(200).json({
-            success: true,
-            data: aiAnalytics,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        logger.error('Error fetching AI analytics:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch AI analytics',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
+    sendDisabledAIAdminResponse(res, 'Admin AI analytics');
 });
 
 /**
  * POST /api/admin/ai/low-stock-recommendations
- * Get AI recommendations for low stock items (sale suggestions)
+ * Get deterministic recommendations for low stock items (sale suggestions)
  * RBAC: admin, superadmin, developer
  */
 router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
@@ -1498,11 +1439,11 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
                     AND created_at >= NOW() - INTERVAL '30 days'
                 `, []);
 
-                const totalCompletedOrders = parseInt(salesResult.rows[0]?.sales_count || 0);
+                const totalCompletedOrders = Number.parseInt(salesResult.rows[0]?.sales_count || 0, 10);
                 
                 // Estimate sales based on product stock level and total orders
                 // Query actual sales data for the past 30 days
-                const currentStock = parseInt(item.stock || 0);
+                const currentStock = Number.parseInt(item.stock || 0, 10);
                 
                 // Get actual sales from order_items table
                 const salesQuery = await query(`
@@ -1514,11 +1455,11 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
                       AND o.status IN ('completed', 'pending')
                 `, [item.id]);
                 
-                const sales30d = parseInt(salesQuery.rows[0]?.total_sold || 0);
+                const sales30d = Number.parseInt(salesQuery.rows[0]?.total_sold || 0, 10);
                 const salesVelocity = sales30d / 30; // Sales per day
                 const daysUntilStockout = salesVelocity > 0 ? Math.floor(currentStock / salesVelocity) : 999;
 
-                // Enhanced AI Logic: Calculate sale percentage based on multiple factors
+                // Deterministic stock-velocity logic: calculate sale percentage from local data.
                 let recommendation = '';
                 let suggestedSalePercent = 0;
 
@@ -1576,6 +1517,7 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
                     stockToSalesRatio: stockToSalesRatio.toFixed(2),
                     recommendation,
                     suggestedSalePercent,
+                    confidence: sales30d >= 10 ? 'High' : sales30d >= 5 ? 'Medium' : 'Low',
                     aiConfidence: sales30d >= 10 ? 'High' : sales30d >= 5 ? 'Medium' : 'Low'
                 };
 
@@ -1584,7 +1526,7 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
                 logger.error('Full error details:', itemError.stack);
                 
                 // Provide fallback recommendation based on stock level alone
-                const currentStock = parseInt(item.stock || 0);
+                const currentStock = Number.parseInt(item.stock || 0, 10);
                 let fallbackRec = '🔥 CLEARANCE - Recommend 25% sale to clear inventory.';
                 let fallbackPercent = 25;
                 
@@ -1598,6 +1540,7 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
                     salesVelocity: '0.00',
                     recommendation: fallbackRec,
                     suggestedSalePercent: fallbackPercent,
+                    confidence: 'Estimated',
                     aiConfidence: 'Estimated'
                 };
             }
@@ -1606,7 +1549,9 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
         res.status(200).json({
             success: true,
             recommendations,
-            modelUsed: 'Statistical Analysis (Ollama Deepseek R1 compatible)',
+            modelUsed: 'Offline stock velocity rules',
+            engine: 'deterministic',
+            aiEnabled: false,
             timestamp: new Date().toISOString()
         });
 
@@ -1614,7 +1559,7 @@ router.post('/ai/low-stock-recommendations', protect, restrictTo('admin', 'super
         logger.error('Error generating low stock recommendations:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to generate AI recommendations',
+            message: 'Failed to generate stock recommendations',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }

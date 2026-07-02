@@ -1,9 +1,17 @@
 const express = require('express');
 const authController = require('../controllers/authController');
 const passwordResetController = require('../controllers/passwordResetController');
-const { protect } = require('../middleware/auth');
+const { protect, restrictTo } = require('../middleware/auth');
 
 const router = express.Router();
+
+const optionalCurrentUser = (req, res, next) => {
+    if (!req.cookies?.jwt && !req.headers.authorization) {
+        return authController.getGuestSession(req, res, next);
+    }
+
+    return protect(req, res, next);
+};
 
 /**
  * @route   POST /api/auth/login
@@ -17,7 +25,7 @@ router.post('/login', authController.login);
  * @desc    Get logged in user
  * @access  Private
  */
-router.get('/me', protect, authController.getCurrentUser);
+router.get('/me', optionalCurrentUser, authController.getCurrentUser);
 
 /**
  * @route   PATCH /api/auth/change-password
@@ -31,7 +39,7 @@ router.patch('/change-password', protect, authController.changePassword);
  * @desc    Logout user (client side)
  * @access  Private
  */
-router.post('/logout', authController.logout);
+router.post('/logout', protect, authController.logout);
 
 /**
  * @route   GET /api/auth/verify
@@ -43,9 +51,9 @@ router.get('/verify', protect, authController.getCurrentUser);
 /**
  * @route   POST /api/auth/register
  * @desc    Register new user (create account)
- * @access  Public
+ * @access  Superadmin
  */
-router.post('/register', authController.register);
+router.post('/register', protect, restrictTo('superadmin'), authController.register);
 
 /**
  * @route   POST /api/auth/forgot-password
