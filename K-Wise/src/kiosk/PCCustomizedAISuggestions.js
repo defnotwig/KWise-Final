@@ -187,7 +187,7 @@ function PCCustomizedAISuggestions() {
       } else {
         const parts = budgetStr.split("-");
         if (parts.length === 2) {
-          maxBudget = parseInt(parts[1]);
+          maxBudget = Number.parseInt(parts[1], 10);
         }
       }
 
@@ -220,8 +220,8 @@ function PCCustomizedAISuggestions() {
             
             // Sort by closest price to allocated budget
             products.sort((a, b) => {
-              const priceA = parseFloat(a.price) || 0;
-              const priceB = parseFloat(b.price) || 0;
+              const priceA = Number.parseFloat(a.price) || 0;
+              const priceB = Number.parseFloat(b.price) || 0;
               return Math.abs(priceA - budget) - Math.abs(priceB - budget);
             });
 
@@ -352,7 +352,7 @@ function PCCustomizedAISuggestions() {
         category,
         icon: imageUrl || categoryIcons[category] || CPU1,
         name: component?.name || `No ${category}`,
-        price: parseFloat(component?.price) || 0,
+        price: Number.parseFloat(component?.price) || 0,
         specifications: component?.specifications,
         stock: component?.stock || 0,
         hasProduct: !!component,
@@ -363,7 +363,7 @@ function PCCustomizedAISuggestions() {
 
   // Calculate total price
   const totalPrice = buildComponents.reduce((sum, item) => {
-    const price = parseFloat(item?.price) || 0;
+    const price = Number.parseFloat(item?.price) || 0;
     return sum + price;
   }, 0);
 

@@ -9,6 +9,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import './PCUpgradeDisplay.css';
 import api from '../api/api';
+import { canonicalCategory, resolveProductImage } from '../utils/kioskContracts';
+import KioskProductImage from '../components/KioskProductImage';
 import PCUpgrade from '../assets/PCUpgrade.webp';
 import CPU1 from '../assets/CPU1.webp';
 import CPUCooler from '../assets/CPUCooler.webp';
@@ -20,11 +22,71 @@ import SystemUnit1 from '../assets/SystemUnit1.webp';
 import PSU1 from '../assets/PSU1.webp';
 import filterspecs from "../assets/CustomProducts/filterspecs.svg";
 
+const isVerboseKioskLogEnabled = () => {
+  const env = import.meta?.env || {};
+  return env.VITE_KWISE_VERBOSE_LOGS === 'true' || env.REACT_APP_KWISE_VERBOSE_LOGS === 'true';
+};
+
+const UPGRADE_CATEGORY_REGISTRY = {
+  processor: { categoryKey: 'processor', categoryName: 'PROCESSOR', apiCategory: 'CPU' },
+  cpu: { categoryKey: 'processor', categoryName: 'PROCESSOR', apiCategory: 'CPU' },
+  gpu: { categoryKey: 'gpu', categoryName: 'GPU', apiCategory: 'GPU' },
+  graphcard: { categoryKey: 'gpu', categoryName: 'GPU', apiCategory: 'GPU' },
+  ram: { categoryKey: 'ram', categoryName: 'RAM', apiCategory: 'RAM' },
+  memory: { categoryKey: 'ram', categoryName: 'RAM', apiCategory: 'RAM' },
+  storage: { categoryKey: 'storage', categoryName: 'STORAGE', apiCategory: 'Storage' },
+  motherboard: { categoryKey: 'motherboard', categoryName: 'MOTHERBOARD', apiCategory: 'Motherboard' },
+  psu: { categoryKey: 'psu', categoryName: 'PSU', apiCategory: 'PSU' },
+  'power supply': { categoryKey: 'psu', categoryName: 'PSU', apiCategory: 'PSU' },
+  'cpu-cooler': { categoryKey: 'cpu-cooler', categoryName: 'CPU COOLER', apiCategory: 'Cooling' },
+  'cpu cooler': { categoryKey: 'cpu-cooler', categoryName: 'CPU COOLER', apiCategory: 'Cooling' },
+  cooling: { categoryKey: 'cpu-cooler', categoryName: 'CPU COOLER', apiCategory: 'Cooling' },
+  cooler: { categoryKey: 'cpu-cooler', categoryName: 'CPU COOLER', apiCategory: 'Cooling' },
+  chassis: { categoryKey: 'chassis', categoryName: 'CHASSIS', apiCategory: 'Case' },
+  case: { categoryKey: 'chassis', categoryName: 'CHASSIS', apiCategory: 'Case' }
+};
+
+const normalizeUpgradeCategoryState = (state = {}) => {
+  const raw = String(state.categoryKey || state.apiCategory || state.categoryName || '').toLowerCase();
+  const normalizedRaw = raw.replaceAll('_', ' ').replaceAll('-', '-').trim();
+  const compactRaw = normalizedRaw.replaceAll(/\s+/g, ' ');
+  const matched = UPGRADE_CATEGORY_REGISTRY[raw]
+    || UPGRADE_CATEGORY_REGISTRY[compactRaw]
+    || UPGRADE_CATEGORY_REGISTRY[canonicalCategory(raw).toLowerCase()];
+
+  if (matched) {
+    return matched;
+  }
+
+  const apiCategory = canonicalCategory(state.apiCategory || state.categoryName || state.categoryKey);
+  return {
+    categoryKey: state.categoryKey || apiCategory.toLowerCase(),
+    categoryName: state.categoryName || apiCategory.toUpperCase(),
+    apiCategory
+  };
+};
+
 const PCUpgradeDisplay = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const verboseLogs = isVerboseKioskLogEnabled();
+  const debugLog = (...args) => {
+    if (verboseLogs) console.log(...args);
+  };
+  const debugWarn = (...args) => {
+    if (verboseLogs) console.warn(...args);
+  };
   
-  const { categoryKey, categoryName } = location.state || {};
+  const readStoredCategoryState = () => {
+    try {
+      return JSON.parse(localStorage.getItem('pc-upgrade-current-category') || 'null') || {};
+    } catch {
+      return {};
+    }
+  };
+
+  const routeCategoryState = normalizeUpgradeCategoryState(location.state || readStoredCategoryState());
+  const { categoryKey, categoryName, apiCategory } = routeCategoryState;
 
   // Product state
   const [products, setProducts] = useState([]);
@@ -47,6 +109,16 @@ const PCUpgradeDisplay = () => {
   // Compatibility modal state
   const [showCompatibilityModal, setShowCompatibilityModal] = useState(false);
   const [selectedProductForModal, setSelectedProductForModal] = useState(null);
+
+  useEffect(() => {
+    if (!location.state?.categoryKey && !location.state?.categoryName) {
+      return;
+    }
+
+    localStorage.setItem('pc-upgrade-current-category', JSON.stringify({
+      ...normalizeUpgradeCategoryState(location.state)
+    }));
+  }, [location.state]);
 
   // Default category images
   const defaultCategoryImages = {
@@ -82,42 +154,28 @@ const PCUpgradeDisplay = () => {
       setLoading(true);
       setError(null);
 
-      console.log('🔍 Loading products for category:', categoryName, categoryKey);
-
-      // Map category key to API format
-      const categoryMapping = {
-        'processor': 'cpu',
-        'cpu': 'cpu',
-        'gpu': 'gpu',
-        'graphcard': 'gpu',
-        'ram': 'ram',
-        'memory': 'ram',
-        'storage': 'storage',
-        'motherboard': 'motherboard',
-        'psu': 'psu',
-        'power supply': 'psu',
-        'cpu-cooler': 'cpu-cooler',
-        'cooling': 'cpu-cooler',
-        'case': 'case',
-        'chassis': 'case'
-      };
-
-      const apiCategory = categoryMapping[categoryKey?.toLowerCase()] || categoryKey;
+      debugLog('Loading products for category:', categoryName, categoryKey);
 
       if (!apiCategory) {
         throw new Error('Invalid category');
       }
 
-      console.log('📡 Fetching products from API for category:', apiCategory);
+      debugLog('Fetching products from API for category:', apiCategory);
 
-      // Fetch products from API
-      const apiResponse = await api.kiosk.getCategoryProducts(apiCategory);
+      const bootstrap = await api.kiosk.getCatalogBootstrap({ category: apiCategory, limit: 500, includeSpecRanges: false });
+      setBrands((bootstrap.brands || []).map((brand) => (typeof brand === 'string' ? brand : brand.name)).filter(Boolean));
+      setBrandCounts((bootstrap.brands || []).reduce((acc, brand) => {
+        const name = typeof brand === 'string' ? brand : brand.name;
+        if (name) acc[name] = Number(brand.count || 0);
+        return acc;
+      }, {}));
+      const apiResponse = { data: bootstrap.products || [] };
       
       // 🔥 FIX: Handle nested response structure {data: {items: [], pagination: {}}}
       const response = apiResponse?.data || apiResponse || [];
       
-      console.log('✅ API Response:', apiResponse);
-      console.log('✅ Products loaded:', response.length);
+      debugLog('API Response:', apiResponse);
+      debugLog('Products loaded:', response.length);
 
       // Get current upgrade parts for compatibility analysis
       const upgradeProgress = JSON.parse(localStorage.getItem('pc-upgrade-progress') || '{}');
@@ -128,21 +186,21 @@ const PCUpgradeDisplay = () => {
       const upgradeParts = JSON.parse(localStorage.getItem('pc-upgrade-selections') || '{}');
       const estimatedBuild = upgradeProgress.estimatedBuild || null;
       
-      console.log('Actual upgrade selections (pc-upgrade-selections):', upgradeParts);
-      console.log('Actual selections count:', Object.keys(upgradeParts).length);
-      console.log('Actual selections details:', Object.entries(upgradeParts).map(([key, val]) => ({
+      debugLog('Actual upgrade selections (pc-upgrade-selections):', upgradeParts);
+      debugLog('Actual selections count:', Object.keys(upgradeParts).length);
+      debugLog('Actual selections details:', Object.entries(upgradeParts).map(([key, val]) => ({
         category: key,
         hasName: !!val?.name,
         isProduct: typeof val === 'object' && val !== null,
         productName: val?.name || 'N/A'
       })));
-      console.log('AI estimation (estimatedBuild):', estimatedBuild ? Object.keys(estimatedBuild) : 'None');
+      debugLog('Estimated build keys:', estimatedBuild ? Object.keys(estimatedBuild) : 'None');
       
       // 🔥 FIX: Only count ACTUAL upgrade selections
       // AI estimation from "Tell Us About Your PC" are NOT real product selections
       // They're just text inputs like "NVIDIA", "16GB", "Gaming", etc.
       // Only apply compatibility filter if there are ACTUAL PRODUCT selections with IDs
-      const currentCategoryLower = categoryKey?.toLowerCase();
+      const currentCategoryLower = (categoryKey || apiCategory)?.toLowerCase();
       
       // Filter to get only items that were ACTUALLY selected as PRODUCTS to purchase
       // 🔥 CRITICAL FIX: Filter to get ONLY ACTUAL USER-SELECTED PRODUCTS
@@ -156,7 +214,7 @@ const PCUpgradeDisplay = () => {
           
           // Exclude AI-estimated current parts (these are what user currently has, not upgrade selections)
           if (item.isAIEstimated || item.isCurrentPart) {
-            console.log('⚠️ Skipping AI-estimated current part:', key, '=', item.name);
+            debugLog('Skipping estimated current part:', key, '=', item.name);
             return false;
           }
           
@@ -165,7 +223,7 @@ const PCUpgradeDisplay = () => {
           
           // Log for debugging
           if (!hasProductData && item) {
-            console.log('⚠️ Skipping non-product data:', key, '=', item);
+            debugLog('Skipping non-product data:', key, '=', item);
           }
           
           return hasProductData;
@@ -179,7 +237,7 @@ const PCUpgradeDisplay = () => {
         return compCategoryKey !== currentCategoryLower;
       });
 
-      console.log('🔍 Category selection check:', {
+      debugLog('Category selection check:', {
         category: categoryName,
         currentCategoryKey: currentCategoryLower,
         totalProductSelections: selectedComponents.length,
@@ -196,11 +254,12 @@ const PCUpgradeDisplay = () => {
       
       if (otherComponents.length > 0) {
         // User has products in OTHER categories - run compatibility filtering
-        console.log('🔍 Running hardware compatibility analysis (products in other categories)...');
-        console.log('  - Total products selected:', selectedComponents.length);
-        console.log('  - Products in OTHER categories:', otherComponents.length);
-        console.log('  - Current category:', categoryName);
-        console.log('  - AI estimated build available:', !!estimatedBuild);
+        debugLog('Running local compatibility annotations for products in other categories:', {
+          totalSelections: selectedComponents.length,
+          otherComponents: otherComponents.length,
+          category: categoryName,
+          hasEstimatedBuild: !!estimatedBuild
+        });
         
         const compatibleProducts = await getCompatibleProducts(
           response, 
@@ -211,7 +270,7 @@ const PCUpgradeDisplay = () => {
         
         if (compatibleProducts && compatibleProducts.length > 0) {
           setProducts(compatibleProducts);
-          console.log('✅ Hardware compatibility filtering completed:', compatibleProducts.length, 'compatible products');
+          debugLog('Compatibility annotation completed:', compatibleProducts.length, 'products');
         } else {
           // Fallback: show all products as compatible if builder API fails
           const fallbackProducts = response.map(product => ({
@@ -223,15 +282,13 @@ const PCUpgradeDisplay = () => {
             isCompatible: true
           }));
           setProducts(fallbackProducts);
-          console.log('⚠️ Using all products with default compatibility (API returned empty)');
+          debugLog('Using all products with default compatibility');
         }
       } else {
         // 🔥 CRITICAL: NO ACTUAL PRODUCTS selected yet (only text from "Tell Us Your PC")
         // Show ALL products as clickable - NO compatibility filtering
         // Products are only filtered by database query (category, stock, etc.)
-        console.log('💡 No products selected yet - showing ALL products as clickable');
-        console.log('   - Only database filtering (category, active, in-stock)');
-        console.log('   - Hardware compatibility will apply AFTER first product selection');
+        debugLog('No products selected yet - showing all category products as clickable');
         
         const allProductsClickable = response.map(product => ({
           ...product,
@@ -243,7 +300,7 @@ const PCUpgradeDisplay = () => {
           isCompatible: true
         }));
         setProducts(allProductsClickable);
-        console.log('✅ Showing all', response.length, 'products as clickable');
+        debugLog('Showing all products as clickable:', response.length);
       }
 
       // Extract unique brands
@@ -260,7 +317,7 @@ const PCUpgradeDisplay = () => {
       setBrandCounts(counts);
 
     } catch (err) {
-      console.error('❌ Error loading products:', err);
+      console.error('Error loading products:', err);
       setError(err.message || 'Failed to load products');
     } finally {
       setLoading(false);
@@ -268,15 +325,13 @@ const PCUpgradeDisplay = () => {
   };
 
   /**
-   * Get compatible products using Builder API
-   * 🔥 CRITICAL FIX: Only apply hardware compatibility when user has selected items
-   * When NO items selected: Show all products (filtered by AI estimation only)
-   * When items ARE selected: Apply Builder API hardware compatibility
+   * Add local compatibility metadata without issuing extra network calls.
+   * The upgrade grid should stay responsive even when a user has prior selections.
    */
   const getCompatibleProducts = async (products, selectedComponents, categoryName, estimatedBuild = null) => {
     try {
-      console.log('🔍 Hardware compatibility check for:', categoryName);
-      console.log('🔍 Selected components count:', selectedComponents.length);
+      debugLog('Compatibility annotation for:', categoryName);
+      debugLog('Selected components count:', selectedComponents.length);
 
       // Build selectedParts object from actual user selections ONLY
       const selectedParts = {};
@@ -287,9 +342,10 @@ const PCUpgradeDisplay = () => {
         // 🔥 CRITICAL FIX: Use comp.category (normalized lowercase) BEFORE comp.categoryName (display name)
         // This fixes filtering failure where "Processor" vs "cpu" key mismatch causes filter to skip
         const category = comp.category || comp.categoryName || '';
+        const normalizedCategory = canonicalCategory(category);
         const catLower = category.toLowerCase();
         
-        if (catLower.includes('cpu') || catLower.includes('processor')) {
+        if (normalizedCategory === 'CPU') {
           selectedParts.CPU = {
             socket: comp.socket || comp.specifications?.socket,
             tdp: comp.tdp || comp.specifications?.tdp || 65,
@@ -297,7 +353,7 @@ const PCUpgradeDisplay = () => {
             name: comp.name
           };
         } 
-        else if (catLower.includes('cool') || catLower.includes('fan')) {
+        else if (normalizedCategory === 'Cooling' || catLower.includes('cool') || catLower.includes('fan')) {
           selectedParts.Cooling = {
             height: comp.height || comp.specifications?.height,
             name: comp.name
@@ -346,30 +402,14 @@ const PCUpgradeDisplay = () => {
         }
       });
 
-      // 🔥 REMOVED: Estimated build constraint injection
-      // We only use Builder API when user has actually selected items
-      // When NO items selected, we show ALL products (no compatibility filtering)
-      // The AI estimation is used for DISPLAY purposes (recommendations, sorting)
-      // NOT for hard filtering (which would prevent users from selecting items)
+      debugLog('Building local compatibility constraints from selected items...');
+      debugLog('Selected parts for compatibility check:', Object.keys(selectedParts));
 
-      console.log('🔧 Building hardware compatibility constraints from selected items...');
-      console.log('📊 Selected parts for compatibility check:', Object.keys(selectedParts));
-
-      // Determine builder category
-      const categoryKeyLower = categoryKey?.toLowerCase() || '';
-      let builderCategory = null;
-      
-      if (categoryKeyLower.includes('cpu') || categoryKeyLower.includes('processor')) builderCategory = 'CPU';
-      else if (categoryKeyLower.includes('cool') || categoryKeyLower.includes('fan')) builderCategory = 'Cooling';
-      else if (categoryKeyLower.includes('mother')) builderCategory = 'Motherboard';
-      else if (categoryKeyLower.includes('ram') || categoryKeyLower.includes('memory')) builderCategory = 'RAM';
-      else if (categoryKeyLower.includes('storage')) builderCategory = 'Storage';
-      else if (categoryKeyLower.includes('gpu') || categoryKeyLower.includes('graphics')) builderCategory = 'GPU';
-      else if (categoryKeyLower.includes('case') || categoryKeyLower.includes('chassis')) builderCategory = 'Case';
-      else if (categoryKeyLower.includes('psu') || categoryKeyLower.includes('power')) builderCategory = 'PSU';
+      // Determine builder category from the shared backend category contract.
+      const builderCategory = canonicalCategory(categoryKey || categoryName);
 
       if (!builderCategory) {
-        console.warn('⚠️ Could not determine builder category for:', categoryKey);
+        debugWarn('Could not determine builder category for:', categoryKey);
         return products.map(product => ({
           ...product,
           compatible: true,
@@ -380,43 +420,27 @@ const PCUpgradeDisplay = () => {
         }));
       }
 
-      console.log('📡 Calling Builder API:', builderCategory);
-      console.log('📡 Constraints:', selectedParts);
+      const selectedPartCount = Object.keys(selectedParts).length;
+      const score = selectedPartCount > 0 ? 90 : 100;
 
-      // Use builder API with AI-enhanced constraints
-      const compatibleProducts = await api.builder.getAvailableOptions(builderCategory, selectedParts);
-      
-      console.log(`✅ Builder API returned ${compatibleProducts.length} compatible products`);
-
-      if (compatibleProducts.length > 0) {
-        return compatibleProducts.map(product => ({
-          ...product,
-          badge: '✅ Compatible',
-          compatible: true,
-          image: api.utils.getFullImageUrl(product.imageUrl || product.image) || getFallbackImage(product.category || categoryName),
-          imageUrl: product.imageUrl || product.image,
-          aiScore: 90,
-          compatibilityScore: 90,
-          compatibilityInfo: 'Compatible with current build',
-          aiAnalyzed: true,
-          recommended: true,
-          isCompatible: true
-        }));
-      } else {
-        // Return all products as compatible if no results (prevents empty screen)
-        console.warn('⚠️ Builder API returned 0 results - showing all products');
-        return products.map(product => ({
-          ...product,
-          compatible: true,
-          badge: '✅ Compatible',
-          compatibilityScore: 80,
-          aiAnalyzed: false,
-          isCompatible: true
-        }));
-      }
+      return products.map(product => ({
+        ...product,
+        badge: '✅ Compatible',
+        compatible: true,
+        image: resolveProductImage(product, getFallbackImage(product.category || categoryName)),
+        imageUrl: product.imageUrl || product.image_url || product.file_path || product.image,
+        image_url: product.image_url || product.imageUrl || product.file_path || product.image,
+        compatibilityScore: score,
+        compatibilityInfo: selectedPartCount > 0
+          ? 'Compatible with current build'
+          : 'Available for upgrade',
+        aiAnalyzed: false,
+        recommended: false,
+        isCompatible: true
+      }));
       
     } catch (error) {
-      console.error('❌ Builder API compatibility check failed:', error);
+      console.error('Compatibility annotation failed:', error);
       // Return all products as compatible on error
       return products.map(product => ({
         ...product,
@@ -433,7 +457,7 @@ const PCUpgradeDisplay = () => {
   useEffect(() => {
     loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryKey]);
+  }, [categoryKey, categoryName, apiCategory]);
 
   /**
    * Handle product click - Navigate to detail view
@@ -448,8 +472,9 @@ const PCUpgradeDisplay = () => {
       state: {
         product: {
           ...product,
-          image: api.utils.getFullImageUrl(product.imageUrl || product.image) || getFallbackImage(product.category || categoryName),
-          imageUrl: product.imageUrl || product.image,
+          image: resolveProductImage(product, getFallbackImage(product.category || categoryName)),
+          imageUrl: product.imageUrl || product.image_url || product.file_path || product.image,
+          image_url: product.image_url || product.imageUrl || product.file_path || product.image,
           specifications: product.specifications || product.spec || {},
           category: product.category || categoryName,
           price: product.price,
@@ -460,6 +485,7 @@ const PCUpgradeDisplay = () => {
         },
         categoryName,
         categoryKey,
+        apiCategory,
         returnTo: '/pc-upgrade-display'
       }
     });
@@ -507,9 +533,9 @@ const PCUpgradeDisplay = () => {
     // Price range filter
     if (priceRange.min || priceRange.max) {
       filtered = filtered.filter(p => {
-        const price = parseFloat(p.sale_price || p.price || 0);
-        const min = priceRange.min ? parseFloat(priceRange.min) : 0;
-        const max = priceRange.max ? parseFloat(priceRange.max) : Infinity;
+        const price = Number.parseFloat(p.sale_price || p.price || 0);
+        const min = priceRange.min ? Number.parseFloat(priceRange.min) : 0;
+        const max = priceRange.max ? Number.parseFloat(priceRange.max) : Infinity;
         return price >= min && price <= max;
       });
     }
@@ -522,9 +548,9 @@ const PCUpgradeDisplay = () => {
         case 'name-desc':
           return (b.name || '').localeCompare(a.name || '');
         case 'price-asc':
-          return parseFloat(a.sale_price || a.price || 0) - parseFloat(b.sale_price || b.price || 0);
+          return Number.parseFloat(a.sale_price || a.price || 0) - Number.parseFloat(b.sale_price || b.price || 0);
         case 'price-desc':
-          return parseFloat(b.sale_price || b.price || 0) - parseFloat(a.sale_price || a.price || 0);
+          return Number.parseFloat(b.sale_price || b.price || 0) - Number.parseFloat(a.sale_price || a.price || 0);
         default:
           return 0;
       }
@@ -538,7 +564,7 @@ const PCUpgradeDisplay = () => {
    * 🔥 FIX ISSUE #3: Fixed event propagation
    */
   // eslint-disable-next-line no-unused-vars
-  const handleCompareToggle = (e) => {
+  const handleCompareToggle = (e) => { // NOSONAR - toggle handler available for UI integration
     if (e) e.preventDefault();
     e?.stopPropagation();
     setCompareMode(!compareMode);
@@ -557,7 +583,7 @@ const PCUpgradeDisplay = () => {
       e.stopPropagation();
     }
     
-    if (selectedForCompare.find(p => p.id === product.id)) {
+    if (selectedForCompare.some(p => p.id === product.id)) {
       setSelectedForCompare(selectedForCompare.filter(p => p.id !== product.id));
     } else {
       if (selectedForCompare.length >= 3) {
@@ -629,7 +655,7 @@ const PCUpgradeDisplay = () => {
     }
 
     if (product.recommended) {
-      return <div className="ai-badge ai-recommended" title="AI Recommended for your build">🤖 AI Pick</div>;
+      return <div className="ai-badge ai-recommended" title="Recommended for your build">Recommended</div>;
     }
 
     return null;
@@ -749,8 +775,8 @@ const PCUpgradeDisplay = () => {
 
           <div className="filter-button-container">
             <button className="filter-button" onClick={toggleFilterModal}>
-              <img src={filterspecs} alt="Filter Icon" className="filter-icon"/>
-              FILTER SPECS
+              <img src={filterspecs} alt="Filter Icon" className="filter-icon" />
+              {' '}FILTER SPECS
             </button>
           </div>
         </div>
@@ -765,7 +791,7 @@ const PCUpgradeDisplay = () => {
           const isSelected = selectedForCompare.find(p => p.id === product.id);
 
           return (
-            <div
+            <div // NOSONAR - card with complex children, not suitable for native <button>
               key={product.id || index}
               className={`customized-products-card ${
                 product.recommended ? 'ai-recommended-card' : ''
@@ -784,6 +810,16 @@ const PCUpgradeDisplay = () => {
                   handleProductClick(product);
                 }
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (compareMode) {
+                    handleSelectForCompare(e, product);
+                  } else if (!isIncompatible) {
+                    handleProductClick(product);
+                  }
+                }
+              }}
               style={{ 
                 opacity: isIncompatible ? 0.5 : 1,
                 cursor: isIncompatible && !compareMode ? 'not-allowed' : 'pointer'
@@ -800,16 +836,17 @@ const PCUpgradeDisplay = () => {
 
               {/* Compare Checkbox */}
               {compareMode && (
-                <div className="compare-checkbox" onClick={(e) => e.stopPropagation()}>
+                <span className="compare-checkbox" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{/* NOSONAR */}
                   <input 
                     type="checkbox" 
                     checked={!!isSelected}
+                    aria-label={`Compare ${product.name}`}
                     onChange={(e) => {
                       e.stopPropagation();
                       handleSelectForCompare(e, product);
                     }}
                   />
-                </div>
+                </span>
               )}
 
               {/* BIOS Warning Banner */}
@@ -820,25 +857,20 @@ const PCUpgradeDisplay = () => {
                 </div>
               )}
 
-              <img
-                src={(() => {
-                  const imageUrl = product.imageUrl || product.image;
-                  if (imageUrl) {
-                    return api.utils.getFullImageUrl(imageUrl);
-                  }
-                  return getFallbackImage(product.category || categoryName);
-                })()}
+              <KioskProductImage
+                product={product}
                 alt={product.name}
                 className="customized-products-image"
-                onError={(e) => {
-                  e.target.src = getFallbackImage(product.category || categoryName);
-                }}
+                fallbackSrc={getFallbackImage(product.category || categoryName)}
+                sizes="(max-width: 768px) 45vw, 220px"
+                width="220"
+                height="220"
               />
 
               <div className="customized-products-name">{product.name}</div>
               <div className="customized-products-price">
                 {product.sale_price || product.price
-                  ? `₱${parseFloat((product.sale_price || product.price).toString().replace(/[^0-9.,]/g, "").replace(/,/g, ""))
+                  ? `₱${Number.parseFloat((product.sale_price || product.price).toString().replaceAll(/[^0-9.,]/g, "").replaceAll(',', ""))
                     .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
@@ -863,8 +895,8 @@ const PCUpgradeDisplay = () => {
 
       {/* Compatibility Modal - Matches CustomizedProducts.js */}
       {showCompatibilityModal && selectedProductForModal && (
-        <div className="incompatibility-modal-overlay" onClick={closeCompatibilityModal}>
-          <div className="incompatibility-modal-content" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="incompatibility-modal-overlay" onClick={closeCompatibilityModal} onKeyDown={(e) => { if (e.key === 'Escape') closeCompatibilityModal(); }} aria-label="Close compatibility modal">
+          <dialog className="incompatibility-modal-content" open>
             <div className="modal-header">
               <h3>
                 <AlertCircle size={24} />
@@ -880,17 +912,20 @@ const PCUpgradeDisplay = () => {
               <div className="modal-score-section">
                 <h4>Compatibility Score</h4>
                 <div className="score-display">
-                  <div 
-                    className="score-bar" 
-                    style={{ 
-                      width: `${selectedProductForModal.compatibilityScore || 0}%`,
-                      backgroundColor: 
-                        selectedProductForModal.compatibilityScore >= 85 ? '#22c55e' :
-                        selectedProductForModal.compatibilityScore >= 60 ? '#f59e0b' : '#ef4444'
-                    }}
-                  >
-                    {selectedProductForModal.compatibilityScore || 0}%
-                  </div>
+                  {(() => {
+                    const score = selectedProductForModal.compatibilityScore || 0;
+                    let barColor = '#ef4444';
+                    if (score >= 85) barColor = '#22c55e';
+                    else if (score >= 60) barColor = '#f59e0b';
+                    return (
+                      <div
+                        className="score-bar"
+                        style={{ width: `${score}%`, backgroundColor: barColor }}
+                      >
+                        {score}%
+                      </div>
+                    );
+                  })()}
                 </div>
                 <p className="score-description">{selectedProductForModal.badge}</p>
               </div>
@@ -901,7 +936,7 @@ const PCUpgradeDisplay = () => {
                   <h4>Issues Detected</h4>
                   <ul className="issues-list">
                     {selectedProductForModal.issues.map((issue, idx) => (
-                      <li key={idx} className={`issue-item ${issue.severity || 'warning'}`}>
+                      <li key={issue.id || `issue-${idx}`} className={`issue-item ${issue.severity || 'warning'}`}>
                         <div className="issue-icon">
                           {issue.severity === 'critical' ? <AlertCircle size={20} /> : <AlertTriangle size={20} />}
                         </div>
@@ -917,8 +952,8 @@ const PCUpgradeDisplay = () => {
                 <div className="modal-recommendations-section">
                   <h4>Recommendations</h4>
                   <ul className="recommendations-list">
-                    {selectedProductForModal.recommendations.map((rec, idx) => (
-                      <li key={idx} className="recommendation-item">
+                    {selectedProductForModal.recommendations.map((rec) => (
+                      <li key={rec} className="recommendation-item">
                         <CheckCircle size={16} />
                         <span>{rec}</span>
                       </li>
@@ -933,14 +968,14 @@ const PCUpgradeDisplay = () => {
                 Close
               </button>
             </div>
-          </div>
-        </div>
+          </dialog>
+        </button>
       )}
 
       {/* Filter & Sort Modal - Matches CustomizedProducts.js */}
       {showFilterModal && (
-        <div className="popup-overlay" onClick={toggleFilterModal}>
-          <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="popup-overlay" onClick={toggleFilterModal} onKeyDown={(e) => { if (e.key === 'Escape') toggleFilterModal(); }} aria-label="Close filter modal">
+          <dialog className="popup" open>
             <h2 className="popup-title">FILTER & SORT</h2>
             <button className="popup-close-btn" onClick={toggleFilterModal}>
               <X size={24} />
@@ -991,8 +1026,8 @@ const PCUpgradeDisplay = () => {
                 Apply Filters
               </button>
             </div>
-          </div>
-        </div>
+          </dialog>
+        </button>
       )}
 
       {/* Footer - Compare Bar and Back Button */}

@@ -8,6 +8,14 @@ import onlineBank from "../assets/PaymentWindow/onlineBank.svg";
 import installment from "../assets/PaymentWindow/installment.svg";
 import cash from "../assets/PaymentWindow/cash.svg";
 
+const createOrderRequestKey = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return `kiosk-order-${globalThis.crypto.randomUUID()}`;
+  }
+
+  return `kiosk-order-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const PaymentWindow = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +25,8 @@ const PaymentWindow = () => {
   // Check if we need to auto-create order (coming back from payment method selection)
   // Track if order creation has been triggered to prevent duplicates
   const orderCreationTriggered = React.useRef(false);
+  const orderSubmissionInFlight = React.useRef(false);
+  const orderIdempotencyKeyRef = React.useRef(null);
 
   useEffect(() => {
     if (location.state?.autoCreateOrder && !loading && !orderCreationTriggered.current) {
@@ -95,9 +105,9 @@ const PaymentWindow = () => {
           .map(([key, component]) => ({
             id: component.id || component.product_id || null,
             name: component.name || component.product_name || 'Custom Component',
-            price: parseFloat(component.price || 0),
+            price: Number.parseFloat(component.price || 0),
             quantity: 1,
-            totalPrice: parseFloat(component.price || 0),
+            totalPrice: Number.parseFloat(component.price || 0),
             category: component.category || key
           }));
       } else if (customOrders.length > 0) {
@@ -106,9 +116,9 @@ const PaymentWindow = () => {
           order.items.filter(Boolean).map(item => ({
             id: item.id || null,
             name: item.name || item.component || 'Custom Component',
-            price: parseFloat(item.price || 0),
+            price: Number.parseFloat(item.price || 0),
             quantity: (item.quantity || 1) * (order.quantity || 1),
-            totalPrice: parseFloat(item.price || 0) * (item.quantity || 1) * (order.quantity || 1),
+            totalPrice: Number.parseFloat(item.price || 0) * (item.quantity || 1) * (order.quantity || 1),
             category: item.category || 'custom'
           }))
         );
@@ -144,9 +154,9 @@ const PaymentWindow = () => {
           orderItems.push({
             id: order.baseProduct.id || null,
             name: order.baseProduct.name || 'Custom PreBuilt PC',
-            price: parseFloat(order.totalPrice || 0),
+            price: Number.parseFloat(order.totalPrice || 0),
             quantity: order.quantity || 1,
-            totalPrice: parseFloat(order.totalPrice || 0) * (order.quantity || 1),
+            totalPrice: Number.parseFloat(order.totalPrice || 0) * (order.quantity || 1),
             category: 'prebuilt',
             isMainProduct: true,
             // ✅ NEW: Include metadata for Community Build detection
@@ -190,7 +200,7 @@ const PaymentWindow = () => {
             orderItems.push({
               id: compData.id || compData.part_id || null,
               name: `[${order.baseProduct.name}] ${compType.toUpperCase()}: ${componentValue}`,
-              price: parseFloat(compData.price || compData.part_price || 0),
+              price: Number.parseFloat(compData.price || compData.part_price || 0),
               quantity: order.quantity || 1,
               totalPrice: 0, // Price included in main product
               category: 'prebuilt-component',
@@ -206,9 +216,9 @@ const PaymentWindow = () => {
               orderItems.push({
                 id: peripheral.id || null,
                 name: peripheral.name,
-                price: parseFloat(peripheral.price || 0),
+                price: Number.parseFloat(peripheral.price || 0),
                 quantity: peripheral.quantity || 1,
-                totalPrice: parseFloat(peripheral.price || 0) * (peripheral.quantity || 1),
+                totalPrice: Number.parseFloat(peripheral.price || 0) * (peripheral.quantity || 1),
                 category: peripheral.category || 'peripheral',
                 isPeripheral: true
               });
@@ -221,9 +231,9 @@ const PaymentWindow = () => {
           orderItems.push({
             id: order.product.id || null,
             name: order.product.name || 'PreBuilt PC',
-            price: parseFloat(order.product.price || 0),
+            price: Number.parseFloat(order.product.price || 0),
             quantity: order.quantity || 1,
-            totalPrice: parseFloat(order.product.price || 0) * (order.quantity || 1),
+            totalPrice: Number.parseFloat(order.product.price || 0) * (order.quantity || 1),
             category: 'prebuilt',
             isMainProduct: true
           });
@@ -266,9 +276,9 @@ const PaymentWindow = () => {
           orderItems.push({
             id: order.addon.id || null,
             name: order.addon.name,
-            price: parseFloat(order.addon.price || 0),
+            price: Number.parseFloat(order.addon.price || 0),
             quantity: order.quantity || 1,
-            totalPrice: parseFloat(order.addon.price || 0) * (order.quantity || 1),
+            totalPrice: Number.parseFloat(order.addon.price || 0) * (order.quantity || 1),
             category: order.addon.category || 'addon',
             isAddon: true
           });
@@ -282,14 +292,14 @@ const PaymentWindow = () => {
         // Parse price from formatted string (e.g., "₱1,000.00") or priceNumeric field
         let price = 0;
         if (service.tier?.priceNumeric) {
-          price = parseFloat(service.tier.priceNumeric);
+          price = Number.parseFloat(service.tier.priceNumeric);
         } else if (service.tier?.price) {
           // Remove currency symbol, commas, and parse
-          price = parseFloat(String(service.tier.price).replace(/[₱,]/g, ''));
+          price = Number.parseFloat(String(service.tier.price).replaceAll(/[₱,]/g, ''));
         } else if (service.priceNumeric) {
-          price = parseFloat(service.priceNumeric);
+          price = Number.parseFloat(service.priceNumeric);
         } else if (service.price) {
-          price = parseFloat(String(service.price).replace(/[₱,]/g, ''));
+          price = Number.parseFloat(String(service.price).replaceAll(/[₱,]/g, ''));
         }
 
         // Get assessment data to include in the order item description
@@ -332,9 +342,9 @@ const PaymentWindow = () => {
         order.items.map(item => ({
           id: item.id || null,
           name: item.name || item.component || 'Upgrade Component',
-          price: parseFloat(item.price || 0),
+          price: Number.parseFloat(item.price || 0),
           quantity: (item.quantity || 1) * (order.quantity || 1),
-          totalPrice: parseFloat(item.price || 0) * (item.quantity || 1) * (order.quantity || 1),
+          totalPrice: Number.parseFloat(item.price || 0) * (item.quantity || 1) * (order.quantity || 1),
           category: 'upgrade' // Always set to 'upgrade' for proper receipt detection
         }))
       );
@@ -357,9 +367,9 @@ const PaymentWindow = () => {
       items = cart.map(item => ({
         id: item.id || null,
         name: item.name || 'PC Component',
-        price: parseFloat(item.price || 0),
+        price: Number.parseFloat(item.price || 0),
         quantity: item.quantity || 1,
-        totalPrice: parseFloat(item.price || 0) * (item.quantity || 1),
+        totalPrice: Number.parseFloat(item.price || 0) * (item.quantity || 1),
         category: item.category || 'component'
       }));
     }
@@ -415,18 +425,30 @@ const PaymentWindow = () => {
   // TASK 4 ENHANCEMENT: Added duplicate detection, debouncing, and comprehensive loading states
   const createOrderWithQueue = async (paymentMethod) => {
     // TASK 4 FIX: Prevent double-clicks with debouncing
-    if (loading) {
+    if (loading || orderSubmissionInFlight.current) {
       console.warn('🚫 Order creation already in progress, ignoring duplicate click');
       return;
     }
 
+    orderSubmissionInFlight.current = true;
     setLoading(true);
     setError('');
 
     try {
       // Validate and prepare order data
       const orderData = prepareOrderData(paymentMethod);
-      console.log('Creating order with queue management:', orderData);
+      if (!orderIdempotencyKeyRef.current) {
+        orderIdempotencyKeyRef.current = createOrderRequestKey();
+      }
+      orderData.clientRequestId = orderIdempotencyKeyRef.current;
+      orderData.idempotencyKey = orderIdempotencyKeyRef.current;
+      console.log('Creating order with queue management:', {
+        itemCount: orderData.items?.length || 0,
+        totalAmount: orderData.totalAmount,
+        serviceType: orderData.serviceType,
+        transactionOrigin: orderData.transactionOrigin,
+        idempotencyKey: orderIdempotencyKeyRef.current
+      });
 
       // Additional frontend validation
       if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
@@ -535,6 +557,7 @@ const PaymentWindow = () => {
       }
 
       setError(errorMessage);
+      orderSubmissionInFlight.current = false;
       setLoading(false);
     }
   };

@@ -4,7 +4,6 @@ import './PCUpgrade.css';
 import './PCCustomized.css';
 import './PCUpgradeEstimate.css'; // NEW - PCCleaningAssessment-style design
 import PcUpgrade from "../assets/PCUpgrade.webp";
-import aiService from "../api/aiService"; // AI integration for upgrade recommendations
 import api from '../api/api'; // API for fetching upgrade categories
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/networkConfig';
@@ -30,6 +29,126 @@ import videoediting from '../assets/UsageSelection/videoediting.svg';
 import recent from "../assets/PCUpgrade/recent.svg";
 import midage from "../assets/PCUpgrade/midage.svg";
 import old from "../assets/PCUpgrade/old.svg";
+
+const CATEGORY_TO_UPGRADE_ID = {
+  CPU: 'processor',
+  GPU: 'gpu',
+  RAM: 'ram',
+  Storage: 'storage',
+  Motherboard: 'motherboard',
+  PSU: 'psu',
+  Cooling: 'cpu-cooler',
+  Case: 'chassis'
+};
+
+const getAgeBand = (yearPurchased) => {
+  const year = Number.parseInt(yearPurchased, 10);
+  if (!year) return 'unknown';
+
+  const age = Math.max(0, new Date().getFullYear() - year);
+  if (age <= 3) return 'recent';
+  if (age <= 7) return 'mid';
+  return 'old';
+};
+
+const getBudgetBand = (budget) => {
+  const value = Number.parseInt(budget, 10);
+  if (!value) return 'unknown';
+  if (value < 26000) return 'entry';
+  if (value < 51000) return 'mainstream';
+  if (value < 76000) return 'performance';
+  return 'highEnd';
+};
+
+const uniqueCategories = (categories) => [...new Set(categories.filter(Boolean))];
+
+const buildLocalUpgradeEstimate = ({ usage, yearPurchased, budget }) => {
+  const ageBand = getAgeBand(yearPurchased);
+  const budgetBand = getBudgetBand(budget);
+  const normalizedUsage = String(usage || 'General Use').toLowerCase();
+
+  const generationLabel = ageBand === 'recent'
+    ? 'recent-generation'
+    : ageBand === 'mid'
+      ? 'mid-generation'
+      : 'older-generation';
+  const budgetLabel = budgetBand === 'highEnd'
+    ? 'high-performance'
+    : budgetBand === 'performance'
+      ? 'performance'
+      : budgetBand === 'mainstream'
+        ? 'mainstream'
+        : 'entry-level';
+
+  const estimated = {
+    CPU: `${generationLabel} ${budgetLabel} CPU class`,
+    Motherboard: `${generationLabel} motherboard platform`,
+    RAM: ageBand === 'recent' ? '16GB or higher DDR4/DDR5 memory' : '8GB to 16GB DDR3/DDR4 memory',
+    Storage: budgetBand === 'entry' ? 'SATA SSD or hard drive storage' : 'SSD-based storage',
+    GPU: normalizedUsage.includes('gaming') || normalizedUsage.includes('video') || normalizedUsage.includes('content')
+      ? `${budgetLabel} dedicated graphics card`
+      : 'integrated or entry dedicated graphics',
+    PSU: budgetBand === 'highEnd' || normalizedUsage.includes('gaming') ? '600W+ power supply class' : '450W to 550W power supply class',
+    Cooling: ageBand === 'old' ? 'stock or aging air cooler' : 'standard CPU cooling',
+    Case: 'standard ATX or mATX case'
+  };
+
+  let suggestedCategories = ['RAM', 'Storage'];
+  if (normalizedUsage.includes('gaming')) {
+    suggestedCategories = ['GPU', 'RAM', 'CPU', 'PSU'];
+  } else if (normalizedUsage.includes('content') || normalizedUsage.includes('video')) {
+    suggestedCategories = ['CPU', 'GPU', 'RAM', 'Storage'];
+  } else if (normalizedUsage.includes('programming') || normalizedUsage.includes('work')) {
+    suggestedCategories = ['RAM', 'Storage', 'CPU'];
+  }
+
+  if (ageBand === 'old') {
+    suggestedCategories.push('Motherboard', 'PSU', 'Cooling');
+  } else if (ageBand === 'mid') {
+    suggestedCategories.push('CPU');
+  }
+
+  const confidence = ageBand === 'unknown' || budgetBand === 'unknown' ? 0.62 : ageBand === 'old' ? 0.68 : 0.74;
+
+  return {
+    estimated,
+    matched: {},
+    confidence,
+    suggestedCategories: uniqueCategories(suggestedCategories)
+  };
+};
+
+const buildLocalRecommendations = (selectedCategories, usage) => {
+  const categories = uniqueCategories(selectedCategories.length ? selectedCategories : ['RAM', 'Storage']);
+  const primary = categories[0] || 'RAM';
+  const secondary = categories[1] || primary;
+  const tertiary = categories[2] || secondary;
+
+  const makeRecommendation = (tier, priority, price) => ({
+    tier,
+    priority,
+    component: {
+      name: `${tier} ${priority} upgrade path for ${usage || 'General Use'}`,
+      price
+    },
+    performanceGain: tier === 'Budget' ? 'Moderate uplift' : tier === 'Balanced' ? 'Strong uplift' : 'Maximum practical uplift',
+    compatibility: 'Verify exact model against selected parts before checkout'
+  });
+
+  return {
+    bottlenecks: categories,
+    recommendations: {
+      budget: makeRecommendation('Budget', primary, 5000),
+      midRange: makeRecommendation('Balanced', secondary, 12000),
+      highEnd: makeRecommendation('Performance', tertiary, 25000)
+    }
+  };
+};
+
+const formatConfidencePercent = (confidence) => {
+  const value = Number(confidence) || 0;
+  return value <= 1 ? Math.round(value * 100) : Math.round(value);
+};
 
 const PCUpgrade = () => {
   const navigate = useNavigate();
@@ -388,94 +507,29 @@ const PCUpgrade = () => {
         return;
       }
 
-      console.log('📊 Estimating PC build...', estimateData);
+      console.log('Estimating PC build locally...', estimateData);
 
-      // Call AI estimation API
-      const response = await aiService.estimateCurrentBuild({
-        usage: estimateData.usage,
-        yearPurchased: parseInt(estimateData.yearPurchased),
-        budget: estimateData.budget ? parseInt(estimateData.budget) : null,
-        knownParts: estimateData.knownParts
-      });
-
-      if (!response.success) {
-        // Check if AI service is disabled/unavailable
-        if (response.data?.error === 'ai_service_disabled' || 
-            response.data?.error === 'ollama_not_running') {
-          setEstimateError(
-            '🤖 AI estimation is currently unavailable. Please fill the form manually based on your PC knowledge. ' +
-            'If you need help, contact our support team.'
-          );
-          // Close modal and let user fill manually
-          setShowEstimateModal(false);
-          return;
-        }
-        throw new Error(response.message || 'Failed to estimate build');
-      }
-
-      console.log('✅ Build estimated successfully:', response.data);
-
-      // Store estimation results
-      setEstimatedBuild(response.data.estimated);
-      setBuildConfidence(response.data.confidence);
-
-      // Auto-fill currentParts with matched products
-      const matched = response.data.matched || {};
-      const newCurrentParts = {};
-      const suggestedCategories = [];
-
-      for (const [category, product] of Object.entries(matched)) {
+      const estimate = buildLocalUpgradeEstimate(estimateData);
+      const newCurrentParts = Object.entries(estimate.matched || {}).reduce((acc, [category, product]) => {
         if (product && product.id) {
-          // 🔥 CRITICAL FIX: Mark AI-estimated products to distinguish from user-selected upgrades
-          // These represent what user CURRENTLY HAS, not what they want to UPGRADE TO
-          // They should NOT trigger compatibility filtering
-          newCurrentParts[category] = {
+          acc[category] = {
             ...product,
-            isAIEstimated: true, // Flag to identify AI-estimated current parts
-            isCurrentPart: true  // Alternative flag for clarity
+            isCurrentPart: true
           };
-          
-          // AI suggests upgrading based on usage type
-          // For Gaming: GPU, CPU, RAM priority
-          // For Content Creation: GPU, CPU, Storage priority
-          // For Office/General: RAM, Storage priority
-          if (estimateData.usage === 'Gaming') {
-            if (['GPU', 'CPU', 'RAM'].includes(category)) {
-              suggestedCategories.push(category);
-            }
-          } else if (estimateData.usage === 'Content Creation') {
-            if (['GPU', 'CPU', 'Storage'].includes(category)) {
-              suggestedCategories.push(category);
-            }
-          } else {
-            if (['RAM', 'Storage'].includes(category)) {
-              suggestedCategories.push(category);
-            }
-          }
         }
-      }
+        return acc;
+      }, {});
 
+      setEstimatedBuild(estimate.estimated);
+      setBuildConfidence(estimate.confidence);
       setCurrentParts(prev => ({ ...prev, ...newCurrentParts }));
-      setAiSuggestedCategories(suggestedCategories);
+      setAiSuggestedCategories(estimate.suggestedCategories);
       
       // Store usage for recommendations
       setEstimatedUsage(estimateData.usage);
 
-      // Auto-select AI-recommended categories
-      // Map category names to upgrade option IDs
-      const categoryToId = {
-        'CPU': 'processor',
-        'GPU': 'gpu',
-        'RAM': 'ram',
-        'Storage': 'storage',
-        'Motherboard': 'motherboard',
-        'PSU': 'psu',
-        'Cooling': 'cpu-cooler',
-        'Case': 'chassis'
-      };
-      
-      const preSelectedIds = suggestedCategories
-        .map(cat => categoryToId[cat])
+      const preSelectedIds = estimate.suggestedCategories
+        .map(cat => CATEGORY_TO_UPGRADE_ID[cat])
         .filter(Boolean);
       
       setSelectedUpgrades(preSelectedIds);
@@ -486,10 +540,10 @@ const PCUpgrade = () => {
       // Navigate to Preview Build page (NEW - Phase 11)
       navigate('/pc-upgrade-preview', {
         state: {
-          estimatedBuild: response.data.estimated,
-          buildConfidence: response.data.confidence,
+          estimatedBuild: estimate.estimated,
+          buildConfidence: estimate.confidence,
           estimateData: estimateData,
-          aiSuggestedCategories: suggestedCategories,
+          aiSuggestedCategories: estimate.suggestedCategories,
           selectedUpgrades: preSelectedIds,
           currentParts: newCurrentParts
         }
@@ -510,28 +564,20 @@ const PCUpgrade = () => {
       setIsLoadingRecommendations(true);
       setRecommendationsError(null);
 
-      console.log('🤖 Getting AI upgrade recommendations...', currentParts);
+      const selectedCategories = selectedUpgrades
+        .map(id => upgradeOptions.find(opt => opt.id === id)?.category)
+        .filter(Boolean);
+      const localRecommendations = buildLocalRecommendations(selectedCategories, estimatedUsage);
 
-      // Call AI recommendations API
-      const response = await aiService.recommendUpgrade(
-        currentParts,
-        20000, // Default budget: ₱20,000
-        estimatedUsage
-      );
+      console.log('Upgrade recommendations prepared:', localRecommendations);
 
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to get recommendations');
-      }
-
-      console.log('✅ Recommendations received:', response.data);
-
-      setRecommendations(response.data);
+      setRecommendations(localRecommendations);
       setShowRecommendationsModal(true);
 
     } catch (err) {
       console.error('❌ Error getting recommendations:', err);
       setRecommendationsError(err.message || 'Failed to get recommendations');
-      alert('Failed to get AI recommendations. Please try again.');
+      alert('Failed to get recommendations. Please try again.');
     } finally {
       setIsLoadingRecommendations(false);
     }
@@ -602,14 +648,14 @@ const PCUpgrade = () => {
           <h2 className="pc-upgrade-section-title">What are you Upgrading?</h2>
           <p className="pc-upgrade-section-desc">
             {aiRecommendedIds.length > 0 
-              ? 'AI-recommended upgrades are highlighted below' 
+              ? 'Recommended upgrades are highlighted below' 
               : 'Select all that counts'}
           </p>
           
-          {/* AI Status Display */}
+          {/* Local status display */}
           {isAnalyzingUpgrades && (
             <div className="ai-status-bar analyzing">
-              <span className="ai-badge">AI</span>
+              <span className="ai-badge">LOCAL</span>
               <span>Analyzing upgrade compatibility...</span>
             </div>
           )}
@@ -759,12 +805,12 @@ const PCUpgrade = () => {
     } catch { return ''; }
   };
   const norm = (s) => String(s || '').toUpperCase();
-  const normSocket = (s) => norm(s).replace(/\s|-/g, '');
+  const normSocket = (s) => norm(s).replaceAll(/\s|-/g, '');
 
   const parseCpuTdpWatts = (cpu) => {
     const t = getSpec(cpu, 'TDP') || '';
     const m = String(t).match(/([0-9]{2,3})\s*W/i);
-    return m ? parseInt(m[1], 10) : 0;
+    return m ? Number.parseInt(m[1], 10) : 0;
   };
 
   const estimateCoolerTdpCapacity = (cooler) => {
@@ -791,10 +837,10 @@ const PCUpgrade = () => {
     const sup = norm(getSpec(cooler, 'Supported Sockets') || getSpec(cooler, 'Socket'));
     if (sup.includes('UNIVERSAL')) return true;
     if (!socketNorm) return true;
-    if (sup.replace(/\s|-/g, '').includes(socketNorm)) return true;
+    if (sup.replaceAll(/\s|-/g, '').includes(socketNorm)) return true;
     if (cpuIsAMD && sup.includes('AMD')) return true;
     if (!cpuIsAMD && sup.includes('INTEL')) return true;
-    const name = norm(cooler?.name).replace(/\s|-/g, '');
+    const name = norm(cooler?.name).replaceAll(/\s|-/g, '');
     if (name.includes(socketNorm)) return true;
     return false;
   };
@@ -827,7 +873,7 @@ const PCUpgrade = () => {
   const parsePsuWattage = (psu) => {
     const src = getSpec(psu, 'Wattage') || psu?.name || '';
     const m = String(src).match(/([0-9]{3,4})\s*W/i);
-    return m ? parseInt(m[1], 10) : 0;
+    return m ? Number.parseInt(m[1], 10) : 0;
   };
   const recommendWattForGpu = (gpu) => {
     const name = norm(gpu?.name);
@@ -872,11 +918,11 @@ const PCUpgrade = () => {
   };
 
   // Precise brand filtering helpers
-  const normalizeBrandLabel = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const normalizeBrandLabel = (s) => String(s || '').toUpperCase().replaceAll(/[^A-Z0-9]/g, '');
   const detectProductBrand = (product, catKey) => {
     const name = norm(product?.name);
     const u = name.toUpperCase();
-    const compact = u.replace(/\s|-/g, '');
+    const compact = u.replaceAll(/\s|-/g, '');
     switch (catKey) {
       case 'cpu':
         if (u.includes('AMD') || u.includes('RYZEN')) return 'AMD';
@@ -1069,6 +1115,7 @@ const PCUpgrade = () => {
         from: 'pc-upgrade',
         returnTo: '/pc-upgrade',
         categoryKey: filterContext.catKey,
+        apiCategory: aiCategory,
         // NEW: AI estimation data for smart filtering
         aiRecommendation: aiRecommendation,
         estimatedUsage: estimatedUsage,
@@ -1347,6 +1394,7 @@ const PCUpgrade = () => {
                       state: {
                         categoryKey: catKey,
                         categoryName: menuItem.name,
+                        apiCategory: aiCategory,
                         returnTo: '/pc-upgrade',
                         from: 'pc-upgrade',
                         fromSelection: true, // 🔥 FIX: Mark that we're navigating from selection
@@ -1500,18 +1548,18 @@ const PCUpgrade = () => {
           </div>
         )}
 
-        {/* NEW - Phase 1: AI Estimate Modal */}
+        {/* NEW - Phase 1: Estimate Modal */}
         {showEstimateModal && (
           <div className="pcu-modal-overlay">
             <div className="pcu-modal-background" onClick={() => setShowEstimateModal(false)}></div>
             <div className="pcu-modal" style={{ maxWidth: '500px', padding: '25px' }}>
               <h2 className="pcu-modal-title" style={{ marginBottom: '20px' }}>
-                🤖 Estimate Your PC Build
+                Estimate Your PC Build
               </h2>
               
               <div style={{ textAlign: 'left', marginBottom: '20px' }}>
                 <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
-                  Tell us about your PC and let AI estimate your components!
+                  Tell us about your PC and we will estimate your components.
                 </p>
                 
                 {/* Usage Field */}
@@ -1624,13 +1672,13 @@ const PCUpgrade = () => {
           </div>
         )}
 
-        {/* NEW - Phase 2: AI Recommendations Modal */}
+        {/* NEW - Phase 2: Recommendations Modal */}
         {showRecommendationsModal && recommendations && (
           <div className="pcu-modal-overlay">
             <div className="pcu-modal-background" onClick={() => setShowRecommendationsModal(false)}></div>
             <div className="pcu-modal" style={{ maxWidth: '800px', padding: '25px', maxHeight: '90vh', overflowY: 'auto' }}>
               <h2 className="pcu-modal-title" style={{ marginBottom: '20px' }}>
-                💡 AI Upgrade Recommendations
+                💡 Upgrade Recommendations
               </h2>
               
               <div style={{ textAlign: 'left', marginBottom: '20px' }}>
@@ -2012,7 +2060,7 @@ const PCUpgrade = () => {
                       }
                       
                       // Fallback: format whatever value we have
-                      return `₱${parseInt(budget).toLocaleString()}`;
+                      return `₱${Number.parseInt(budget, 10).toLocaleString()}`;
                     };
                     
                     return (
@@ -2077,7 +2125,7 @@ const PCUpgrade = () => {
                 onClick={handleEstimateSubmit}
                 disabled={isEstimating || !estimateData.usage || !estimateData.yearPurchased}
               >
-                {isEstimating ? 'Analyzing Your PC...' : 'Estimate My Build with AI'}
+                {isEstimating ? 'Analyzing Your PC...' : 'Estimate My Build'}
               </button>
             </div>
           </>
@@ -2187,7 +2235,7 @@ const PCUpgrade = () => {
         <div className="pc-upgrade-content">
           <div className="pc-upgrade-intro">
             <h2 className="pc-upgrade-section-title">
-              ✅ Build Estimated with {buildConfidence}% Confidence!
+              ✅ Build Estimated with {formatConfidencePercent(buildConfidence)}% Confidence!
             </h2>
             <p className="pc-upgrade-section-desc">
               Based on your {estimatedUsage} usage
@@ -2226,7 +2274,7 @@ const PCUpgrade = () => {
                         fontWeight: 'bold',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                       }}>
-                        ⭐ AI RECOMMENDS
+                        ⭐ RECOMMENDED
                       </div>
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
@@ -2250,7 +2298,7 @@ const PCUpgrade = () => {
               })}
             </div>
 
-            {/* AI Recommendations Summary */}
+            {/* Recommendations Summary */}
             {aiSuggestedCategories.length > 0 && (
               <div style={{
                 padding: '25px',
@@ -2260,7 +2308,7 @@ const PCUpgrade = () => {
                 marginBottom: '25px'
               }}>
                 <strong style={{ fontSize: '18px', display: 'block', marginBottom: '12px' }}>
-                  🎯 AI Upgrade Recommendations:
+                  🎯 Upgrade Recommendations:
                 </strong>
                 <p style={{ fontSize: '15px', color: '#666', margin: 0, lineHeight: '1.6' }}>
                   For optimal <strong>{estimatedUsage}</strong> performance, we recommend upgrading:{' '}

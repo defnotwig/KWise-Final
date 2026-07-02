@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './PCUpgradePreview.css';
 import PcUpgrade from "../assets/PCUpgrade.webp";
-import api from '../api/api'; // 🔥 FIX #2: Import API utilities for image URL handling
+import KioskProductImage from '../components/KioskProductImage';
 
 // Import component icons
 import CPU1 from "../assets/CPU1.webp";
@@ -49,22 +49,10 @@ const PCUpgradePreview = () => {
     .map(category => {
       const product = currentParts[category];
       const estimation = estimatedBuild[category];
-      
-      // 🔥 FIX #2: Get proper image URL using API utility (like other pages)
-      let imageUrl = null;
-      if (product?.image_url) {
-        // Use getFullImageUrl to convert relative path to full URL
-        imageUrl = api.utils.getFullImageUrl(product.image_url);
-      } else if (product?.imageUrl) {
-        imageUrl = api.utils.getFullImageUrl(product.imageUrl);
-      } else if (product?.image) {
-        imageUrl = api.utils.getFullImageUrl(product.image);
-      }
-      
+
       return {
         category,
-        // Priority: Real DB image → Category fallback icon
-        icon: imageUrl || categoryIcons[category] || CPU1,
+        fallbackIcon: categoryIcons[category] || CPU1,
         name: product?.name || estimation || `Unknown ${category}`,
         price: product?.price || 0,
         hasProduct: !!product,
@@ -116,7 +104,7 @@ const PCUpgradePreview = () => {
           {/* Confidence Badge */}
           {buildConfidence > 0 && (
             <div className="confidence-badge">
-              <span className="confidence-label">AI Confidence:</span>
+              <span className="confidence-label">Estimate Confidence:</span>
               <span className="confidence-value">{Math.round(buildConfidence * 100)}%</span>
             </div>
           )}
@@ -135,7 +123,7 @@ const PCUpgradePreview = () => {
           {estimateData.budget && (
             <div className="preview-summary-item">
               <span className="preview-summary-label">Budget:</span>
-              <span className="preview-summary-value">₱{parseInt(estimateData.budget).toLocaleString()} |</span>
+              <span className="preview-summary-value">₱{Number.parseInt(estimateData.budget, 10).toLocaleString()} |</span>
             </div>
           )}
         </div>
@@ -150,7 +138,14 @@ const PCUpgradePreview = () => {
                 <div className={`preview-component-step ${component.hasProduct ? 'has-product' : 'estimated-only'}`}>
                   <div className="preview-step-icon">
                     {/* 🔥 FIX #2: Use real product image with proper URL handling */}
-                    <img src={component.icon} alt={component.category} />
+                    <KioskProductImage
+                      product={component.productData}
+                      alt={component.name}
+                      fallbackSrc={component.fallbackIcon}
+                      sizes="96px"
+                      width="96"
+                      height="96"
+                    />
                   </div>
                   <div className="preview-step-details">
                     <p className="preview-step-title">

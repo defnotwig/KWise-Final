@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./PCCustomized.css";
+import { categoryKey as getCategoryKey, normalizeKioskProduct } from "../utils/kioskContracts";
 
 // Import the centralized API
 import api from "../api/api";
-import { filterCompatibleProducts } from "../utils/compatibilityFilter"; // 🔥 CRITICAL: Import client-side filter
 
 // ✅ COMPATIBILITY VALIDATION
 import CompatibilityValidationModal from "../components/CompatibilityValidationModal"; // ✅ ENHANCED COMPATIBILITY MODAL
@@ -22,6 +22,392 @@ import PSU1 from "../assets/PSU1.webp";
 import Vector from "../assets/Vector (3).webp";
 import Chest from "../assets/Chest.webp";
 
+const baseConsole = globalThis.window !== undefined && globalThis.console
+  ? globalThis.console
+  : { log: () => {}, warn: () => {}, error: () => {} };
+
+const console = process.env.NODE_ENV === "test"
+  ? { ...baseConsole, log: () => {}, warn: () => {}, error: () => {} }
+  : baseConsole;
+
+/** Parse a dimension string, stripping 'mm' suffix */
+function parseDimensionMM(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number.parseInt(value.replaceAll(/mm/gi, ''), 10);
+  return null;
+}
+
+/** Check GPU length vs Case max GPU length */
+function checkGPUCaseClearance(gpu, pcCase) {
+  if (!gpu || !pcCase) return [];
+  const gpuDims = gpu.dimensions || {};
+  const gpuSpecs = gpu.specifications || {};
+  const caseDims = pcCase.dimensions || {};
+  const caseSpecs = pcCase.specifications || {};
+
+  const gpuLength = parseDimensionMM(gpuDims.length_mm || gpuSpecs.length_mm || gpuSpecs.length);
+  const caseMaxGPU = parseDimensionMM(caseDims.max_gpu_length_mm || caseSpecs.max_gpu_length_mm || caseSpecs.max_gpu_length);
+
+  if (gpuLength && caseMaxGPU && gpuLength > caseMaxGPU) {
+    console.log(`🔴 COMPATIBILITY ERROR: GPU ${gpu.name} (${gpuLength}mm) doesn't fit in ${pcCase.name} (max ${caseMaxGPU}mm)`);
+    return [{
+      type: 'critical', component: 'GPU/Case',
+      message: `GPU (${gpuLength}mm) exceeds Case max GPU length (${caseMaxGPU}mm)`,
+      gpu: gpu.name, case: pcCase.name, gpuLength, caseMaxGPU
+    }];
+  }
+  return [];
+}
+
+/** Check CPU Cooler height vs Case max cooler height */
+function checkCoolerCaseHeight(cooler, pcCase) {
+  if (!cooler || !pcCase) return [];
+  const coolerDims = cooler.dimensions || {};
+  const coolerSpecs = cooler.specifications || {};
+  const caseDims = pcCase.dimensions || {};
+  const caseSpecs = pcCase.specifications || {};
+
+  const coolerHeight = parseDimensionMM(coolerDims.height_mm || coolerSpecs.height_mm || coolerSpecs.height);
+  const caseMaxCooler = parseDimensionMM(caseDims.max_cooler_height_mm || caseSpecs.max_cooler_height_mm || caseSpecs.max_cpu_cooler_height_mm);
+
+  if (coolerHeight && caseMaxCooler && coolerHeight > caseMaxCooler) {
+    console.log(`🔴 COMPATIBILITY ERROR: Cooler ${cooler.name} (${coolerHeight}mm) doesn't fit in ${pcCase.name} (max ${caseMaxCooler}mm)`);
+    return [{
+      type: 'critical', component: 'Cooler/Case',
+      message: `Cooler (${coolerHeight}mm) exceeds Case max cooler height (${caseMaxCooler}mm)`,
+      cooler: cooler.name, case: pcCase.name, coolerHeight, caseMaxCooler
+    }];
+  }
+  return [];
+}
+
+/** Parse AIO radiator size from cooler specs/name */
+function parseRadiatorSize(cooler) {
+  const specs = cooler.specifications || {};
+  let size = specs.radiator_size || specs.radiator_mm;
+  if (!size) {
+    const sizeMatch = /\b(420|360|280|240|120)\b/.exec((cooler.name || '').toUpperCase());
+    return sizeMatch ? Number.parseInt(sizeMatch[1], 10) : null;
+  }
+  return typeof size === 'string' ? Number.parseInt(size.replaceAll(/mm/gi, ''), 10) : size;
+}
+
+/** Get max radiator support from case specs/dimensions */
+function getCaseRadiatorSupport(pcCase) {
+  const caseDims = pcCase.dimensions || {};
+  const caseSpecs = pcCase.specifications || {};
+  const radFields = [
+    caseSpecs.front_radiator_support, caseSpecs.top_radiator_support, caseSpecs.max_radiator_size,
+    caseDims.front_radiator_support, caseDims.top_radiator_support, caseDims.max_radiator_size
+  ];
+  for (const field of radFields) {
+    if (field) return Number.parseInt(field, 10);
+  }
+  const radSupportStr = caseSpecs.radiator_support || caseDims.radiator_support || '';
+  if (typeof radSupportStr === 'string' && radSupportStr) {
+    const radMatches = radSupportStr.match(/(\d{2,3})mm/g);
+    if (radMatches?.length > 0) {
+      return Math.max(...radMatches.map(m => Number.parseInt(m.replace('mm', ''), 10)));
+    }
+  }
+  return null;
+}
+
+/** Check AIO radiator size vs Case radiator support */
+function checkAIORadiator(cooler, pcCase) {
+  if (!cooler || !pcCase) return [];
+  const coolerSpecs = cooler.specifications || {};
+  const coolerText = `${(cooler.name || '').toUpperCase()} ${(cooler.description || '').toUpperCase()}`;
+
+  const isAIO = coolerSpecs.water_cooled === true ||
+    coolerSpecs.type === 'AIO' ||
+    coolerSpecs.cooling_type === 'AIO' ||
+    coolerText.includes('AIO') ||
+    coolerText.includes('LIQUID') ||
+    coolerText.includes('WATER') ||
+    /\b(120|240|280|360|420)\s?(MM|BLACK|WHITE|RGB|ARGB|PRO|ELITE)?\b/.exec(coolerText);
+
+  if (!isAIO) return [];
+
+  const radiatorSize = parseRadiatorSize(cooler);
+  const caseRadiatorSupport = getCaseRadiatorSupport(pcCase);
+
+  console.log(`🧊 AIO Check: Cooler ${cooler.name} is AIO with ${radiatorSize}mm radiator, Case ${pcCase.name} supports ${caseRadiatorSupport}mm`);
+
+  if (radiatorSize && caseRadiatorSupport && !Number.isNaN(caseRadiatorSupport) && radiatorSize > caseRadiatorSupport) {
+    console.log(`🔴 COMPATIBILITY ERROR: AIO ${cooler.name} (${radiatorSize}mm radiator) doesn't fit in ${pcCase.name} (max ${caseRadiatorSupport}mm radiator)`);
+    return [{
+      type: 'critical', component: 'Cooler/Case (AIO)',
+      message: `AIO radiator (${radiatorSize}mm) exceeds Case max radiator support (${caseRadiatorSupport}mm)`,
+      cooler: cooler.name, case: pcCase.name, radiatorSize, caseRadiatorSupport
+    }];
+  }
+  return [];
+}
+
+/** Check PSU vs GPU 12VHPWR connector compatibility */
+function checkPSUGPUConnector(gpu, psu) {
+  if (!gpu || !psu) return [];
+  const gpuDims = gpu.dimensions || {};
+  const gpuSpecs = gpu.specifications || {};
+  const psuSpecs = psu.specifications || {};
+  const gpuName = (gpu.name || '').toUpperCase();
+
+  const powerConnectors = gpuDims.power_connectors || gpuSpecs.power_connectors || gpuSpecs['Power Connectors'] || '';
+  const powerConnStr = String(powerConnectors).toUpperCase();
+
+  const gpuRequires12VHPWR = powerConnStr.includes('12VHPWR') || powerConnStr.includes('16-PIN') || powerConnStr.includes('16PIN');
+
+  if (!gpuRequires12VHPWR) return [];
+
+  const psuHas12VHPWR = psuSpecs.has_12vhpwr_connector === true ||
+    String(psuSpecs.pcie_connectors || '').toUpperCase().includes('12VHPWR') ||
+    String(psuSpecs.pcie_connectors || '').toUpperCase().includes('16-PIN') ||
+    String(psuSpecs['Power Connectors'] || '').toUpperCase().includes('12VHPWR');
+
+  if (!psuHas12VHPWR) {
+    console.log(`🔴 COMPATIBILITY ERROR: PSU ${psu.name} lacks 12VHPWR connector for RTX 4000 GPU ${gpu.name}`);
+    return [{
+      type: 'manual_check', component: 'PSU/GPU',
+      message: `PSU lacks 12VHPWR connector required by ${gpu.name}`,
+      psu: psu.name, gpu: gpu.name,
+      reason: 'RTX 4000 series GPUs require a 12VHPWR (16-pin) power connector'
+    }];
+  }
+  return [];
+}
+
+/** Check CPU vs Motherboard socket compatibility */
+function checkCPUSocket(cpu, motherboard) {
+  if (!cpu || !motherboard) return [];
+  const cpuSocket = (cpu.specifications?.socket || '').toUpperCase();
+  const mbSocket = (motherboard.specifications?.socket || '').toUpperCase();
+
+  if (cpuSocket && mbSocket && cpuSocket !== mbSocket) {
+    console.log(`🔴 COMPATIBILITY ERROR: CPU ${cpu.name} (${cpuSocket}) incompatible with ${motherboard.name} (${mbSocket})`);
+    return [{
+      type: 'critical', component: 'CPU/Motherboard',
+      message: `CPU socket (${cpuSocket}) doesn't match Motherboard socket (${mbSocket})`,
+      cpu: cpu.name, motherboard: motherboard.name, cpuSocket, mbSocket
+    }];
+  }
+  return [];
+}
+
+/** Check RAM vs Motherboard DDR type compatibility */
+function checkRAMDDRType(ram, motherboard) {
+  if (!ram || !motherboard) return [];
+  const mbDDR = (motherboard.specifications?.memory_type || '').toUpperCase();
+  if (!mbDDR) return [];
+
+  const ramSpecs = ram.specifications || {};
+  const ramDDR = (ramSpecs.type || ramSpecs.memory_type || '').toUpperCase();
+
+  if (ramDDR && !ramDDR.includes(mbDDR) && !mbDDR.includes(ramDDR)) {
+    console.log(`🔴 COMPATIBILITY ERROR: RAM ${ram.name} (${ramDDR}) incompatible with ${motherboard.name} (${mbDDR})`);
+    return [{
+      type: 'critical', component: 'RAM/Motherboard',
+      message: `RAM (${ramDDR}) incompatible with Motherboard (${mbDDR})`,
+      ram: ram.name, motherboard: motherboard.name, ramDDR, mbDDR
+    }];
+  }
+  return [];
+}
+
+/** Parse RAM sticks count from item specs, configuration, or product name */
+function getRAMSticksCount(item) {
+  const specs = item?.specifications || {};
+  let count = specs.sticks_count;
+  if (typeof count === 'number') return count;
+  if (typeof count === 'string') return Number.parseInt(count, 10) || 1;
+  if (specs.configuration) {
+    const configMatch = specs.configuration.match(/^(\d+)x/i);
+    if (configMatch) return Number.parseInt(configMatch[1], 10);
+  }
+  if (item?.name) {
+    const nameMatch = item.name.match(/\((\d+)x\d+GB\)/i);
+    if (nameMatch) return Number.parseInt(nameMatch[1], 10);
+  }
+  return 1;
+}
+
+/** Calculate which physical RAM slots are occupied (accounting for multi-stick kits) */
+function calculateRAMOccupiedSlots(multiSlotCartObj) {
+  const occupied = [];
+  for (const [slotKey, item] of Object.entries(multiSlotCartObj)) {
+    const categoryLower = item?.category?.toLowerCase() || '';
+    const isRAM = categoryLower.includes('ram') || categoryLower.includes('memory');
+    if (!item || !isRAM) continue;
+    const slotMatch = /ram-(\d+)/.exec(slotKey);
+    if (!slotMatch) continue;
+    const startSlot = Number.parseInt(slotMatch[1], 10);
+    const sticksCount = getRAMSticksCount(item);
+    for (let i = 0; i < sticksCount; i++) occupied.push(startSlot + i);
+  }
+  return occupied;
+}
+
+/** Calculate which storage slots are occupied */
+function calculateStorageOccupiedSlots(multiSlotCartObj, motherboard) {
+  const occupied = [];
+  for (const [slotKey, item] of Object.entries(multiSlotCartObj)) {
+    if (item?.category?.toLowerCase() !== 'storage') continue;
+    const m2Match = /storage-m2-(\d+)/.exec(slotKey);
+    const sataMatch = /storage-sata-(\d+)/.exec(slotKey);
+    if (m2Match) {
+      occupied.push(Number.parseInt(m2Match[1], 10));
+    } else if (sataMatch) {
+      const totalM2 = Number.parseInt(motherboard?.specifications?.m2_slots, 10) || 0;
+      occupied.push(totalM2 + Number.parseInt(sataMatch[1], 10));
+    }
+  }
+  return occupied;
+}
+
+/** Filter RAM products to only show configs that fit in remaining slots */
+function filterRAMBySlotCapacity(products, availableSlotsRemaining) {
+  return products.filter(product => {
+    const sticksCount = getRAMSticksCount(product);
+    return sticksCount <= availableSlotsRemaining;
+  });
+}
+
+/** Expand a RAM category into individual slot entries */
+function expandRAMCategory(cat, originalIndex, ramSlotResult, ramOccupiedSlots, multiSlotCartObj) {
+  const totalSlots = ramSlotResult.totalSlots || 4;
+  const expanded = [];
+  for (let slot = 0; slot < totalSlots; slot++) {
+    const isOccupied = ramOccupiedSlots.includes(slot);
+    const slotKey = `ram-${slot}`;
+    const hasItem = !!multiSlotCartObj[slotKey];
+    const availableSlotsRemaining = totalSlots - ramOccupiedSlots.length;
+    const filteredRAMProducts = (!isOccupied && !hasItem)
+      ? filterRAMBySlotCapacity(cat.products, availableSlotsRemaining)
+      : cat.products;
+    expanded.push({
+      ...cat,
+      name: `Memory (RAM) - Slot ${slot + 1}${isOccupied && !hasItem ? ' (Occupied)' : ''}`,
+      slotIndex: slot, slotType: 'ram', isMultiSlot: true, originalIndex,
+      isOccupied: isOccupied && !hasItem, slotKey, products: filteredRAMProducts,
+      availableSlotsRemaining
+    });
+  }
+  return expanded;
+}
+
+/** Expand a Storage category into M.2 + SATA slot entries */
+function expandStorageCategory(cat, originalIndex, storageSlotResult) {
+  const totalM2 = storageSlotResult.m2?.total || 0;
+  const totalSATA = storageSlotResult.sata?.total || 0;
+  const expanded = [];
+
+  if (totalM2 > 0) {
+    const m2Filtered = cat.products.filter(p => {
+      const iface = (p.specifications?.interface || p.specifications?.bus_type || '').toLowerCase();
+      const stype = (p.specifications?.storage_type || '').toLowerCase();
+      return (iface.includes('nvme') || iface.includes('m.2') || iface.includes('pcie') || stype.includes('nvme')) && !iface.includes('sata');
+    });
+    for (let slot = 0; slot < totalM2; slot++) {
+      expanded.push({
+        ...cat, name: `Storage - M.2 Slot ${slot + 1}`,
+        slotIndex: slot, slotType: 'storage-m2', isMultiSlot: true, originalIndex,
+        requiredInterface: 'nvme', slotKey: `storage-m2-${slot}`, products: m2Filtered
+      });
+    }
+  }
+
+  if (totalSATA > 0) {
+    const sataFiltered = cat.products.filter(p => {
+      const iface = (p.specifications?.interface || p.specifications?.bus_type || '').toLowerCase();
+      return iface.includes('sata') && !iface.includes('nvme') && !iface.includes('pcie') && !iface.includes('m.2');
+    });
+    for (let slot = 0; slot < totalSATA; slot++) {
+      expanded.push({
+        ...cat, name: `Storage - SATA Port ${slot + 1}`,
+        slotIndex: totalM2 + slot, slotType: 'storage-sata', isMultiSlot: true, originalIndex,
+        requiredInterface: 'sata', slotKey: `storage-sata-${slot}`, products: sataFiltered
+      });
+    }
+  }
+  return expanded;
+}
+
+/** Enhance a cart item with dimensions and category from loaded categories */
+function enhanceCartItem(item, index, categoriesList) {
+  if (!item) return null;
+  const category = categoriesList[index];
+  if (item.dimensions && Object.keys(item.dimensions).length > 0 && item.category) return item;
+  if (category?.products) {
+    const matchingProduct = category.products.find(p => p.id === item.id);
+    if (matchingProduct) {
+      return {
+        ...item,
+        specifications: item.specifications || matchingProduct.specifications || {},
+        dimensions: item.dimensions && Object.keys(item.dimensions).length > 0
+          ? item.dimensions : (matchingProduct.dimensions || {}),
+        category: item.category || matchingProduct.category || category.category?.toLowerCase() || '',
+        categoryName: item.categoryName || category.name || ''
+      };
+    }
+  }
+  if (!item.category && category) {
+    return { ...item, category: category.category?.toLowerCase() || '', categoryName: item.categoryName || category.name || '' };
+  }
+  return item;
+}
+
+/** Check if a cart component is valid (has name and positive price) */
+function isValidComponent(component) {
+  if (!component || typeof component !== 'object') return false;
+  if (!component.name || typeof component.name !== 'string' || !component.name.trim()) return false;
+  if (component.price === null || component.price === undefined) return false;
+  return typeof component.price === 'number' ? component.price > 0 : Number.parseFloat(component.price) > 0;
+}
+
+/** Convert a cart item to a selectedComponents entry for compatibility filtering */
+function toSelectedComponent(item) {
+  return {
+    id: item.id, name: item.name, category: item.category, price: item.price,
+    specifications: item.specifications || {}, dimensions: item.dimensions || {},
+    brand: item.brand || null,
+    socket: item.socket || item.specifications?.socket,
+    memory_type: item.memory_type || item.specifications?.memory_type,
+    form_factor: item.form_factor || item.specifications?.form_factor,
+    tdp: item.tdp || item.specifications?.tdp,
+    wattage: item.wattage || item.specifications?.wattage,
+    length: item.length || item.specifications?.length,
+    height: item.height || item.specifications?.height,
+    max_gpu_length: item.max_gpu_length || item.specifications?.max_gpu_length,
+    max_cooler_height: item.max_cooler_height || item.specifications?.max_cooler_height
+  };
+}
+
+/** Compute the CSS class for a build step */
+function getStepClass(isOccupiedSlot, hasComponent, isUnlocked, isOptional, isMultiSlot) {
+  let cls = "pc-customizer-step ";
+  if (isOccupiedSlot) cls += "occupied-slot locked-step ";
+  else if (hasComponent) cls += "selected-step unlocked-step ";
+  else if (isUnlocked) {
+    cls += "active-step unlocked-step ";
+    if (isOptional) cls += "optional-step ";
+  } else cls += "inactive-step locked-step ";
+  if (isMultiSlot) cls += "multi-slot-step ";
+  return cls;
+}
+
+/** Resolve the component for a category step from cart/multiSlotCart */
+function getStepComponent(category, displayIndex, cartArr, multiSlotCartObj, categoriesList) {
+  const isMultiSlot = category.isMultiSlot || false;
+  const slotIndex = category.slotIndex || 0;
+  const originalIndex = category.originalIndex ?? displayIndex;
+  const categoryKey = categoriesList[originalIndex]?.category?.toLowerCase() || '';
+  if (isMultiSlot) {
+    const slotKey = category.slotKey || `${categoryKey}-${slotIndex}`;
+    return multiSlotCartObj[slotKey] || null;
+  }
+  return cartArr[originalIndex] || null;
+}
+
 const PCCustomized = () => {
   const navigate = useNavigate();
   const location = useLocation(); // Add location hook to detect navigation changes
@@ -29,8 +415,7 @@ const PCCustomized = () => {
   // State management for real-time data
   const [categories, setCategories] = useState([]);
   const [selectedItem, setSelectedItem] = useState(0);
-  // eslint-disable-next-line no-unused-vars
-  const [loading, setLoading] = useState(false); // 🔥 FIX ISSUE #2: Start with false - NO loading screen on initial render
+  const loadingRef = useRef(false); // Internal loading flag - no re-render needed
   // Removed error state - using fallback categories instead
 
   // 🆕 DYNAMIC MULTI-SLOT CATEGORIES STATE
@@ -41,6 +426,19 @@ const PCCustomized = () => {
   const [cart, setCart] = useState(new Array(8).fill(null));
   const [totalPrice, setTotalPrice] = useState(0);
   const [unlockedCategories, setUnlockedCategories] = useState([0]); // First category (CPU) always unlocked
+
+  // Stable primitive values for useEffect dependencies (prevents request storms)
+  const motherboardIndex = useMemo(() => 
+    categories.findIndex(cat => cat.category?.toLowerCase() === 'motherboard'),
+    [categories]
+  );
+  const motherboardId = cart[motherboardIndex]?.id ?? null;
+  const multiSlotCartKeyCount = Object.keys(multiSlotCart).length;
+  const categoryHydrationSignature = useMemo(() => (
+    categories
+      .map((category) => `${category.category || ''}:${category.products?.length || 0}`)
+      .join('|')
+  ), [categories]);
 
   // Modal state
   const [showStartOverModal, setShowStartOverModal] = useState(false);
@@ -76,11 +474,11 @@ const PCCustomized = () => {
     const unlocked = [0]; // CPU always unlocked
     
     // Check base cart for sequential unlocking
-    const hasCPU = cart[0] !== null;
-    const hasCooling = cart[1] !== null;
-    const hasMotherboard = cart[2] !== null;
-    const hasGPU = cart[5] !== null;
-    const hasCase = cart[6] !== null;
+    const hasCPU = cart[0] != null;
+    const hasCooling = cart[1] != null;
+    const hasMotherboard = cart[2] != null;
+    const hasGPU = cart[5] != null;
+    const hasCase = cart[6] != null;
     
     console.log('🔍 Cart state check:', {
       'cart[0] CPU': cart[0]?.name || 'null',
@@ -122,8 +520,7 @@ const PCCustomized = () => {
     // 🔥 CRITICAL FIX: After 1 RAM + 1 Storage, unlock GPU (5, optional) and Case (6, required)
     // PSU (7) remains LOCKED until Case is selected
     if (hasRAM && hasStorage) {
-      unlocked.push(5); // Unlock GPU (optional - user can skip)
-      unlocked.push(6); // Unlock Case (required before PSU)
+      unlocked.push(5, 6); // Unlock GPU (optional - user can skip) and Case (required before PSU)
       console.log('✅ GPU and Case unlocked (1 RAM + 1 Storage present)');
       console.log('🔒 PSU still locked (waiting for Case selection)');
     }
@@ -147,235 +544,22 @@ const PCCustomized = () => {
    * Returns array of compatibility warnings
    */
   const validateCartCompatibility = useCallback(() => {
-    const warnings = [];
-    
-    // Get GPU from cart (index 5)
     const gpu = cart[5];
-    // Get Case from cart (index 6)
     const pcCase = cart[6];
-    // Get Cooler from cart (index 1)
     const cooler = cart[1];
-    
-    // Check GPU vs Case clearance
-    if (gpu && pcCase) {
-      const gpuDims = gpu.dimensions || {};
-      const gpuSpecs = gpu.specifications || {};
-      const caseDims = pcCase.dimensions || {};
-      const caseSpecs = pcCase.specifications || {};
-      
-      // Get GPU length
-      let gpuLength = gpuDims.length_mm || gpuSpecs.length_mm || gpuSpecs.length;
-      if (typeof gpuLength === 'string') gpuLength = parseInt(gpuLength.replace(/mm/gi, ''));
-      
-      // Get Case max GPU length
-      let caseMaxGPU = caseDims.max_gpu_length_mm || caseSpecs.max_gpu_length_mm || caseSpecs.max_gpu_length;
-      if (typeof caseMaxGPU === 'string') caseMaxGPU = parseInt(caseMaxGPU.replace(/mm/gi, ''));
-      
-      if (gpuLength && caseMaxGPU && gpuLength > caseMaxGPU) {
-        warnings.push({
-          type: 'critical',
-          component: 'GPU/Case',
-          message: `GPU (${gpuLength}mm) exceeds Case max GPU length (${caseMaxGPU}mm)`,
-          gpu: gpu.name,
-          case: pcCase.name,
-          gpuLength,
-          caseMaxGPU
-        });
-        console.log(`🔴 COMPATIBILITY ERROR: GPU ${gpu.name} (${gpuLength}mm) doesn't fit in ${pcCase.name} (max ${caseMaxGPU}mm)`);
-      }
-    }
-    
-    // Check Cooler vs Case clearance
-    if (cooler && pcCase) {
-      const coolerDims = cooler.dimensions || {};
-      const coolerSpecs = cooler.specifications || {};
-      const caseDims = pcCase.dimensions || {};
-      const caseSpecs = pcCase.specifications || {};
-      
-      // Get Cooler height
-      let coolerHeight = coolerDims.height_mm || coolerSpecs.height_mm || coolerSpecs.height;
-      if (typeof coolerHeight === 'string') coolerHeight = parseInt(coolerHeight.replace(/mm/gi, ''));
-      
-      // Get Case max cooler height
-      let caseMaxCooler = caseDims.max_cooler_height_mm || caseSpecs.max_cooler_height_mm || caseSpecs.max_cpu_cooler_height_mm;
-      if (typeof caseMaxCooler === 'string') caseMaxCooler = parseInt(caseMaxCooler.replace(/mm/gi, ''));
-      
-      if (coolerHeight && caseMaxCooler && coolerHeight > caseMaxCooler) {
-        warnings.push({
-          type: 'critical',
-          component: 'Cooler/Case',
-          message: `Cooler (${coolerHeight}mm) exceeds Case max cooler height (${caseMaxCooler}mm)`,
-          cooler: cooler.name,
-          case: pcCase.name,
-          coolerHeight,
-          caseMaxCooler
-        });
-        console.log(`🔴 COMPATIBILITY ERROR: Cooler ${cooler.name} (${coolerHeight}mm) doesn't fit in ${pcCase.name} (max ${caseMaxCooler}mm)`);
-      }
-      
-      // 🔥 CRITICAL FIX: Check AIO radiator size vs Case radiator support
-      const coolerName = (cooler.name || '').toUpperCase();
-      const coolerDesc = (cooler.description || '').toUpperCase();
-      const coolerText = `${coolerName} ${coolerDesc}`;
-      
-      // Check if cooler is an AIO
-      const isAIO = coolerSpecs.water_cooled === true || 
-                    coolerSpecs.type === 'AIO' || 
-                    coolerSpecs.cooling_type === 'AIO' ||
-                    coolerText.includes('AIO') || 
-                    coolerText.includes('LIQUID') || 
-                    coolerText.includes('WATER') ||
-                    coolerText.match(/\b(120|240|280|360|420)\s?(MM|BLACK|WHITE|RGB|ARGB|PRO|ELITE)?\b/);
-      
-      if (isAIO) {
-        // Extract radiator size from cooler name
-        let radiatorSize = coolerSpecs.radiator_size || coolerSpecs.radiator_mm;
-        if (!radiatorSize) {
-          // Parse from name: look for 120, 240, 280, 360, 420
-          const sizeMatch = coolerName.match(/\b(420|360|280|240|120)\b/);
-          if (sizeMatch) {
-            radiatorSize = parseInt(sizeMatch[1]);
-          }
-        } else if (typeof radiatorSize === 'string') {
-          radiatorSize = parseInt(radiatorSize.replace(/mm/gi, ''));
-        }
-        
-        // 🔥 FIX: Get case radiator support - check ALL possible field names and parse strings properly
-        let caseRadiatorSupport = null;
-        
-        // Priority 1: Direct numeric fields from specifications
-        if (caseSpecs.front_radiator_support) {
-          caseRadiatorSupport = parseInt(caseSpecs.front_radiator_support);
-        } else if (caseSpecs.top_radiator_support) {
-          caseRadiatorSupport = parseInt(caseSpecs.top_radiator_support);
-        } else if (caseSpecs.max_radiator_size) {
-          caseRadiatorSupport = parseInt(caseSpecs.max_radiator_size);
-        } else if (caseDims.front_radiator_support) {
-          caseRadiatorSupport = parseInt(caseDims.front_radiator_support);
-        } else if (caseDims.top_radiator_support) {
-          caseRadiatorSupport = parseInt(caseDims.top_radiator_support);
-        } else if (caseDims.max_radiator_size) {
-          caseRadiatorSupport = parseInt(caseDims.max_radiator_size);
-        }
-        
-        // Priority 2: Parse string fields (like "280mm front, 120mm rear")
-        if (!caseRadiatorSupport || isNaN(caseRadiatorSupport)) {
-          const radSupportStr = caseSpecs.radiator_support || caseDims.radiator_support || '';
-          if (typeof radSupportStr === 'string' && radSupportStr) {
-            const radMatches = radSupportStr.match(/(\d{2,3})mm/g);
-            if (radMatches && radMatches.length > 0) {
-              const sizes = radMatches.map(m => parseInt(m.replace('mm', '')));
-              caseRadiatorSupport = Math.max(...sizes);
-            }
-          }
-        }
-        
-        console.log(`🧊 AIO Check: Cooler ${cooler.name} is AIO with ${radiatorSize}mm radiator, Case ${pcCase.name} supports ${caseRadiatorSupport}mm`);
-        
-        if (radiatorSize && caseRadiatorSupport && !isNaN(caseRadiatorSupport) && radiatorSize > caseRadiatorSupport) {
-          warnings.push({
-            type: 'critical',
-            component: 'Cooler/Case (AIO)',
-            message: `AIO radiator (${radiatorSize}mm) exceeds Case max radiator support (${caseRadiatorSupport}mm)`,
-            cooler: cooler.name,
-            case: pcCase.name,
-            radiatorSize,
-            caseRadiatorSupport
-          });
-          console.log(`🔴 COMPATIBILITY ERROR: AIO ${cooler.name} (${radiatorSize}mm radiator) doesn't fit in ${pcCase.name} (max ${caseRadiatorSupport}mm radiator)`);
-        }
-      }
-    }
-    
-    // 🔥 CRITICAL FIX: Check PSU vs GPU 12VHPWR connector compatibility
-    // Get PSU from cart (index 7)
     const psu = cart[7];
-    if (gpu && psu) {
-      const gpuDims = gpu.dimensions || {};
-      const gpuSpecs = gpu.specifications || {};
-      const psuSpecs = psu.specifications || {};
-      const gpuName = (gpu.name || '').toUpperCase();
-      
-      // Check if GPU requires 12VHPWR connector (RTX 4000 series)
-      const powerConnectors = gpuDims.power_connectors || gpuSpecs.power_connectors || gpuSpecs['Power Connectors'] || '';
-      const powerConnStr = String(powerConnectors).toUpperCase();
-      
-      // RTX 4000 series detection
-      const isRTX4000 = gpuName.includes('RTX40') || gpuName.includes('RTX 40') || 
-                        gpuName.includes('RTX4070') || gpuName.includes('RTX4080') || gpuName.includes('RTX4090');
-      const gpuRequires12VHPWR = isRTX4000 || powerConnStr.includes('12VHPWR') || powerConnStr.includes('16-PIN') || powerConnStr.includes('16PIN');
-      
-      if (gpuRequires12VHPWR) {
-        // Check if PSU has 12VHPWR connector
-        const psuHas12VHPWR = psuSpecs.has_12vhpwr_connector === true || 
-                              String(psuSpecs.pcie_connectors || '').toUpperCase().includes('12VHPWR') ||
-                              String(psuSpecs.pcie_connectors || '').toUpperCase().includes('16-PIN') ||
-                              String(psuSpecs['Power Connectors'] || '').toUpperCase().includes('12VHPWR');
-        
-        if (!psuHas12VHPWR) {
-          warnings.push({
-            type: 'critical',
-            component: 'PSU/GPU',
-            message: `PSU lacks 12VHPWR connector required by ${gpu.name}`,
-            psu: psu.name,
-            gpu: gpu.name,
-            reason: 'RTX 4000 series GPUs require a 12VHPWR (16-pin) power connector'
-          });
-          console.log(`🔴 COMPATIBILITY ERROR: PSU ${psu.name} lacks 12VHPWR connector for RTX 4000 GPU ${gpu.name}`);
-        }
-      }
-    }
-    
-    // 🔥 CRITICAL FIX: Check CPU vs Motherboard socket compatibility
     const cpu = cart[0];
     const motherboard = cart[2];
-    if (cpu && motherboard) {
-      const cpuSpecs = cpu.specifications || {};
-      const mbSpecs = motherboard.specifications || {};
-      const cpuSocket = (cpuSpecs.socket || '').toUpperCase();
-      const mbSocket = (mbSpecs.socket || '').toUpperCase();
-      
-      if (cpuSocket && mbSocket && cpuSocket !== mbSocket) {
-        warnings.push({
-          type: 'critical',
-          component: 'CPU/Motherboard',
-          message: `CPU socket (${cpuSocket}) doesn't match Motherboard socket (${mbSocket})`,
-          cpu: cpu.name,
-          motherboard: motherboard.name,
-          cpuSocket,
-          mbSocket
-        });
-        console.log(`🔴 COMPATIBILITY ERROR: CPU ${cpu.name} (${cpuSocket}) incompatible with ${motherboard.name} (${mbSocket})`);
-      }
-    }
-    
-    // 🔥 CRITICAL FIX: Check RAM vs Motherboard DDR type compatibility
-    const ram = cart[3]; // First RAM slot or check multiSlotCart
-    if (motherboard) {
-      const mbSpecs = motherboard.specifications || {};
-      const mbDDR = (mbSpecs.memory_type || '').toUpperCase();
-      
-      // Check main RAM slot
-      if (ram && mbDDR) {
-        const ramSpecs = ram.specifications || {};
-        const ramDDR = (ramSpecs.type || ramSpecs.memory_type || '').toUpperCase();
-        
-        if (ramDDR && mbDDR && !ramDDR.includes(mbDDR) && !mbDDR.includes(ramDDR)) {
-          warnings.push({
-            type: 'critical',
-            component: 'RAM/Motherboard',
-            message: `RAM (${ramDDR}) incompatible with Motherboard (${mbDDR})`,
-            ram: ram.name,
-            motherboard: motherboard.name,
-            ramDDR,
-            mbDDR
-          });
-          console.log(`🔴 COMPATIBILITY ERROR: RAM ${ram.name} (${ramDDR}) incompatible with ${motherboard.name} (${mbDDR})`);
-        }
-      }
-    }
-    
-    return warnings;
+    const ram = cart[3];
+
+    return [
+      ...checkGPUCaseClearance(gpu, pcCase),
+      ...checkCoolerCaseHeight(cooler, pcCase),
+      ...checkAIORadiator(cooler, pcCase),
+      ...checkPSUGPUConnector(gpu, psu),
+      ...checkCPUSocket(cpu, motherboard),
+      ...checkRAMDDRType(ram, motherboard)
+    ];
   }, [cart]);
 
   /**
@@ -401,8 +585,10 @@ const PCCustomized = () => {
     
     const newUnlocked = calculateUnlockedCategories();
     console.log('🔄 Auto-recalculating unlocked categories due to cart change:', newUnlocked);
-    setUnlockedCategories(newUnlocked);
-  }, [cart, multiSlotCart, calculateUnlockedCategories, categories]);
+    setUnlockedCategories((current) => (
+      JSON.stringify(current) === JSON.stringify(newUnlocked) ? current : newUnlocked
+    ));
+  }, [cart, multiSlotCart, calculateUnlockedCategories, categories.length]);
 
   // Default category images mapping
   const defaultCategoryImages = React.useMemo(() => ({
@@ -436,7 +622,7 @@ const PCCustomized = () => {
     };
 
     return nameMap[categoryName.toLowerCase()] ||
-      categoryName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      categoryName.replaceAll('_', ' ').replaceAll(/\b\w/g, l => l.toUpperCase());
   }, []);
 
   /**
@@ -468,7 +654,7 @@ const PCCustomized = () => {
         
         // Calculate total price with parseFloat to handle string prices
         const total = aiCart.reduce((sum, item) => {
-          const price = parseFloat(item?.price) || 0;
+          const price = Number.parseFloat(item?.price) || 0;
           return sum + price;
         }, 0);
         setTotalPrice(total);
@@ -494,15 +680,15 @@ const PCCustomized = () => {
   useEffect(() => {
     const selectedCategoryFromState = location.state?.selectedCategory;
     
-    if (selectedCategoryFromState !== null && selectedCategoryFromState !== undefined) {
-      const categoryIndex = parseInt(selectedCategoryFromState, 10);
+    if (selectedCategoryFromState != null) {
+      const categoryIndex = Number.parseInt(selectedCategoryFromState, 10);
       
-      if (!isNaN(categoryIndex) && categoryIndex >= 0 && categoryIndex < 8) {
+      if (!Number.isNaN(categoryIndex) && categoryIndex >= 0 && categoryIndex < 8) {
         console.log('🎯 Navigation state detected - selectedCategory:', categoryIndex);
         setSelectedItem(categoryIndex);
         
         // Clear the state after using it to prevent re-triggering
-        window.history.replaceState({}, document.title);
+        globalThis.history.replaceState({}, document.title);
       }
     }
   }, [location.state?.selectedCategory]);
@@ -515,46 +701,48 @@ const PCCustomized = () => {
     // 🔥 FIX ISSUE #2: Better detection of return navigation
     // Check multiple indicators that user is returning from another page
     const fromNavigation = 
-      window.location.search.includes('added=true') ||  // Added item flag
-      window.location.search.includes('selectedCategory') ||  // Selected category flag
-      window.history.state?.usr ||  // React Router navigation state
+      globalThis.location.search.includes('added=true') ||  // Added item flag
+      globalThis.location.search.includes('selectedCategory') ||  // Selected category flag
+      globalThis.history.state?.usr ||  // React Router navigation state
       sessionStorage.getItem('pcCustomizedLoaded') === 'true';  // Session flag
     
     // If returning from navigation and categories already loaded, skip loading
     if (fromNavigation && categories.length > 0) {
       console.log('🔄 Returning from navigation - skipping data reload');
-      setLoading(false);  // 🔥 Ensure loading is false
+      loadingRef.current = false;  // Ensure loading is false
       return;
     }
     
     // If categories already loaded (component remount), skip loading
     if (categories.length > 0) {
       console.log('✅ Categories already loaded - skipping reload');
-      setLoading(false);  // 🔥 Ensure loading is false
+      loadingRef.current = false;  // Ensure loading is false
       return;
     }
     
     const loadBuildComponents = async () => {
       try {
-        setLoading(true);
+        loadingRef.current = true;
         console.log('🔄 Loading build components using direct category approach...');
 
         // Instead of using getBuildComponents (which has issues),
         // let's directly fetch all products for each category using getCategoryProducts
-        const categoryNames = ['CPU', 'Cooling', 'Motherboard', 'RAM', 'Storage', 'GPU', 'Case', 'PSU'];
+        const categoryNames = [];
         
         console.log('📦 Fetching categories individually to avoid getBuildComponents issues...');
         
-        const categoriesData = {};
+        const categoriesData = await api.kiosk.getBuildComponents({ limit: 500 });
         
         // 🔥 FIX ISSUE #3: Increase limit to 500 to get all products (some categories have 59 products)
-        for (const categoryName of categoryNames) {
+        await Promise.all(categoryNames.map(async (categoryName) => {
           try {
             console.log(`📦 Fetching ${categoryName} products...`);
             
-            // FIX ISSUE 2: Use getCategoryProducts for better image/spec handling
-            const categoryResponse = await api.kiosk.getCategoryProducts(categoryName, { limit: 500 });
-            const categoryBrands = await api.kiosk.getCategoryBrands(categoryName);
+            const bootstrap = await api.kiosk.getCatalogBootstrap({ category: categoryName, limit: 500 });
+            const categoryResponse = { data: bootstrap.products || [] };
+            const categoryBrands = (bootstrap.brands || [])
+              .map((brand) => (typeof brand === 'string' ? brand : brand.name))
+              .filter(Boolean);
             
             console.log(`✅ ${categoryName} response:`, categoryResponse?.data?.length || 0, 'products');
             console.log(`📸 ${categoryName} first image:`, categoryResponse?.data?.[0]?.image);
@@ -571,41 +759,55 @@ const PCCustomized = () => {
             console.error(`❌ Error loading ${categoryName}:`, error);
             categoriesData[categoryName.toLowerCase()] = { products: [], brands: [] };
           }
-        }
+        }));
         
         console.log('📦 All categories loaded using direct approach');
 
-        // Transform categories data into the expected structure  
+        // Helper to map product data with image and spec enrichment
+        const mapProduct = (product, categoryKey) => {
+          const normalizedProduct = normalizeKioskProduct(product, {
+            category: product.category || categoryKey,
+            fallbackImage: defaultCategoryImages[String(categoryKey).toLowerCase()] || CPU1
+          });
+
+          return {
+            ...normalizedProduct,
+            category: normalizedProduct.category || product.category || formatCategoryNameLocal(categoryKey) || categoryKey,
+            categoryKey: normalizedProduct.categoryKey || getCategoryKey(categoryKey),
+            specifications: normalizedProduct.specifications || {},
+            dimensions: normalizedProduct.dimensions || {},
+            description: normalizedProduct.description || ''
+          };
+        };
+
+        // Transform categories data into the expected structure
+        // Pre-map products per category to avoid deep nesting
+        const mappedCategoryProducts = {};
+        for (const [categoryKey, categoryData] of Object.entries(categoriesData)) {
+          const products = Array.isArray(categoryData.products) ? categoryData.products : [];
+          mappedCategoryProducts[categoryKey] = products.map(p => mapProduct(p, categoryKey));
+        }
+
         const dynamicCategories = Object.entries(categoriesData)
-          .filter(([categoryKey, categoryData]) => categoryKey && categoryData) // Filter out invalid entries
+          .filter(([categoryKey, categoryData]) => categoryKey && categoryData)
           .map(([categoryKey, categoryData]) => ({
             name: formatCategoryNameLocal(categoryKey) || categoryKey,
             image: defaultCategoryImages[categoryKey.toLowerCase()] || CPU1,
             category: categoryKey,
             brands: Array.isArray(categoryData.brands) ? categoryData.brands : [],
-            products: Array.isArray(categoryData.products) ? categoryData.products.map(product => ({
-              ...product,
-              // FIX ISSUE 2: Ensure proper image URL processing
-              image: product.image || api.utils.getFullImageUrl(product.imageUrl) || defaultCategoryImages[categoryKey.toLowerCase()] || CPU1,
-              imageUrl: product.imageUrl || product.image,
-              // FIX ISSUE 2: Ensure specifications AND dimensions are preserved
-              specifications: product.specifications || {},
-              dimensions: product.dimensions || {}, // 🔥 CRITICAL FIX: Preserve dimensions for compatibility validation
-              description: product.description || '',
-              category: categoryKey.toLowerCase()
-            })) : []
+            products: mappedCategoryProducts[categoryKey] || []
           }));
 
         // Sort categories by typical build order
         const buildOrder = ['cpu', 'cooling', 'motherboard', 'ram', 'storage', 'gpu', 'case', 'psu'];
-        const sortedCategories = dynamicCategories.sort((a, b) => {
+        const sortedCategories = [...dynamicCategories].sort((a, b) => {
           const indexA = buildOrder.indexOf(a.category.toLowerCase());
           const indexB = buildOrder.indexOf(b.category.toLowerCase());
           return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
 
         // Filter out any invalid categories before setting state
-        const validCategories = sortedCategories.filter(cat => cat && cat.name && cat.category);
+        const validCategories = sortedCategories.filter(cat => cat?.name && cat?.category);
         
         // 🔥 CRITICAL: Verify dimensions survived category mapping
         console.log('🔍 Verifying dimensions in final categories...');
@@ -635,7 +837,7 @@ const PCCustomized = () => {
           { name: "System Error", category: "error", image: CPU1, products: [], brands: [], error: "Unable to connect to backend. Please check server status." }
         ]);
       } finally {
-        setLoading(false);
+        loadingRef.current = false;
       }
     };
 
@@ -646,326 +848,70 @@ const PCCustomized = () => {
   /**
    * 🆕 DYNAMIC MULTI-SLOT CATEGORY EXPANSION
    * When motherboard is selected, expand RAM and Storage categories based on available slots
+   * OPTIMIZED: Uses stable primitive dependencies (motherboard ID + cart length) instead of
+   * full object references to prevent request storms on every re-render
    */
   useEffect(() => {
+    if (!categories || categories.length === 0) return;
+
+    const motherboardIndex = categories.findIndex(cat => 
+      cat.category?.toLowerCase() === 'motherboard'
+    );
+    const motherboard = motherboardIndex >= 0 ? cart[motherboardIndex] : null;
+
+    if (!motherboard?.specifications) {
+      console.log('📦 No motherboard selected - using base categories');
+      setDynamicCategories(categories);
+      return;
+    }
+
+    console.log('🔧 Motherboard selected:', motherboard.name);
+    
     const expandCategories = async () => {
-      if (!categories || categories.length === 0) return;
-
-      // Find motherboard in cart
-      const motherboardIndex = categories.findIndex(cat => 
-        cat.category?.toLowerCase() === 'motherboard'
-      );
-
-      const motherboard = motherboardIndex >= 0 ? cart[motherboardIndex] : null;
-
-      // If no motherboard selected, use base categories only
-      if (!motherboard || !motherboard.specifications) {
-        console.log('📦 No motherboard selected - using base categories');
-        setDynamicCategories(categories);
-        return;
-      }
-
-      console.log('🔧 Motherboard selected:', motherboard.name);
-      
-      // Fetch slot information from backend
       try {
         const existingRAM = Object.values(multiSlotCart).filter(item => {
-          const categoryLower = item?.category?.toLowerCase() || '';
-          return item && (categoryLower.includes('ram') || categoryLower.includes('memory'));
+          const cat = item?.category?.toLowerCase() || '';
+          return item && (cat.includes('ram') || cat.includes('memory'));
         });
+        const existingStorage = Object.values(multiSlotCart).filter(item =>
+          item && (item.category?.toLowerCase() || '').includes('storage')
+        );
 
-        const existingStorage = Object.values(multiSlotCart).filter(item => {
-          const categoryLower = item?.category?.toLowerCase() || '';
-          return item && categoryLower.includes('storage');
-        });
-
-        // Calculate which physical slots are occupied by RAM (accounting for sticks_count)
-        const ramOccupiedSlots = [];
-        console.log('🔍 DEBUG: Analyzing multiSlotCart for RAM occupation:', Object.keys(multiSlotCart));
-        console.log('🔍 DEBUG: Full multiSlotCart:', JSON.stringify(multiSlotCart, null, 2));
-        
-        Object.entries(multiSlotCart).forEach(([slotKey, item]) => {
-          // 🔥 ENHANCED: More flexible category matching - check if category contains 'ram' or 'memory'
-          const categoryLower = item?.category?.toLowerCase() || '';
-          const isRAM = categoryLower.includes('ram') || categoryLower.includes('memory');
-          
-          console.log(`🔍 Checking slotKey: ${slotKey}, category: "${item?.category}", isRAM: ${isRAM}`);
-          
-          if (item && isRAM) {
-            const slotMatch = slotKey.match(/ram-(\d+)/);
-            if (slotMatch) {
-              const startSlot = parseInt(slotMatch[1]);
-              console.log(`🔍 DEBUG: Found RAM item - slotKey: ${slotKey}, category: "${item.category}", item:`, {
-                name: item.name,
-                specifications: item.specifications,
-                sticks_count: item.specifications?.sticks_count,
-                total_capacity_gb: item.specifications?.total_capacity_gb
-              });
-              
-              // 🔥 CRITICAL FIX: Properly read sticks_count from specifications
-              let sticksCount = item.specifications?.sticks_count;
-              
-              // If sticks_count is already a number, use it directly
-              if (typeof sticksCount === 'number') {
-                console.log(`✅ Using sticks_count=${sticksCount} from specifications`);
-              } else if (typeof sticksCount === 'string') {
-                sticksCount = parseInt(sticksCount);
-                console.log(`✅ Parsed sticks_count=${sticksCount} from string`);
-              }
-              
-              // Fallback: Parse from configuration field (e.g., "2x8GB", "4x8GB")
-              if (!sticksCount && item.specifications?.configuration) {
-                const configMatch = item.specifications.configuration.match(/^(\d+)x/i);
-                if (configMatch) {
-                  sticksCount = parseInt(configMatch[1]);
-                  console.log(`💡 Inferred sticks_count=${sticksCount} from configuration: "${item.specifications.configuration}"`);
-                }
-              }
-              
-              // Fallback: Parse from product name (e.g., "16GB Kit (2x8GB)", "(4x8GB)")
-              if (!sticksCount && item.name) {
-                const nameMatch = item.name.match(/\((\d+)x\d+GB\)/i);
-                if (nameMatch) {
-                  sticksCount = parseInt(nameMatch[1]);
-                  console.log(`💡 Inferred sticks_count=${sticksCount} from product name: "${item.name}"`);
-                }
-              }
-              
-              // Final fallback: Default to 1 (single stick)
-              if (!sticksCount || isNaN(sticksCount)) {
-                sticksCount = 1;
-                console.log(`⚠️ Using default sticks_count=1 (could not determine from data)`);
-              }
-              
-              const totalCapacity = parseInt(item.specifications?.total_capacity_gb) || 0;
-              
-              console.log(`🎰 RAM occupation: "${item.name}" in slot ${startSlot}, sticks=${sticksCount}, total_capacity=${totalCapacity}GB`);
-              
-              // Mark all slots occupied by this RAM kit
-              for (let i = 0; i < sticksCount; i++) {
-                const slotToOccupy = startSlot + i;
-                ramOccupiedSlots.push(slotToOccupy);
-                console.log(`   ✓ Slot ${slotToOccupy} OCCUPIED by ${item.name}`);
-              }
-            } else {
-              console.warn(`⚠️ WARNING: RAM item found but slotKey "${slotKey}" doesn't match ram-(\\d+) pattern!`);
-            }
-          } else if (item) {
-            console.log(`🔍 DEBUG: Skipping non-RAM item - slotKey: ${slotKey}, category: "${item.category}"`);
-          }
-        });
-        
-        console.log(`🎰 FINAL ramOccupiedSlots array:`, ramOccupiedSlots);
-
-        // Calculate which physical slots are occupied by Storage
-        const storageOccupiedSlots = [];
-        Object.entries(multiSlotCart).forEach(([slotKey, item]) => {
-          if (item && item.category && item.category.toLowerCase() === 'storage') {
-            const m2Match = slotKey.match(/storage-m2-(\d+)/);
-            const sataMatch = slotKey.match(/storage-sata-(\d+)/);
-            if (m2Match) {
-              storageOccupiedSlots.push(parseInt(m2Match[1]));
-            } else if (sataMatch) {
-              const totalM2 = parseInt(motherboard.specifications?.m2_slots) || 0;
-              storageOccupiedSlots.push(totalM2 + parseInt(sataMatch[1]));
-            }
-          }
-        });
-
+        const ramOccupiedSlots = calculateRAMOccupiedSlots(multiSlotCart);
+        const storageOccupiedSlots = calculateStorageOccupiedSlots(multiSlotCart, motherboard);
         console.log('🎰 Occupied slots:', { ram: ramOccupiedSlots, storage: storageOccupiedSlots });
 
-        // Get slot information from backend
         const [ramSlotResult, storageSlotResult] = await Promise.all([
           api.builder.checkRAMSlots(motherboard, existingRAM).catch(err => {
             console.error('Error fetching RAM slots:', err);
-            return { totalSlots: parseInt(motherboard.specifications?.ram_slots) || 4, usedSlots: 0, availableSlots: parseInt(motherboard.specifications?.ram_slots) || 4 };
+            return { totalSlots: Number.parseInt(motherboard.specifications?.ram_slots, 10) || 4, usedSlots: 0, availableSlots: Number.parseInt(motherboard.specifications?.ram_slots, 10) || 4 };
           }),
           api.builder.checkStorageSlots(motherboard, existingStorage).catch(err => {
             console.error('Error fetching Storage slots:', err);
-            const m2Slots = parseInt(motherboard.specifications?.m2_slots) || 0;
-            const sataSlots = parseInt(motherboard.specifications?.sata_ports) || 0;
-            return { 
-              m2: { total: m2Slots, used: 0, available: m2Slots }, 
-              sata: { total: sataSlots, used: 0, available: sataSlots } 
-            };
+            const m2Slots = Number.parseInt(motherboard.specifications?.m2_slots, 10) || 0;
+            const sataSlots = Number.parseInt(motherboard.specifications?.sata_ports, 10) || 0;
+            return { m2: { total: m2Slots, used: 0, available: m2Slots }, sata: { total: sataSlots, used: 0, available: sataSlots } };
           })
         ]);
 
         console.log('🎰 Slot Info:', { ram: ramSlotResult, storage: storageSlotResult });
 
-        // Generate dynamic categories with expanded RAM and Storage slots
         const expanded = [];
-        
         for (let i = 0; i < categories.length; i++) {
           const cat = categories[i];
           const catLower = cat.category?.toLowerCase();
 
-          // RAM category - expand to match available slots
           if (catLower === 'ram' || catLower === 'memory') {
-            const totalSlots = ramSlotResult.totalSlots || 4;
-            console.log(`💾 Expanding RAM to ${totalSlots} slots`);
-            console.log(`💾 RAM occupied slots:`, ramOccupiedSlots);
-            
-            for (let slot = 0; slot < totalSlots; slot++) {
-              const isOccupied = ramOccupiedSlots.includes(slot);
-              const slotKey = `ram-${slot}`;
-              const hasItem = !!multiSlotCart[slotKey];
-              
-              // 🔥 FIX: Calculate remaining available slots for this slot
-              const availableSlotsRemaining = totalSlots - ramOccupiedSlots.length;
-              console.log(`   Slot ${slot + 1} (${slotKey}): hasItem=${hasItem}, isOccupied=${isOccupied}, availableRemaining=${availableSlotsRemaining}`);
-              
-              // 🔥 FIX: Filter RAM products to only show configurations that fit in remaining slots
-              let filteredRAMProducts = cat.products;
-              if (!isOccupied && !hasItem) {
-                // Only filter if this slot is available for selection
-                filteredRAMProducts = cat.products.filter(product => {
-                  // Extract sticks_count from specifications
-                  const specs = product.specifications || {};
-                  let sticksCount = specs.sticks_count;
-                  
-                  // If sticks_count is string, parse it
-                  if (typeof sticksCount === 'string') {
-                    sticksCount = parseInt(sticksCount);
-                  }
-                  
-                  // Fallback: Parse from configuration field (e.g., "2x8GB", "4x8GB")
-                  if (!sticksCount && specs.configuration) {
-                    const configMatch = specs.configuration.match(/^(\d+)x/i);
-                    if (configMatch) {
-                      sticksCount = parseInt(configMatch[1]);
-                    }
-                  }
-                  
-                  // Fallback: Parse from product name
-                  if (!sticksCount && product.name) {
-                    const nameMatch = product.name.match(/\((\d+)x\d+GB\)/i);
-                    if (nameMatch) {
-                      sticksCount = parseInt(nameMatch[1]);
-                    }
-                  }
-                  
-                  // Default to 1 if cannot determine
-                  if (!sticksCount || isNaN(sticksCount)) {
-                    sticksCount = 1;
-                  }
-                  
-                  // 🔥 CRITICAL FIX: Only show products that fit in remaining slots
-                  const fitsInRemainingSlots = sticksCount <= availableSlotsRemaining;
-                  
-                  if (!fitsInRemainingSlots) {
-                    console.log(`   ❌ Filtered out ${product.name}: needs ${sticksCount} sticks but only ${availableSlotsRemaining} slots remaining`);
-                  }
-                  
-                  return fitsInRemainingSlots;
-                });
-                
-                console.log(`   📦 Filtered RAM products: ${filteredRAMProducts.length}/${cat.products.length} (removed ${cat.products.length - filteredRAMProducts.length} incompatible configurations)`);
-              }
-              
-              expanded.push({
-                ...cat,
-                name: `Memory (RAM) - Slot ${slot + 1}${isOccupied && !hasItem ? ' (Occupied)' : ''}`,
-                slotIndex: slot,
-                slotType: 'ram',
-                isMultiSlot: true,
-                originalIndex: i,
-                isOccupied: isOccupied && !hasItem, // Occupied by another kit's sticks
-                slotKey: slotKey,
-                products: filteredRAMProducts, // 🔥 FIX: Use filtered products
-                availableSlotsRemaining: availableSlotsRemaining // Pass this info
-              });
-            }
-          }
-          // Storage category - expand to match M.2 + SATA slots (only if they exist)
-          else if (catLower === 'storage') {
-            const totalM2 = storageSlotResult.m2?.total || 0;
-            const totalSATA = storageSlotResult.sata?.total || 0;
-            const totalStorageSlots = totalM2 + totalSATA;
-            
-            console.log(`💿 Expanding Storage to ${totalStorageSlots} slots (M.2: ${totalM2}, SATA: ${totalSATA})`);
-            
-            // Add M.2 slots only if motherboard has M.2 support
-            if (totalM2 > 0) {
-              // 🔍 DEBUG: Log filtering for M.2 products
-              let m2LogCount = 0;
-              const m2Filtered = cat.products.filter(p => {
-                const interface_type = (p.specifications?.interface || p.specifications?.bus_type || '').toLowerCase();
-                const storage_type = (p.specifications?.storage_type || '').toLowerCase();
-                // M.2 NVMe: must have (nvme OR m.2 OR pcie) AND NOT sata
-                const isM2 = (interface_type.includes('nvme') || interface_type.includes('m.2') || interface_type.includes('pcie') || storage_type.includes('nvme')) && 
-                            !interface_type.includes('sata');
-                if (m2LogCount < 3) { // Log first 3 products for debugging
-                  console.log(`🔍 M.2 filter check (product ${m2LogCount + 1}):`, p.name, '| interface:', interface_type, '| storage_type:', storage_type, '| isM2:', isM2);
-                  m2LogCount++;
-                }
-                return isM2;
-              });
-              console.log(`📦 M.2 products found: ${m2Filtered.length} out of ${cat.products.length} total storage products`);
-              
-              for (let slot = 0; slot < totalM2; slot++) {
-                const slotKey = `storage-m2-${slot}`;
-                expanded.push({
-                  ...cat,
-                  name: `Storage - M.2 Slot ${slot + 1}`,
-                  slotIndex: slot,
-                  slotType: 'storage-m2',
-                  isMultiSlot: true,
-                  originalIndex: i,
-                  requiredInterface: 'nvme',
-                  slotKey: slotKey,
-                  products: m2Filtered  // 🔥 Use pre-filtered array
-                });
-              }
-            }
-            
-            // Add SATA slots only if motherboard has SATA support
-            if (totalSATA > 0) {
-              // 🔍 DEBUG: Log filtering for SATA products
-              let sataLogCount = 0;
-              const sataFiltered = cat.products.filter(p => {
-                const interface_type = (p.specifications?.interface || p.specifications?.bus_type || '').toLowerCase();
-                // SATA must have 'sata' in interface AND must NOT have nvme/pcie/m.2
-                const isSATA = interface_type.includes('sata') && 
-                              !interface_type.includes('nvme') && 
-                              !interface_type.includes('pcie') && 
-                              !interface_type.includes('m.2');
-                if (sataLogCount < 3) { // Log first 3 products for debugging
-                  console.log(`🔍 SATA filter check (product ${sataLogCount + 1}):`, p.name, '| interface:', interface_type, '| isSATA:', isSATA);
-                  sataLogCount++;
-                }
-                return isSATA;
-              });
-              console.log(`📦 SATA products found: ${sataFiltered.length} out of ${cat.products.length} total storage products`);
-              
-              for (let slot = 0; slot < totalSATA; slot++) {
-                const slotKey = `storage-sata-${slot}`;
-                expanded.push({
-                  ...cat,
-                  name: `Storage - SATA Port ${slot + 1}`,
-                  slotIndex: totalM2 + slot,
-                  slotType: 'storage-sata',
-                  isMultiSlot: true,
-                  originalIndex: i,
-                  requiredInterface: 'sata',
-                  slotKey: slotKey,
-                  products: sataFiltered  // 🔥 Use pre-filtered array
-                });
-              }
-            }
-          }
-          // Other categories remain unchanged - but ADD originalIndex for step numbering!
-          else {
-            expanded.push({
-              ...cat,
-              originalIndex: i  // 🔥 CRITICAL: Set originalIndex for non-multi-slot categories
-            });
+            expanded.push(...expandRAMCategory(cat, i, ramSlotResult, ramOccupiedSlots, multiSlotCart));
+          } else if (catLower === 'storage') {
+            expanded.push(...expandStorageCategory(cat, i, storageSlotResult));
+          } else {
+            expanded.push({ ...cat, originalIndex: i });
           }
         }
 
         console.log('✅ Dynamic categories expanded:', expanded.length, 'total slots');
         setDynamicCategories(expanded);
-
       } catch (error) {
         console.error('❌ Error expanding categories:', error);
         setDynamicCategories(categories);
@@ -1000,7 +946,7 @@ const PCCustomized = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, cart, multiSlotCart]);
+  }, [categories.length, motherboardId, multiSlotCartKeyCount]);
 
   /**
    * Calculate total price when cart or multiSlotCart changes
@@ -1008,8 +954,8 @@ const PCCustomized = () => {
   useEffect(() => {
     // Calculate base cart total
     const baseTotal = cart.reduce((sum, item) => {
-      if (item && item.price) {
-        const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+      if (item?.price) {
+        const price = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
         return sum + price;
       }
       return sum;
@@ -1017,8 +963,8 @@ const PCCustomized = () => {
     
     // Calculate multi-slot cart total
     const multiSlotTotal = Object.values(multiSlotCart).reduce((sum, item) => {
-      if (item && item.price) {
-        const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+      if (item?.price) {
+        const price = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
         return sum + price;
       }
       return sum;
@@ -1076,7 +1022,7 @@ const PCCustomized = () => {
             
             // Find category and matching product
             const category = categories.find(c => c.category.toLowerCase() === categoryKey);
-            if (category && category.products) {
+            if (category?.products) {
               const matchingProduct = category.products.find(p => p.id === item.id);
               if (matchingProduct) {
                 enhancedMultiSlotCart[slotKey] = {
@@ -1101,10 +1047,17 @@ const PCCustomized = () => {
             };
           });
           
-          setMultiSlotCart(enhancedMultiSlotCart);
+          const enhancedMultiSlotCartJson = JSON.stringify(enhancedMultiSlotCart);
+          setMultiSlotCart((current) => (
+            JSON.stringify(current) === enhancedMultiSlotCartJson
+              ? current
+              : enhancedMultiSlotCart
+          ));
           
           // 🔥 CRITICAL: Update localStorage with enhanced multiSlotCart
-          localStorage.setItem("multiSlotCart", JSON.stringify(enhancedMultiSlotCart));
+          if (savedMultiSlotCart !== enhancedMultiSlotCartJson) {
+            localStorage.setItem("multiSlotCart", enhancedMultiSlotCartJson);
+          }
           console.log('💾 MultiSlotCart updated with dimensions in localStorage');
         }
       } catch (error) {
@@ -1116,58 +1069,22 @@ const PCCustomized = () => {
       try {
         const parsedCart = JSON.parse(savedCart);
         if (Array.isArray(parsedCart)) {
-          console.log('📊 Parsed cart array:', parsedCart);
-          console.log('📊 Cart item at index 0 (CPU):', parsedCart[0]);
+          const enhancedCart = parsedCart.map((item, index) => enhanceCartItem(item, index, categories));
           
-          // 🔥 CRITICAL FIX: Enhance cart items with dimensions from freshly loaded categories
-          // This ensures items saved before the dimension fix still get dimensions
-          // 🔥 CRITICAL FIX: Also ensure category field is preserved/restored for compatibility validation
-          const enhancedCart = parsedCart.map((item, index) => {
-            if (!item) return null;
-            
-            // Find matching product in categories to get dimensions
-            const category = categories[index];
-            if (category && category.products) {
-              const matchingProduct = category.products.find(p => p.id === item.id);
-              if (matchingProduct) {
-                // Merge dimensions from category product into cart item
-                // 🔥 CRITICAL FIX: Also restore category field if missing (for older cart data)
-                const enhancedItem = {
-                  ...item,
-                  specifications: item.specifications || matchingProduct.specifications || {},
-                  dimensions: item.dimensions && Object.keys(item.dimensions).length > 0 
-                    ? item.dimensions 
-                    : (matchingProduct.dimensions || {}),
-                  // 🔥 CRITICAL FIX: Ensure category field exists for compatibility validation
-                  category: item.category || matchingProduct.category || category.category?.toLowerCase() || '',
-                  categoryName: item.categoryName || category.name || ''
-                };
-                console.log(`📏 Enhanced ${item.name} with dimensions:`, Object.keys(enhancedItem.dimensions), 'category:', enhancedItem.category);
-                return enhancedItem;
-              }
-            }
-            // 🔥 CRITICAL FIX: Even if no matching product found, try to derive category from index
-            if (!item.category && category) {
-              return {
-                ...item,
-                category: category.category?.toLowerCase() || '',
-                categoryName: item.categoryName || category.name || ''
-              };
-            }
-            return item;
-          });
+          const enhancedCartJson = JSON.stringify(enhancedCart);
+          setCart((current) => (
+            JSON.stringify(current) === enhancedCartJson ? current : enhancedCart
+          ));
+          if (savedCart !== enhancedCartJson) {
+            localStorage.setItem("cart", enhancedCartJson);
+          }
           
-          setCart(enhancedCart);
-          
-          // 🔥 CRITICAL: Update localStorage with enhanced cart (so validation gets dimensions)
-          localStorage.setItem("cart", JSON.stringify(enhancedCart));
-          console.log('💾 Cart updated with dimensions in localStorage');
-          
-          // Use new unlock calculation logic
           const newUnlockedCategories = calculateUnlockedCategories();
-          console.log('🔓 Final unlocked categories:', newUnlockedCategories);
-          console.log('🔓 Category names:', newUnlockedCategories.map(idx => categories[idx]?.name));
-          setUnlockedCategories(newUnlockedCategories);
+          setUnlockedCategories((current) => (
+            JSON.stringify(current) === JSON.stringify(newUnlockedCategories)
+              ? current
+              : newUnlockedCategories
+          ));
         }
       } catch (error) {
         console.error('❌ Error loading cart from localStorage:', error);
@@ -1176,11 +1093,14 @@ const PCCustomized = () => {
       console.log('⚠️ No cart found in localStorage - starting fresh');
       // Initialize empty cart
       const emptyCart = new Array(categories.length).fill(null);
-      setCart(emptyCart);
-      localStorage.setItem("cart", JSON.stringify(emptyCart));
+      const emptyCartJson = JSON.stringify(emptyCart);
+      setCart((current) => (
+        JSON.stringify(current) === emptyCartJson ? current : emptyCart
+      ));
+      localStorage.setItem("cart", emptyCartJson);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, categories.length, isCategoryOptional, location]);
+  }, [categoryHydrationSignature, categories.length, location.state?.selectedCategory, location.pathname]);
 
   /**
    * 🔥 FIX ISSUE #1: Watch for cart changes from CustomizedDisplay
@@ -1191,8 +1111,6 @@ const PCCustomized = () => {
       console.log('🔔 Storage change event received:', event.type);
       const savedCart = localStorage.getItem("cart");
       const savedMultiSlotCart = localStorage.getItem("multiSlotCart");
-      console.log('📦 Cart from localStorage:', savedCart);
-      console.log('📦 MultiSlotCart from localStorage:', savedMultiSlotCart);
       
       // Update multiSlotCart if changed
       if (savedMultiSlotCart) {
@@ -1206,84 +1124,43 @@ const PCCustomized = () => {
         }
       }
       
-      if (savedCart) {
-        try {
-          const parsedCart = JSON.parse(savedCart);
-          console.log('📊 Parsed cart:', parsedCart);
-          
-          if (Array.isArray(parsedCart)) {
-            // 🔥 CRITICAL FIX: Enhance cart items with dimensions AND category from categories
-            const enhancedCart = parsedCart.map((item, index) => {
-              if (!item) return null;
-              
-              // Find matching product in categories to get dimensions
-              const category = categories[index];
-              
-              // If item already has dimensions AND category, keep it
-              if (item.dimensions && Object.keys(item.dimensions).length > 0 && item.category) {
-                return item;
-              }
-              
-              if (category && category.products) {
-                const matchingProduct = category.products.find(p => p.id === item.id);
-                if (matchingProduct) {
-                  return {
-                    ...item,
-                    specifications: item.specifications || matchingProduct.specifications || {},
-                    dimensions: item.dimensions && Object.keys(item.dimensions).length > 0 
-                      ? item.dimensions 
-                      : (matchingProduct.dimensions || {}),
-                    // 🔥 CRITICAL FIX: Ensure category field exists for compatibility validation
-                    category: item.category || matchingProduct.category || category.category?.toLowerCase() || '',
-                    categoryName: item.categoryName || category.name || ''
-                  };
-                }
-              }
-              // 🔥 CRITICAL FIX: Even if no matching product, ensure category exists
-              if (!item.category && category) {
-                return {
-                  ...item,
-                  category: category.category?.toLowerCase() || '',
-                  categoryName: item.categoryName || category.name || ''
-                };
-              }
-              return item;
-            });
-            
-            setCart(enhancedCart);
-            
-            // Use new unlock calculation logic
-            const newUnlockedCategories = calculateUnlockedCategories();
-            console.log('🔓 New unlocked categories:', newUnlockedCategories);
-            setUnlockedCategories(newUnlockedCategories);
-            
-            // If an item was just added, update selectedItem to next category
-            const lastFilledIndex = parsedCart.findIndex((item, idx) => {
-              return item !== null && (idx === parsedCart.length - 1 || parsedCart[idx + 1] === null);
-            });
-            if (lastFilledIndex >= 0 && lastFilledIndex + 1 < categories.length) {
-              console.log(`🎯 Auto-selecting next category: ${lastFilledIndex + 1}`);
-              setSelectedItem(lastFilledIndex + 1);
-            }
-          }
-        } catch (error) {
-          console.error('❌ Error processing cart change:', error);
-        }
-      } else {
+      if (!savedCart) {
         console.log('⚠️ No cart in localStorage');
+        return;
+      }
+
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        if (!Array.isArray(parsedCart)) return;
+
+        const enhancedCart = parsedCart.map((item, index) => enhanceCartItem(item, index, categories));
+        setCart(enhancedCart);
+        
+        const newUnlockedCategories = calculateUnlockedCategories();
+        setUnlockedCategories(newUnlockedCategories);
+        
+        // If an item was just added, update selectedItem to next category
+        const lastFilledIndex = parsedCart.findIndex((item, idx) =>
+          item !== null && (idx === parsedCart.length - 1 || parsedCart[idx + 1] === null)
+        );
+        if (lastFilledIndex >= 0 && lastFilledIndex + 1 < categories.length) {
+          setSelectedItem(lastFilledIndex + 1);
+        }
+      } catch (error) {
+        console.error('❌ Error processing cart change:', error);
       }
     };
 
     console.log('👂 Setting up cart change listeners');
     // Listen for storage events (cross-tab) and custom events (same-tab)
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('cartUpdated', handleStorageChange);
+    globalThis.addEventListener('storage', handleStorageChange);
+    globalThis.addEventListener('cartUpdated', handleStorageChange);
 
     // Cleanup
     return () => {
       console.log('🧹 Cleaning up cart change listeners');
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('cartUpdated', handleStorageChange);
+      globalThis.removeEventListener('storage', handleStorageChange);
+      globalThis.removeEventListener('cartUpdated', handleStorageChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories.length, isCategoryOptional]);
@@ -1292,14 +1169,14 @@ const PCCustomized = () => {
    * Handle navigation state for returning from product selection
    */
   useEffect(() => {
-    const currentLocation = window.location;
+    const currentLocation = globalThis.location;
     const urlParams = new URLSearchParams(currentLocation.search);
     const selectedCategory = urlParams.get('selectedCategory');
     const added = urlParams.get('added');
     
     if (selectedCategory !== null) {
-      const categoryIndex = parseInt(selectedCategory, 10);
-      if (!isNaN(categoryIndex) && categoryIndex >= 0 && categoryIndex < categories.length) {
+      const categoryIndex = Number.parseInt(selectedCategory, 10);
+      if (!Number.isNaN(categoryIndex) && categoryIndex >= 0 && categoryIndex < categories.length) {
         setSelectedItem(categoryIndex);
         
         // If item was added, focus on next unlocked category
@@ -1319,201 +1196,49 @@ const PCCustomized = () => {
    * UPDATED: Support multi-slot categories with filtered products
    */
   const handleComponentClick = useCallback(async (categoryIndex, slotKey = null, filteredProducts = null) => {
-    console.log('🖱️ Category clicked:', categoryIndex, categories[categoryIndex]?.name, 'slotKey:', slotKey);
-    console.log('🔍 Category data check:', {
-      categoryIndex,
-      categoryExists: !!categories[categoryIndex],
-      categoryName: categories[categoryIndex]?.name,
-      hasProducts: categories[categoryIndex]?.products?.length > 0,
-      productsCount: categories[categoryIndex]?.products?.length || 0
-    });
-    
-    const component = slotKey ? multiSlotCart[slotKey] : cart[categoryIndex];
-    const hasComponent = component && 
-                        typeof component === 'object' &&
-                        component.name && 
-                        typeof component.name === 'string' &&
-                        component.name.trim() !== '' &&
-                        component.price !== null &&
-                        component.price !== undefined &&
-                        (typeof component.price === 'number' ? component.price > 0 : parseFloat(component.price) > 0);
-    
     const isUnlocked = unlockedCategories.includes(categoryIndex);
     
-    console.log('📊 Click state:', { 
-      categoryIndex, 
-      categoryName: categories[categoryIndex]?.name,
-      hasComponent, 
-      isUnlocked,
-      componentData: component,
-      slotKey 
-    });
-    
-    if (!isUnlocked) {
-      console.log('🔒 Category locked, cannot navigate');
-      return;
-    }
-    
-    if (hasComponent) {
-      console.log('⚠️ Component already selected, but allowing view/change');
-    }
+    if (!isUnlocked) return;
     
     setSelectedItem(categoryIndex);
 
-    // 🔥 CRITICAL FIX: Read cart from localStorage to get the LATEST data
-    // This ensures we have the most up-to-date cart including any items just added
-    let currentCartData = [...cart]; // Start with state
+    // Read latest cart from localStorage and enhance with dimensions
+    const currentCartData = cart.map((item, idx) => enhanceCartItem(item, idx, categories));
     try {
       const savedCart = localStorage.getItem("cart");
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
         if (Array.isArray(parsedCart)) {
-          // Merge localStorage cart with state, preferring localStorage for dimensions
-          currentCartData = parsedCart.map((lsItem, idx) => {
-            if (!lsItem) return cart[idx] || null;
-            
-            // Check if localStorage item has dimensions
-            if (lsItem.dimensions && Object.keys(lsItem.dimensions).length > 0) {
-              return lsItem; // Use localStorage item (has dimensions)
-            }
-            
-            // Otherwise try to enhance from categories
-            const category = categories[idx];
-            if (category && category.products) {
-              const matchingProduct = category.products.find(p => p.id === lsItem.id);
-              if (matchingProduct && matchingProduct.dimensions) {
-                return {
-                  ...lsItem,
-                  dimensions: matchingProduct.dimensions,
-                  specifications: lsItem.specifications || matchingProduct.specifications || {}
-                };
-              }
-            }
-            
-            return lsItem;
+          parsedCart.forEach((lsItem, idx) => {
+            if (lsItem) currentCartData[idx] = enhanceCartItem(lsItem, idx, categories);
           });
-          console.log('🔵 Using localStorage cart with enhanced dimensions');
         }
       }
     } catch (e) {
       console.error('Error reading cart from localStorage:', e);
     }
 
-    // Build selectedComponents object for validation
-    // 🔥 CRITICAL FIX: Include ALL fields including dimensions for compatibility filtering
-    console.log('🔵 DEBUG: Building selectedComponents from cart...');
-    console.log('🔵 Cart data:', currentCartData.map((item, idx) => item ? { idx, name: item.name, category: item.category, hasDims: !!item.dimensions, dimKeys: Object.keys(item.dimensions || {}) } : { idx, item: null }));
-    
+    // Build selectedComponents for compatibility filtering
     const selectedComponents = {};
-    currentCartData.forEach((item, idx) => {
-      if (item && item.category) {
-        console.log(`🔵 Adding cart[${idx}] to selectedComponents['${item.category}']:`, {
-          name: item.name,
-          hasDims: !!item.dimensions,
-          dimKeys: Object.keys(item.dimensions || {}),
-          length_mm: item.dimensions?.length_mm
-        });
-        
-        selectedComponents[item.category] = {
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          specifications: item.specifications || {},
-          dimensions: item.dimensions || {}, // 🔥 CRITICAL: Include dimensions for GPU clearance
-          brand: item.brand || null,
-          socket: item.socket || item.specifications?.socket,
-          memory_type: item.memory_type || item.specifications?.memory_type,
-          form_factor: item.form_factor || item.specifications?.form_factor,
-          tdp: item.tdp || item.specifications?.tdp,
-          wattage: item.wattage || item.specifications?.wattage,
-          length: item.length || item.specifications?.length,
-          height: item.height || item.specifications?.height,
-          max_gpu_length: item.max_gpu_length || item.specifications?.max_gpu_length,
-          max_cooler_height: item.max_cooler_height || item.specifications?.max_cooler_height
-        };
-      }
+    currentCartData.forEach(item => {
+      if (item?.category) selectedComponents[item.category] = toSelectedComponent(item);
     });
-    
-    // Add multi-slot items to selectedComponents
     Object.values(multiSlotCart).forEach(item => {
-      if (item && item.category) {
-        selectedComponents[item.category] = {
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          specifications: item.specifications || {},
-          dimensions: item.dimensions || {}, // 🔥 CRITICAL: Include dimensions for GPU clearance
-          brand: item.brand || null,
-          socket: item.socket || item.specifications?.socket,
-          memory_type: item.memory_type || item.specifications?.memory_type,
-          form_factor: item.form_factor || item.specifications?.form_factor,
-          tdp: item.tdp || item.specifications?.tdp,
-          wattage: item.wattage || item.specifications?.wattage,
-          length: item.length || item.specifications?.length,
-          height: item.height || item.specifications?.height,
-          max_gpu_length: item.max_gpu_length || item.specifications?.max_gpu_length,
-          max_cooler_height: item.max_cooler_height || item.specifications?.max_cooler_height
-        };
-      }
+      if (item?.category) selectedComponents[item.category] = toSelectedComponent(item);
     });
     
-    console.log('🔍 Selected components for compatibility:', Object.keys(selectedComponents));
-    
-    // 🔥 CRITICAL DEBUG: Log dimensions of selected GPU (if any) for case filtering
-    // Check both uppercase and lowercase keys
-    const gpuComponent = selectedComponents['gpu'] || selectedComponents['GRAPHICS PROCESSING UNIT'] || selectedComponents['GPU'] || selectedComponents['graphics processing unit'] || selectedComponents['graphics'];
-    if (gpuComponent) {
-      console.log('🎮 GPU for case filtering:', {
-        name: gpuComponent.name,
-        hasDims: !!gpuComponent.dimensions && Object.keys(gpuComponent.dimensions).length > 0,
-        dimKeys: Object.keys(gpuComponent.dimensions || {}),
-        length_mm: gpuComponent.dimensions?.length_mm,
-        specs_length: gpuComponent.specifications?.length_mm
-      });
-    }
-    
-    // 🔥 CRITICAL FIX: Apply client-side compatibility filter BEFORE navigation
-    // This ensures users ONLY see compatible products from the start (step-by-step narrowing)
     let productsToShow = filteredProducts || categories[categoryIndex]?.products || [];
-    
-    // Apply client-side compatibility filtering if we have selected components
-    if (Object.keys(selectedComponents).length > 0 && productsToShow.length > 0) {
-      const categoryName = categories[categoryIndex]?.name || '';
-      const catLower = categoryName.toLowerCase();
-      
-      // Determine category key for filtering
-      let categoryKey = catLower;
-      if (catLower.includes('cooler') || catLower.includes('cool')) categoryKey = 'cooling';
-      else if (catLower.includes('cpu') || catLower.includes('processor')) categoryKey = 'cpu';
-      else if (catLower.includes('mother')) categoryKey = 'motherboard';
-      else if (catLower.includes('ram') || catLower.includes('memory')) categoryKey = 'ram';
-      else if (catLower.includes('storage')) categoryKey = 'storage';
-      else if (catLower.includes('gpu') || catLower.includes('graphics')) categoryKey = 'gpu';
-      else if (catLower.includes('case')) categoryKey = 'case';
-      else if (catLower.includes('psu') || catLower.includes('power')) categoryKey = 'psu';
-      
-      console.log(`🔍 Pre-filtering ${productsToShow.length} ${categoryKey} products based on ${Object.keys(selectedComponents).length} selected components...`);
-      const clientFiltered = filterCompatibleProducts(productsToShow, selectedComponents, categoryKey);
-      console.log(`✅ Client-side filter: ${productsToShow.length} → ${clientFiltered.length} compatible products (removed ${productsToShow.length - clientFiltered.length} incompatible)`);
-      
-      productsToShow = clientFiltered;
-    }
-    
-    console.log('🚀 Navigating to category:', categories[categoryIndex]?.name, 'with', productsToShow.length, 'pre-filtered products', slotKey ? `(Slot: ${slotKey})` : '');
 
-    // Navigate with compatibility context and PRE-FILTERED products
     navigate("/customized-products", {
       state: {
         category: categories[categoryIndex],
         categoryIndex,
         currentCart: cart,
         multiSlotCart: multiSlotCart,
-        slotKey: slotKey, // Pass slot key for multi-slot items
+        slotKey: slotKey,
         returnTo: "/pc-customized",
         categoryName: categories[categoryIndex]?.name,
-        products: productsToShow, // 🔥 CRITICAL: Pass pre-filtered products, not all products
+        products: productsToShow,
         brands: categories[categoryIndex]?.brands || [],
         hasCompatibilityAnalysis: Object.keys(selectedComponents).length > 0,
         selectedComponents: selectedComponents
@@ -1526,7 +1251,7 @@ const PCCustomized = () => {
    * FIX ISSUE #1: Handle optional categories when unlocking next
    */
   // eslint-disable-next-line no-unused-vars
-  const handleAddToCart = useCallback((product, categoryIndex) => {
+  const _handleAddToCart = useCallback((product, categoryIndex) => {
     const newCart = [...cart];
     newCart[categoryIndex] = {
       ...product,
@@ -1676,8 +1401,8 @@ const PCCustomized = () => {
       return `₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     if (typeof price === "string") {
-      const numPrice = parseFloat(price.replace(/[^\d.]/g, ""));
-      if (!isNaN(numPrice)) {
+      const numPrice = Number.parseFloat(price.replaceAll(/[^\d.]/g, ""));
+      if (!Number.isNaN(numPrice)) {
         return `₱${numPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
     }
@@ -1718,15 +1443,15 @@ const PCCustomized = () => {
           <span style={{ fontSize: '28px' }}>⚠️</span>
           <div>
             <strong style={{ fontSize: '16px', display: 'block', marginBottom: '5px' }}>
-              COMPATIBILITY ISSUE DETECTED
+              COMPATIBILITY WARNING DETECTED
             </strong>
-            {cartCompatibilityWarnings.map((warning, idx) => (
-              <div key={idx} style={{ fontSize: '14px', opacity: 0.95 }}>
+            {cartCompatibilityWarnings.map((warning) => (
+              <div key={warning.component} style={{ fontSize: '14px', opacity: 0.95 }}>
                 ❌ {warning.message}
               </div>
             ))}
             <div style={{ fontSize: '12px', marginTop: '8px', opacity: 0.8 }}>
-              Please change your {cartCompatibilityWarnings[0]?.component?.split('/')[0]} or {cartCompatibilityWarnings[0]?.component?.split('/')[1]} selection to proceed
+              These selections will be reviewed in the final compatibility check before checkout.
             </div>
           </div>
         </div>
@@ -1734,173 +1459,70 @@ const PCCustomized = () => {
 
       {/* Steps - DYNAMIC MULTI-SLOT SUPPORT */}
       <div className="pc-customizer-steps">
-        {(dynamicCategories.length > 0 ? dynamicCategories : categories).filter(category => category && category.name).map((category, displayIndex) => {
+        {(dynamicCategories.length > 0 ? dynamicCategories : categories).filter(category => category?.name).map((category, displayIndex) => {
           const isMultiSlot = category.isMultiSlot || false;
           const slotIndex = category.slotIndex || 0;
-          const originalIndex = category.originalIndex !== undefined ? category.originalIndex : displayIndex;
-          
-          // Determine base step number (1-8 for main categories)
+          const originalIndex = category.originalIndex ?? displayIndex;
+          const isOccupiedSlot = category.isOccupied || false;
+          const isOptional = isCategoryOptional(originalIndex);
+          const isUnlocked = unlockedCategories.includes(originalIndex);
+
           const baseStepMap = { cpu: 1, cooling: 2, motherboard: 3, ram: 4, memory: 4, storage: 5, gpu: 6, case: 7, psu: 8 };
           const categoryKey = categories[originalIndex]?.category?.toLowerCase() || '';
           const baseStepNumber = baseStepMap[categoryKey] || (originalIndex + 1);
-          
-          // Get component from cart
-          let component = null;
-          if (isMultiSlot) {
-            // Multi-slot items stored in multiSlotCart
-            // 🔥 CRITICAL FIX: Use category.slotKey which has correct format (ram-0, storage-m2-0, storage-sata-0)
-            const slotKey = category.slotKey || `${categoryKey}-${slotIndex}`;
-            component = multiSlotCart[slotKey] || null;
-            console.log('🔍 Looking up multi-slot item:', { slotKey, found: !!component });
-          } else {
-            // Base items stored in cart array
-            component = cart[originalIndex] || null;
-          }
-          
-          // Check if this category is optional (GPU)
-          const isOptional = isCategoryOptional(originalIndex);
-          
-          // Validate component - must have name AND valid price
-          const hasComponent = component && 
-                              typeof component === 'object' &&
-                              component.name && 
-                              typeof component.name === 'string' &&
-                              component.name.trim() !== '' &&
-                              component.price !== null &&
-                              component.price !== undefined &&
-                              (typeof component.price === 'number' ? component.price > 0 : parseFloat(component.price) > 0);
+          const slotKey = category.slotKey || `${categoryKey}-${slotIndex}`;
 
-          // Enhanced step class logic
-          let stepClass = "pc-customizer-step ";
-          
-          // Check if this slot is occupied by another item's multi-stick configuration
-          const isOccupiedSlot = category.isOccupied || false;
-          
-          // 🔥 CRITICAL FIX: Always check originalIndex for unlock status, not displayIndex!
-          // unlockedCategories contains base indices (0-7), not expanded indices
-          const isUnlocked = unlockedCategories.includes(originalIndex);
-
-          if (isOccupiedSlot) {
-            stepClass += "occupied-slot locked-step ";
-          } else if (hasComponent) {
-            stepClass += "selected-step unlocked-step ";
-          } else if (isUnlocked) {
-            stepClass += "active-step unlocked-step ";
-            if (isOptional) {
-              stepClass += "optional-step ";
-            }
-          } else {
-            stepClass += "inactive-step locked-step ";
-          }
-
-          if (isMultiSlot) {
-            stepClass += "multi-slot-step ";
-          }
+          const component = getStepComponent(category, displayIndex, cart, multiSlotCart, categories);
+          const hasComponent = isValidComponent(component);
+          const stepClass = getStepClass(isOccupiedSlot, hasComponent, isUnlocked, isOptional, isMultiSlot);
+          const isClickable = !isOccupiedSlot && stepClass.includes("unlocked-step");
+          const isActive = stepClass.includes("active-step");
+          const stepLabel = isMultiSlot ? category.name : `Choose a ${category?.name?.toLowerCase() || "component"}`;
 
           return (
-            <div key={`step-${displayIndex}-${category.slotIndex || 0}`} className="pc-customizer-step-container">
-              {/* Step subtitle - always show Step X format for base categories */}
+            <div key={`step-${displayIndex}-${slotIndex}`} className="pc-customizer-step-container">
               <p className="step-subtitle">
-                {isMultiSlot ? (
-                  <>
-                    Step {baseStepNumber}: {category.name}
-                    {isOptional && <span className="optional-badge"> (Optional)</span>}
-                  </>
-                ) : (
-                  <>
-                    Step {baseStepNumber}: Choose a {category?.name?.toLowerCase() || "component"}
-                    {isOptional && <span className="optional-badge"> (Optional)</span>}
-                  </>
-                )}
+                Step {baseStepNumber}: {stepLabel}
+                {isOptional && <span className="optional-badge"> (Optional)</span>}
               </p>
               
               <div
+                role="button"
+                tabIndex={0}
                 className={stepClass}
                 onClick={() => {
-                  // Block clicking on occupied slots
-                  if (isOccupiedSlot) {
-                    console.log('🚫 Cannot click occupied slot:', category.name);
-                    return;
-                  }
-                  
-                  // Allow clicking if it's active/unlocked or has component
-                  const isActive = stepClass.includes("active-step");
-                  const hasComp = stepClass.includes("selected-step");
-                  if (isActive || hasComp) {
-                    if (isMultiSlot) {
-                      // For multi-slot items, use slotKey from category if available, otherwise generate it
-                      const slotKey = category.slotKey || `${categoryKey}-${slotIndex}`;
-                      console.log('🖱️ Clicking multi-slot category:', category.name, 'with slotKey:', slotKey, 'originalIndex:', originalIndex);
-                      // 🔥 CRITICAL FIX: Use originalIndex (base category index) not displayIndex (expanded index)
-                      handleComponentClick(originalIndex, slotKey, category.products);
-                    } else {
-                      // 🔥 CRITICAL FIX: For base items (GPU, Case, PSU), use originalIndex NOT displayIndex!
-                      // displayIndex can be 15+ after RAM/Storage expansion, but originalIndex is always 0-7
-                      console.log('🖱️ Clicking base category:', category.name, 'displayIndex:', displayIndex, 'originalIndex:', originalIndex);
-                      handleComponentClick(originalIndex);
-                    }
-                  }
+                  if (isOccupiedSlot) return;
+                  if (!isActive && !hasComponent) return;
+                  handleComponentClick(originalIndex, isMultiSlot ? slotKey : undefined, isMultiSlot ? category.products : undefined);
                 }}
-                style={{ 
-                  cursor: isOccupiedSlot ? 'not-allowed' : (stepClass.includes("unlocked-step") ? 'pointer' : 'not-allowed'),
-                  opacity: isOccupiedSlot ? 0.5 : 1
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }}
+                style={{ cursor: isClickable ? 'pointer' : 'not-allowed', opacity: isOccupiedSlot ? 0.5 : 1 }}
               >
                 <div className="step-icon">
-                  <img 
-                    src={component?.image || category?.image || CPU1} 
-                    alt={component?.name || category?.name || "Component"} 
-                  />
+                  <img src={component?.image || category?.image || CPU1} alt={component?.name || category?.name || "Component"} />
                 </div>
-
                 <div className="step-details">
-                  <p className="step-title">
-                    {/* Show component name if selected, otherwise category name */}
-                    {hasComponent && component?.name ? component.name : (category?.name || "Not selected")}
-                  </p>
-                  <p className="step-price">
-                    {/* Show price only if component exists and has valid price */}
-                    {hasComponent && component?.price ? formatPrice(component.price) : ""}
-                  </p>
+                  <p className="step-title">{hasComponent && component?.name ? component.name : (category?.name || "Not selected")}</p>
+                  <p className="step-price">{hasComponent && component?.price ? formatPrice(component.price) : ""}</p>
                 </div>
-
-                {/* Enhanced button logic - multi-slot aware */}
                 <div className="step-button-container">
-                  <div
+                  <button
+                    type="button"
+                    tabIndex={0}
                     className={`step-add-minus-icon${hasComponent ? " minus-active" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (hasComponent) {
-                        // Remove product from this step
-                        if (isMultiSlot) {
-                          const slotKey = category.slotKey || `${categoryKey}-${slotIndex}`;
-                          console.log('➖ Removing multi-slot component:', category.name, 'slotKey:', slotKey, 'originalIndex:', originalIndex);
-                          // 🔥 CRITICAL FIX: Use originalIndex for multi-slot items
-                          handleRemoveFromCart(originalIndex, slotKey);
-                        } else {
-                          handleRemoveFromCart(displayIndex);
-                        }
-                      } else if (stepClass.includes("active-step")) {
-                        // Only allow adding if this is the active step
-                        if (isMultiSlot) {
-                          const slotKey = category.slotKey || `${categoryKey}-${slotIndex}`;
-                          console.log('➕ Adding multi-slot component:', category.name, 'slotKey:', slotKey, 'originalIndex:', originalIndex);
-                          // 🔥 CRITICAL FIX: Use originalIndex (base category index) not displayIndex
-                          handleComponentClick(originalIndex, slotKey, category.products);
-                        } else {
-                          handleComponentClick(displayIndex);
-                        }
+                        handleRemoveFromCart(isMultiSlot ? originalIndex : displayIndex, isMultiSlot ? slotKey : undefined);
+                      } else if (isActive) {
+                        handleComponentClick(originalIndex, isMultiSlot ? slotKey : undefined, isMultiSlot ? category.products : undefined);
                       }
                     }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); }}
                   >
-                    {hasComponent ? (
-                      // Show minus button if component exists
-                      <div className="step-minus-icon">−</div>
-                    ) : stepClass.includes("active-step") ? (
-                      // Show plus button only for active (next) step
-                      <div className="step-add-icon">+</div>
-                    ) : null}
-                  </div>
+                    {hasComponent && <div className="step-minus-icon">−</div>}
+                    {!hasComponent && isActive && <div className="step-add-icon">+</div>}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1914,7 +1536,7 @@ const PCCustomized = () => {
           <div className="pc-customized-order-info">
             <div className="pc-customized-cart-icon">
               <img src={Chest} alt="Cart" />
-              {cart.filter(item => item !== null).length > 0 && (
+              {cart.some(item => item !== null) && (
                 <div className="pc-customized-notification">
                   {cart.filter(item => item !== null).length}
                 </div>
@@ -1963,14 +1585,10 @@ const PCCustomized = () => {
                 if (!hasStorage) missingComponents.push('Storage');
                 
                 // 🔥 CRITICAL: Also check for compatibility warnings
-                const hasCompatibilityIssues = cartCompatibilityWarnings.length > 0;
-                
-                const isDisabled = missingComponents.length > 0 || hasCompatibilityIssues;
+                const isDisabled = missingComponents.length > 0;
                 
                 if (missingComponents.length > 0) {
                   console.log('🔒 Order Summary disabled - Missing components:', missingComponents.join(', '));
-                } else if (hasCompatibilityIssues) {
-                  console.log('🔒 Order Summary disabled - Compatibility issues:', cartCompatibilityWarnings.map(w => w.message).join(', '));
                 } else {
                   console.log('✅ Order Summary enabled - All required components present (GPU is optional)');
                 }
@@ -1993,7 +1611,7 @@ const PCCustomized = () => {
                   localStorage.removeItem("cartTotal");
                   
                   // Reset local state to start fresh
-                  setCart(Array(categories.length).fill(null));
+                  setCart(new Array(categories.length).fill(null));
                   setMultiSlotCart({});
                   setDynamicCategories([]);
                   setUnlockedCategories([0]); // Reset to only first category unlocked

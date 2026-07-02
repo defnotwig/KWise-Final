@@ -4,10 +4,10 @@
  * Features: Full specifications, compatibility notes, Add to Upgrade action
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './PCUpgradeProduct.css';
-import api from '../api/api';
+import KioskProductImage from '../components/KioskProductImage';
 import PCUpgrade from '../assets/PCUpgrade.webp';
 import CPU1 from '../assets/CPU1.webp';
 import CPUCooler from '../assets/CPUCooler.webp';
@@ -22,13 +22,11 @@ const PCUpgradeProduct = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const { product: initialProduct, categoryName, categoryKey } = location.state || {};
+  const { product: initialProduct, categoryName, categoryKey, apiCategory } = location.state || {};
   
   const [product] = useState(initialProduct);
-  // eslint-disable-next-line no-unused-vars
-  const [showAddedModal, setShowAddedModal] = useState(false);
-  // eslint-disable-next-line no-unused-vars
-  const [compatibilityNote, setCompatibilityNote] = useState(null);
+  const showAddedModalRef = useRef(false);
+  const compatibilityNoteRef = useRef(null);
 
   // Default category images
   const defaultCategoryImages = {
@@ -56,6 +54,23 @@ const PCUpgradeProduct = () => {
     return defaultCategoryImages[catLower] || SystemUnit1;
   };
 
+  const checkCategoryCompatibility = (catLower, currentParts) => {
+    const issues = [];
+    if (catLower.includes('cpu')) {
+      const motherboard = Object.values(currentParts).find(p => p?.category?.toLowerCase().includes('motherboard'));
+      if (motherboard && product.socket && motherboard.socket && product.socket !== motherboard.socket) {
+        issues.push(`Socket mismatch: This CPU uses ${product.socket}, but your motherboard uses ${motherboard.socket}`);
+      }
+    }
+    if (catLower.includes('ram')) {
+      const motherboard = Object.values(currentParts).find(p => p?.category?.toLowerCase().includes('motherboard'));
+      if (motherboard && product.memory_type && motherboard.memory_type && product.memory_type !== motherboard.memory_type) {
+        issues.push(`Memory type mismatch: This RAM is ${product.memory_type}, but your motherboard supports ${motherboard.memory_type}`);
+      }
+    }
+    return issues;
+  };
+
   /**
    * Check compatibility with existing upgrade parts
    */
@@ -71,36 +86,19 @@ const PCUpgradeProduct = () => {
     const selectedComponents = Object.values(currentParts).filter(item => item !== null);
 
     if (selectedComponents.length > 0) {
-      // Simple compatibility check
-      const issues = [];
-      
-      // Example compatibility checks (can be expanded)
       const catLower = (categoryKey || '').toLowerCase();
-      
-      if (catLower.includes('cpu')) {
-        const motherboard = Object.values(currentParts).find(p => p?.category?.toLowerCase().includes('motherboard'));
-        if (motherboard && product.socket && motherboard.socket && product.socket !== motherboard.socket) {
-          issues.push(`Socket mismatch: This CPU uses ${product.socket}, but your motherboard uses ${motherboard.socket}`);
-        }
-      }
-
-      if (catLower.includes('ram')) {
-        const motherboard = Object.values(currentParts).find(p => p?.category?.toLowerCase().includes('motherboard'));
-        if (motherboard && product.memory_type && motherboard.memory_type && product.memory_type !== motherboard.memory_type) {
-          issues.push(`Memory type mismatch: This RAM is ${product.memory_type}, but your motherboard supports ${motherboard.memory_type}`);
-        }
-      }
+      const issues = checkCategoryCompatibility(catLower, currentParts);
 
       if (issues.length > 0) {
-        setCompatibilityNote({
+        compatibilityNoteRef.current = {
           type: 'warning',
           issues: issues
-        });
-      } else if (selectedComponents.length > 0) {
-        setCompatibilityNote({
+        };
+      } else {
+        compatibilityNoteRef.current = {
           type: 'compatible',
           message: 'This component appears compatible with your current build'
-        });
+        };
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,8 +144,6 @@ const PCUpgradeProduct = () => {
 
       // Get current upgrade progress from localStorage
       const upgradeProgress = JSON.parse(localStorage.getItem('pc-upgrade-progress') || '{}');
-      // eslint-disable-next-line no-unused-vars
-      const currentParts = upgradeProgress.currentParts || {}; // Keep for backward compatibility
 
       // 🔥 CRITICAL FIX: Save to pc-upgrade-selections (actual parts to BUY)
       // NOT to pc-upgrade-current (which contains AI-estimated build for display only)
@@ -162,8 +158,9 @@ const PCUpgradeProduct = () => {
         brand: product.brand,
         category: product.category,
         price: product.sale_price || product.price,
-        image: product.image_url || product.image,
-        image_url: product.image_url || product.image,
+        image: product.imageUrl || product.image_url || product.file_path || product.image,
+        image_url: product.image_url || product.imageUrl || product.file_path || product.image,
+        imageUrl: product.imageUrl || product.image_url || product.file_path || product.image,
         quantity: 1,
         stock: product.stock,
         specifications: product.specifications
@@ -180,11 +177,11 @@ const PCUpgradeProduct = () => {
       console.log('📦 All upgrade selections:', upgradeParts);
 
       // Show success modal
-      setShowAddedModal(true);
+      showAddedModalRef.current = true;
       
       // Auto-hide after 2 seconds and redirect back to PC Upgrade Step 3
       setTimeout(() => {
-        setShowAddedModal(false);
+        showAddedModalRef.current = false;
         navigate('/pc-upgrade', {
           state: {
             step: 'current-parts',
@@ -207,7 +204,8 @@ const PCUpgradeProduct = () => {
     navigate('/pc-upgrade-display', {
       state: {
         categoryKey,
-        categoryName
+        categoryName,
+        apiCategory: apiCategory || product.category
       }
     });
   };
@@ -215,6 +213,26 @@ const PCUpgradeProduct = () => {
   /**
    * Extract specifications from product
    */
+  // Category-specific spec field mappings (data-driven to minimize CC)
+  const CATEGORY_SPEC_FIELDS = {
+    cpu: { cores: 'Cores', threads: 'Threads', base_clock: 'Base Clock', boost_clock: 'Boost Clock', socket: 'Socket', tdp: 'TDP' },
+    processor: { cores: 'Cores', threads: 'Threads', base_clock: 'Base Clock', boost_clock: 'Boost Clock', socket: 'Socket', tdp: 'TDP' },
+    gpu: { memory: 'Memory', memory_type: 'Memory Type', core_clock: 'Core Clock', boost_clock: 'Boost Clock', power_consumption: 'Power' },
+    graph: { memory: 'Memory', memory_type: 'Memory Type', core_clock: 'Core Clock', boost_clock: 'Boost Clock', power_consumption: 'Power' },
+    ram: { capacity: 'Capacity', speed: 'Speed', type: 'Type', memory_type: 'Memory Type', latency: 'Latency' },
+    memory: { capacity: 'Capacity', speed: 'Speed', type: 'Type', memory_type: 'Memory Type', latency: 'Latency' },
+    storage: { capacity: 'Capacity', type: 'Type', interface: 'Interface', read_speed: 'Read Speed', write_speed: 'Write Speed' },
+    mother: { chipset: 'Chipset', socket: 'Socket', form_factor: 'Form Factor', memory_type: 'Memory Type', max_memory: 'Max Memory' },
+    psu: { wattage: 'Wattage', efficiency: 'Efficiency', modular: 'Modular' },
+    power: { wattage: 'Wattage', efficiency: 'Efficiency', modular: 'Modular' },
+  };
+
+  const applySpecFields = (specObj, fieldMap, prod) => {
+    for (const [key, label] of Object.entries(fieldMap)) {
+      if (prod[key]) specObj[label] = prod[key];
+    }
+  };
+
   const getSpecifications = () => {
     const specs = {};
     
@@ -226,58 +244,16 @@ const PCUpgradeProduct = () => {
     }
     
     // Common fields
-    if (product.brand) specs['Brand'] = product.brand;
-    if (product.category) specs['Category'] = product.category;
-    if (product.model) specs['Model'] = product.model;
+    const commonFields = { brand: 'Brand', category: 'Category', model: 'Model' };
+    applySpecFields(specs, commonFields, product);
     
-    // Category-specific specs
+    // Category-specific specs (data-driven lookup)
     const catLower = (categoryKey || '').toLowerCase();
-    
-    if (catLower.includes('cpu') || catLower.includes('processor')) {
-      if (product.cores) specs['Cores'] = product.cores;
-      if (product.threads) specs['Threads'] = product.threads;
-      if (product.base_clock) specs['Base Clock'] = product.base_clock;
-      if (product.boost_clock) specs['Boost Clock'] = product.boost_clock;
-      if (product.socket) specs['Socket'] = product.socket;
-      if (product.tdp) specs['TDP'] = product.tdp;
-    }
-    
-    if (catLower.includes('gpu') || catLower.includes('graph')) {
-      if (product.memory) specs['Memory'] = product.memory;
-      if (product.memory_type) specs['Memory Type'] = product.memory_type;
-      if (product.core_clock) specs['Core Clock'] = product.core_clock;
-      if (product.boost_clock) specs['Boost Clock'] = product.boost_clock;
-      if (product.power_consumption) specs['Power'] = product.power_consumption;
-    }
-    
-    if (catLower.includes('ram') || catLower.includes('memory')) {
-      if (product.capacity) specs['Capacity'] = product.capacity;
-      if (product.speed) specs['Speed'] = product.speed;
-      if (product.type) specs['Type'] = product.type;
-      if (product.memory_type) specs['Memory Type'] = product.memory_type;
-      if (product.latency) specs['Latency'] = product.latency;
-    }
-    
-    if (catLower.includes('storage')) {
-      if (product.capacity) specs['Capacity'] = product.capacity;
-      if (product.type) specs['Type'] = product.type;
-      if (product.interface) specs['Interface'] = product.interface;
-      if (product.read_speed) specs['Read Speed'] = product.read_speed;
-      if (product.write_speed) specs['Write Speed'] = product.write_speed;
-    }
-    
-    if (catLower.includes('mother')) {
-      if (product.chipset) specs['Chipset'] = product.chipset;
-      if (product.socket) specs['Socket'] = product.socket;
-      if (product.form_factor) specs['Form Factor'] = product.form_factor;
-      if (product.memory_type) specs['Memory Type'] = product.memory_type;
-      if (product.max_memory) specs['Max Memory'] = product.max_memory;
-    }
-    
-    if (catLower.includes('psu') || catLower.includes('power')) {
-      if (product.wattage) specs['Wattage'] = product.wattage;
-      if (product.efficiency) specs['Efficiency'] = product.efficiency;
-      if (product.modular) specs['Modular'] = product.modular;
+    for (const [keyword, fieldMap] of Object.entries(CATEGORY_SPEC_FIELDS)) {
+      if (catLower.includes(keyword)) {
+        applySpecFields(specs, fieldMap, product);
+        break;
+      }
     }
 
     return specs;
@@ -296,8 +272,6 @@ const PCUpgradeProduct = () => {
     );
   }
 
-  const productImage = api.utils.getFullImageUrl(product.image_url || product.image) || getFallbackImage();
-
   return (
     <div className="customized-display-container">
       {/* Header - Matches CustomizedDisplay.js */}
@@ -315,11 +289,15 @@ const PCUpgradeProduct = () => {
       {/* Product Display - Exact CustomizedDisplay.js Layout */}
       <div className="customized-display-product">
         {/* Product Image */}
-        <img
-          src={productImage}
+        <KioskProductImage
+          product={product}
           alt={product.name}
           className="customized-display-image"
-          onError={(e) => { e.target.src = getFallbackImage(); }}
+          fallbackSrc={getFallbackImage()}
+          variant="detail"
+          sizes="420px"
+          width="420"
+          height="420"
         />
 
         {/* Product Info - Price first, then name (CustomizedDisplay order) */}
@@ -340,11 +318,11 @@ const PCUpgradeProduct = () => {
               {Object.entries(specifications).map(([key, value], index) => {
                 // Format the key for display
                 const formattedKey = key
-                  .replace(/_/g, ' ')
-                  .replace(/\b\w/g, l => l.toUpperCase());
+                  .replaceAll('_', ' ')
+                  .replaceAll(/\b\w/g, l => l.toUpperCase());
                 
                 // Format the value
-                let formattedValue = value;
+                let formattedValue;
                 if (Array.isArray(value)) {
                   formattedValue = value.join(', ');
                 } else if (typeof value === 'object' && value !== null) {
@@ -354,7 +332,7 @@ const PCUpgradeProduct = () => {
                 }
                 
                 return (
-                  <div key={index} className="spec-item">
+                  <div key={`spec-${key}`} className="spec-item">
                     <span className="spec-label">{formattedKey}:</span>{' '}
                     <span className="spec-value">{formattedValue}</span>
                   </div>
