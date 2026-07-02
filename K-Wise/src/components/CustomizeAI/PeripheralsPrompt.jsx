@@ -55,7 +55,7 @@ const PeripheralsPrompt = () => {
         // Ensure all items have category field
         const enhancedCartItems = cartItems.map(item => ({
           ...item,
-          category: item.category || item.categoryName?.toLowerCase().replace(/\s+/g, '-') || ''
+          category: item.category || item.categoryName?.toLowerCase().replaceAll(/\s+/g, '-') || ''
         }));
         localStorage.setItem("cart", JSON.stringify(enhancedCartItems));
         console.log('💾 Saved cart to localStorage before OrderSumCustom:', enhancedCartItems.length, 'items');
@@ -94,7 +94,7 @@ const PeripheralsPrompt = () => {
           id: component.id,
           product_id: component.id,
           name: component.name,
-          price: parseFloat(component.price),
+          price: Number.parseFloat(component.price),
           image: component.image_url || component.image,
           image_url: component.image_url || component.image,
           category: component.category || key.toUpperCase(),
@@ -129,7 +129,7 @@ const PeripheralsPrompt = () => {
                 id: component.id,
                 product_id: component.id,
                 name: component.name,
-                price: parseFloat(component.price),
+                price: Number.parseFloat(component.price),
                 image: component.image_url || component.image,
                 image_url: component.image_url || component.image,
                 category: component.category || key.toUpperCase(),

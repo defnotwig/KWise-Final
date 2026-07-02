@@ -3,7 +3,9 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { FiBell, FiX, FiCheck, FiMessageCircle, FiAlertTriangle, FiInfo } from 'react-icons/fi';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './NotificationsDropdown.css';
 
 const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
@@ -16,10 +18,8 @@ const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
     const fetchNotifications = async () => {
         try {
             setIsLoading(true);
-            const response = await fetch('http://localhost:5000/api/notifications?limit=10', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
+            const response = await fetch(`${getServerBaseUrl()}/api/notifications?limit=10`, {
+                headers: {                    'Content-Type': 'application/json'
                 }
             });
 
@@ -38,11 +38,9 @@ const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
     // Mark notification as read
     const markAsRead = async (notificationId) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+            const response = await fetch(`${getServerBaseUrl()}/api/notifications/${notificationId}/read`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
+                headers: {                    'Content-Type': 'application/json'
                 }
             });
 
@@ -64,11 +62,9 @@ const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
     // Mark all as read
     const markAllAsRead = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/notifications/read-all', {
+            const response = await fetch(`${getServerBaseUrl()}/api/notifications/read-all`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
+                headers: {                    'Content-Type': 'application/json'
                 }
             });
 
@@ -159,23 +155,31 @@ const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
             </div>
 
             <div className="notifications-content">
-                {isLoading ? (
-                    <div className="loading-notifications">
-                        <div className="loading-spinner"></div>
-                        <p>Loading notifications...</p>
-                    </div>
-                ) : notifications.length === 0 ? (
-                    <div className="no-notifications">
-                        <FiBell size={32} />
-                        <h4>All caught up!</h4>
-                        <p>You have no new notifications</p>
-                    </div>
-                ) : (
+                {(() => {
+                    if (isLoading) {
+                        return (
+                            <div className="loading-notifications">
+                                <div className="loading-spinner"></div>
+                                <p>Loading notifications...</p>
+                            </div>
+                        );
+                    }
+                    if (notifications.length === 0) {
+                        return (
+                            <div className="no-notifications">
+                                <FiBell size={32} />
+                                <h4>All caught up!</h4>
+                                <p>You have no new notifications</p>
+                            </div>
+                        );
+                    }
+                    return (
                     <div className="notifications-list">
                         {notifications.map(notification => (
-                            <div
+                            <button
+                                type="button"
                                 key={notification.id}
-                                className={`notification-item ${!notification.is_read ? 'unread' : ''}`}
+                                className={`notification-item ${notification.is_read ? '' : 'unread'}`}
                                 onClick={() => !notification.is_read && markAsRead(notification.id)}
                             >
                                 <div className="notification-content">
@@ -203,10 +207,11 @@ const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
                                         <button className="action-btn">View</button>
                                     </div>
                                 )}
-                            </div>
+                            </button>
                         ))}
                     </div>
-                )}
+                    );
+                })()}
             </div>
 
             <div className="notifications-footer">
@@ -216,6 +221,12 @@ const NotificationsDropdown = ({ isOpen, onClose, currentUser }) => {
             </div>
         </div>
     );
+};
+
+NotificationsDropdown.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+    currentUser: PropTypes.object,
 };
 
 export default NotificationsDropdown;

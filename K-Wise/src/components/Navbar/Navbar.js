@@ -1,23 +1,22 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearch } from '../../contexts/SearchContext-simple';
 import { FiSearch, FiUser, FiSettings, FiLogOut } from 'react-icons/fi';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMessage, faBell } from '@fortawesome/free-solid-svg-icons';
-import logo from "../../assets/logo.webp";
 import SearchResults from '../Widgets/SearchResults';
 import UserProfile from '../UserProfile/UserProfile';
 import ChatModal from '../Chat/ChatModal';
 import { ProfileImage } from '../../hooks/useProfileImage';
 import NotificationsDropdown from '../Notifications/NotificationsDropdown';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './Navbar.css';
 
 const Navbar = () => {
     const { currentUser, logout } = useAuth();
     const { searchQuery, handleSearch, setSearchQuery, setShowResults } = useSearch();
-    const location = useLocation();
     const navigate = useNavigate();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -25,28 +24,9 @@ const Navbar = () => {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [unreadMessages, setUnreadMessages] = useState(0);
-    const [forceUpdate, setForceUpdate] = useState(0); // Force re-render trigger
     const [currentTime, setCurrentTime] = useState(new Date());
     const searchInputRef = useRef(null);
-
-    // Get stored user info for immediate display while loading
-    const [userInfo, setUserInfo] = useState(() => {
-        try {
-            const storedUser = localStorage.getItem('currentUser');
-            if (storedUser) {
-                const parsedUser = JSON.parse(storedUser);
-                console.log('Initial userInfo from localStorage:', parsedUser);
-                return parsedUser;
-            }
-        } catch (e) {
-            console.error('Error parsing user from localStorage:', e);
-        }
-        // Use improved default fallback
-        return {
-            name: 'Marcel',
-            role: 'superadmin'
-        };
-    });
+    const [userInfo, setUserInfo] = useState(null);
 
     // Keyboard shortcut for search (Ctrl+K)
     useEffect(() => {
@@ -66,24 +46,9 @@ const Navbar = () => {
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [setShowResults]);
-
-    // Update userInfo when currentUser changes
+    // Update userInfo only from the verified AuthContext session.
     useEffect(() => {
-        if (currentUser && currentUser.name) {
-            console.log('Setting userInfo from currentUser:', currentUser);
-            setUserInfo(currentUser);
-        } else {
-            try {
-                const storedUser = localStorage.getItem('currentUser');
-                if (storedUser) {
-                    const parsedUser = JSON.parse(storedUser);
-                    console.log('Setting userInfo from localStorage:', parsedUser);
-                    setUserInfo(parsedUser);
-                }
-            } catch (e) {
-                console.error('Error parsing stored user:', e);
-            }
-        }
+        setUserInfo(currentUser || null);
     }, [currentUser]);
 
     // Real-time clock update
@@ -99,15 +64,14 @@ const Navbar = () => {
     const fetchUnreadCounts = async () => {
         try {
             const headers = {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             };
 
             // Use Promise.all with graceful failure handling
             const [messagesResponse, notificationsResponse] = await Promise.all([
-                fetch('http://localhost:5000/api/messages/unread-count', { headers })
+                fetch(`${getServerBaseUrl()}/api/messages/unread-count`, { headers })
                     .catch(() => ({ ok: false })), // Graceful failure
-                fetch('http://localhost:5000/api/notifications?unread=true', { headers })
+                fetch(`${getServerBaseUrl()}/api/notifications?unread=true`, { headers })
                     .catch(() => ({ ok: false })) // Graceful failure
             ]);
 
@@ -116,8 +80,6 @@ const Navbar = () => {
                 const messagesData = await messagesResponse.json().catch(() => ({ data: {} }));
                 const newUnreadCount = messagesData.data?.unreadCount || 0;
                 setUnreadMessages(newUnreadCount);
-                // Force re-render to ensure UI updates
-                setForceUpdate(prev => prev + 1);
             } else if (messagesResponse.status === 304) {
                 console.log('📡 Navbar: Messages count not modified (304)');
             }
@@ -128,7 +90,7 @@ const Navbar = () => {
             } else if (notificationsResponse.status === 304) {
                 console.log('📡 Navbar: Notifications count not modified (304)');
             }
-        } catch (error) {
+        } catch (_error) { // NOSONAR - intentionally silent for rate-limited API calls
             // Silent fail to prevent console spam from rate limiting
         }
     };
@@ -140,7 +102,7 @@ const Navbar = () => {
             // FIXED: Much longer interval and user interaction tracking
             const interval = setInterval(() => {
                 const now = Date.now();
-                const lastInteraction = window.lastNavbarInteraction || 0;
+                const lastInteraction = globalThis.lastNavbarInteraction || 0;
                 
                 // Only refresh if user hasn't interacted in last 45 seconds
                 if (now - lastInteraction > 45000) {
@@ -158,18 +120,18 @@ const Navbar = () => {
             
             // Track user interactions to prevent spam
             const handleUserInteraction = () => {
-                window.lastNavbarInteraction = Date.now();
+                globalThis.lastNavbarInteraction = Date.now();
             };
             
-            window.addEventListener('focus', handleFocus);
-            window.addEventListener('mousedown', handleUserInteraction);
-            window.addEventListener('keydown', handleUserInteraction);
+            globalThis.addEventListener('focus', handleFocus);
+            globalThis.addEventListener('mousedown', handleUserInteraction);
+            globalThis.addEventListener('keydown', handleUserInteraction);
             
             return () => {
                 clearInterval(interval);
-                window.removeEventListener('focus', handleFocus);
-                window.removeEventListener('mousedown', handleUserInteraction);
-                window.removeEventListener('keydown', handleUserInteraction);
+                globalThis.removeEventListener('focus', handleFocus);
+                globalThis.removeEventListener('mousedown', handleUserInteraction);
+                globalThis.removeEventListener('keydown', handleUserInteraction);
             };
         }
     }, [currentUser]);
@@ -185,27 +147,15 @@ const Navbar = () => {
             setTimeout(fetchUnreadCounts, 1000);
         };
 
-        window.addEventListener('messagesRead', handleMessagesRead);
-        window.addEventListener('newMessageSent', handleNewMessageSent);
+        globalThis.addEventListener('messagesRead', handleMessagesRead);
+        globalThis.addEventListener('newMessageSent', handleNewMessageSent);
         
         return () => {
-            window.removeEventListener('messagesRead', handleMessagesRead);
-            window.removeEventListener('newMessageSent', handleNewMessageSent);
+            globalThis.removeEventListener('messagesRead', handleMessagesRead);
+            globalThis.removeEventListener('newMessageSent', handleNewMessageSent);
         };
     }, []);
 
-    // Page title logic (simplified)
-    const getPageTitle = () => {
-        const path = location.pathname;
-        if (path === '/admin/dashboard') return 'Dashboard';
-        if (path === '/admin/accounts') return 'Account Management';
-        if (path === '/admin/stock') return 'Inventory Management';
-        if (path === '/admin/orders') return 'Order Management';
-        if (path === '/admin/logs') return 'System Logs';
-        if (path === '/admin/settings') return 'Settings';
-        if (path === '/admin/developer') return 'Developer Tools';
-        return 'Admin Panel';
-    };
 
     // Search handlers
     const handleSubmitSearch = (e) => {
@@ -334,7 +284,7 @@ const Navbar = () => {
                     </div>
 
                     {/* Enhanced User Profile */}
-                    <div className="user-profile-trigger" onClick={toggleDropdown}>
+                    <button type="button" className="user-profile-trigger" onClick={toggleDropdown}>
                         <div className="user-avatar">
                             <ProfileImage
                                 userInfo={userInfo}
@@ -362,22 +312,22 @@ const Navbar = () => {
                                     </div>
                                 </div>
                                 <div className="dropdown-divider"></div>
-                                <div className="dropdown-item-enhanced" onClick={openProfileModal}>
+                                <button type="button" className="dropdown-item-enhanced" onClick={openProfileModal}>
                                     <FiUser className="dropdown-icon" />
                                     Edit Profile
-                                </div>
+                                </button>
                                 <div className="dropdown-item-enhanced">
                                     <FiSettings className="dropdown-icon" />
                                     Settings
                                 </div>
                                 <div className="dropdown-divider"></div>
-                                <div className="dropdown-item-enhanced logout" onClick={handleLogout}>
+                                <button type="button" className="dropdown-item-enhanced logout" onClick={handleLogout}>
                                     <FiLogOut className="dropdown-icon" />
                                     Logout
-                                </div>
+                                </button>
                             </div>
                         )}
-                    </div>
+                    </button>
                 </div>
             </div>
 

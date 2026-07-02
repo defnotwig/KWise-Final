@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import React, { useState, useEffect, useCallback } from 'react';
 import './LogHistory.css';
 
 const LogHistory = () => {
-    const { user } = useContext(AuthContext);
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -24,9 +22,6 @@ const LogHistory = () => {
         pages: 0
     });
 
-    // Real-time refresh interval
-    const [refreshInterval, setRefreshInterval] = useState(null);
-
     // Available filter options
     const [filterOptions, setFilterOptions] = useState({
         actions: [],
@@ -34,33 +29,7 @@ const LogHistory = () => {
         users: []
     });
 
-    useEffect(() => {
-        loadLogs();
-        loadFilterOptions();
-        
-        if (autoRefresh) {
-            const interval = setInterval(loadLogs, 10000); // Refresh every 10 seconds
-            setRefreshInterval(interval);
-        }
-
-        return () => {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-        };
-    }, [filters, pagination.page, autoRefresh]);
-
-    useEffect(() => {
-        if (autoRefresh && !refreshInterval) {
-            const interval = setInterval(loadLogs, 10000);
-            setRefreshInterval(interval);
-        } else if (!autoRefresh && refreshInterval) {
-            clearInterval(refreshInterval);
-            setRefreshInterval(null);
-        }
-    }, [autoRefresh]);
-
-    const loadLogs = async () => {
+    const loadLogs = useCallback(async () => {
         try {
             setError('');
 
@@ -70,11 +39,7 @@ const LogHistory = () => {
                 ...Object.fromEntries(Object.entries(filters).filter(([_, value]) => value))
             });
 
-            const response = await fetch(`/api/audit-logs?${queryParams}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
+            const response = await fetch(`/api/audit-logs?${queryParams}`);
 
             if (!response.ok) {
                 throw new Error('Failed to load logs');
@@ -101,15 +66,11 @@ const LogHistory = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters, pagination.limit, pagination.page]);
 
-    const loadFilterOptions = async () => {
+    const loadFilterOptions = useCallback(async () => {
         try {
-            const response = await fetch('/api/audit-logs/filters', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
+            const response = await fetch('/api/audit-logs/filters');
 
             if (response.ok) {
                 const data = await response.json();
@@ -118,7 +79,19 @@ const LogHistory = () => {
         } catch (error) {
             console.error('Error loading filter options:', error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadLogs();
+        loadFilterOptions();
+
+        if (!autoRefresh) {
+            return undefined;
+        }
+
+        const interval = setInterval(loadLogs, 10000);
+        return () => clearInterval(interval);
+    }, [autoRefresh, loadFilterOptions, loadLogs]);
 
     const exportLogs = async (format = 'csv') => {
         try {
@@ -127,25 +100,21 @@ const LogHistory = () => {
                 ...Object.fromEntries(Object.entries(filters).filter(([_, value]) => value))
             });
 
-            const response = await fetch(`/api/audit-logs/export?${queryParams}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
+            const response = await fetch(`/api/audit-logs/export?${queryParams}`);
 
             if (!response.ok) {
                 throw new Error('Failed to export logs');
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.${format}`;
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            a.remove();
 
         } catch (error) {
             console.error('Error exporting logs:', error);
@@ -235,7 +204,7 @@ const LogHistory = () => {
             <div className="log-history-header">
                 <div className="header-title">
                     <h2>
-                        <i className="fas fa-history"></i>
+                        <i className="fas fa-history"></i>{' '}
                         Log History
                         {autoRefresh && <span className="live-indicator">● LIVE</span>}
                     </h2>
@@ -247,7 +216,7 @@ const LogHistory = () => {
                         className={`btn btn-sm ${autoRefresh ? 'btn-danger' : 'btn-success'}`}
                         onClick={() => setAutoRefresh(!autoRefresh)}
                     >
-                        <i className={`fas ${autoRefresh ? 'fa-pause' : 'fa-play'}`}></i>
+                        <i className={`fas ${autoRefresh ? 'fa-pause' : 'fa-play'}`}></i>{' '}
                         {autoRefresh ? 'Pause' : 'Resume'} Auto-refresh
                     </button>
                     
@@ -255,13 +224,13 @@ const LogHistory = () => {
                         className="btn btn-sm btn-primary"
                         onClick={loadLogs}
                     >
-                        <i className="fas fa-sync-alt"></i>
+                        <i className="fas fa-sync-alt"></i>{' '}
                         Refresh
                     </button>
                     
                     <div className="dropdown">
                         <button className="btn btn-sm btn-secondary dropdown-toggle">
-                            <i className="fas fa-download"></i>
+                            <i className="fas fa-download"></i>{' '}
                             Export
                         </button>
                         <div className="dropdown-menu">
@@ -387,8 +356,8 @@ const LogHistory = () => {
                                     </div>
                                     
                                     <div className="log-details">
-                                        {formatLogDetails(log).map((detail, index) => (
-                                            <span key={index} className="log-detail">{detail}</span>
+                                        {formatLogDetails(log).map((detail) => (
+                                            <span key={`${log.id ?? log.created_at}-${detail}`} className="log-detail">{detail}</span>
                                         ))}
                                     </div>
                                     

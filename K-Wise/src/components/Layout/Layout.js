@@ -28,17 +28,6 @@ const Layout = ({ children }) => {
             if (currentUser) {
                 console.log("Layout - Found current user in context:", currentUser.name);
                 user = currentUser;
-            } else {
-                // Try from localStorage as fallback
-                try {
-                    const storedUser = localStorage.getItem('currentUser');
-                    if (storedUser) {
-                        user = JSON.parse(storedUser);
-                        console.log("Layout - Found user in localStorage:", user.name);
-                    }
-                } catch (err) {
-                    console.error('Error checking stored user:', err);
-                }
             }
 
             if (user) {

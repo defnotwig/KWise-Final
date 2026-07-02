@@ -5,7 +5,7 @@ import Toast from './Toast';
 import './ReferenceBuildsModal.css';
 
 const ReferenceBuildsModal = ({ onClose }) => {
-    // System selector: 'pc-upgrade' or 'pc-customized-ai'
+    // Offline kiosk mode keeps only PC Upgrade reference-build administration visible.
     const [activeSystem, setActiveSystem] = useState('pc-upgrade');
     const [activeTab, setActiveTab] = useState('builds'); // 'builds', 'parameters'
     const [loading, setLoading] = useState(true);
@@ -17,7 +17,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
     const [buildStats, setBuildStats] = useState(null);
     const [selectedBuild, setSelectedBuild] = useState(null);
     
-    // State for PC Customized AI builds
+    // Legacy customized-build state is retained for rollback but is not exposed in offline mode.
     const [aiBuilds, setAiBuilds] = useState({});
     const [aiBuildStats, setAiBuildStats] = useState(null);
     
@@ -73,19 +73,19 @@ const ReferenceBuildsModal = ({ onClose }) => {
                 // Fetch PC Upgrade data - Using admin endpoints with proper authentication
                 const [buildsRes, newProductsRes, parametersRes, statsRes, statusRes] = await Promise.all([
                     axios.get(`${getApiBaseUrl()}/admin/reference-builds/all`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/reference-builds/new-products`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/pc-upgrade-parameters/all`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/reference-builds/statistics`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/reference-builds/status`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     })
                 ]);
 
@@ -120,22 +120,22 @@ const ReferenceBuildsModal = ({ onClose }) => {
                     setRegenerationStatus(statusRes.data.data);
                 }
             } else if (activeSystem === 'pc-customized-ai') {
-                // Fetch PC Customized AI data - Using admin endpoints with proper authentication
+                // Legacy customized-build data is disabled in offline kiosk mode.
                 const [buildsRes, newProductsRes, parametersRes, statsRes, statusRes] = await Promise.all([
                     axios.get(`${getApiBaseUrl()}/admin/pc-customized-ai-builds/all`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/pc-customized-ai-builds/new-products`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/pc-customized-ai-builds/parameters/all`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/pc-customized-ai-builds/statistics`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     }),
                     axios.get(`${getApiBaseUrl()}/admin/pc-customized-ai-builds/status`, { 
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                        withCredentials: true
                     })
                 ]);
 
@@ -180,7 +180,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
     };
 
     const handleRegenerate = async () => {
-        const systemName = activeSystem === 'pc-upgrade' ? 'PC Upgrade' : 'PC Customized AI';
+        const systemName = 'PC Upgrade';
         if (!window.confirm(`Regenerate all ${systemName} reference builds? This may take a few minutes.`)) {
             return;
         }
@@ -188,11 +188,9 @@ const ReferenceBuildsModal = ({ onClose }) => {
         try {
             setIsRegenerating(true);
             // Use admin endpoints with authentication
-            const endpoint = activeSystem === 'pc-upgrade'
-                ? `${getApiBaseUrl()}/admin/reference-builds/regenerate`
-                : `${getApiBaseUrl()}/admin/pc-customized-ai-builds/regenerate`;
+            const endpoint = `${getApiBaseUrl()}/admin/reference-builds/regenerate`;
             const response = await axios.post(endpoint, {}, { 
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                withCredentials: true
             });
             
             if (response.data.success) {
@@ -202,11 +200,9 @@ const ReferenceBuildsModal = ({ onClose }) => {
                 const pollInterval = setInterval(async () => {
                     try {
                         // Use admin endpoints with authentication
-                        const statusEndpoint = activeSystem === 'pc-upgrade'
-                            ? `${getApiBaseUrl()}/admin/reference-builds/status`
-                            : `${getApiBaseUrl()}/admin/pc-customized-ai-builds/status`;
+                        const statusEndpoint = `${getApiBaseUrl()}/admin/reference-builds/status`;
                         const statusRes = await axios.get(statusEndpoint, { 
-                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                            withCredentials: true
                         });
                         
                         if (statusRes.data.success) {
@@ -254,12 +250,12 @@ const ReferenceBuildsModal = ({ onClose }) => {
                 const startYear = prompt('Enter start year:');
                 const endYear = prompt('Enter end year:');
                 const repYear = prompt('Enter representative year:');
-                data = { ...data, start_year: parseInt(startYear), end_year: parseInt(endYear), representative_year: parseInt(repYear) };
+                data = { ...data, start_year: Number.parseInt(startYear, 10), end_year: Number.parseInt(endYear, 10), representative_year: Number.parseInt(repYear, 10) };
             } else if (type === 'budget') {
                 const minBudget = prompt('Enter minimum budget:');
                 const maxBudget = prompt('Enter maximum budget:');
                 const repBudget = prompt('Enter representative budget:');
-                data = { ...data, min_budget: parseInt(minBudget), max_budget: parseInt(maxBudget), representative_budget: parseInt(repBudget) };
+                data = { ...data, min_budget: Number.parseInt(minBudget, 10), max_budget: Number.parseInt(maxBudget, 10), representative_budget: Number.parseInt(repBudget, 10) };
             }
 
             const response = await axios.post(`${getApiBaseUrl()}/admin/pc-upgrade-parameters/${endpoint}`, data);
@@ -360,12 +356,10 @@ const ReferenceBuildsModal = ({ onClose }) => {
                     >
                         🔧 PC Upgrade (72 Builds)
                     </button>
-                    <button 
-                        className={`system-button ${activeSystem === 'pc-customized-ai' ? 'active' : ''}`}
-                        onClick={() => setActiveSystem('pc-customized-ai')}
-                    >
-                        🤖 PC Customized AI (135+ Builds)
-                    </button>
+                    {/*
+                      Legacy PC Customized AI reference builds are intentionally hidden for
+                      offline kiosk mode. The old branch remains in this file for rollback.
+                    */}
                 </div>
 
                 {/* Tabs */}
@@ -568,7 +562,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
                                                     .map(([compType, comp]) => {
                                                         const isObject = typeof comp === 'object' && comp !== null;
                                                         const name = isObject && comp.name ? comp.name : `Component ID: ${comp}`;
-                                                        const price = isObject && comp.price ? parseFloat(comp.price) : 0;
+                                                        const price = isObject && comp.price ? Number.parseFloat(comp.price) : 0;
                                                         
                                                         return (
                                                             <div key={compType} className="component-item">
@@ -774,7 +768,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
                                                         value={editingParameter.start_year}
                                                         onChange={(e) => setEditingParameter({
                                                             ...editingParameter,
-                                                            start_year: parseInt(e.target.value)
+                                                            start_year: Number.parseInt(e.target.value, 10)
                                                         })}
                                                         placeholder="Start Year"
                                                     />
@@ -783,7 +777,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
                                                         value={editingParameter.end_year}
                                                         onChange={(e) => setEditingParameter({
                                                             ...editingParameter,
-                                                            end_year: parseInt(e.target.value)
+                                                            end_year: Number.parseInt(e.target.value, 10)
                                                         })}
                                                         placeholder="End Year"
                                                     />
@@ -852,7 +846,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
                                                         value={editingParameter.min_budget}
                                                         onChange={(e) => setEditingParameter({
                                                             ...editingParameter,
-                                                            min_budget: parseFloat(e.target.value)
+                                                            min_budget: Number.parseFloat(e.target.value)
                                                         })}
                                                         placeholder="Min Budget"
                                                     />
@@ -861,7 +855,7 @@ const ReferenceBuildsModal = ({ onClose }) => {
                                                         value={editingParameter.max_budget}
                                                         onChange={(e) => setEditingParameter({
                                                             ...editingParameter,
-                                                            max_budget: parseFloat(e.target.value)
+                                                            max_budget: Number.parseFloat(e.target.value)
                                                         })}
                                                         placeholder="Max Budget"
                                                     />

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { Search, X, Users, ShoppingCart, Package, FileText, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import { useNavigate } from 'react-router-dom';
 
 const GlobalSearch = ({ isOpen, onClose }) => {
@@ -53,11 +55,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         setError(null);
 
         try {
-            const response = await fetch(`http://localhost:5000/api/search?q=${encodeURIComponent(searchQuery.trim())}`, {
-                headers: {
-                    'Authorization': `Bearer ${user.token}`
-                }
-            });
+            const response = await fetch(${getServerBaseUrl()}/api/search?q=, { credentials: 'include' });
 
             if (!response.ok) {
                 throw new Error(`Search failed: ${response.status}`);
@@ -72,7 +70,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         } finally {
             setLoading(false);
         }
-    }, [user?.token]);
+    }, [user?.id]);
 
     // Debounce search input
     useEffect(() => {
@@ -115,7 +113,11 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                 return {
                     title: item.name,
                     subtitle: `${item.email} • ${item.role}`,
-                    meta: item.status === 'online' ? '🟢 Online' : item.status === 'away' ? '🟡 Away' : '⚫ Offline'
+                    meta: (() => {
+                        if (item.status === 'online') return '🟢 Online';
+                        if (item.status === 'away') return '🟡 Away';
+                        return '⚫ Offline';
+                    })()
                 };
             case 'order':
                 return {
@@ -204,7 +206,8 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                     {data.items.map((item, index) => {
                                                         const formatted = formatResult(item);
                                                         return (
-                                                            <div
+                                                            <button
+                                                                type="button"
                                                                 key={`${category}-${index}`}
                                                                 className="flex items-center p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                                                                 onClick={() => handleResultClick(item)}
@@ -224,7 +227,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                                     <Clock className="w-3 h-3 mr-1" />
                                                                     {formatted.meta}
                                                                 </div>
-                                                            </div>
+                                                            </button>
                                                         );
                                                     })}
                                                 </div>
@@ -262,6 +265,11 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             </div>
         </div>
     );
+};
+
+GlobalSearch.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
 };
 
 export default GlobalSearch;

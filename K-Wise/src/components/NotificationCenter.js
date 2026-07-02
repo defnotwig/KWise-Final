@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../contexts/AuthContext';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import { Bell, X, Check, AlertCircle, Info, CheckCircle } from 'lucide-react';
 
 const NotificationCenter = () => {
@@ -14,14 +15,13 @@ const NotificationCenter = () => {
   // Fetch notifications on component mount
   useEffect(() => {
     const fetchNotifications = async () => {
-      if (!user?.token) return;
+      if (!user?.id) return;
       
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:5000/api/notifications', {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Content-Type': 'application/json'
+        const response = await fetch(`${getServerBaseUrl()}/api/notifications`, {
+          credentials: 'include',
+          headers: {            'Content-Type': 'application/json'
           }
         });
 
@@ -39,7 +39,7 @@ const NotificationCenter = () => {
     };
 
     fetchNotifications();
-  }, [user?.token]);
+  }, [user?.id]);
 
   // Real-time notification listeners
   useEffect(() => {
@@ -58,10 +58,11 @@ const NotificationCenter = () => {
       }
     };
 
+    const updateNotificationAsRead = (prev, id) =>
+      prev.map(n => n.id === id ? { ...n, read: true } : n);
+
     const handleNotificationRead = (notificationId) => {
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
+      setNotifications(prev => updateNotificationAsRead(prev, notificationId));
       setUnreadCount(prev => Math.max(0, prev - 1));
     };
 
@@ -82,14 +83,13 @@ const NotificationCenter = () => {
   }, []);
 
   const markAsRead = async (notificationId) => {
-    if (!user?.token) return;
+    if (!user?.id) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`${getServerBaseUrl()}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
+        credentials: 'include',
+        headers: {          'Content-Type': 'application/json'
         }
       });
 
@@ -105,14 +105,13 @@ const NotificationCenter = () => {
   };
 
   const markAllAsRead = async () => {
-    if (!user?.token || unreadCount === 0) return;
+    if (!user?.id || unreadCount === 0) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/notifications/mark-all-read', {
+      const response = await fetch(`${getServerBaseUrl()}/api/notifications/mark-all-read`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
+        credentials: 'include',
+        headers: {          'Content-Type': 'application/json'
         }
       });
 
@@ -126,14 +125,13 @@ const NotificationCenter = () => {
   };
 
   const deleteNotification = async (notificationId) => {
-    if (!user?.token) return;
+    if (!user?.id) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+      const response = await fetch(`${getServerBaseUrl()}/api/notifications/${notificationId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
+        credentials: 'include',
+        headers: {          'Content-Type': 'application/json'
         }
       });
 
@@ -221,7 +219,7 @@ const NotificationCenter = () => {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
               </div>
-            ) : notifications.length === 0 ? (
+            ) : notifications.length === 0 ? ( // NOSONAR
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>No notifications yet</p>
@@ -232,7 +230,7 @@ const NotificationCenter = () => {
                   <div
                     key={notification.id}
                     className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                      !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      notification.read ? '' : 'bg-blue-50 dark:bg-blue-900/20'
                     }`}
                   >
                     <div className="flex items-start space-x-3">

@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../contexts/AuthContext';
-import { MessageSquare, Send, X, Users, Smile } from 'lucide-react';
+import { getServerBaseUrl } from '../utils/networkConfig';
+import { MessageSquare, Send, X, Users } from 'lucide-react';
+
+const appendMessage = (previousMessages, message) => [...previousMessages, message];
+const addOnlineUser = (previousUsers, userData) => [...previousUsers, userData];
+const removeOnlineUser = (previousUsers, userId) => previousUsers.filter((onlineUser) => onlineUser.id !== userId);
+
+const getMessageKey = (message) => (
+  message.id || `${message.timestamp || 'no-time'}-${message.sender_id || 'no-sender'}-${message.content || 'no-content'}`
+);
 
 const MessagingCenter = () => {
   const { user } = useAuth();
@@ -26,14 +35,13 @@ const MessagingCenter = () => {
   // Fetch recent messages when opening chat
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!isOpen || !user?.token) return;
+      if (!isOpen || !user?.id) return;
       
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:5000/api/messages/recent', {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Content-Type': 'application/json'
+        const response = await fetch(`${getServerBaseUrl()}/api/messages/recent`, {
+          credentials: 'include',
+          headers: {            'Content-Type': 'application/json'
           }
         });
 
@@ -51,17 +59,17 @@ const MessagingCenter = () => {
     if (isOpen) {
       fetchMessages();
     }
-  }, [isOpen, user?.token]);
+  }, [isOpen, user?.id]);
 
   // Real-time message listeners
   useEffect(() => {
     if (!socket) return;
 
     const handleNewMessage = (message) => {
-      setMessages(prev => [...prev, message]);
+      setMessages((previousMessages) => appendMessage(previousMessages, message));
       
       if (!isOpen && message.sender_id !== user?.id) {
-        setUnreadCount(prev => prev + 1);
+        setUnreadCount((previousUnreadCount) => previousUnreadCount + 1);
       }
     };
 
@@ -70,11 +78,11 @@ const MessagingCenter = () => {
     };
 
     const handleUserJoined = (userData) => {
-      setOnlineUsers(prev => [...prev, userData]);
+      setOnlineUsers((previousUsers) => addOnlineUser(previousUsers, userData));
     };
 
     const handleUserLeft = (userData) => {
-      setOnlineUsers(prev => prev.filter(u => u.id !== userData.id));
+      setOnlineUsers((previousUsers) => removeOnlineUser(previousUsers, userData.id));
     };
 
     socket.on('message:new', handleNewMessage);
@@ -114,11 +122,10 @@ const MessagingCenter = () => {
 
     try {
       // Also save to database
-      await fetch('http://localhost:5000/api/messages', {
+      await fetch(`${getServerBaseUrl()}/api/messages`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
+        credentials: 'include',
+        headers: {          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ content: messageData.content })
       });
@@ -149,6 +156,51 @@ const MessagingCenter = () => {
         return 'text-gray-600 dark:text-gray-400';
     }
   };
+
+  let messagesContent = null;
+  if (loading) {
+    messagesContent = (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  } else if (messages.length === 0) {
+    messagesContent = (
+      <div className="text-center py-8 text-gray-500">
+        <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+        <p>Start the conversation!</p>
+      </div>
+    );
+  } else {
+    messagesContent = messages.map((message) => (
+      <div
+        key={getMessageKey(message)}
+        className={`flex ${message.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
+      >
+        <div
+          className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
+            message.sender_id === user.id
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-900'
+          }`}
+        >
+          {message.sender_id !== user.id && (
+            <p className={`text-xs font-medium mb-1 ${getRoleColor(message.sender_role)}`}>
+              {message.sender_name}
+            </p>
+          )}
+          <p className="text-sm">{message.content}</p>
+          <p className={`text-xs mt-1 ${
+            message.sender_id === user.id
+              ? 'text-blue-100'
+              : 'text-gray-500'
+          }`}>
+            {formatTime(message.timestamp)}
+          </p>
+        </div>
+      </div>
+    ));
+  }
 
   return (
     <div className="relative">
@@ -210,45 +262,7 @@ const MessagingCenter = () => {
 
           {/* Messages */}
           <div className="h-80 overflow-y-auto p-4 space-y-3">
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Start the conversation!</p>
-              </div>
-            ) : (
-              messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
-                      message.sender_id === user.id
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-900'
-                    }`}
-                  >
-                    {message.sender_id !== user.id && (
-                      <p className={`text-xs font-medium mb-1 ${getRoleColor(message.sender_role)}`}>
-                        {message.sender_name}
-                      </p>
-                    )}
-                    <p className="text-sm">{message.content}</p>
-                    <p className={`text-xs mt-1 ${
-                      message.sender_id === user.id 
-                        ? 'text-blue-100' 
-                        : 'text-gray-500'
-                    }`}>
-                      {formatTime(message.timestamp)}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
+            {messagesContent}
             <div ref={messagesEndRef} />
           </div>
 
