@@ -11,8 +11,154 @@ import CompatibilityWarningModal from "../components/CompatibilityWarningModal";
 const getItemPrice = (item) => {
   if (!item?.price) return 0;
   return typeof item.price === "string"
-    ? parseFloat(item.price.replace(/[^0-9.,]/g, "").replace(/,/g, "")) || 0
+    ? Number.parseFloat(item.price.replaceAll(/[^0-9.,]/g, "").replaceAll(',', "")) || 0
     : item.price || 0;
+};
+
+// ── Data-driven category normalization (reduces Cognitive Complexity) ──
+const CATEGORY_RULES = [
+  { exact: ['cpu'], includes: ['processor', 'central processing'], result: 'CPU' },
+  { exact: ['gpu', 'graphics card'], includes: ['graphics', 'video card'], result: 'GPU' },
+  { exact: ['motherboard'], includes: ['mobo', 'mainboard'], result: 'Motherboard' },
+  { exact: ['ram', 'memory', 'memory (ram)'], includes: ['memory', 'ddr'], result: 'RAM' },
+  { exact: ['storage', 'ssd', 'hdd', 'nvme'], includes: [], result: 'Storage' },
+  { exact: ['psu', 'power supply'], includes: ['power'], result: 'PSU' },
+  { exact: ['case', 'chassis', 'pc case'], includes: [], result: 'Case' },
+  { exact: ['cooling', 'cooler'], includes: ['cpu cooler', 'cpu-cooler'], result: 'Cooling' },
+  { exact: ['monitor'], includes: ['display'], result: 'Monitor' },
+  { exact: ['keyboard'], includes: [], result: 'Keyboard' },
+  { exact: ['mouse'], includes: [], result: 'Mouse' },
+  { exact: ['headphones'], includes: ['headset'], result: 'Headphones' },
+  { exact: ['speakers'], includes: [], result: 'Speakers' },
+  { exact: ['webcam'], includes: [], result: 'Webcam' },
+];
+
+const mapRawCategory = (rawCategory) => {
+  if (!rawCategory) return '';
+  const lower = rawCategory.toLowerCase().trim();
+  for (const rule of CATEGORY_RULES) {
+    if (rule.exact.includes(lower)) return rule.result;
+    if (rule.includes.some(kw => lower.includes(kw))) return rule.result;
+  }
+  return '';
+};
+
+// Name-based category inference for items lacking category metadata
+const NAME_INFERENCE_RULES = [
+  { keywords: ['ryzen', 'intel', 'core i', 'i5-', 'i7-', 'i9-', 'i3-'], result: 'cpu' },
+  { keywords: ['rtx', 'gtx', 'radeon', 'geforce', 'rx 7', 'rx 6'], result: 'gpu' },
+  { keywords: ['motherboard', 'b550', 'b650', 'b660', 'b760', 'x570', 'x670', 'z690', 'z790', 'a620', 'b450'], result: 'motherboard' },
+  { keywords: ['ddr4', 'ddr5', 'dimm', 'vengeance', 'trident', 'g.skill'], result: 'ram' },
+  { keywords: ['ssd', 'nvme', 'hdd', 'hard drive', 'western digital', 'seagate', 'crucial', 'adata', 'legend'], result: 'storage' },
+  { keywords: ['cooler', 'deepcool', 'noctua', 'cooling', 'aio', 'liquid', 'hyper 212'], result: 'cooling' },
+  { keywords: ['psu', 'power supply', 'watt', 'corsair rm', 'evga', 'seasonic', 'coolermaster mwe'], result: 'psu' },
+  { keywords: ['chassis', 'darkflash', 'nzxt', 'mid tower', 'keytech', 'darkvader'], result: 'case' },
+];
+
+const inferCategoryFromName = (name) => {
+  if (!name) return null;
+  const nameLower = name.toLowerCase();
+  for (const rule of NAME_INFERENCE_RULES) {
+    if (rule.keywords.some(kw => nameLower.includes(kw))) return rule.result;
+  }
+  if (nameLower.includes('ram') && !nameLower.includes('program')) return 'ram';
+  if (nameLower.includes('memory')) return 'ram';
+  if (nameLower.includes('case') && !nameLower.includes('showcase')) return 'case';
+  return null;
+};
+
+// Category field variation map (lowercase output)
+const CATEGORY_FIELD_MAP = new Map([
+  ['cpu', 'cpu'], ['processor', 'cpu'],
+  ['gpu', 'gpu'], ['graphics', 'gpu'],
+  ['motherboard', 'motherboard'], ['mobo', 'motherboard'],
+  ['ram', 'ram'], ['memory', 'ram'],
+  ['storage', 'storage'], ['ssd', 'storage'], ['hdd', 'storage'],
+  ['psu', 'psu'], ['power', 'psu'],
+  ['case', 'case'], ['chassis', 'case'],
+  ['cooling', 'cooling'], ['cool', 'cooling'], ['fan', 'cooling'], ['aio', 'cooling'],
+]);
+
+const normalizeCategoryField = (category) => {
+  if (!category) return null;
+  const lower = category.toLowerCase().trim();
+  if (CATEGORY_FIELD_MAP.has(lower)) return CATEGORY_FIELD_MAP.get(lower);
+  for (const [key, value] of CATEGORY_FIELD_MAP) {
+    if (lower.includes(key)) return value;
+  }
+  return lower || null;
+};
+
+// Stock calculation helper
+const calculateTotalUsage = (orders, itemName, targetIndex, newQuantity) => {
+  let total = 0;
+  for (const [ordIndex, ord] of orders.entries()) {
+    if (!ord?.items || !Array.isArray(ord.items)) continue;
+    for (const ordItem of ord.items) {
+      if (ordItem?.name === itemName) {
+        total += ordIndex === targetIndex ? newQuantity : (ord.quantity || 1);
+      }
+    }
+  }
+  return total;
+};
+
+// Fetch real-time stock for an item
+const fetchItemStock = async (item) => {
+  try {
+    const stockResponse = await api.kiosk.getCategoryProducts(
+      item.category || item.categoryName, { limit: 1000 }
+    );
+    const currentProduct = stockResponse.data.find(p => p.id === item.id || p.name === item.name);
+    return currentProduct ? currentProduct.stock : 0;
+  } catch (error) {
+    console.error('⚠️ Failed to fetch stock, using cached value:', error);
+    return item.stock || 0;
+  }
+};
+
+// Cart rebuilding helpers for Order More flow
+const CATEGORY_INDEX_MAP = {
+  'cpu': 0, 'processor': 0, 'central processing unit': 0,
+  'cooling': 1, 'cooler': 1, 'cpu cooler': 1, 'cpu-cooler': 1,
+  'motherboard': 2,
+  'gpu': 5, 'graphics processing unit': 5, 'graphics': 5,
+  'case': 6, 'pc case': 6, 'chassis': 6,
+  'psu': 7, 'power supply': 7, 'power supply unit': 7,
+};
+
+const rebuildCartStructure = (items) => {
+  const baseCartItems = new Array(8).fill(null);
+  const multiSlotItems = {};
+  let ramSlotIndex = 0;
+  let storageM2Index = 0;
+  let storageSataIndex = 0;
+
+  items.forEach(item => {
+    const cat = (item.category || item.categoryName || '').toLowerCase().trim();
+    if (cat === 'ram' || cat === 'memory' || cat.includes('memory')) {
+      multiSlotItems[`ram-${ramSlotIndex}`] = item;
+      ramSlotIndex++;
+    } else if (cat === 'storage' || cat.includes('ssd') || cat.includes('hdd') || cat.includes('nvme')) {
+      const isNVMe = (item.name || '').toUpperCase().includes('NVME') ||
+                    (item.name || '').toUpperCase().includes('M.2') ||
+                    (item.specifications?.interface || '').includes('NVMe');
+      if (isNVMe) {
+        multiSlotItems[`storage-m2-${storageM2Index}`] = item;
+        storageM2Index++;
+      } else {
+        multiSlotItems[`storage-sata-${storageSataIndex}`] = item;
+        storageSataIndex++;
+      }
+    } else {
+      const index = CATEGORY_INDEX_MAP[cat];
+      if (index !== undefined) {
+        baseCartItems[index] = item;
+      }
+    }
+  });
+
+  return { baseCartItems, multiSlotItems };
 };
 
 function OrderSumCustom() {
@@ -34,8 +180,8 @@ function OrderSumCustom() {
   const [isValidatingCompatibility, setIsValidatingCompatibility] = useState(false);
 
   // PRIORITY 3: Compatibility checking state
-  // eslint-disable-next-line no-unused-vars
-  const [compatibilityData, setCompatibilityData] = useState(null);
+  // eslint-disable-next-line react/hook-use-state
+  const [, setCompatibilityData] = useState(null);
   const [loadingCompatibility, setLoadingCompatibility] = useState(false);
 
   // Only allow navigation back to appropriate page based on source
@@ -123,7 +269,7 @@ function OrderSumCustom() {
         if (!items || !Array.isArray(items) || items.length === 0) return 'empty';
         return items
           .map(item => `${item.id || item.product_id}:${item.name}:${item.quantity || 1}`)
-          .sort()
+          .sort((a, b) => a.localeCompare(b))
           .join('|');
       };
       
@@ -135,11 +281,13 @@ function OrderSumCustom() {
         return orderKey === cartKey;
       });
 
-      if (!orderExists) {
+      if (orderExists) {
+        console.log("⚠️ OrderSumCustom - Duplicate build detected, skipping:", cartKey);
+      } else {
         // Clean up any metadata before saving
         const cleanedItems = storedCart.map(item => {
           const { _reusedFromBuild, _reuseTimestamp, ...cleanItem } = item;
-          return JSON.parse(JSON.stringify(cleanItem)); // Deep clone to prevent mutations
+          return structuredClone(cleanItem);
         });
         
         // 🔥 CRITICAL DEBUG: Log item categories before saving
@@ -167,8 +315,6 @@ function OrderSumCustom() {
         
         // Clear the Order More flag after creating the build
         localStorage.removeItem("orderMoreFlow");
-      } else {
-        console.log("⚠️ OrderSumCustom - Duplicate build detected, skipping:", cartKey);
       }
 
       // Clear working cart and multiSlotCart to prevent duplication when returning here again
@@ -203,7 +349,7 @@ function OrderSumCustom() {
 
       try {
         // Build components map from latest order
-        const latestOrder = orders[orders.length - 1];
+        const latestOrder = orders.at(-1);
         if (!latestOrder?.items || latestOrder.items.length === 0) {
           setCompatibilityData(null);
           setLoadingCompatibility(false);
@@ -217,7 +363,7 @@ function OrderSumCustom() {
           // Parse price to number
           const price = typeof item.price === "number"
             ? item.price
-            : parseFloat(String(item.price).replace(/[^\d.]/g, "")) || 0;
+            : Number.parseFloat(String(item.price).replaceAll(/[^\d.]/g, "")) || 0;
 
           // 🔥 CRITICAL FIX: Normalize category to exact API enum values
           // API accepts: CPU, GPU, Motherboard, RAM, Storage, PSU, Case, Cooling, Monitor, Keyboard, Mouse, Headphones, Speakers, Webcam
@@ -235,37 +381,7 @@ function OrderSumCustom() {
             });
           }
           
-          // Map all variations to API enum
-          let normalizedCategory = '';
-          if (rawCategory === 'cpu' || rawCategory.includes('processor') || rawCategory.includes('central processing')) {
-            normalizedCategory = 'CPU';
-          } else if (rawCategory === 'gpu' || rawCategory === 'graphics card' || rawCategory.includes('graphics')) {
-            normalizedCategory = 'GPU';
-          } else if (rawCategory === 'motherboard' || rawCategory.includes('mobo')) {
-            normalizedCategory = 'Motherboard';
-          } else if (rawCategory === 'ram' || rawCategory === 'memory' || rawCategory === 'memory (ram)' || rawCategory.includes('memory')) {
-            normalizedCategory = 'RAM';
-          } else if (rawCategory === 'storage' || rawCategory === 'ssd' || rawCategory === 'hdd' || rawCategory === 'nvme') {
-            normalizedCategory = 'Storage';
-          } else if (rawCategory === 'psu' || rawCategory === 'power supply' || rawCategory.includes('power')) {
-            normalizedCategory = 'PSU';
-          } else if (rawCategory === 'case' || rawCategory === 'chassis' || rawCategory === 'pc case') {
-            normalizedCategory = 'Case';
-          } else if (rawCategory === 'cooling' || rawCategory === 'cooler' || rawCategory.includes('cpu cooler') || rawCategory.includes('cpu-cooler')) {
-            normalizedCategory = 'Cooling';
-          } else if (rawCategory === 'monitor' || rawCategory.includes('display')) {
-            normalizedCategory = 'Monitor';
-          } else if (rawCategory === 'keyboard') {
-            normalizedCategory = 'Keyboard';
-          } else if (rawCategory === 'mouse') {
-            normalizedCategory = 'Mouse';
-          } else if (rawCategory === 'headphones' || rawCategory.includes('headset')) {
-            normalizedCategory = 'Headphones';
-          } else if (rawCategory === 'speakers') {
-            normalizedCategory = 'Speakers';
-          } else if (rawCategory === 'webcam') {
-            normalizedCategory = 'Webcam';
-          }
+          const normalizedCategory = mapRawCategory(rawCategory);
           
           // 🔥 DEBUG: Log when normalizedCategory is still empty after mapping
           if (!normalizedCategory && rawCategory) {
@@ -295,7 +411,7 @@ function OrderSumCustom() {
           const formatted = formatComponent(item);
 
           // Only add component if it has valid ID and category
-          if (formatted && formatted.id && formatted.id > 0 && formatted.category) {
+          if (formatted?.id > 0 && formatted?.category) {
             const categoryKey = formatted.category.toLowerCase();
             if (categoryKey === 'cpu') components.cpu = formatted;
             else if (categoryKey === 'gpu') components.gpu = formatted;
@@ -340,9 +456,7 @@ function OrderSumCustom() {
       }
     };
 
-    // Debounce compatibility check
-    const timeoutId = setTimeout(checkCompatibility, 500);
-    return () => clearTimeout(timeoutId);
+    checkCompatibility();
   }, [orders]);
 
   // Compute price for a given order
@@ -374,38 +488,14 @@ function OrderSumCustom() {
         for (const item of order.items) {
           if (!item) continue; // Skip null items
 
-          // 🔥 CRITICAL FIX: Fetch real-time stock from API, don't trust cached data
-          let itemStock = 0;
-          try {
-            const stockResponse = await api.kiosk.getCategoryProducts(item.category || item.categoryName, { limit: 1000 });
-            const currentProduct = stockResponse.data.find(p => p.id === item.id || p.name === item.name);
-            itemStock = currentProduct ? currentProduct.stock : 0;
-
-            console.log('📦 Real-time stock check:', {
-              component: item.name,
-              cachedStock: item.stock,
-              currentStock: itemStock
-            });
-          } catch (error) {
-            console.error('⚠️ Failed to fetch stock, using cached value:', error);
-            itemStock = item.stock || 0; // Fallback to cached
-          }
-
-          const itemName = item.name || '';
-
-          // 🔥 CRITICAL FIX: Calculate cumulative usage across ALL custom orders
-          let totalUsedAcrossOrders = 0;
-          orders.forEach((ord, ordIndex) => {
-            if (ord?.items && Array.isArray(ord.items)) {
-              ord.items.forEach(ordItem => {
-                if (ordItem && ordItem.name === itemName) {
-                  // For the current order being increased, use newQuantity
-                  const qty = ordIndex === index ? newQuantity : (ord.quantity || 1);
-                  totalUsedAcrossOrders += qty;
-                }
-              });
-            }
+          const itemStock = await fetchItemStock(item);
+          console.log('📦 Real-time stock check:', {
+            component: item.name,
+            cachedStock: item.stock,
+            currentStock: itemStock
           });
+
+          const totalUsedAcrossOrders = calculateTotalUsage(orders, item.name || '', index, newQuantity);
 
           if (totalUsedAcrossOrders > itemStock) {
             const componentName = item.name || item.categoryName || 'Unknown Component';
@@ -459,7 +549,7 @@ function OrderSumCustom() {
     
     if (fromSource === 'customize-ai') {
       // CustomizeAI flow: Reuse the latest AI build
-      const last = orders[orders.length - 1];
+      const last = orders.at(-1);
       if (last?.items) {
         // Separate PC components from peripherals - build properly formatted object
         // 🔥 FIX: Exclude peripherals when reusing previous build
@@ -488,69 +578,17 @@ function OrderSumCustom() {
     } else {
       // PC Customized flow: Reuse the latest saved build by loading its items back to working cart
       // 🔥 FIX: Filter out peripherals from previous build - only keep PC components
-      const last = orders[orders.length - 1];
+      const last = orders.at(-1);
       if (last?.items) {
         const pcComponentsOnly = last.items.filter(item => !item.isPeripheral);
         
         // 🔥 CRITICAL FIX: Deep clone items to prevent state mutations
         const reusedItems = pcComponentsOnly.map(item => {
           const { _reusedFromBuild, _reuseTimestamp, ...cleanItem } = item;
-          return JSON.parse(JSON.stringify(cleanItem)); // Deep clone
+          return structuredClone(cleanItem);
         });
         
-        // 🔥 CRITICAL FIX: Separate base cart items (non-RAM/Storage) from multi-slot items (RAM/Storage)
-        const baseCartItems = []; // CPU, Cooling, Motherboard, GPU, Case, PSU (indexed by position)
-        const multiSlotItems = {}; // RAM and Storage with slot keys
-        
-        // Category index mapping for base cart
-        const categoryIndexMap = {
-          'cpu': 0, 'processor': 0, 'central processing unit': 0,
-          'cooling': 1, 'cooler': 1, 'cpu cooler': 1, 'cpu-cooler': 1,
-          'motherboard': 2,
-          'gpu': 5, 'graphics processing unit': 5, 'graphics': 5,
-          'case': 6, 'pc case': 6, 'chassis': 6,
-          'psu': 7, 'power supply': 7, 'power supply unit': 7
-        };
-        
-        // Initialize base cart array with 8 slots
-        for (let i = 0; i < 8; i++) baseCartItems[i] = null;
-        
-        // Track RAM and Storage slot counters
-        let ramSlotIndex = 0;
-        let storageM2Index = 0;
-        let storageSataIndex = 0;
-        
-        reusedItems.forEach(item => {
-          const cat = (item.category || item.categoryName || '').toLowerCase().trim();
-          
-          // Check if RAM or Storage (multi-slot)
-          if (cat === 'ram' || cat === 'memory' || cat.includes('memory')) {
-            const slotKey = `ram-${ramSlotIndex}`;
-            multiSlotItems[slotKey] = item;
-            ramSlotIndex++;
-          } else if (cat === 'storage' || cat.includes('ssd') || cat.includes('hdd') || cat.includes('nvme')) {
-            // Determine if M.2/NVMe or SATA based on item properties
-            const isNVMe = (item.name || '').toUpperCase().includes('NVME') || 
-                          (item.name || '').toUpperCase().includes('M.2') ||
-                          (item.specifications?.interface || '').includes('NVMe');
-            
-            if (isNVMe) {
-              const slotKey = `storage-m2-${storageM2Index}`;
-              multiSlotItems[slotKey] = item;
-              storageM2Index++;
-            } else {
-              const slotKey = `storage-sata-${storageSataIndex}`;
-              multiSlotItems[slotKey] = item;
-              storageSataIndex++;
-            }
-          } else {
-            // Base cart item - find correct index
-            const index = categoryIndexMap[cat];
-            if (index !== undefined) {
-              baseCartItems[index] = item;
-            }
-          }
-        });
+        const { baseCartItems, multiSlotItems } = rebuildCartStructure(reusedItems);
         
         console.log('🔄 Order More - Rebuilding cart structure:');
         console.log('📦 Base cart items:', baseCartItems.map((item, idx) => item ? `[${idx}] ${item.name}` : `[${idx}] null`));
@@ -567,56 +605,38 @@ function OrderSumCustom() {
         // Menu items are in this exact order in PCCustomized.js
         const menuItemCategories = ['CPU', 'Cooling', 'Motherboard', 'RAM', 'Storage', 'GPU', 'Case', 'PSU'];
         
-        // 🔥 ENHANCED: Robust category normalization helper
-        const normalizeCategoryName = (rawCategory) => {
-          if (!rawCategory) return '';
-          const cat = String(rawCategory).trim().toLowerCase();
-          
-          // Map all variations to standard uppercase names
-          if (cat === 'cpu' || cat.includes('processor') || cat.includes('central processing')) return 'CPU';
-          if (cat === 'cooling' || cat.includes('cooler') || cat.includes('cpu cooler') || cat.includes('cpu-cooler')) return 'Cooling';
-          if (cat === 'motherboard' || cat.includes('mobo') || cat.includes('mainboard')) return 'Motherboard';
-          if (cat === 'ram' || cat === 'memory' || cat.includes('memory (ram)') || cat.includes('ddr')) return 'RAM';
-          if (cat === 'storage' || cat.includes('ssd') || cat.includes('hdd') || cat.includes('nvme')) return 'Storage';
-          if (cat === 'gpu' || cat.includes('graphics') || cat.includes('video card')) return 'GPU';
-          if (cat === 'case' || cat.includes('chassis') || cat.includes('pc case')) return 'Case';
-          if (cat === 'psu' || cat.includes('power') || cat.includes('power supply')) return 'PSU';
-          
-          return ''; // Unknown category
-        };
-        
         // Get existing categories from cart items using robust normalization
         const existingCategories = pcComponentsOnly
-          .map(item => normalizeCategoryName(item.category || item.categoryName))
+          .map(item => mapRawCategory(item.category || item.categoryName))
           .filter(cat => cat !== ''); // Filter out unknowns
         
         // Find which categories are missing (required categories only - GPU is optional)
-        const requiredCategories = ['CPU', 'Cooling', 'Motherboard', 'RAM', 'Storage', 'Case', 'PSU'];
+        const requiredCategories = new Set(['CPU', 'Cooling', 'Motherboard', 'RAM', 'Storage', 'Case', 'PSU']);
         const missingCategories = menuItemCategories.filter(cat => {
-          const isRequired = requiredCategories.includes(cat);
+          const isRequired = requiredCategories.has(cat);
           const exists = existingCategories.includes(cat);
           return isRequired && !exists; // Only missing if required AND not present
         });
         
         // Find the index of the FIRST missing category in the menu order
         const firstMissingIndex = missingCategories.length > 0
-          ? menuItemCategories.findIndex(cat => cat === missingCategories[0])
+          ? menuItemCategories.indexOf(missingCategories[0])
           : -1;
         
         console.log('🔍 Order More - Reused components:', pcComponentsOnly.map(i => ({ 
           name: i.name, 
           rawCategory: i.category || i.categoryName,
-          normalized: normalizeCategoryName(i.category || i.categoryName)
+          normalized: mapRawCategory(i.category || i.categoryName)
         })));
         console.log('🔍 Order More - Existing categories (normalized):', existingCategories);
         console.log('🔍 Order More - Missing REQUIRED categories:', missingCategories);
         console.log('🔍 Order More - First missing category:', missingCategories[0] || 'NONE (all required components present)');
-        console.log('🔍 Order More - Navigating to index:', firstMissingIndex >= 0 ? firstMissingIndex : 0);
+        console.log('🔍 Order More - Navigating to index:', Math.max(firstMissingIndex, 0));
         
         // Navigate to pc-customized with the index of the first missing component
         // If no required categories are missing, navigate to first category (CPU) for optional GPU
         navigate("/pc-customized", {
-          state: { selectedCategory: firstMissingIndex >= 0 ? firstMissingIndex : 0 },
+          state: { selectedCategory: Math.max(firstMissingIndex, 0) },
         });
       } else {
         navigate("/pc-customized", {
@@ -667,42 +687,13 @@ function OrderSumCustom() {
       const normalizeCategory = (item) => {
         if (!item) return null;
         
-        // Try direct category field first
-        let category = (item.category || item.categoryName || item.type || '').toLowerCase().trim();
+        const category = (item.category || item.categoryName || item.type || '').toLowerCase().trim();
         
-        // If no category, infer from product name
         if (!category && item.name) {
-          const nameLower = item.name.toLowerCase();
-          if (nameLower.includes('ryzen') || nameLower.includes('intel') || nameLower.includes('core i') || nameLower.includes('i5-') || nameLower.includes('i7-') || nameLower.includes('i9-') || nameLower.includes('i3-')) {
-            return 'cpu';
-          } else if (nameLower.includes('rtx') || nameLower.includes('gtx') || nameLower.includes('radeon') || nameLower.includes('geforce') || nameLower.includes('rx 7') || nameLower.includes('rx 6')) {
-            return 'gpu';
-          } else if (nameLower.includes('motherboard') || nameLower.includes('b550') || nameLower.includes('b650') || nameLower.includes('b660') || nameLower.includes('b760') || nameLower.includes('x570') || nameLower.includes('x670') || nameLower.includes('z690') || nameLower.includes('z790') || nameLower.includes('a620') || nameLower.includes('b450')) {
-            return 'motherboard';
-          } else if (nameLower.includes('ddr4') || nameLower.includes('ddr5') || (nameLower.includes('ram') && !nameLower.includes('program')) || nameLower.includes('memory') || nameLower.includes('dimm') || nameLower.includes('vengeance') || nameLower.includes('trident') || nameLower.includes('g.skill')) {
-            return 'ram';
-          } else if (nameLower.includes('ssd') || nameLower.includes('nvme') || nameLower.includes('hdd') || nameLower.includes('hard drive') || nameLower.includes('western digital') || nameLower.includes('seagate') || nameLower.includes('crucial') || nameLower.includes('adata') || nameLower.includes('legend')) {
-            return 'storage';
-          } else if (nameLower.includes('cooler') || nameLower.includes('deepcool') || nameLower.includes('noctua') || nameLower.includes('cooling') || nameLower.includes('aio') || nameLower.includes('liquid') || nameLower.includes('hyper 212')) {
-            return 'cooling';
-          } else if (nameLower.includes('psu') || nameLower.includes('power supply') || nameLower.includes('watt') || nameLower.includes('corsair rm') || nameLower.includes('evga') || nameLower.includes('seasonic') || nameLower.includes('coolermaster mwe')) {
-            return 'psu';
-          } else if ((nameLower.includes('case') && !nameLower.includes('showcase')) || nameLower.includes('chassis') || nameLower.includes('darkflash') || nameLower.includes('nzxt') || nameLower.includes('mid tower') || nameLower.includes('keytech') || nameLower.includes('darkvader')) {
-            return 'case';
-          }
+          return inferCategoryFromName(item.name);
         }
         
-        // Map category variations to standard names
-        if (category.includes('cpu') || category.includes('processor')) return 'cpu';
-        if (category.includes('gpu') || category.includes('graphics')) return 'gpu';
-        if (category.includes('motherboard') || category.includes('mobo')) return 'motherboard';
-        if (category.includes('ram') || category.includes('memory')) return 'ram';
-        if (category.includes('storage') || category.includes('ssd') || category.includes('hdd')) return 'storage';
-        if (category.includes('psu') || category.includes('power')) return 'psu';
-        if (category.includes('case') || category.includes('chassis')) return 'case';
-        if (category.includes('cool') || category.includes('fan') || category.includes('aio')) return 'cooling';
-        
-        return category || null;
+        return normalizeCategoryField(category);
       };
 
       // Convert items to components object for validation
@@ -739,7 +730,7 @@ function OrderSumCustom() {
       console.log('✅ Starting full build validation with', Object.keys(buildComponents).length, 'components...');
       
       // Call full build validation
-      const validation = await compatibilityValidator.validateFullBuild(buildComponents);
+      const validation = compatibilityValidator.validateFullBuild(buildComponents);
       
       console.log('📊 Validation result:', validation);
       console.log('📊 Validation blocking:', validation.blocking);
@@ -891,7 +882,7 @@ function OrderSumCustom() {
               <div className="order-sum-custom-components-summary">
                 <h2 className="order-sum-custom-components-title">Components</h2>
                 <div className="order-sum-custom-components-table">
-                  {order.items?.filter(item => item && item.name && !item.isPeripheral).map((item, itemIdx) => {
+                  {order.items?.filter(item => item?.name && !item.isPeripheral).map((item, itemIdx) => {
                     // 🔥 FIX: Display items directly using their actual category names to avoid mismatch
                     const displayCategory = item.categoryName || item.category || 'Component';
 
@@ -906,11 +897,11 @@ function OrderSumCustom() {
               </div>
 
               {/* Peripherals Section - Separate table for peripheral items */}
-              {order.items?.some(item => item && item.isPeripheral) && (
+              {order.items?.some(item => item?.isPeripheral) && (
                 <div className="order-sum-custom-peripherals-summary">
                   <h2 className="order-sum-custom-peripherals-title">Peripherals</h2>
                   <div className="order-sum-custom-peripherals-table">
-                    {order.items?.filter(item => item && item.name && item.isPeripheral).map((item, itemIdx) => {
+                    {order.items?.filter(item => item?.name && item?.isPeripheral).map((item, itemIdx) => {
                       const displayCategory = item.category || 'Peripheral';
 
                       return (
@@ -938,7 +929,7 @@ function OrderSumCustom() {
 
       {/* PCPartPicker-style Compatibility Notes */}
       <CompatibilityNotes
-        buildComponents={orders.length > 0 ? orders[orders.length - 1].items : []}
+        buildComponents={orders.length > 0 ? orders.at(-1).items : []}
         buildType="pc-customized"
       />
 
@@ -1056,10 +1047,10 @@ function OrderSumCustom() {
           onProceed={() => {
             console.log('✅ User clicked Proceed in modal');
             console.log('🔍 Blocking status:', compatibilityValidation.blocking);
-            if (!compatibilityValidation.blocking) {
-              proceedToPayment();
-            } else {
+            if (compatibilityValidation.blocking) {
               console.log('🚫 Cannot proceed - critical issues present');
+            } else {
+              proceedToPayment();
             }
           }}
           onFixIssues={() => {

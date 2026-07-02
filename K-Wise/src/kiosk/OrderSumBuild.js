@@ -21,7 +21,7 @@ const OrderSumBuild = () => {
 
   // PRIORITY 3: Compatibility checking state
   // eslint-disable-next-line no-unused-vars
-  const [compatibilityData, setCompatibilityData] = useState(null);
+  const [compatibilityData, setCompatibilityData] = useState(null); // NOSONAR - state setter used in effects
   const [loadingCompatibility, setLoadingCompatibility] = useState(false);
 
   // ✅ FIX: Redirect based on build source
@@ -49,8 +49,8 @@ const OrderSumBuild = () => {
       }
     };
     measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    globalThis.addEventListener('resize', measure);
+    return () => globalThis.removeEventListener('resize', measure);
   }, []);
 
   useEffect(() => {
@@ -123,6 +123,74 @@ const OrderSumBuild = () => {
     localStorage.setItem("cart", JSON.stringify(groups));
   }, [handleEmptyCartRedirect, location.state]);
 
+  // Category map for component key assignment
+  const CATEGORY_MAP = {
+    'cpu': 'CPU', 'processor': 'CPU',
+    'gpu': 'GPU', 'graphics card': 'GPU',
+    'motherboard': 'Motherboard',
+    'ram': 'RAM', 'memory': 'RAM',
+    'storage': 'Storage',
+    'psu': 'PSU', 'power supply': 'PSU',
+    'case': 'Case',
+    'cooling': 'Cooling', 'cooler': 'Cooling',
+    'monitor': 'Monitor', 'keyboard': 'Keyboard',
+    'mouse': 'Mouse', 'headphones': 'Headphones',
+    'speakers': 'Speakers', 'webcam': 'Webcam'
+  };
+  const CATEGORY_TO_KEY = {
+    'cpu': 'cpu', 'processor': 'cpu',
+    'gpu': 'gpu', 'graphics card': 'gpu',
+    'motherboard': 'motherboard',
+    'ram': 'ram', 'memory': 'ram',
+    'storage': 'storage',
+    'psu': 'psu', 'power supply': 'psu',
+    'case': 'case',
+    'cooling': 'cooling', 'cooler': 'cooling'
+  };
+
+  // Format a single component for the compatibility API
+  const formatComponent = (comp) => {
+    const rawCategory = (comp.name || '').toLowerCase();
+    const componentType = CATEGORY_MAP[rawCategory] || CATEGORY_MAP[rawCategory.trim()] || 'CPU';
+    return {
+      id: comp.part_id || comp.id || 0,
+      name: comp.value || comp.part_name || comp.name || '',
+      category: componentType,
+      brand: comp.brand || comp.part_brand || '',
+      price: typeof comp.price === "number" ? comp.price : Number.parseFloat(String(comp.price || '0').replaceAll(/[^\d.]/g, "")) || 0,
+      stock: comp.part_stock || comp.stock || 0,
+      specifications: comp.specifications || {},
+      image_url: comp.image || comp.image_url || '',
+      description: comp.description || '',
+      performance_index: comp.performance_index || 0,
+      quantity: comp.quantity || 1
+    };
+  };
+
+  // Assign a single component to the components map by category
+  const assignComponent = (comp, components, formatter) => {
+    if (!comp || (!comp.value && !comp.part_name)) return;
+    const category = (comp.name || '').toLowerCase();
+    const formatted = formatter(comp);
+    if (!formatted.id || formatted.id <= 0) return;
+    const key = CATEGORY_TO_KEY[category];
+    if (key) components[key] = formatted;
+  };
+
+  // Aggregate all components from cart items into a categorized object
+  const aggregateComponents = useCallback((items) => {
+    const components = {};
+    for (const order of items) {
+      const orderComponents = order?.product?.components;
+      if (!Array.isArray(orderComponents)) continue;
+      for (const comp of orderComponents) {
+        assignComponent(comp, components, formatComponent);
+      }
+    }
+    return components;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // PRIORITY 3: Check compatibility when cart changes
   useEffect(() => {
     const checkCompatibility = async () => {
@@ -133,96 +201,17 @@ const OrderSumBuild = () => {
 
       setLoadingCompatibility(true);
 
+      const components = aggregateComponents(cartItems);
+
+      if (Object.keys(components).length === 0) {
+        setCompatibilityData(null);
+        setLoadingCompatibility(false);
+        return;
+      }
+
+      console.log('🔍 Formatted components for API:', components);
+
       try {
-        // 🔧 FIX: Format components to match backend schema (object with cpu/gpu/etc, not array)
-        // Helper to format component for API
-        const formatComponent = (comp) => {
-          // 🔥 FIX: Extract component type from 'name' field (e.g., "CPU", "RAM", "GPU")
-          // and use 'value' field as the actual component name
-          const rawCategory = (comp.name || '').toLowerCase();
-          
-          // Map to exact category format expected by backend schema validation
-          const categoryMap = {
-            'cpu': 'CPU',
-            'processor': 'CPU',
-            'gpu': 'GPU',
-            'graphics card': 'GPU',
-            'motherboard': 'Motherboard',
-            'ram': 'RAM',
-            'memory': 'RAM',
-            'storage': 'Storage',
-            'psu': 'PSU',
-            'power supply': 'PSU',
-            'case': 'Case',
-            'cooling': 'Cooling',
-            'cooler': 'Cooling',
-            'monitor': 'Monitor',
-            'keyboard': 'Keyboard',
-            'mouse': 'Mouse',
-            'headphones': 'Headphones',
-            'speakers': 'Speakers',
-            'webcam': 'Webcam'
-          };
-          
-          // 🔥 FIX: Always use mapped category, fallback to 'CPU' if unknown to prevent validation errors
-          const componentType = categoryMap[rawCategory] || categoryMap[rawCategory.trim()] || 'CPU';
-          const componentName = comp.value || comp.part_name || comp.name || '';
-          const componentId = comp.part_id || comp.id || 0;
-          const componentStock = comp.part_stock || comp.stock || 0;
-
-          return {
-            id: componentId,
-            name: componentName,
-            category: componentType, // API expects exact format: 'CPU', 'Motherboard', 'RAM', etc.
-            brand: comp.brand || comp.part_brand || '',
-            price: typeof comp.price === "number" ? comp.price : parseFloat(String(comp.price || '0').replace(/[^\d.]/g, "")) || 0,
-            stock: componentStock, // Use stock from linked pc_parts table
-            specifications: comp.specifications || {},
-            image_url: comp.image || comp.image_url || '',
-            description: comp.description || '',
-            performance_index: comp.performance_index || 0,
-            quantity: comp.quantity || 1
-          };
-        };
-
-        // Aggregate all components from all cart items into categorized object
-        const components = {};
-
-        cartItems.forEach(order => {
-          // Extract components from product
-          if (order?.product?.components && Array.isArray(order.product.components)) {
-            order.product.components.forEach(comp => {
-              if (comp && (comp.value || comp.part_name)) {
-                const category = (comp.name || '').toLowerCase();
-                const formatted = formatComponent(comp);
-
-                // 🔥 FIX: Only add component if it has valid ID (required by API schema)
-                // Skip components without database linkage (NULL pc_part_id)
-                if (formatted.id && formatted.id > 0) {
-                  if (category === 'cpu') components.cpu = formatted;
-                  else if (category === 'gpu' || category === 'graphics card') components.gpu = formatted;
-                  else if (category === 'motherboard') components.motherboard = formatted;
-                  else if (category === 'ram' || category === 'memory') components.ram = formatted;
-                  else if (category === 'storage') components.storage = formatted;
-                  else if (category === 'psu' || category === 'power supply') components.psu = formatted;
-                  else if (category === 'case') components.case = formatted;
-                  else if (category === 'cooling' || category === 'cooler') components.cooling = formatted;
-                } else {
-                  // 🔥 Components without part_id are not tracked in stock - skip them
-                  console.log('ℹ️ Component not in stock database (skipping):', comp.name, comp.value);
-                }
-              }
-            });
-          }
-        });
-
-        if (Object.keys(components).length === 0) {
-          setCompatibilityData(null);
-          setLoadingCompatibility(false);
-          return;
-        }
-
-        console.log('🔍 Formatted components for API:', components);
 
         // Call compatibility API using kioskAPI
         const response = await api.kiosk.checkFullBuildCompatibility(components);
@@ -242,16 +231,15 @@ const OrderSumBuild = () => {
       }
     };
 
-    // Debounce compatibility check
-    const timeoutId = setTimeout(checkCompatibility, 500);
-    return () => clearTimeout(timeoutId);
-  }, [cartItems]);
+    checkCompatibility();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems, aggregateComponents]);
 
   // Helpers and totals
   const getPrice = (item) => {
     if (!item?.price && item?.price !== 0) return 0;
     return typeof item.price === "string"
-      ? parseFloat(item.price.replace(/[^0-9.,]/g, "").replace(/,/g, ""))
+      ? Number.parseFloat(item.price.replaceAll(/[^0-9.,]/g, "").replaceAll(',', ""))
       : item.price || 0;
   };
 
@@ -259,120 +247,122 @@ const OrderSumBuild = () => {
     const productPrice = getPrice(order?.product);
     const addonPrice = getPrice(order?.addon);
     // 🔥 FIX: Include peripherals in total calculation
-    const peripheralsPrice = (order?.peripherals || []).reduce((sum, p) => sum + (parseFloat(p.price || 0)), 0);
+    const peripheralsPrice = (order?.peripherals || []).reduce((sum, p) => sum + (Number.parseFloat(p.price || 0)), 0);
     return (productPrice + addonPrice + peripheralsPrice) * (order?.quantity || 1);
   };
 
   // eslint-disable-next-line no-unused-vars
-  const grandTotal = cartItems.reduce((sum, order) => sum + orderTotal(order), 0);
+  const grandTotal = cartItems.reduce((sum, order) => sum + orderTotal(order), 0); // NOSONAR - used by child components
+
+  // Helper: determine if this is a prebuilt flow
+  const isPrebuiltFlow = () => {
+    const buildType = location.state?.buildType;
+    const buildSource = location.state?.buildSource || location.state?.from;
+    return buildType === 'prebuilt' || buildSource === 'preset' || buildSource === 'community';
+  };
+
+  // Helper: transform cart to prebuilt format for localStorage
+  const toPrebuiltFormat = (items) => items.map(item => ({
+    id: item.id,
+    baseProduct: {
+      name: item.product?.name || 'Custom Build',
+      originalPrice: item.product?.price || 0,
+      image: item.product?.image || ''
+    },
+    components: item.product?.components || [],
+    customizations: item.product?.customizations || {},
+    totalPrice: item.product?.price || 0,
+    buildSource: item.product?.buildSource || 'preset',
+    quantity: item.quantity || 1,
+    peripherals: item.peripherals || [],
+    compatibilityScore: item.compatibilityScore
+  }));
+
+  // Helper: save cart items to correct localStorage key
+  const saveCartToStorage = (items) => {
+    if (isPrebuiltFlow()) {
+      localStorage.setItem("prebuiltCart", JSON.stringify(toPrebuiltFormat(items)));
+    } else {
+      localStorage.setItem("cart", JSON.stringify(items));
+    }
+  };
+
+  // Helper: calculate effective stock from all components
+  const calculateEffectiveStock = (components) => {
+    let effectiveStock = Infinity;
+    const componentStocks = [];
+    for (const comp of components) {
+      if (!comp.part_id) continue;
+      const compStock = comp.part_stock || comp.stock || 0;
+      const compQuantity = comp.quantity || 1;
+      const maxBuilds = Math.floor(compStock / compQuantity);
+      componentStocks.push({ name: comp.value || comp.name, stock: compStock, quantity: compQuantity, maxBuilds });
+      if (maxBuilds < effectiveStock) effectiveStock = maxBuilds;
+    }
+    return { effectiveStock, componentStocks };
+  };
+
+  // Helper: check prebuilt system-level stock limit
+  const checkPrebuiltStockLimit = (order, index, newQuantity, finalStockLimit, effectiveStock, adminStockLimit) => {
+    let totalPrebuiltUsed = 0;
+    cartItems.forEach((ord, ordIndex) => {
+      if (ord?.product?.id === order.product.id) {
+        totalPrebuiltUsed += ordIndex === index ? newQuantity : (ord.quantity || 1);
+      }
+    });
+    if (totalPrebuiltUsed > finalStockLimit) {
+      const limitingFactor = effectiveStock < adminStockLimit ? 'component availability' : 'admin stock limit';
+      setStockModalMessage(`Cannot add more. Pre-built system stock limit reached. Total needed: ${totalPrebuiltUsed}. Available: ${finalStockLimit} (limited by ${limitingFactor}).`);
+      setShowStockModal(true);
+      return true; // blocked
+    }
+    return false;
+  };
+
+  // Helper: check individual component stock across all orders
+  const checkComponentStock = (order, index, newQuantity) => {
+    for (const comp of order.product.components) {
+      if (!comp.part_id) continue;
+      const compStock = comp.part_stock || comp.stock || 0;
+      const compQuantity = comp.quantity || 1;
+      let totalUsed = 0;
+      cartItems.forEach((ord, ordIndex) => {
+        const ordComps = ord?.product?.components;
+        if (!Array.isArray(ordComps)) return;
+        ordComps.forEach(ordComp => {
+          if (ordComp?.part_id === comp.part_id) {
+            totalUsed += (ordComp.quantity || 1) * (ordIndex === index ? newQuantity : (ord.quantity || 1));
+          }
+        });
+      });
+      if (totalUsed > compStock) {
+        setStockModalMessage(`Cannot add more. Component "${comp.value || comp.name}" has insufficient stock. Total needed across all builds: ${totalUsed}. Available: ${compStock}. Maximum builds possible: ${Math.floor(compStock / compQuantity)}.`);
+        setShowStockModal(true);
+        return true; // blocked
+      }
+    }
+    return false;
+  };
 
   const updateQuantity = (index, delta) => {
-    // 🔒 STOCK VALIDATION: Check if all components have enough stock before increasing
     if (delta > 0) {
       const order = cartItems[index];
-      if (order?.product?.components && Array.isArray(order.product.components)) {
+      if (Array.isArray(order?.product?.components)) {
         const newQuantity = (order.quantity || 1) + delta;
+        const { effectiveStock, componentStocks } = calculateEffectiveStock(order.product.components);
 
-        // 🔥 CRITICAL FIX: Calculate effective stock as MINIMUM across all components
-        // This is the TRUE stock limit - not the manual stock_quantity field
-        let effectivePrebuiltStock = Infinity;
-        const componentStocks = [];
-        
-        for (const comp of order.product.components) {
-          // Skip components without database linkage (NULL pc_part_id)
-          if (!comp.part_id) {
-            console.log('ℹ️ Component not tracked in stock (bundled item):', comp.value || comp.name);
-            continue;
-          }
-
-          const compStock = comp.part_stock || comp.stock || 0;
-          const compQuantity = comp.quantity || 1;
-          const maxBuildsFromThisComponent = Math.floor(compStock / compQuantity);
-          
-          componentStocks.push({
-            name: comp.value || comp.name,
-            stock: compStock,
-            quantity: compQuantity,
-            maxBuilds: maxBuildsFromThisComponent
-          });
-          
-          // The effective stock is limited by the component with least availability
-          if (maxBuildsFromThisComponent < effectivePrebuiltStock) {
-            effectivePrebuiltStock = maxBuildsFromThisComponent;
-          }
-        }
-        
         console.log('📦 Pre-built stock calculation:', {
           system: order.product.name,
           manualStockQuantity: order.product.stock_quantity,
-          calculatedMinimumStock: effectivePrebuiltStock,
+          calculatedMinimumStock: effectiveStock,
           componentBreakdown: componentStocks
         });
 
-        // Use the admin stock_quantity as an additional limit (if set)
         const adminStockLimit = order.product.stock_quantity || order.product.stockQuantity || Infinity;
-        const finalStockLimit = Math.min(effectivePrebuiltStock, adminStockLimit);
+        const finalStockLimit = Math.min(effectiveStock, adminStockLimit);
 
-        // Calculate cumulative pre-built usage across all orders of THIS pre-built
-        let totalPrebuiltUsed = 0;
-        cartItems.forEach((ord, ordIndex) => {
-          if (ord?.product?.id === order.product.id) {
-            const qty = ordIndex === index ? newQuantity : (ord.quantity || 1);
-            totalPrebuiltUsed += qty;
-          }
-        });
-
-        if (totalPrebuiltUsed > finalStockLimit) {
-          const limitingFactor = effectivePrebuiltStock < adminStockLimit ? 
-            'component availability' : 'admin stock limit';
-          setStockModalMessage(`Cannot add more. Pre-built system stock limit reached. Total needed: ${totalPrebuiltUsed}. Available: ${finalStockLimit} (limited by ${limitingFactor}).`);
-          setShowStockModal(true);
-          console.warn('⚠️ Pre-built stock limit:', {
-            system: order.product.name,
-            totalNeeded: totalPrebuiltUsed,
-            finalLimit: finalStockLimit,
-            componentLimit: effectivePrebuiltStock,
-            adminLimit: adminStockLimit,
-            limitingFactor
-          });
-          return;
-        }
-
-        // Also check individual component stock to provide specific error messages
-        for (const comp of order.product.components) {
-          if (!comp.part_id) continue;
-
-          const compStock = comp.part_stock || comp.stock || 0;
-          const compQuantity = comp.quantity || 1;
-          const compPartId = comp.part_id;
-
-          // Calculate cumulative usage across ALL pre-built orders
-          let totalUsedAcrossOrders = 0;
-          cartItems.forEach((ord, ordIndex) => {
-            if (ord?.product?.components && Array.isArray(ord.product.components)) {
-              ord.product.components.forEach(ordComp => {
-                if (ordComp && ordComp.part_id === compPartId) {
-                  const ordCompQty = ordComp.quantity || 1;
-                  const buildQty = ordIndex === index ? newQuantity : (ord.quantity || 1);
-                  totalUsedAcrossOrders += ordCompQty * buildQty;
-                }
-              });
-            }
-          });
-
-          if (totalUsedAcrossOrders > compStock) {
-            const maxBuildQuantity = Math.floor(compStock / compQuantity);
-            setStockModalMessage(`Cannot add more. Component "${comp.value || comp.name}" has insufficient stock. Total needed across all builds: ${totalUsedAcrossOrders}. Available: ${compStock}. Maximum builds possible: ${maxBuildQuantity}.`);
-            setShowStockModal(true);
-            console.warn('⚠️ Insufficient component stock:', {
-              component: comp.value || comp.name,
-              componentStock: compStock,
-              totalNeeded: totalUsedAcrossOrders,
-              maxBuilds: maxBuildQuantity
-            });
-            return;
-          }
-        }
+        if (checkPrebuiltStockLimit(order, index, newQuantity, finalStockLimit, effectiveStock, adminStockLimit)) return;
+        if (checkComponentStock(order, index, newQuantity)) return;
       }
     }
 
@@ -380,34 +370,7 @@ const OrderSumBuild = () => {
       const next = prev.map((o, i) =>
         i === index ? { ...o, quantity: Math.max(1, (o.quantity || 1) + delta) } : o
       );
-      
-      // 🔥 FIX: Save to correct localStorage key based on build type
-      const buildType = location.state?.buildType;
-      const buildSource = location.state?.buildSource || location.state?.from;
-      const isPrebuiltFlow = buildType === 'prebuilt' || buildSource === 'preset' || buildSource === 'community';
-      
-      if (isPrebuiltFlow) {
-        // Transform back to prebuilt cart format before saving
-        const prebuiltFormat = next.map(item => ({
-          id: item.id,
-          baseProduct: {
-            name: item.product?.name || 'Custom Build',
-            originalPrice: item.product?.price || 0,
-            image: item.product?.image || ''
-          },
-          components: item.product?.components || [],
-          customizations: item.product?.customizations || {},
-          totalPrice: item.product?.price || 0,
-          buildSource: item.product?.buildSource || 'preset',
-          quantity: item.quantity || 1,
-          peripherals: item.peripherals || [],
-          compatibilityScore: item.compatibilityScore
-        }));
-        localStorage.setItem("prebuiltCart", JSON.stringify(prebuiltFormat));
-      } else {
-        localStorage.setItem("cart", JSON.stringify(next));
-      }
-      
+      saveCartToStorage(next);
       return next;
     });
   };
@@ -415,36 +378,8 @@ const OrderSumBuild = () => {
   const handleRemoveAtIndex = (index) => {
     setCartItems(prev => {
       const next = prev.filter((_, i) => i !== index);
-      
-      // 🔥 FIX: Save to correct localStorage key based on build type
-      const buildType = location.state?.buildType;
-      const buildSource = location.state?.buildSource || location.state?.from;
-      const isPrebuiltFlow = buildType === 'prebuilt' || buildSource === 'preset' || buildSource === 'community';
-      
-      if (isPrebuiltFlow) {
-        // Transform back to prebuilt cart format before saving
-        const prebuiltFormat = next.map(item => ({
-          id: item.id,
-          baseProduct: {
-            name: item.product?.name || 'Custom Build',
-            originalPrice: item.product?.price || 0,
-            image: item.product?.image || ''
-          },
-          components: item.product?.components || [],
-          customizations: item.product?.customizations || {},
-          totalPrice: item.product?.price || 0,
-          buildSource: item.product?.buildSource || 'preset',
-          quantity: item.quantity || 1,
-          peripherals: item.peripherals || [],
-          compatibilityScore: item.compatibilityScore
-        }));
-        localStorage.setItem("prebuiltCart", JSON.stringify(prebuiltFormat));
-      } else {
-        localStorage.setItem("cart", JSON.stringify(next));
-      }
-      
+      saveCartToStorage(next);
       if (next.length === 0) {
-        // Use setTimeout to avoid setState during render
         setTimeout(() => handleEmptyCartRedirect(), 0);
       }
       return next;
@@ -502,7 +437,7 @@ const OrderSumBuild = () => {
               <h2 className="order-sum-build-components-title">Components</h2>
               <div className="order-sum-build-components-table">
                 {order?.product?.components?.map((comp, idx) => (
-                  <div key={idx} className="order-sum-build-component-row">
+                  <div key={comp.name || idx} className="order-sum-build-component-row">
                     <span className="order-sum-build-component-label">{comp.name}</span>
                     <span className="order-sum-build-component-value">{comp.value}</span>
                   </div>
@@ -528,7 +463,7 @@ const OrderSumBuild = () => {
                 <h2 className="order-sum-build-peripherals-title">Peripherals</h2>
                 <div className="order-sum-build-peripherals-table">
                   {order.peripherals.map((peripheral, pIdx) => (
-                    <div key={pIdx} className="order-sum-build-peripheral-row">
+                    <div key={peripheral.name || pIdx} className="order-sum-build-peripheral-row">
                       <span className="order-sum-build-peripheral-category">{peripheral.category || 'Peripheral'}</span>
                       <span className="order-sum-build-peripheral-value">{peripheral.name}</span>
                     </div>

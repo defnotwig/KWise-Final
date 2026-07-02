@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 import CompatibilityNotes from "../components/CompatibilityNotes/CompatibilityNotes";
+import { buildCompatibilityPayload, resolveProductImage } from "../utils/kioskContracts";
 import "./OrderSummary.css";
 
 function OrderSummary() {
@@ -51,7 +52,7 @@ function OrderSummary() {
           // Parse price to number
           const price = typeof item.price === "number"
             ? item.price
-            : parseFloat(String(item.price).replace(/[^\d.]/g, "")) || 0;
+            : Number.parseFloat(String(item.price).replaceAll(/[^\d.]/g, "")) || 0;
 
           // Map to exact category format expected by backend schema validation
           const rawCategory = (item.category || '').toLowerCase();
@@ -131,9 +132,7 @@ function OrderSummary() {
       }
     };
 
-    // Debounce compatibility check
-    const timeoutId = setTimeout(checkCompatibility, 500);
-    return () => clearTimeout(timeoutId);
+    checkCompatibility();
   }, [cartItems]);
 
   // Ensure price is a number
@@ -141,7 +140,7 @@ function OrderSummary() {
     if (!item || !item.price) return 0;
     return typeof item.price === "number"
       ? item.price
-      : parseFloat(item.price.replace(/[^\d.]/g, "")) || 0;
+      : Number.parseFloat(item.price.replaceAll(/[^\d.]/g, "")) || 0;
   };
 
   const updateQuantity = (index, amount) => {
@@ -212,6 +211,9 @@ function OrderSummary() {
   const totalPrice = cartItems.filter(item => item !== null).reduce((acc, item) =>
     acc + getPrice(item) * (item.quantity || 1), 0
   );
+  const compatibilityCartItems = cartItems.filter((item) => (
+    item && Object.keys(buildCompatibilityPayload([item], { arrayCategories: true })).length > 0
+  ));
 
   return (
     <div className="order-summary-container">
@@ -242,7 +244,7 @@ function OrderSummary() {
                   {/* Product Image Wrapper */}
                   <div className="order-summary-product-wrapper">
                     <img
-                      src={api.utils.getFullImageUrl(item.image_url || item.image)}
+                      src={resolveProductImage(item)}
                       alt={item.name}
                       className="order-summary-product-image"
                     />
@@ -301,7 +303,7 @@ function OrderSummary() {
 
           {/* PCPartPicker-style Compatibility Notes - ABOVE FOOTER */}
           <CompatibilityNotes
-            buildComponents={cartItems}
+            buildComponents={compatibilityCartItems}
             buildType="pc-parts"
           />
 

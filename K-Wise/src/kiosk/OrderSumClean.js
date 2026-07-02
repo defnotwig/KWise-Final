@@ -23,8 +23,8 @@ function OrderSumClean() {
 
   useEffect(() => {
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    globalThis.addEventListener("resize", measure);
+    return () => globalThis.removeEventListener("resize", measure);
   }, [measure]);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ function OrderSumClean() {
     const single = JSON.parse(localStorage.getItem("cleaningOrder"));
     let list = JSON.parse(localStorage.getItem("cleaningOrders")) || [];
 
-    if (single && single.name) {
+    if (single?.name) {
       const snapshot = {
         id: Date.now(),
         tier: single,
@@ -62,8 +62,8 @@ function OrderSumClean() {
   const parsePrice = useCallback((price) => {
     if (typeof price === "number") return price;
     if (typeof price === "string") {
-      const n = parseFloat(price.replace(/[^0-9.,]/g, "").replace(/,/g, ""));
-      return isNaN(n) ? 0 : n;
+      const n = Number.parseFloat(price.replaceAll(/[^0-9.,]/g, "").replaceAll(',', ""));
+      return Number.isNaN(n) ? 0 : n;
     }
     return 0;
   }, []);
@@ -146,7 +146,7 @@ function OrderSumClean() {
               <h2 className="order-sum-build-components-title">Inclusions</h2>
               <ul className="order-sum-build-components-list">
                 {(order?.tier?.details?.inclusion || []).map((inc, idx) => (
-                  <li key={idx} className="order-sum-build-component-item-inclusion">
+                  <li key={inc || idx} className="order-sum-build-component-item-inclusion">
                     <span className="order-sum-build-component-label" style={{ fontSize: '25px'}}>• </span>{" "}
                     <span className="order-sum-build-component-value">{inc}</span>
                   </li>
@@ -198,12 +198,10 @@ function OrderSumClean() {
                 
                 {/* PC Re-Case Status - Plain text format */}
                 {order.reCaseRequested && (
-                  <>
                     <li className="order-sum-build-component-item" style={{ marginTop: '10px' }}>
                       <span className="order-sum-build-component-label"style={{ fontSize: '25px', color: '#00E083'}}>PC Re-Case:</span>{" "}
                       <span className="order-sum-build-component-value">Requested (staff will assist with selection)</span>
                     </li>
-                  </>
                 )}
               </ul>
             </div>

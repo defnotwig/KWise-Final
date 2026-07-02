@@ -8,11 +8,11 @@ import CompatibilityNotes from "../components/CompatibilityNotes/CompatibilityNo
 
 // Helpers
 const parsePrice = (item) => {
-  if (!item || item.price === undefined || item.price === null) return 0;
+  if (item?.price == null) return 0;
   if (typeof item.price === "number") return item.price;
   if (typeof item.price === "string") {
-    const n = parseFloat(item.price.replace(/[^0-9.,]/g, "").replace(/,/g, ""));
-    return isNaN(n) ? 0 : n;
+    const n = Number.parseFloat(item.price.replaceAll(/[^0-9.,]/g, "").replaceAll(',', ""));
+    return Number.isNaN(n) ? 0 : n;
   }
   return 0;
 };
@@ -66,6 +66,77 @@ const catLabel = {
   Case: "Case",
 };
 
+const CATEGORY_TO_COMPONENT_KEY = {
+  "cpu": "cpu",
+  "gpu": "gpu",
+  "graphics card": "gpu",
+  "motherboard": "motherboard",
+  "ram": "ram",
+  "memory": "ram",
+  "storage": "storage",
+  "psu": "psu",
+  "power supply": "psu",
+  "case": "case",
+  "cooling": "cooling",
+  "cooler": "cooling",
+};
+
+const assignComponent = (components, category, formatted) => {
+  const key = CATEGORY_TO_COMPONENT_KEY[category];
+  if (key) {
+    components[key] = formatted;
+  }
+};
+
+const processUpgradeItems = (components, order, formatComponent) => {
+  if (!order?.items || !Array.isArray(order.items)) return;
+  order.items.forEach((item, idx) => {
+    if (!item?.name) return;
+    const category = (order.categories?.[idx] || item.category || "other").toLowerCase();
+    const formatted = formatComponent(item, category);
+    if (formatted.id && formatted.id > 0 && formatted.category) {
+      assignComponent(components, category, formatted);
+    } else {
+      console.warn("⚠️ Skipping upgrade component without valid ID or category:", item.name, "ID:", formatted.id, "Category:", formatted.category);
+    }
+  });
+};
+
+const fetchItemRealTimeStock = async (item, order) => {
+  try {
+    const itemIdx = order.items.indexOf(item);
+    let category = item.category || order.categories?.[itemIdx] || "Unknown";
+    category = category.trim();
+    const stockResponse = await api.kiosk.getCategoryProducts(category, { limit: 1000 });
+    const currentProduct = stockResponse.data.find(p => p.id === item.id || p.name === item.name);
+    const stock = currentProduct ? currentProduct.stock : 0;
+    console.log("📦 Real-time stock check (Upgrade):", {
+      component: item.name,
+      category: category,
+      cachedStock: item.stock,
+      currentStock: stock
+    });
+    return stock;
+  } catch (error) {
+    console.error("⚠️ Failed to fetch stock for upgrade item, using cached value:", error);
+    return item.stock || 0;
+  }
+};
+
+const calculateCumulativeUsage = (orders, itemName, targetIndex, newQuantity) => {
+  let total = 0;
+  orders.forEach((ord, ordIndex) => {
+    if (ord?.items && Array.isArray(ord.items)) {
+      ord.items.forEach(ordItem => {
+        if (ordItem?.name === itemName) {
+          total += ordIndex === targetIndex ? newQuantity : (ord.quantity || 1);
+        }
+      });
+    }
+  });
+  return total;
+};
+
 function OrderSumUpgrade() {
   const navigate = useNavigate();
 
@@ -82,7 +153,7 @@ function OrderSumUpgrade() {
 
   // PRIORITY 3: Compatibility checking state
   // eslint-disable-next-line no-unused-vars
-  const [compatibilityData, setCompatibilityData] = useState(null);
+  const [compatibilityData, setCompatibilityData] = useState(null); // NOSONAR
   const [loadingCompatibility, setLoadingCompatibility] = useState(false);
 
   const handleEmptyRedirect = useCallback(() => {
@@ -249,7 +320,7 @@ function OrderSumUpgrade() {
             name: item.name || item.upgradeItem || '',
             category: categoryMap[rawCategory] || category || '',
             brand: item.brand || '',
-            price: typeof item.price === "number" ? item.price : parseFloat(String(item.price || '0').replace(/[^\d.]/g, "")) || 0,
+            price: typeof item.price === "number" ? item.price : Number.parseFloat(String(item.price || '0').replaceAll(/[^\d.]/g, "")) || 0,
             stock: item.stock || 0,
             specifications: item.specifications || {},
             image_url: item.image || item.image_url || '',
@@ -261,32 +332,7 @@ function OrderSumUpgrade() {
 
         // Aggregate all components from all upgrade orders into categorized object
         const components = {};
-
-        orders.forEach(order => {
-          if (order?.items && Array.isArray(order.items)) {
-            order.items.forEach((item, idx) => {
-              if (item && item.name) {
-                // Get category from the parallel categories array
-                const category = (order.categories?.[idx] || item.category || 'other').toLowerCase();
-                const formatted = formatComponent(item, category);
-
-                // 🔥 FIX: Only add component if it has valid ID and category
-                if (formatted.id && formatted.id > 0 && formatted.category) {
-                  if (category === 'cpu') components.cpu = formatted;
-                  else if (category === 'gpu' || category === 'graphics card') components.gpu = formatted;
-                  else if (category === 'motherboard') components.motherboard = formatted;
-                  else if (category === 'ram' || category === 'memory') components.ram = formatted;
-                  else if (category === 'storage') components.storage = formatted;
-                  else if (category === 'psu' || category === 'power supply') components.psu = formatted;
-                  else if (category === 'case') components.case = formatted;
-                  else if (category === 'cooling' || category === 'cooler') components.cooling = formatted;
-                } else {
-                  console.warn('⚠️ Skipping upgrade component without valid ID or category:', item.name, 'ID:', formatted.id, 'Category:', formatted.category);
-                }
-              }
-            });
-          }
-        });
+        orders.forEach(order => processUpgradeItems(components, order, formatComponent));
 
         if (Object.keys(components).length === 0) {
           setCompatibilityData(null);
@@ -322,9 +368,7 @@ function OrderSumUpgrade() {
       }
     };
 
-    // Debounce compatibility check
-    const timeoutId = setTimeout(checkCompatibility, 500);
-    return () => clearTimeout(timeoutId);
+    checkCompatibility();
   }, [orders, isManualProcessing]);
 
   const orderSubtotal = (order) => {
@@ -345,57 +389,17 @@ function OrderSumUpgrade() {
       if (order?.items && Array.isArray(order.items)) {
         const newQuantity = (order.quantity || 1) + delta;
 
-        // 🔥 CRITICAL FIX: Use PC Parts stock validation (like OrderSumCustom)
-        // NOT pre-built validation - upgrade items are individual PC parts
         for (const item of order.items) {
           if (!item) continue;
-
-          // Fetch real-time stock from API
-          let itemStock = 0;
-          try {
-            // Get category from item or from parallel categories array
-            const itemIdx = order.items.indexOf(item);
-            let category = item.category || order.categories?.[itemIdx] || 'Unknown';
-            
-            // Normalize category name for API
-            // The kiosk API expects standard category names like 'CPU', 'RAM', 'GPU', etc.
-            category = category.trim();
-            
-            const stockResponse = await api.kiosk.getCategoryProducts(category, { limit: 1000 });
-            const currentProduct = stockResponse.data.find(p => p.id === item.id || p.name === item.name);
-            itemStock = currentProduct ? currentProduct.stock : 0;
-
-            console.log('📦 Real-time stock check (Upgrade):', {
-              component: item.name,
-              category: category,
-              cachedStock: item.stock,
-              currentStock: itemStock
-            });
-          } catch (error) {
-            console.error('⚠️ Failed to fetch stock for upgrade item, using cached value:', error);
-            itemStock = item.stock || 0;
-          }
-
-          const itemName = item.name || '';
-
-          // Calculate cumulative usage across ALL upgrade orders
-          let totalUsedAcrossOrders = 0;
-          orders.forEach((ord, ordIndex) => {
-            if (ord?.items && Array.isArray(ord.items)) {
-              ord.items.forEach(ordItem => {
-                if (ordItem && ordItem.name === itemName) {
-                  const qty = ordIndex === index ? newQuantity : (ord.quantity || 1);
-                  totalUsedAcrossOrders += qty;
-                }
-              });
-            }
-          });
+          const itemStock = await fetchItemRealTimeStock(item, order);
+          const itemName = item.name || "";
+          const totalUsedAcrossOrders = calculateCumulativeUsage(orders, itemName, index, newQuantity);
 
           if (totalUsedAcrossOrders > itemStock) {
-            const componentName = item.name || item.categoryName || 'Unknown Component';
+            const componentName = item.name || item.categoryName || "Unknown Component";
             setStockModalMessage(`Cannot add more. Component "${componentName}" has insufficient stock. Total needed across all upgrade packages: ${totalUsedAcrossOrders}. Available stock: ${itemStock}.`);
             setShowStockModal(true);
-            console.warn('⚠️ Insufficient upgrade component stock:', {
+            console.warn("⚠️ Insufficient upgrade component stock:", {
               component: componentName,
               stock: itemStock,
               totalNeeded: totalUsedAcrossOrders,
