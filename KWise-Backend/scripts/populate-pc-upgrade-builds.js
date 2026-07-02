@@ -8,7 +8,7 @@
  */
 
 const { Pool } = require('pg');
-const path = require('path');
+const path = require('node:path');
 
 // Database configuration
 const pool = new Pool({
@@ -25,7 +25,7 @@ const referenceBuildsPath = path.join(__dirname, '../ai/utils/referenceBuilds.js
 console.log('📦 Loading reference builds from:', referenceBuildsPath);
 
 // Read the file and extract REFERENCE_BUILDS object
-const fs = require('fs');
+const fs = require('node:fs');
 const fileContent = fs.readFileSync(referenceBuildsPath, 'utf8');
 
 // Extract REFERENCE_BUILDS using eval (safe in this controlled context)
@@ -68,7 +68,7 @@ async function populateReferenceBuilds() {
         if (build.components) {
           Object.values(build.components).forEach(component => {
             if (component.price) {
-              totalPrice += parseFloat(component.price.replace(/,/g, ''));
+              totalPrice += Number.parseFloat(component.price.replaceAll(',', ''));
             }
           });
         }
@@ -159,7 +159,7 @@ async function populateReferenceBuilds() {
     const finalCount = await client.query('SELECT COUNT(*) FROM pc_upgrade_reference_builds');
     console.log(`\n✅ Total builds in database: ${finalCount.rows[0].count}`);
     
-    if (parseInt(finalCount.rows[0].count) >= 72) {
+    if (Number.parseInt(finalCount.rows[0].count, 10) >= 72) {
       console.log('\n🎉 SUCCESS: PC Upgrade Reference Builds table fully populated!');
       console.log('✅ Phase 1.1 COMPLETE: 0 → 72 builds (CRITICAL BLOCKER FIXED)');
     } else {

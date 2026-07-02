@@ -8,7 +8,7 @@
  * 4. All systems operational
  */
 
-const http = require('http');
+const http = require('node:http');
 
 async function makeRequest(path, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {

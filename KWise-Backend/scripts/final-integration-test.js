@@ -107,8 +107,8 @@ async function finalIntegrationTest() {
         console.log('TEST 4: Image Files Existence');
         console.log('─'.repeat(80));
         
-        const fs = require('fs');
-        const path = require('path');
+        const fs = require('node:fs');
+        const path = require('node:path');
         const uploadDir = path.join(__dirname, '..', 'uploads', 'prebuilt');
         
         const missingImages = allPreBuilt.rows.filter(item => {
@@ -178,7 +178,7 @@ async function finalIntegrationTest() {
             WHERE category = 'Monitor' AND is_active = true AND kiosk_visible = true
         `);
         
-        const monitorCount = parseInt(monitorResult.rows[0].count);
+        const monitorCount = Number.parseInt(monitorResult.rows[0].count, 10);
         
         if (monitorCount >= 28) {
             console.log(`✅ PASS: ${monitorCount} monitors available (required: 28)`);

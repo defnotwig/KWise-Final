@@ -1,7 +1,7 @@
 // Migration script to add daily queue reset functionality
 const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // Database connection config
 const pool = new Pool({

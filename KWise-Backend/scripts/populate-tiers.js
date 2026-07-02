@@ -169,7 +169,7 @@ async function populateTiers() {
                     // Determine tier using rule-based system
                     const determinedTier = determineTierByRules(
                         item.category,
-                        parseFloat(item.price || 0),
+                        Number.parseFloat(item.price || 0),
                         item.name,
                         item.specifications
                     );
@@ -187,7 +187,7 @@ async function populateTiers() {
                         'elite': '🟠'
                     }[determinedTier] || '⚪';
 
-                    console.log(`  ✅ ${tierEmoji} ${item.name} → ${determinedTier} (₱${parseFloat(item.price || 0).toLocaleString()})`);
+                    console.log(`  ✅ ${tierEmoji} ${item.name} → ${determinedTier} (₱${Number.parseFloat(item.price || 0).toLocaleString()})`);
                     updated++;
 
                 } catch (error) {

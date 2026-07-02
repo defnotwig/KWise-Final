@@ -7,8 +7,8 @@
  */
 
 const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 require('dotenv').config();
 
@@ -300,7 +300,7 @@ function parseArgs() {
         else if (arg === '--down') args.action = 'down';
         else if (arg === '--status') args.action = 'status';
         else if (arg.startsWith('--version=')) {
-            args.version = parseInt(arg.split('=')[1]);
+            args.version = Number.parseInt(arg.split('=')[1], 10);
         }
     });
     
