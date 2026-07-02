@@ -16,7 +16,7 @@ const QueueMonitorDisplay = () => {
             // Fetch dual serving stations
             const servingResponse = await queueAPI.getNowServing();
             
-            if (servingResponse.data && servingResponse.data.success) {
+            if (servingResponse.data?.success) {
                 const { station1, station2 } = servingResponse.data.data;
                 setServingStation1(station1);
                 setServingStation2(station2);
@@ -28,7 +28,7 @@ const QueueMonitorDisplay = () => {
                 status: 'assigned'
             });
 
-            if (response.data && response.data.success) {
+            if (response.data?.success) {
                 const queues = response.data.data || [];
                 
                 // Get all pending queues (assigned status, not currently being served)
@@ -113,7 +113,7 @@ const QueueMonitorDisplay = () => {
                     <ul className='queue-container'>
                         <li className='on-queue-footer'><h3>On Queue:</h3></li>
                         {formattedPendingQueues.map((queue, index) => (
-                            <li key={index} className='queue-item'>
+                            <li key={queue.number} className='queue-item'>
                                 <span className='queue-number'>{queue.number}</span>
                             </li>
                         ))}

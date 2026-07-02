@@ -71,8 +71,8 @@ const Stock = () => {
                 id: category.category,
                 name: category.category,
                 category: category.category,
-                count: parseInt(category.count) || 0,
-                totalValue: parseFloat(category.totalValue) || 0,
+                count: Number.parseInt(category.count, 10) || 0,
+                totalValue: Number.parseFloat(category.totalValue) || 0,
                 icon: categoryIcons[category.category?.toLowerCase()] || <FiBox />
             }));
 

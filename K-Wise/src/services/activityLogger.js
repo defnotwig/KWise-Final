@@ -3,13 +3,16 @@
  * Logs all UI interactions to backend for comprehensive audit trail
  */
 
-const API_BASE = 'http://localhost:5000/api';
+import { getApiBaseUrl } from '../utils/networkConfig';
+
+const API_BASE = getApiBaseUrl();
 
 class ActivityLogger {
+    enabled = true;
+    queue = [];
+    flushInterval = 5000;
+
     constructor() {
-        this.enabled = true;
-        this.queue = [];
-        this.flushInterval = 5000; // Flush every 5 seconds
         this.startAutoFlush();
     }
 
@@ -26,8 +29,8 @@ class ActivityLogger {
             metadata: {
                 ...metadata,
                 timestamp: new Date().toISOString(),
-                url: window.location.href,
-                pathname: window.location.pathname
+                url: globalThis.location.href,
+                pathname: globalThis.location.pathname
             }
         };
 
@@ -43,11 +46,7 @@ class ActivityLogger {
      * Flush queued activities to backend
      */
     async flush() {
-        if (this.queue.length === 0) return;
-
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
+        if (this.queue.length === 0) return;
         const activities = [...this.queue];
         this.queue = [];
 
@@ -57,9 +56,7 @@ class ActivityLogger {
                 await fetch(`${API_BASE}/activity/log-interaction`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                        'Content-Type': 'application/json',                    },
                     body: JSON.stringify(activity)
                 });
             }
@@ -79,7 +76,7 @@ class ActivityLogger {
         }, this.flushInterval);
 
         // Flush on page unload
-        window.addEventListener('beforeunload', () => {
+        globalThis.addEventListener('beforeunload', () => {
             this.flush();
         });
     }

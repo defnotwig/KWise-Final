@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { FiPlus, FiEdit, FiTrash2, FiUpload, FiImage, FiX, FiSearch, FiFilter, FiChevronLeft, FiChevronRight, FiCpu, FiCheckSquare } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiUpload, FiImage, FiX, FiSearch, FiFilter, FiCpu, FiCheckSquare } from 'react-icons/fi';
 import { Notyf } from 'notyf';
 import 'notyf/notyf.min.css';
 import { getApiBaseUrl, getFullImageUrl } from '../../utils/networkConfig'; // Network-aware URLs
@@ -10,6 +10,96 @@ import './StockDetail.css';
 import './StockDetail.admin-scope.css'; // Scoped admin styles (Issue 2)
 import './StockDetailSpecifications.css'; // Specifications styling
 import './StockDetailPreBuilt.css'; // Pre-Built component management styling
+
+/**
+ * Fetch a URL with optional authentication retry.
+ * Uses cookie-backed admin authentication for protected stock actions.
+ */
+const fetchWithAuthRetry = async (url) => {
+    const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+    if (response.ok) return response;
+
+    return fetch(url, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+};
+
+/**
+ * Build URLSearchParams for the stock list API from filter state.
+ */
+const buildStockQueryParams = ({ category, currentPage, itemsPerPage, sortBy, sortOrder, searchTerm, selectedBrand, selectedTier, priceRange, stockFilter }) => {
+    const params = new URLSearchParams({
+        category,
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sort: sortBy,
+        order: sortOrder
+    });
+
+    const safeSearchTerm = typeof searchTerm === 'string' ? searchTerm : '';
+    if (safeSearchTerm.trim()) params.append('q', safeSearchTerm.trim());
+    if (selectedBrand) params.append('brand', selectedBrand);
+    if (selectedTier) params.append('tier', selectedTier);
+    if (priceRange.min) params.append('minPrice', priceRange.min);
+    if (priceRange.max) params.append('maxPrice', priceRange.max);
+    if (stockFilter === 'inStock') params.append('inStock', 'true');
+    else if (stockFilter === 'outOfStock') params.append('inStock', 'false');
+
+    return params;
+};
+
+/**
+ * Get field metadata from a spec field definition (string or object).
+ */
+const getFieldMeta = (field) => {
+    const fieldName = typeof field === 'string' ? field : field.name;
+    const fieldType = typeof field === 'object' ? field.type : 'text';
+    const isRequired = typeof field === 'object' ? field.required : false;
+    const label = fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replaceAll('_', ' ');
+    return { fieldName, fieldType, isRequired, label };
+};
+
+/**
+ * Process bulk API responses: check for auth failures and report results.
+ * Returns { authFailed, failedCount }.
+ */
+const processBulkResponses = (responses) => {
+    const authFailed = responses.some(r => r.status === 401);
+    const failedCount = responses.filter(r => !r.ok).length;
+    return { authFailed, failedCount };
+};
+
+/**
+ * Build FormData for stock item add/edit submissions.
+ */
+const buildStockFormData = (formData, categoryName, specifications, prebuiltSpecs) => {
+    const submitData = new FormData();
+    submitData.append('name', formData.name.trim());
+    submitData.append('category', categoryName);
+    submitData.append('brand', formData.brand.trim() || '');
+    submitData.append('price', Number.parseFloat(formData.price) || 0);
+    submitData.append('stock', Number.parseInt(formData.stock, 10) || 0);
+    submitData.append('description', formData.description.trim() || '');
+    submitData.append('tier', formData.tier || '');
+
+    const finalSpecifications = prebuiltSpecs
+        ? { ...specifications, ...prebuiltSpecs }
+        : specifications;
+
+    if (Object.keys(finalSpecifications).length > 0) {
+        submitData.append('specifications', JSON.stringify(finalSpecifications));
+    }
+
+    if (formData.imageFile) {
+        submitData.append('image', formData.imageFile);
+    }
+
+    return submitData;
+};
 
 /**
  * Enhanced Stock Detail Component with Modern Table Design
@@ -63,9 +153,9 @@ const StockDetail = () => {
     // Debug category detection
     useEffect(() => {
         console.log('🔍 StockDetail: Category from URL params:', category);
-        console.log('🔍 StockDetail: Current URL:', window.location.href);
+        console.log('🔍 StockDetail: Current URL:', globalThis.location.href);
         console.log('🔍 StockDetail: useParams result:', { category });
-        console.log('🔍 StockDetail: URL pathname:', window.location.pathname);
+        console.log('🔍 StockDetail: URL pathname:', globalThis.location.pathname);
     }, [category]);
 
     // Debug spec fields changes
@@ -200,7 +290,7 @@ const StockDetail = () => {
     // Professional confirmation dialog using Notyf
     const showConfirmation = (message, onConfirm, onCancel = null) => {
         return new Promise((resolve) => {
-            const isConfirmed = window.confirm(`K-Wise wants to ${message}`);
+            const isConfirmed = globalThis.confirm(`K-Wise wants to ${message}`);
             if (isConfirmed) {
                 if (onConfirm) onConfirm();
                 resolve(true);
@@ -214,13 +304,13 @@ const StockDetail = () => {
     // Safety function for notifications to prevent runtime errors
     const showNotification = useCallback((type, message) => {
         try {
-            if (notyf && notyf[type]) {
+            if (notyf?.[type]) {
                 notyf[type](message);
             } else {
                 console.log(`${type.toUpperCase()}: ${message}`);
             }
-        } catch (err) {
-            console.log(`${type.toUpperCase()}: ${message}`);
+        } catch (notyfErr) {
+            console.log(`${type.toUpperCase()}: ${message} (notification error: ${notyfErr.message})`);
         }
     }, [notyf]);
 
@@ -234,7 +324,7 @@ const StockDetail = () => {
         }
         
         // Normalize tier value to lowercase for comparison
-        const normalizedTier = tierValue.toLowerCase().replace(/\s+/g, '-');
+        const normalizedTier = tierValue.toLowerCase().replaceAll(/\s+/g, '-');
         
         const tierMap = {
             'entry': { className: 'entry', displayName: 'Entry' },
@@ -270,7 +360,6 @@ const StockDetail = () => {
             // Load brands specific to the current category
             const response = await fetch(`${getApiBaseUrl()}/stock/brands?category=${encodeURIComponent(category)}`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -287,68 +376,28 @@ const StockDetail = () => {
     // Load specification fields for current category
     const loadSpecificationFields = useCallback(async (targetCategory = null) => {
         const categoryToUse = targetCategory || category;
-
-        if (!categoryToUse) {
-            console.log('📋 No category provided, skipping spec fields load');
-            console.log('📋 targetCategory:', targetCategory, 'URL category:', category);
-            console.log('📋 Current URL:', window.location.href);
-            console.log('📋 Current pathname:', window.location.pathname);
-            return;
-        }
+        if (!categoryToUse) return;
 
         try {
-            console.log('📋 Loading specification fields for category:', categoryToUse);
+            const response = await fetchWithAuthRetry(`${getApiBaseUrl()}/stock/meta/${categoryToUse}`);
 
-            // Try without authentication first since the endpoint is public
-            let response = await fetch(`${getApiBaseUrl()}/stock/meta/${categoryToUse}`, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            // If that fails, try with authentication
             if (!response.ok) {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    console.log('📋 Retrying with authentication token');
-                    response = await fetch(`${getApiBaseUrl()}/stock/meta/${categoryToUse}`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                }
-            }
-
-            console.log('📋 API Response status:', response.status);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('📋 API Response data:', data);
-
-                if (data.success && data.data && data.data.fields) {
-                    setSpecFields(data.data.fields);
-                    console.log('✅ Specification fields loaded for', categoryToUse + ':', data.data.fields);
-                    console.log('📋 Spec fields count:', data.data.fields.length);
-                    console.log('📋 Field names:', data.data.fields.map(f => f.name).join(', '));
-
-                    // Always show specifications for categories that have fields
-                    if (data.data.fields.length > 0) {
-                        setShowSpecifications(true);
-                        console.log('📋 Auto-expanding specifications section');
-                    }
-                } else {
-                    console.warn('⚠️ API returned success=false or no data:', data);
-                    setSpecFields([]);
-                }
-            } else {
-                console.error('❌ HTTP error loading spec fields:', response.status, response.statusText);
-
                 if (response.status === 401) {
                     showNotification('error', 'Session expired. Please refresh and log in again.');
                 } else {
                     showNotification('warning', 'Could not load specification fields for ' + categoryToUse);
                 }
+                setSpecFields([]);
+                return;
+            }
+
+            const data = await response.json();
+            if (data?.success && data?.data?.fields) {
+                setSpecFields(data.data.fields);
+                if (data.data.fields.length > 0) {
+                    setShowSpecifications(true);
+                }
+            } else {
                 setSpecFields([]);
             }
         } catch (error) {
@@ -362,63 +411,19 @@ const StockDetail = () => {
     const loadItems = useCallback(async (searchTerm = searchQuery) => {
         if (!category || !mountedRef.current) return;
 
+        const isNewSearch = searchTerm !== searchQuery;
+        (isNewSearch ? setIsSearching : setIsLoading)(true);
+        setError(null);
+
         try {
-            // Use isSearching state for search operations, isLoading for other operations
-            if (searchTerm !== searchQuery) {
-                setIsSearching(true);
-            } else {
-                setIsLoading(true);
-            }
-            setError(null);
 
-            console.log('📡 Fetching items for category:', category);
-            console.log('📄 Current page state:', currentPage);
-            console.log('📊 Items per page:', itemsPerPage);
-
-            // Ensure searchTerm is a string for safety
-            const safeSearchTerm = typeof searchTerm === 'string' ? searchTerm : '';
-
-            // Build query parameters using current state values
-            const params = new URLSearchParams({
-                category: category,
-                page: currentPage.toString(),
-                limit: itemsPerPage.toString(),
-                sort: sortBy,
-                order: sortOrder
+            const params = buildStockQueryParams({
+                category, currentPage, itemsPerPage, sortBy, sortOrder,
+                searchTerm, selectedBrand, selectedTier, priceRange, stockFilter
             });
 
-            console.log('🔗 API request params:', params.toString());
-
-            if (safeSearchTerm && safeSearchTerm.trim()) {
-                params.append('q', safeSearchTerm.trim());
-            }
-
-            if (selectedBrand) {
-                params.append('brand', selectedBrand);
-            }
-
-            if (selectedTier) {
-                params.append('tier', selectedTier);
-            }
-
-            if (priceRange.min) {
-                params.append('minPrice', priceRange.min);
-            }
-
-            if (priceRange.max) {
-                params.append('maxPrice', priceRange.max);
-            }
-
-            if (stockFilter === 'inStock') {
-                params.append('inStock', 'true');
-            } else if (stockFilter === 'outOfStock') {
-                params.append('inStock', 'false');
-            }
-
-            // Use the main stock API with pagination
             const response = await fetch(`${getApiBaseUrl()}/stock?${params}`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -429,67 +434,37 @@ const StockDetail = () => {
 
             const data = await response.json();
 
-            if (data.success && mountedRef.current) {
-                console.log('✅ Items loaded successfully:', data.data.length);
-
-                // Debug: Log items with images
-                const itemsWithImages = data.data.filter(item => item.image_url && item.image_url.includes('part-'));
-                if (itemsWithImages.length > 0) {
-                    console.log('📸 Items with uploaded images:', itemsWithImages.map(item => ({
-                        id: item.id,
-                        name: item.name,
-                        image_url: item.image_url
-                    })));
-                } else {
-                    console.log('📷 No items with uploaded images found in this batch');
-                }
-
-                setItems(data.data || []);
-
-                // Update pagination info and handle page overflow
-                if (data.pagination) {
-                    const newTotalPages = data.pagination.totalPages;
-                    const newTotalItems = data.pagination.totalItems;
-                    const serverCurrentPage = data.pagination.currentPage;
-
-                    setTotalPages(newTotalPages);
-                    setTotalItems(newTotalItems);
-
-                    // Handle page overflow after filtering without causing infinite loops
-                    if (currentPage > newTotalPages && newTotalPages > 0) {
-                        console.log(`📄 Current page ${currentPage} exceeds available pages ${newTotalPages}, adjusting to page ${newTotalPages}`);
-                        // Use setTimeout to avoid immediate re-render and allow this loadItems call to complete
-                        setTimeout(() => {
-                            setCurrentPage(newTotalPages);
-                        }, 0);
-                    }
-
-                    console.log(`📄 Pagination updated: page ${currentPage}/${newTotalPages}, total items: ${newTotalItems}`);
-                }
-            } else {
+            if (!data.success || !mountedRef.current) {
                 throw new Error(data.message || 'Failed to load items');
             }
 
+            setItems(data.data || []);
+
+            if (data.pagination) {
+                const { totalPages: newTotalPages, totalItems: newTotalItems } = data.pagination;
+                setTotalPages(newTotalPages);
+                setTotalItems(newTotalItems);
+
+                if (currentPage > newTotalPages && newTotalPages > 0) {
+                    setTimeout(() => setCurrentPage(newTotalPages), 0);
+                }
+            }
         } catch (error) {
             console.error('❌ Error loading items:', error);
-            if (mountedRef.current) {
-                setError('Failed to load items: ' + error.message);
-                setItems([]);
-            }
+            if (!mountedRef.current) return;
+            setError('Failed to load items: ' + error.message);
+            setItems([]);
         } finally {
-            if (mountedRef.current) {
-                setIsLoading(false);
-                setIsSearching(false);
+            if (!mountedRef.current) return;
+            setIsLoading(false);
+            setIsSearching(false);
 
-                // Restore scroll position if it was preserved (for filter changes)
-                if (preserveScrollPosition && scrollPositionRef.current > 0) {
-                    requestAnimationFrame(() => {
-                        window.scrollTo(0, scrollPositionRef.current);
-                        console.log('📜 Restored scroll position to:', scrollPositionRef.current);
-                        setPreserveScrollPosition(false);
-                        scrollPositionRef.current = 0;
-                    });
-                }
+            if (preserveScrollPosition && scrollPositionRef.current > 0) {
+                requestAnimationFrame(() => {
+                    window.scrollTo(0, scrollPositionRef.current);
+                    setPreserveScrollPosition(false);
+                    scrollPositionRef.current = 0;
+                });
             }
         }
         // Removed dependency array - we'll manage dependencies differently
@@ -686,61 +661,38 @@ const StockDetail = () => {
         }
 
         const confirmed = await showConfirmation(`delete ${selectedItems.length} items? This action cannot be undone.`);
-        if (!confirmed) {
-            return;
-        }
+        if (!confirmed) return;
 
         try {
             setIsSubmitting(true);
-            console.log('🗑️ Bulk deleting items:', selectedItems);
 
-            // Check if we have a valid token
-            const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error('Authentication token not found. Please log in again.');
-            }
-
-            // Delete each selected item
-            const deletePromises = selectedItems.map(itemId =>
-                fetch(`${getApiBaseUrl()}/stock/${itemId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                })
+            const responses = await Promise.all(
+                selectedItems.map(itemId =>
+                    fetch(`${getApiBaseUrl()}/stock/${itemId}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                )
             );
 
-            const responses = await Promise.all(deletePromises);
-
-            // Check for authentication failures
-            const authFailures = responses.filter(response => response.status === 401);
-            if (authFailures.length > 0) {
-                localStorage.removeItem('token');
+            const { authFailed, failedCount } = processBulkResponses(responses);
+            if (authFailed) {
                 throw new Error('Authentication failed. Please log in again.');
             }
 
-            // Check if all deletions were successful
-            const failedDeletions = responses.filter(response => !response.ok);
-
-            if (failedDeletions.length === 0) {
+            if (failedCount === 0) {
                 showNotification('success', `Successfully deleted ${selectedItems.length} items!`);
                 setSelectedItems([]);
                 setSelectAll(false);
                 await loadItems();
             } else {
-                console.log('Failed responses:', failedDeletions.map(r => ({ status: r.status, statusText: r.statusText })));
-                showNotification('error', `Failed to delete ${failedDeletions.length} items`);
+                showNotification('error', `Failed to delete ${failedCount} items`);
             }
-
         } catch (error) {
             console.error('❌ Error in bulk delete:', error);
-
-            if (error.message.includes('log in again')) {
-                showNotification('error', 'Your session has expired. Please refresh the page and log in again.');
-            } else {
-                showNotification('error', 'Failed to delete items: ' + error.message);
-            }
+            showNotification('error', error.message.includes('log in again')
+                ? 'Your session has expired. Please refresh the page and log in again.'
+                : 'Failed to delete items: ' + error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -758,39 +710,28 @@ const StockDetail = () => {
 
     // Handle bulk stock quantity confirmation
     const handleBulkStockConfirm = async () => {
-        const parsedStock = parseInt(bulkStockQuantity);
-        if (isNaN(parsedStock) || parsedStock < 0) {
+        const parsedStock = Number.parseInt(bulkStockQuantity, 10);
+        if (Number.isNaN(parsedStock) || parsedStock < 0) {
             showNotification('error', 'Please enter a valid stock quantity (0 or greater)');
             return;
         }
 
         try {
             setIsSubmitting(true);
-            console.log('📦 Bulk updating stock for items:', selectedItems, 'to quantity:', parsedStock);
-
-            // Get selected items data to update
             const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
 
-            // Update each selected item's stock using PATCH
-            const updatePromises = selectedItemsData.map(item =>
-                fetch(`${getApiBaseUrl()}/stock/${item.id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: JSON.stringify({
-                        stock: parsedStock
+            const responses = await Promise.all(
+                selectedItemsData.map(item =>
+                    fetch(`${getApiBaseUrl()}/stock/${item.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ stock: parsedStock })
                     })
-                })
+                )
             );
 
-            const responses = await Promise.all(updatePromises);
-
-            // Check if all updates were successful
-            const failedUpdates = responses.filter(response => !response.ok);
-
-            if (failedUpdates.length === 0) {
+            const { failedCount } = processBulkResponses(responses);
+            if (failedCount === 0) {
                 showNotification('success', `Successfully updated stock for ${selectedItems.length} items!`);
                 setSelectedItems([]);
                 setSelectAll(false);
@@ -798,9 +739,8 @@ const StockDetail = () => {
                 setBulkStockQuantity('0');
                 await loadItems();
             } else {
-                showNotification('error', `Failed to update ${failedUpdates.length} items`);
+                showNotification('error', `Failed to update ${failedCount} items`);
             }
-
         } catch (error) {
             console.error('❌ Error in bulk stock update:', error);
             showNotification('error', 'Failed to update stock: ' + error.message);
@@ -846,12 +786,8 @@ const StockDetail = () => {
 
     // Helper function to render the appropriate input type based on field type
     const renderSpecificationField = (field, isEditMode = false) => {
-        const fieldName = typeof field === 'string' ? field : field.name;
-        const fieldType = typeof field === 'object' ? field.type : 'text';
-        const isRequired = typeof field === 'object' ? field.required : false;
-
+        const { fieldName, fieldType, isRequired, label } = getFieldMeta(field);
         const inputId = isEditMode ? `spec-${fieldName}` : `add-spec-${fieldName}`;
-        const label = fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ');
         const value = specifications[fieldName] || '';
 
         const commonProps = {
@@ -952,7 +888,7 @@ const StockDetail = () => {
     };
 
     // Upload image separately for an existing item lacking an image
-    const handleSeparateImageUpload = async (file, item) => {
+    const _handleSeparateImageUpload = async (file, item) => {
         try {
             if (!file || !item) return;
             if (!file.type.startsWith('image/')) return showNotification('error', 'Invalid image file');
@@ -962,7 +898,7 @@ const StockDetail = () => {
             const endpoint = `${getApiBaseUrl()}/images/${encodeURIComponent(category)}/${item.id}`;
             const res = await fetch(endpoint, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+                withCredentials: true,
                 body: fd
             });
             if (!res.ok) {
@@ -1051,12 +987,7 @@ const StockDetail = () => {
         // Fetch available components for this category
         try {
             const response = await fetch(
-                `${getApiBaseUrl()}/stock/items/${encodeURIComponent(componentCategory)}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                    }
-                }
+                `${getApiBaseUrl()}/stock/items/${encodeURIComponent(componentCategory)}`
             );
             
             if (response.ok) {
@@ -1120,7 +1051,7 @@ const StockDetail = () => {
                 // Regular Pre-Built format
                 specs.componentLinks.forEach(link => {
                     // Only set component if it has a name (not empty)
-                    if (link.componentName && link.componentName.trim()) {
+                    if (link.componentName?.trim()) {
                         components[link.componentType] = {
                             id: link.linkedStockIds?.[0],
                             name: link.componentName,
@@ -1162,7 +1093,7 @@ const StockDetail = () => {
         COMPONENT_ORDER.forEach(type => {
             const component = prebuiltComponents[type];
             
-            if (component && component.name) {
+            if (component?.name) {
                 // Component has a value - include it
                 components.push({
                     name: type,
@@ -1212,64 +1143,22 @@ const StockDetail = () => {
         try {
             setIsSubmitting(true);
 
-            // Validate required fields
             if (!formData.name.trim() || !formData.price) {
                 showNotification('error', 'Please fill in required fields (name and price)');
                 return;
             }
             
-            // Validate tier for Pre-Built items
             if (category === 'Pre-Built' && !formData.tier) {
                 showNotification('error', 'Please select a Build Tier for Pre-Built items');
                 return;
             }
 
-            console.log('➕ Adding new item:', formData.name);
-
-            // Create FormData for file upload
-            const submitData = new FormData();
-            submitData.append('name', formData.name.trim());
-            submitData.append('category', category);
-            submitData.append('brand', formData.brand.trim() || '');
-            submitData.append('price', parseFloat(formData.price) || 0);
-            submitData.append('stock', parseInt(formData.stock) || 0);
-            submitData.append('description', formData.description.trim() || '');
-            
-            // ✅ FIX: ALWAYS send tier to backend, even if empty (to allow clearing tier)
-            // Previous bug: 'if (formData.tier)' was FALSE for empty string, preventing tier updates
-            submitData.append('tier', formData.tier || '');
-            console.log('🏆 Including tier (always sent):', formData.tier || '(empty)');
-
-            // Build Pre-Built specifications if adding a Pre-Built item
-            let finalSpecifications = specifications;
-            if (category === 'Pre-Built') {
-                console.log('🖥️ Building Pre-Built specifications...');
-                const prebuiltSpecs = buildPreBuiltSpecifications();
-                finalSpecifications = {
-                    ...specifications,
-                    ...prebuiltSpecs
-                };
-                console.log('🖥️ Final Pre-Built specifications:', finalSpecifications);
-            }
-
-            // Add specifications as JSON string
-            if (Object.keys(finalSpecifications).length > 0) {
-                submitData.append('specifications', JSON.stringify(finalSpecifications));
-                console.log('📋 Including specifications:', finalSpecifications);
-            }
-
-            // Add image file if selected
-            if (formData.imageFile) {
-                submitData.append('image', formData.imageFile);
-                console.log('📸 Including image file:', formData.imageFile.name);
-            }
+            const prebuiltSpecs = category === 'Pre-Built' ? buildPreBuiltSpecifications() : null;
+            const submitData = buildStockFormData(formData, category, specifications, prebuiltSpecs);
 
             const response = await fetch(`${getApiBaseUrl()}/stock`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    // Note: Don't set Content-Type for FormData - browser will set it with boundary
-                },
+                withCredentials: true,
                 body: submitData
             });
 
@@ -1315,105 +1204,40 @@ const StockDetail = () => {
         try {
             setIsSubmitting(true);
 
-            console.log('✏️ Starting edit process for item:', currentItem.id);
-            console.log('📝 Form data before submission:', formData);
-
-            // Create FormData for file upload (matching backend expectations)
-            const submitData = new FormData();
-            submitData.append('name', formData.name.trim());
-            submitData.append('category', currentItem.category); // Use item's actual category, not URL category
-            submitData.append('brand', formData.brand.trim() || '');
-            submitData.append('price', parseFloat(formData.price) || 0);
-            // Fix: Backend expects 'stock', not 'stock_quantity'
-            submitData.append('stock', parseInt(formData.stock) || 0);
-            submitData.append('description', formData.description.trim() || '');
-            
-            // ✅ FIX: ALWAYS send tier to backend, even if empty (to allow clearing/updating tier)
-            // SMOKING GUN: Previous 'if (formData.tier)' condition prevented saving when dropdown reset to empty
-            submitData.append('tier', formData.tier || '');
-            console.log('🏆 Including tier (always sent):', formData.tier || '(empty)');
-
-            // Build Pre-Built specifications if editing a Pre-Built item
-            let finalSpecifications = specifications;
-            if (currentItem.category === 'Pre-Built') {
-                console.log('🖥️ Building Pre-Built specifications...');
-                const prebuiltSpecs = buildPreBuiltSpecifications();
-                finalSpecifications = {
-                    ...specifications,
-                    ...prebuiltSpecs
-                };
-                console.log('🖥️ Final Pre-Built specifications:', finalSpecifications);
-            }
-
-            // Add specifications as JSON string
-            if (Object.keys(finalSpecifications).length > 0) {
-                submitData.append('specifications', JSON.stringify(finalSpecifications));
-                console.log('📋 Including specifications:', finalSpecifications);
-            }
-
-            // Add image file if new one is selected (multer will handle this as req.file)
-            if (formData.imageFile) {
-                submitData.append('image', formData.imageFile);
-                console.log('📸 Including image file:', formData.imageFile.name);
-            }
-
-            // Debug: Log all FormData entries
-            console.log('📦 FormData contents:');
-            for (let [key, value] of submitData.entries()) {
-                console.log(`  ${key}:`, value);
-            }
-
-            console.log('🌐 Making API call to:', `${getApiBaseUrl()}/stock/${currentItem.id}`);
+            const prebuiltSpecs = currentItem.category === 'Pre-Built' ? buildPreBuiltSpecifications() : null;
+            const submitData = buildStockFormData(formData, currentItem.category, specifications, prebuiltSpecs);
 
             const response = await fetch(`${getApiBaseUrl()}/stock/${currentItem.id}`, {
                 method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    // Note: Don't set Content-Type for FormData - browser will set it with boundary
-                },
+                withCredentials: true,
                 body: submitData
             });
 
-            console.log('📡 Response status:', response.status, response.statusText);
-
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-                console.error('❌ Error response:', errorData);
                 throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('✅ Update response:', data);
 
-            if (data.success) {
-                console.log('✅ Item updated successfully:', data.data);
-
-                // ✅ FIX: Update the item in state immediately with the returned data
-                setItems(prevItems => 
-                    prevItems.map(item => 
-                        item.id === currentItem.id ? data.data : item
-                    )
-                );
-
-                // Force refresh items list to ensure data consistency
-                console.log('🔄 Refreshing items list...');
-                await loadItems();
-
-                // Small delay to ensure backend cache is cleared
-                await new Promise(resolve => setTimeout(resolve, 100));
-
-                // Second refresh to ensure we get the latest data
-                await loadItems();
-
-                // Reset form and close modal
-                resetForm();
-                setShowEditModal(false);
-                setCurrentItem(null);
-
-                showNotification('success', 'Item updated successfully!');
-            } else {
+            if (!data.success) {
                 throw new Error(data.message || 'Failed to update item');
             }
+
+            setItems(prevItems => 
+                prevItems.map(item => 
+                    item.id === currentItem.id ? data.data : item
+                )
+            );
+
+            await loadItems();
+            await new Promise(resolve => setTimeout(resolve, 100));
+            await loadItems();
+
+            resetForm();
+            setShowEditModal(false);
+            setCurrentItem(null);
+            showNotification('success', 'Item updated successfully!');
 
         } catch (error) {
             console.error('❌ Error updating item:', error);
@@ -1427,32 +1251,16 @@ const StockDetail = () => {
     // Handle delete item
     const handleDeleteItem = async (item) => {
         const confirmed = await showConfirmation(`delete "${item.name}"? This action cannot be undone.`);
-        if (!confirmed) {
-            return;
-        }
+        if (!confirmed) return;
 
         try {
-            console.log('🗑️ Deleting item:', item.id);
-
-            // Check if we have a valid token
-            const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error('Authentication token not found. Please log in again.');
-            }
 
             const response = await fetch(`${getApiBaseUrl()}/stock/${item.id}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            console.log(`Delete response status: ${response.status}`);
-
             if (response.status === 401) {
-                // Authentication failed - token might be expired
-                localStorage.removeItem('token');
                 throw new Error('Authentication failed. Please log in again.');
             }
 
@@ -1462,65 +1270,41 @@ const StockDetail = () => {
             }
 
             const data = await response.json();
+            if (!data.success) throw new Error(data.message || 'Failed to delete item');
 
-            if (data.success) {
-                console.log('✅ Item deleted successfully');
-
-                // Refresh items list
-                await loadItems();
-
-                showNotification('success', 'Item deleted successfully!');
-            } else {
-                throw new Error(data.message || 'Failed to delete item');
-            }
-
+            await loadItems();
+            showNotification('success', 'Item deleted successfully!');
         } catch (error) {
             console.error('❌ Error deleting item:', error);
-
-            if (error.message.includes('log in again')) {
-                showNotification('error', 'Your session has expired. Please refresh the page and log in again.');
-            } else {
-                showNotification('error', 'Failed to delete item: ' + error.message);
-            }
+            showNotification('error', error.message.includes('log in again')
+                ? 'Your session has expired. Please refresh the page and log in again.'
+                : 'Failed to delete item: ' + error.message);
         }
     };
 
     // Handle make out of stock
     const handleMakeOutOfStock = async (item) => {
-        // Validate that item has stock
         if (item.stock <= 0) {
-            showNotification('warning', 'This item is already out of stock');
-            return;
+            return showNotification('warning', 'This item is already out of stock');
         }
 
         const confirmed = await showConfirmation(`mark "${item.name}" as out of stock? This will set stock to 0.`);
-        if (!confirmed) {
-            return;
-        }
+        if (!confirmed) return;
 
         try {
             const response = await fetch(`${getApiBaseUrl()}/stock/${item.id}`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                    stock: 0
-                })
+                headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ stock: 0 })
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to update stock');
-            }
+            if (!response.ok) throw new Error('Failed to update stock');
 
             const data = await response.json();
-            if (data.success) {
-                showNotification('success', `"${item.name}" marked as out of stock!`);
-                await loadItems();
-            } else {
-                throw new Error(data.message || 'Failed to update stock');
-            }
+            if (!data.success) throw new Error(data.message || 'Failed to update stock');
+
+            showNotification('success', `"${item.name}" marked as out of stock!`);
+            await loadItems();
         } catch (error) {
             console.error('Error updating stock:', error);
             showNotification('error', 'Failed to update stock: ' + error.message);
@@ -1552,7 +1336,7 @@ const StockDetail = () => {
             setSaleModalItem(item);
             setSaleData({
                 salePrice: (item.price * 0.9).toFixed(2), // Default 10% discount
-                startDate: new Date().toISOString().split('T')[0],
+                startDate: Date.now().toISOString().split('T')[0],
                 endDate: ''
             });
             setShowSaleModal(true);
@@ -1570,12 +1354,11 @@ const StockDetail = () => {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({
-                    salePrice: parseFloat(saleData.salePrice),
+                    salePrice: Number.parseFloat(saleData.salePrice),
                     saleDuration: saleData.endDate ? 
-                        Math.ceil((new Date(saleData.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : 
+                        Math.ceil((new Date(saleData.endDate) - Date.now()) / (1000 * 60 * 60 * 24)) : 
                         null
                 })
             });
@@ -1595,8 +1378,8 @@ const StockDetail = () => {
                             ? {
                                 ...item,
                                 on_sale: true,
-                                sale_price: parseFloat(saleData.salePrice),
-                                sale_start_date: new Date().toISOString(),
+                                sale_price: Number.parseFloat(saleData.salePrice),
+                                sale_start_date: Date.now().toISOString(),
                                 sale_end_date: saleData.endDate ? new Date(saleData.endDate).toISOString() : null
                             }
                             : item
@@ -1629,7 +1412,6 @@ const StockDetail = () => {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
 
@@ -1671,7 +1453,7 @@ const StockDetail = () => {
 
     // Handle stock quantity confirmation
     const handleStockQuantityConfirm = async () => {
-        if (!stockQuantity || isNaN(stockQuantity) || parseInt(stockQuantity) <= 0) {
+        if (!stockQuantity || Number.isNaN(stockQuantity) || Number.parseInt(stockQuantity, 10) <= 0) {
             showNotification('warning', 'Please enter a valid quantity greater than 0');
             return;
         }
@@ -1681,10 +1463,9 @@ const StockDetail = () => {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({
-                    stock: parseInt(stockQuantity)
+                    stock: Number.parseInt(stockQuantity, 10)
                 })
             });
 
@@ -1723,7 +1504,6 @@ const StockDetail = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
 
@@ -1762,7 +1542,6 @@ const StockDetail = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
 
@@ -1803,7 +1582,6 @@ const StockDetail = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({
                     category: category,
@@ -1840,22 +1618,10 @@ const StockDetail = () => {
 
         setCurrentItem(item);
         
-        // Parse specifications to get tier/buildType
-        let itemSpecs = {};
-        if (item.specifications && typeof item.specifications === 'object') {
-            itemSpecs = item.specifications;
-        } else if (item.specifications && typeof item.specifications === 'string') {
-            try {
-                itemSpecs = JSON.parse(item.specifications);
-            } catch (error) {
-                console.error('❌ Error parsing specifications JSON:', error);
-            }
-        }
-        
         // Normalize tier value to match dropdown options (e.g., "Mid Tier" → "mid-tier")
         const normalizeTierForDropdown = (tierValue) => {
             if (!tierValue) return '';
-            return tierValue.toLowerCase().replace(/\s+/g, '-');
+            return tierValue.toLowerCase().replaceAll(/\s+/g, '-');
         };
         
         setFormData({
@@ -1919,6 +1685,180 @@ const StockDetail = () => {
         const safeAmount = Number(amount) || 0;
         return `₱${safeAmount.toLocaleString()}`;
     };
+
+    // Extracted: sort arrow indicator (eliminates 5 repeated conditionals)
+    const renderSortArrow = (field) => {
+        if (sortBy !== field) return null;
+        return (
+            <span className={`sort-arrow ${sortOrder.toLowerCase()}`}>
+                {sortOrder === 'ASC' ? '↑' : '↓'}
+            </span>
+        );
+    };
+
+    // Extracted: single table row rendering (isolates ~12 CC from component body)
+    const renderTableRow = (item, index) => (
+        <tr key={item.id} className={selectedItems.includes(item.id) ? 'selected' : ''}>
+            <td>
+                <input
+                    type="checkbox"
+                    checked={selectedItems.includes(item.id)}
+                    onChange={() => handleSelectItem(item.id)}
+                />
+            </td>
+            <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
+            <td className="product-name-cell">
+                <div className="product-info">
+                    <div className="product-image-thumb">
+                        {(item.image_url || item.file_path) ? (
+                            <button
+                                type="button"
+                                className="product-image-button"
+                                onClick={() => setModalImage(getFullImageUrl(item.image_url || item.file_path))}
+                            >
+                            <img
+                                src={getFullImageUrl(item.image_url || item.file_path)}
+                                alt={item.name}
+                                onLoad={() => {
+                                    console.log(`🖼️ Image loaded successfully: ${item.image_url || item.file_path}`);
+                                }}
+                                onError={(e) => {
+                                    console.error(`❌ Image failed to load: ${item.image_url || item.file_path}`);
+                                    console.error('❌ Full URL attempted:', e.target.src);
+                                    console.error('❌ Network error or file not found');
+                                    e.target.style.display = 'none';
+                                    const placeholder = e.target.nextSibling;
+                                    if (placeholder) placeholder.style.display = 'flex';
+                                }}
+                                crossOrigin="anonymous"
+                            />
+                            </button>
+                        ) : (
+                            <div className="image-placeholder-small">
+                                <FiImage />
+                                <small style={{ fontSize: '10px', marginTop: '4px' }}>No Image</small>
+                            </div>
+                        )}
+                    </div>
+                    <div className="product-details">
+                        <span className="product-name">{item.name}</span>
+                        {item.brand && <span className="product-brand">{item.brand}</span>}
+                    </div>
+                </div>
+            </td>
+            <td className="tier-cell">
+                {(() => {
+                    const tierInfo = getTierInfo(item.tier);
+                    return (
+                        <span className={`tier-badge ${tierInfo.className}`}>
+                            {tierInfo.displayName}
+                        </span>
+                    );
+                })()}
+            </td>
+            <td>{category}</td>
+            <td>
+                <span className={`stock-badge ${item.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
+                    {item.stock}
+                </span>
+            </td>
+            <td>{item.sold || 0}</td>
+            <td className="price-cell">{formatCurrency(item.price)}</td>
+            <td>
+                {category === 'Community Build' && item.specifications?.approvalStatus ? (
+                    <span className={`status-badge approval-${item.specifications.approvalStatus}`}>
+                        {item.specifications.approvalStatus === 'pending' && '⏳ Pending Approval'}
+                        {item.specifications.approvalStatus === 'approved' && '✓ Approved'}
+                        {item.specifications.approvalStatus === 'rejected' && '✗ Rejected'}
+                    </span>
+                ) : (
+                    <span className={`status-badge ${item.stock > 0 ? 'published' : 'out-of-stock'}`}>
+                        {item.stock > 0 ? 'Published' : 'Out of Stock'}
+                    </span>
+                )}
+            </td>
+            <td>
+                <div className="action-dropdown">
+                    <button
+                        className="action-btn"
+                        onClick={() => toggleActionDropdown(item.id)}
+                    >
+                        ⋯
+                    </button>
+                    <div className={`dropdown-menu ${activeDropdown === item.id ? 'show' : ''}`}>
+                        {category === 'Community Build' && item.specifications?.approvalStatus === 'pending' && (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        handleApproveCommunityBuild(item);
+                                        setActiveDropdown(null);
+                                    }}
+                                    className="approve-btn"
+                                >
+                                    ✓ Approve Build
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleRejectCommunityBuild(item);
+                                        setActiveDropdown(null);
+                                    }}
+                                    className="reject-btn danger"
+                                >
+                                    ✗ Reject Build
+                                </button>
+                                <div className="dropdown-divider"></div>
+                            </>
+                        )}
+                        
+                        <button onClick={() => {
+                            openEditModal(item);
+                            setActiveDropdown(null);
+                        }}>
+                            <FiEdit /> Edit Stock
+                        </button>
+                        <button
+                            onClick={() => {
+                                handleMakeOnSale(item);
+                                setActiveDropdown(null);
+                            }}
+                            className={`sale-btn ${item.on_sale ? 'remove-sale' : 'add-sale'}`}
+                        >
+                            {item.on_sale ? 'Remove from Sale' : 'Make On Sale'}
+                        </button>
+
+                        {item.stock > 0 && (
+                            <button
+                                onClick={() => {
+                                    handleMakeOutOfStock(item);
+                                    setActiveDropdown(null);
+                                }}
+                                className="stock-out-btn"
+                            >
+                                Make Stock Out
+                            </button>
+                        )}
+                        {item.stock === 0 && (
+                            <button
+                                onClick={() => {
+                                    handleMakeAvailable(item);
+                                    setActiveDropdown(null);
+                                }}
+                                className="make-available-btn"
+                            >
+                                Make Available
+                            </button>
+                        )}
+                        <button onClick={() => {
+                            handleDeleteItem(item);
+                            setActiveDropdown(null);
+                        }} className="danger">
+                            <FiTrash2 /> Delete
+                        </button>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    );
 
     if (isLoading) {
         return (
@@ -2007,7 +1947,7 @@ const StockDetail = () => {
                     </div>
                     <select
                         value={itemsPerPage}
-                        onChange={(e) => handleItemsPerPageChange(parseInt(e.target.value))}
+                        onChange={(e) => handleItemsPerPageChange(Number.parseInt(e.target.value, 10))}
                         className="items-per-page"
                     >
                         <option value={10}>10 per page</option>
@@ -2100,44 +2040,28 @@ const StockDetail = () => {
                                     onClick={() => handleSort('name')}
                                 >
                                     Product Name
-                                    {sortBy === 'name' && (
-                                        <span className={`sort-arrow ${sortOrder.toLowerCase()}`}>
-                                            {sortOrder === 'ASC' ? '↑' : '↓'}
-                                        </span>
-                                    )}
+                                    {renderSortArrow('name')}
                                 </th>
                                 <th
                                     className="sortable-column"
                                     onClick={() => handleSort('tier')}
                                 >
                                     Tier
-                                    {sortBy === 'tier' && (
-                                        <span className={`sort-arrow ${sortOrder.toLowerCase()}`}>
-                                            {sortOrder === 'ASC' ? '↑' : '↓'}
-                                        </span>
-                                    )}
+                                    {renderSortArrow('tier')}
                                 </th>
                                 <th
                                     className="sortable-column"
                                     onClick={() => handleSort('category')}
                                 >
                                     Category
-                                    {sortBy === 'category' && (
-                                        <span className={`sort-arrow ${sortOrder.toLowerCase()}`}>
-                                            {sortOrder === 'ASC' ? '↑' : '↓'}
-                                        </span>
-                                    )}
+                                    {renderSortArrow('category')}
                                 </th>
                                 <th
                                     className="sortable-column"
                                     onClick={() => handleSort('stock')}
                                 >
                                     Stock
-                                    {sortBy === 'stock' && (
-                                        <span className={`sort-arrow ${sortOrder.toLowerCase()}`}>
-                                            {sortOrder === 'ASC' ? '↑' : '↓'}
-                                        </span>
-                                    )}
+                                    {renderSortArrow('stock')}
                                 </th>
                                 <th>Sold</th>
                                 <th
@@ -2145,179 +2069,14 @@ const StockDetail = () => {
                                     onClick={() => handleSort('price')}
                                 >
                                     Price
-                                    {sortBy === 'price' && (
-                                        <span className={`sort-arrow ${sortOrder.toLowerCase()}`}>
-                                            {sortOrder === 'ASC' ? '↑' : '↓'}
-                                        </span>
-                                    )}
+                                    {renderSortArrow('price')}
                                 </th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {items.map((item, index) => (
-                                <tr key={item.id} className={selectedItems.includes(item.id) ? 'selected' : ''}>
-                                    <td>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedItems.includes(item.id)}
-                                            onChange={() => handleSelectItem(item.id)}
-                                        />
-                                    </td>
-                                    <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                                    <td className="product-name-cell">
-                                        <div className="product-info">
-                                            <div className="product-image-thumb">
-                                                {(item.image_url || item.file_path) ? (
-                                                    <img
-                                                        src={getFullImageUrl(item.image_url || item.file_path)}
-                                                        alt={item.name}
-                                                        onClick={() => setModalImage(getFullImageUrl(item.image_url || item.file_path))}
-                                                        onLoad={() => {
-                                                            console.log(`🖼️ Image loaded successfully: ${item.image_url || item.file_path}`);
-                                                        }}
-                                                        onError={(e) => {
-                                                            console.error(`❌ Image failed to load: ${item.image_url || item.file_path}`);
-                                                            console.error('❌ Full URL attempted:', e.target.src);
-                                                            console.error('❌ Network error or file not found');
-                                                            e.target.style.display = 'none';
-                                                            const placeholder = e.target.nextSibling;
-                                                            if (placeholder) placeholder.style.display = 'flex';
-                                                        }}
-                                                        crossOrigin="anonymous"
-                                                    />
-                                                ) : (
-                                                    <div className="image-placeholder-small">
-                                                        <FiImage />
-                                                        <small style={{ fontSize: '10px', marginTop: '4px' }}>No Image</small>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="product-details">
-                                                <span className="product-name">{item.name}</span>
-                                                {item.brand && <span className="product-brand">{item.brand}</span>}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="tier-cell">
-                                        {(() => {
-                                            const tierInfo = getTierInfo(item.tier);
-                                            return (
-                                                <span className={`tier-badge ${tierInfo.className}`}>
-                                                    {tierInfo.displayName}
-                                                </span>
-                                            );
-                                        })()}
-                                    </td>
-                                    <td>{category}</td>
-                                    <td>
-                                        <span className={`stock-badge ${item.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
-                                            {item.stock}
-                                        </span>
-                                    </td>
-                                    <td>{item.sold || 0}</td>
-                                    <td className="price-cell">{formatCurrency(item.price)}</td>
-                                    <td>
-                                        {/* Show approval status for Community Build category */}
-                                        {category === 'Community Build' && item.specifications?.approvalStatus ? (
-                                            <span className={`status-badge approval-${item.specifications.approvalStatus}`}>
-                                                {item.specifications.approvalStatus === 'pending' && '⏳ Pending Approval'}
-                                                {item.specifications.approvalStatus === 'approved' && '✓ Approved'}
-                                                {item.specifications.approvalStatus === 'rejected' && '✗ Rejected'}
-                                            </span>
-                                        ) : (
-                                            <span className={`status-badge ${item.stock > 0 ? 'published' : 'out-of-stock'}`}>
-                                                {item.stock > 0 ? 'Published' : 'Out of Stock'}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <div className="action-dropdown">
-                                            <button
-                                                className="action-btn"
-                                                onClick={() => toggleActionDropdown(item.id)}
-                                            >
-                                                ⋯
-                                            </button>
-                                            <div className={`dropdown-menu ${activeDropdown === item.id ? 'show' : ''}`}>
-                                                {/* Approve/Reject buttons for Community Build category */}
-                                                {category === 'Community Build' && item.specifications?.approvalStatus === 'pending' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => {
-                                                                handleApproveCommunityBuild(item);
-                                                                setActiveDropdown(null);
-                                                            }}
-                                                            className="approve-btn"
-                                                        >
-                                                            ✓ Approve Build
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                handleRejectCommunityBuild(item);
-                                                                setActiveDropdown(null);
-                                                            }}
-                                                            className="reject-btn danger"
-                                                        >
-                                                            ✗ Reject Build
-                                                        </button>
-                                                        <div className="dropdown-divider"></div>
-                                                    </>
-                                                )}
-                                                
-                                                <button onClick={() => {
-                                                    openEditModal(item);
-                                                    setActiveDropdown(null);
-                                                }}>
-                                                    <FiEdit /> Edit Stock
-                                                </button>
-                                                {/* Make On Sale - New feature */}
-                                                <button
-                                                    onClick={() => {
-                                                        handleMakeOnSale(item);
-                                                        setActiveDropdown(null);
-                                                    }}
-                                                    className={`sale-btn ${item.on_sale ? 'remove-sale' : 'add-sale'}`}
-                                                >
-                                                    {item.on_sale ? 'Remove from Sale' : 'Make On Sale'}
-                                                </button>
-
-                                                {/* Make Stock Out - Only available when stock > 0 */}
-                                                {item.stock > 0 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            handleMakeOutOfStock(item);
-                                                            setActiveDropdown(null);
-                                                        }}
-                                                        className="stock-out-btn"
-                                                    >
-                                                        Make Stock Out
-                                                    </button>
-                                                )}
-                                                {/* Make Available - Only available when stock = 0 */}
-                                                {item.stock === 0 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            handleMakeAvailable(item);
-                                                            setActiveDropdown(null);
-                                                        }}
-                                                        className="make-available-btn"
-                                                    >
-                                                        Make Available
-                                                    </button>
-                                                )}
-                                                <button onClick={() => {
-                                                    handleDeleteItem(item);
-                                                    setActiveDropdown(null);
-                                                }} className="danger">
-                                                    <FiTrash2 /> Delete
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {items.map((item, index) => renderTableRow(item, index))}
                         </tbody>
                     </table>
                 )}
@@ -2374,7 +2133,9 @@ const StockDetail = () => {
             )}
 
             {/* Add Modal */}
-            {showAddModal && (
+            {(() => {
+                if (!showAddModal) return null;
+                return (
                 <div className="modal-overlay">
                     <div className="modal">
                         <div className="modal-header">
@@ -2631,11 +2392,7 @@ const StockDetail = () => {
                                             style={{ display: 'none' }}
                                         />
 
-                                        {!formData.imageFile ? (
-                                            <label htmlFor="image" className="file-upload-btn">
-                                                <FiUpload /> Choose Image File
-                                            </label>
-                                        ) : (
+                                        {formData.imageFile ? (
                                             <div className="file-selected">
                                                 <div className="file-info">
                                                     <FiImage />
@@ -2655,6 +2412,10 @@ const StockDetail = () => {
                                                     </div>
                                                 )}
                                             </div>
+                                        ) : (
+                                            <label htmlFor="image" className="file-upload-btn">
+                                                <FiUpload /> Choose Image File
+                                            </label>
                                         )}
 
                                         <p className="file-help">
@@ -2686,10 +2447,13 @@ const StockDetail = () => {
                         </form>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Edit Modal */}
-            {showEditModal && currentItem && (
+            {(() => {
+                if (!showEditModal || !currentItem) return null;
+                return (
                 <div className="modal-overlay">
                     <div className="modal">
                         <div className="modal-header">
@@ -2965,11 +2729,7 @@ const StockDetail = () => {
                                             style={{ display: 'none' }}
                                         />
 
-                                        {!formData.imageFile ? (
-                                            <label htmlFor="edit-image" className="file-upload-btn">
-                                                <FiUpload /> Choose New Image
-                                            </label>
-                                        ) : (
+                                        {formData.imageFile ? (
                                             <div className="file-selected">
                                                 <div className="file-info">
                                                     <FiImage />
@@ -2989,6 +2749,10 @@ const StockDetail = () => {
                                                     </div>
                                                 )}
                                             </div>
+                                        ) : (
+                                            <label htmlFor="edit-image" className="file-upload-btn">
+                                                <FiUpload /> Choose New Image
+                                            </label>
                                         )}
                                     </div>
                                 </div>
@@ -3017,7 +2781,8 @@ const StockDetail = () => {
                         </form>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Component Picker Modal */}
             {showComponentPicker && (
@@ -3053,13 +2818,14 @@ const StockDetail = () => {
                                         item.name.toLowerCase().includes(
                                             componentSearchQuery.toLowerCase()
                                         ) ||
-                                        (item.brand && item.brand.toLowerCase().includes(
+                                        (item.brand?.toLowerCase().includes(
                                             componentSearchQuery.toLowerCase()
                                         ))
                                     )
                                     .map(item => (
-                                        <div
+                                        <button
                                             key={item.id}
+                                            type="button"
                                             className="component-result-item"
                                             onClick={() => selectComponent(item)}
                                         >
@@ -3077,7 +2843,7 @@ const StockDetail = () => {
                                                     Stock: {item.stock}
                                                 </span>
                                             </div>
-                                        </div>
+                                        </button>
                                     ))
                                 }
                                 {componentSearchResults.length === 0 && (
@@ -3090,7 +2856,7 @@ const StockDetail = () => {
                                     item.name.toLowerCase().includes(
                                         componentSearchQuery.toLowerCase()
                                     ) ||
-                                    (item.brand && item.brand.toLowerCase().includes(
+                                    (item.brand?.toLowerCase().includes(
                                         componentSearchQuery.toLowerCase()
                                     ))
                                 ).length === 0 && componentSearchResults.length > 0 && (
@@ -3115,8 +2881,8 @@ const StockDetail = () => {
             )}
 
             {modalImage && (
-                <div className="image-modal-overlay" onClick={() => setModalImage(null)}>
-                    <div className="image-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="image-modal-overlay" role="none" onClick={() => setModalImage(null)} onKeyDown={(e) => { if (e.key === 'Escape') setModalImage(null); }}>
+                    <div className="image-modal" role="none" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                         <button className="close-modal" onClick={() => setModalImage(null)}><FiX /></button>
                         <img src={modalImage} alt="Preview" />
                     </div>
@@ -3206,7 +2972,7 @@ const StockDetail = () => {
                         <div className="modal-content">
                             <div className="sale-item-info">
                                 <p><strong>Item:</strong> {saleModalItem.name}</p>
-                                <p><strong>Original Price:</strong> ₱{parseFloat(saleModalItem.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                                <p><strong>Original Price:</strong> ₱{Number.parseFloat(saleModalItem.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
                             </div>
 
                             <div className="form-group">
@@ -3223,7 +2989,7 @@ const StockDetail = () => {
                                 />
                                 {saleData.salePrice && saleModalItem.price && (
                                     <small className="discount-info">
-                                        Discount: {Math.round((1 - (parseFloat(saleData.salePrice) / parseFloat(saleModalItem.price))) * 100)}%
+                                        Discount: {Math.round((1 - (Number.parseFloat(saleData.salePrice) / Number.parseFloat(saleModalItem.price))) * 100)}%
                                     </small>
                                 )}
                             </div>
@@ -3245,7 +3011,7 @@ const StockDetail = () => {
                                     id="sale-end-date"
                                     value={saleData.endDate}
                                     onChange={(e) => setSaleData(prev => ({ ...prev, endDate: e.target.value }))}
-                                    min={saleData.startDate || new Date().toISOString().split('T')[0]}
+                                    min={saleData.startDate || Date.now().toISOString().split('T')[0]}
                                 />
                             </div>
 
@@ -3264,7 +3030,7 @@ const StockDetail = () => {
                                     type="button"
                                     className="submit-btn sale-btn"
                                     onClick={handleAddToSale}
-                                    disabled={isSubmitting || !saleData.salePrice || parseFloat(saleData.salePrice) <= 0}
+                                    disabled={isSubmitting || !saleData.salePrice || Number.parseFloat(saleData.salePrice) <= 0}
                                 >
                                     {isSubmitting ? 'Adding to Sale...' : 'Put on Sale'}
                                 </button>
@@ -3322,7 +3088,7 @@ const StockDetail = () => {
                                     type="button"
                                     className="submit-btn"
                                     onClick={handleBulkStockConfirm}
-                                    disabled={isSubmitting || bulkStockQuantity === '' || isNaN(bulkStockQuantity) || parseInt(bulkStockQuantity) < 0}
+                                    disabled={isSubmitting || bulkStockQuantity === '' || Number.isNaN(bulkStockQuantity) || Number.parseInt(bulkStockQuantity, 10) < 0}
                                 >
                                     {isSubmitting ? 'Updating...' : 'Update Stock'}
                                 </button>
