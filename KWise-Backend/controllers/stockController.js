@@ -1,8 +1,18 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const multer = require('multer');
-const path = require('path');
+const path = require('node:path');
 const { createPart, updatePart, findPartById, listParts } = require('../utils/testMemoryStore');
+const {
+    buildCanonicalSpecs,
+    syncProductCompatibilitySpecs
+} = require('../services/compatibilitySpecService');
+const {
+    normalizeUploadFolder,
+    isAllowedImageMetadata,
+    randomImageFilename
+} = require('../middleware/secureImageUpload');
+const { sanitizeForLog } = require('../utils/securitySanitizer');
 const isTest = process.env.NODE_ENV === 'test' || process.env.BYPASS_AUTH_FOR_TESTS === 'true';
 
 /**
@@ -112,129 +122,140 @@ const getCategoryTableMapping = (category) => {
     return mapping[category];
 };
 
+/**
+ * Build WHERE clause fragments for the list query from request query parameters.
+ * Returns { whereClause, queryParams, paramIndex }.
+ */
+const buildListWhereClause = (queryObj) => {
+    const { category, q, brand, minPrice, maxPrice, inStock = true, tier } = queryObj;
+    let whereClause;
+    if (category === 'Community Build') {
+        whereClause = 'WHERE 1=1';
+    } else {
+        whereClause = 'WHERE is_active = true AND kiosk_visible = true';
+    }
+    const queryParams = [];
+    let paramIndex = 1;
+
+    if (category) {
+        if (category === 'Community Build') {
+            whereClause += ` AND category = $${paramIndex++} AND specifications->>'buildSource' = $${paramIndex++}`;
+            queryParams.push('Pre-Built', 'community');
+        } else {
+            whereClause += ` AND category = $${paramIndex++}`;
+            queryParams.push(category);
+        }
+    }
+
+    if (q) {
+        whereClause += ` AND (name ILIKE $${paramIndex++} OR brand ILIKE $${paramIndex++})`;
+        queryParams.push(`%${q}%`, `%${q}%`);
+    }
+
+    if (brand) {
+        const result = appendBrandFilter(whereClause, queryParams, paramIndex, brand);
+        whereClause = result.whereClause;
+        paramIndex = result.paramIndex;
+    }
+
+    if (minPrice) {
+        whereClause += ` AND price >= $${paramIndex++}`;
+        queryParams.push(Number.parseFloat(minPrice));
+    }
+    if (maxPrice) {
+        whereClause += ` AND price <= $${paramIndex++}`;
+        queryParams.push(Number.parseFloat(maxPrice));
+    }
+
+    if (inStock === 'true') {
+        whereClause += ' AND stock > 0';
+    } else if (inStock === 'false') {
+        whereClause += ' AND stock = 0';
+    }
+
+    if (tier) {
+        whereClause += ` AND tier = $${paramIndex++}`;
+        queryParams.push(tier);
+    }
+
+    return { whereClause, queryParams, paramIndex };
+};
+
+/** Append brand filter (single or multiple brands) */
+const appendBrandFilter = (whereClause, queryParams, paramIndex, brand) => {
+    if (brand.includes(',')) {
+        const brands = brand.split(',').map(b => b.trim()).filter(Boolean);
+        const placeholders = brands.map((_, i) => `$${paramIndex + i}`).join(',');
+        whereClause += ` AND brand IN (${placeholders})`;
+        queryParams.push(...brands);
+        paramIndex += brands.length;
+    } else {
+        whereClause += ` AND brand = $${paramIndex++}`;
+        queryParams.push(brand);
+    }
+    return { whereClause, paramIndex };
+};
+
+/** Append specification filters (spec_<field>=value or spec_<field>=min-max) */
+const appendSpecFilters = (whereClause, queryParams, paramIndex, queryObj) => {
+    const specFilters = Object.entries(queryObj).filter(([k]) => k.startsWith('spec_'));
+    for (const [key, rawVal] of specFilters) {
+        const field = key.substring(5);
+        if (!field || typeof rawVal !== 'string' || rawVal.trim() === '') continue;
+
+        if (/^-?\d+(\.\d+)?-?-?\d*(\.\d+)?$/.test(rawVal) && rawVal.includes('-')) {
+            const [min, max] = rawVal.split('-');
+            if (min) {
+                whereClause += ` AND (specifications->>$${paramIndex})::numeric >= $${paramIndex + 1}`;
+                queryParams.push(field, Number.parseFloat(min));
+                paramIndex += 2;
+            }
+            if (max) {
+                whereClause += ` AND (specifications->>$${paramIndex})::numeric <= $${paramIndex + 1}`;
+                queryParams.push(field, Number.parseFloat(max));
+                paramIndex += 2;
+            }
+        } else if (rawVal === 'true' || rawVal === 'false') {
+            whereClause += ` AND (LOWER(specifications->>$${paramIndex}) = $${paramIndex + 1})`;
+            queryParams.push(field, rawVal.toLowerCase());
+            paramIndex += 2;
+        } else {
+            whereClause += ` AND (specifications->>$${paramIndex}) ILIKE $${paramIndex + 1}`;
+            queryParams.push(field, rawVal);
+            paramIndex += 2;
+        }
+    }
+    return { whereClause, paramIndex };
+};
+
 // GET /api/stock - List all parts with filtering, pagination & specification filters
 const list = async (req, res) => {
     try {
         const {
-            category,
-            q,
             page = 1,
             limit = 20,
             sort = 'name',
-            order = 'ASC',
-            brand,
-            minPrice,
-            maxPrice,
-            inStock = true
+            order = 'ASC'
         } = req.query;
 
-        // Base clause - filter for kiosk visible products
-        // ✅ MODIFIED: For Community Build category, show ALL items including pending
-        let whereClause;
-        if (category === 'Community Build') {
-            // Show all Community Builds regardless of status (for admin review)
-            whereClause = 'WHERE 1=1';
-        } else {
-            whereClause = 'WHERE is_active = true AND kiosk_visible = true';
-        }
-        const queryParams = [];
-        let paramIndex = 1;
-
-        // Category filter - special handling for Community Build
-        if (category) {
-            if (category === 'Community Build') {
-                // Community builds are Pre-Built with buildSource = 'community'
-                whereClause += ` AND category = $${paramIndex++} AND specifications->>'buildSource' = $${paramIndex++}`;
-                queryParams.push('Pre-Built', 'community');
-            } else {
-                whereClause += ` AND category = $${paramIndex++}`;
-                queryParams.push(category);
-            }
-        }
-
-        // Text / brand search
-        if (q) {
-            whereClause += ` AND (name ILIKE $${paramIndex++} OR brand ILIKE $${paramIndex++})`;
-            queryParams.push(`%${q}%`, `%${q}%`);
-        }
-
-        if (brand) {
-            if (brand.includes(',')) {
-                // Multiple brands - use IN clause
-                const brands = brand.split(',').map(b => b.trim()).filter(b => b);
-                const brandPlaceholders = brands.map((_, i) => `$${paramIndex + i}`).join(',');
-                whereClause += ` AND brand IN (${brandPlaceholders})`;
-                queryParams.push(...brands);
-                paramIndex += brands.length;
-            } else {
-                // Single brand
-                whereClause += ` AND brand = $${paramIndex++}`;
-                queryParams.push(brand);
-            }
-        }
-
-        if (minPrice) {
-            whereClause += ` AND price >= $${paramIndex++}`;
-            queryParams.push(parseFloat(minPrice));
-        }
-
-        if (maxPrice) {
-            whereClause += ` AND price <= $${paramIndex++}`;
-            queryParams.push(parseFloat(maxPrice));
-        }
-
-        if (inStock === 'true') {
-            whereClause += ' AND stock > 0';
-        } else if (inStock === 'false') {
-            whereClause += ' AND stock = 0';
-        }
-
-        // Tier filter
-        const { tier } = req.query;
-        if (tier) {
-            whereClause += ` AND tier = $${paramIndex++}`;
-            queryParams.push(tier);
-        }
+        // Build WHERE clause from query parameters
+        let { whereClause, queryParams, paramIndex } = buildListWhereClause(req.query);
 
         // Specification filters: spec_<field>=value OR spec_<field>=min-max
-        const specFilters = Object.entries(req.query).filter(([k]) => k.startsWith('spec_'));
-        for (const [key, rawVal] of specFilters) {
-            const field = key.substring(5); // remove spec_
-            if (!field) continue;
-            if (typeof rawVal !== 'string' || rawVal.trim() === '') continue;
-
-            // Range syntax: a-b (numbers) or single value equality
-            if (/^-?\d+(\.\d+)?-?-?\d*(\.\d+)?$/.test(rawVal) && rawVal.includes('-')) {
-                const [min, max] = rawVal.split('-');
-                if (min) {
-                    whereClause += ` AND (specifications->>$${paramIndex})::numeric >= $${paramIndex + 1}`;
-                    queryParams.push(field, parseFloat(min));
-                    paramIndex += 2;
-                }
-                if (max) {
-                    whereClause += ` AND (specifications->>$${paramIndex})::numeric <= $${paramIndex + 1}`;
-                    queryParams.push(field, parseFloat(max));
-                    paramIndex += 2;
-                }
-            } else if (rawVal === 'true' || rawVal === 'false') {
-                whereClause += ` AND (LOWER(specifications->>$${paramIndex}) = $${paramIndex + 1})`;
-                queryParams.push(field, rawVal.toLowerCase());
-                paramIndex += 2;
-            } else {
-                // Text equality (case-insensitive)
-                whereClause += ` AND (specifications->>$${paramIndex}) ILIKE $${paramIndex + 1}`;
-                queryParams.push(field, rawVal);
-                paramIndex += 2;
-            }
-        }
+        ({ whereClause, paramIndex } = appendSpecFilters(whereClause, queryParams, paramIndex, req.query));
 
         // Pagination
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const offset = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
 
-        // Sanitize sort/order (whitelist columns)
-        const allowedSort = ['name', 'price', 'brand', 'created_at'];
-        const safeSort = allowedSort.includes(sort) ? sort : 'name';
-        const safeOrder = order && order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        // Sanitize sort/order (whitelist columns mapped to qualified names)
+        const sortColumnMap = {
+            'name': 'pp.name',
+            'price': 'pp.price',
+            'brand': 'pp.brand',
+            'created_at': 'pp.created_at'
+        };
+        const safeSortColumn = sortColumnMap[sort] || 'pp.name';
+        const safeOrder = order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
         // ⚡ FIX: Merge pc_parts.specifications with enriched fields from product_specs
         const mainQuery = `
@@ -250,11 +271,11 @@ const list = async (req, res) => {
             FROM pc_parts pp
             LEFT JOIN product_specs ps ON pp.id = ps.product_id
             ${whereClause}
-            ORDER BY pp.${safeSort} ${safeOrder}
+            ORDER BY ${safeSortColumn} ${safeOrder}
             LIMIT $${paramIndex++} OFFSET $${paramIndex++}
         `;
 
-        queryParams.push(parseInt(limit), offset);
+        queryParams.push(Number.parseInt(limit, 10), offset);
 
         // ⚡ FIX: Update count query to match aliased table
         const countQuery = `SELECT COUNT(*) AS total FROM pc_parts pp ${whereClause}`;
@@ -265,19 +286,19 @@ const list = async (req, res) => {
             query(countQuery, countParams)
         ]);
 
-        const total = parseInt(countResult.rows[0].total) || 0;
-        const totalPages = Math.ceil(total / parseInt(limit));
+        const total = Number.parseInt(countResult.rows[0].total, 10) || 0;
+        const totalPages = Math.ceil(total / Number.parseInt(limit, 10));
 
         res.json({
             success: true,
             data: result.rows,
             pagination: {
-                currentPage: parseInt(page),
+                currentPage: Number.parseInt(page, 10),
                 totalPages,
                 totalItems: total,
-                itemsPerPage: parseInt(limit),
-                hasNext: parseInt(page) < totalPages,
-                hasPrev: parseInt(page) > 1
+                itemsPerPage: Number.parseInt(limit, 10),
+                hasNext: Number.parseInt(page, 10) < totalPages,
+                hasPrev: Number.parseInt(page, 10) > 1
             }
         });
     } catch (error) {
@@ -300,7 +321,7 @@ const getAllStockItems = async (req, res) => {
         let paramIndex = 1;
 
         // Optional search filter
-        if (q && q.trim()) {
+        if (q?.trim()) {
             whereClause += ` AND (pp.name ILIKE $${paramIndex++} OR pp.brand ILIKE $${paramIndex++} OR pp.category ILIKE $${paramIndex++} OR pp.description ILIKE $${paramIndex++})`;
             const searchTerm = `%${q.trim()}%`;
             queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
@@ -327,7 +348,7 @@ const getAllStockItems = async (req, res) => {
             LIMIT $${paramIndex++}
         `;
 
-        queryParams.push(parseInt(limit));
+        queryParams.push(Number.parseInt(limit, 10));
 
         const result = await query(mainQuery, queryParams);
 
@@ -365,7 +386,7 @@ const getPriceRange = async (req, res) => {
             WHERE is_active = true AND category = $1
         `, [category]);
         const row = result.rows[0] || {};
-        res.json({ success: true, data: { min: parseFloat(row.min_price) || 0, max: parseFloat(row.max_price) || 0 } });
+        res.json({ success: true, data: { min: Number.parseFloat(row.min_price) || 0, max: Number.parseFloat(row.max_price) || 0 } });
     } catch (error) {
         logger.error('Error getting price range:', error);
         res.status(500).json({ success: false, message: 'Failed to retrieve price range' });
@@ -445,7 +466,7 @@ const getSpecificationRange = async (req, res) => {
                 WHERE category = $2 
                 AND is_active = true 
                 AND specifications ? $1 
-                AND specifications->>$1 ~ '^[0-9]*\.?[0-9]+$'
+                AND specifications->>$1 ~ '^[0-9]*.?[0-9]+$'
             `;
             
             const result = await query(sql, [fieldName, category]);
@@ -453,9 +474,9 @@ const getSpecificationRange = async (req, res) => {
             
             if (row.min_value !== null && row.max_value !== null) {
                 ranges[fieldName] = { 
-                    min: parseFloat(row.min_value) || 0, 
-                    max: parseFloat(row.max_value) || 0,
-                    totalItems: parseInt(row.total_items) || 0
+                    min: Number.parseFloat(row.min_value) || 0, 
+                    max: Number.parseFloat(row.max_value) || 0,
+                    totalItems: Number.parseInt(row.total_items, 10) || 0
                 };
             }
         }
@@ -493,7 +514,7 @@ const getCategories = async (req, res) => {
               AND specifications->>'buildSource' = 'community'
         `);
 
-        const communityBuildCount = parseInt(communityBuildResult.rows[0]?.count || 0);
+        const communityBuildCount = Number.parseInt(communityBuildResult.rows[0]?.count || 0, 10);
 
         // Combine regular categories with Community Build
         // Always show Community Build category (even with 0 count) for admin access
@@ -627,14 +648,14 @@ const getBrandsWithCounts = async (req, res) => {
         }
 
         const totalResult = await query(totalCountSql, totalParams);
-        const totalItems = parseInt(totalResult.rows[0]?.total || 0);
+        const totalItems = Number.parseInt(totalResult.rows[0]?.total || 0, 10);
 
         res.json({
             success: true,
             data: {
                 brands: result.rows.map(row => ({
                     name: row.brand,
-                    count: parseInt(row.item_count)
+                    count: Number.parseInt(row.item_count, 10)
                 })),
                 totalItems: totalItems
             }
@@ -668,11 +689,11 @@ const getStats = async (req, res) => {
         res.json({
             success: true,
             data: {
-                totalProducts: parseInt(stats.total_products) || 0,
-                totalStock: parseInt(stats.total_stock) || 0,
-                totalValue: parseFloat(stats.total_value) || 0,
-                totalCategories: parseInt(stats.total_categories) || 0,
-                totalBrands: parseInt(stats.total_brands) || 0
+                totalProducts: Number.parseInt(stats.total_products, 10) || 0,
+                totalStock: Number.parseInt(stats.total_stock, 10) || 0,
+                totalValue: Number.parseFloat(stats.total_value) || 0,
+                totalCategories: Number.parseInt(stats.total_categories, 10) || 0,
+                totalBrands: Number.parseInt(stats.total_brands, 10) || 0
             }
         });
 
@@ -818,11 +839,12 @@ const convertSpecificationValues = async (category, specifications) => {
                     // Convert string 'true'/'false' or actual boolean to boolean
                     convertedSpecs[key] = value === true || value === 'true' || value === '1';
                     break;
-                case 'number':
+                case 'number': {
                     // Convert to number, handle invalid numbers
                     const numValue = Number(value);
-                    convertedSpecs[key] = isNaN(numValue) ? null : numValue;
+                    convertedSpecs[key] = Number.isNaN(numValue) ? null : numValue;
                     break;
+                }
                 case 'text':
                 default:
                     // Keep as string, trim whitespace
@@ -840,7 +862,7 @@ const convertSpecificationValues = async (category, specifications) => {
 };
 
 // Multer configuration for file uploads
-const fs = require('fs');
+const fs = require('node:fs');
 
 // Create per-category directory structure
 const createCategoryDirs = () => {
@@ -863,15 +885,6 @@ const createCategoryDirs = () => {
 // Initialize directory structure
 createCategoryDirs();
 
-// Sanitize filename while preserving original name readability
-const sanitizeFilename = (filename) => {
-    // Remove unsafe characters but keep readable format
-    return filename
-        .replace(/[^\w\s.-]/g, '') // Remove special chars except word chars, spaces, dots, dashes
-        .replace(/\s+/g, '-') // Replace spaces with dashes
-        .toLowerCase();
-};
-
 // Map standard categories to folder names
 const getCategoryFolderName = (category) => {
     const mapping = {
@@ -890,7 +903,7 @@ const getCategoryFolderName = (category) => {
         'Speakers': 'speakers',
         'Webcam': 'webcam'
     };
-    return mapping[category] || 'other';
+    return normalizeUploadFolder(mapping[category] || category, 'other');
 };
 
 const storage = multer.diskStorage({
@@ -930,24 +943,13 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         try {
-            // Extract file extension
-            const ext = path.extname(file.originalname).toLowerCase();
-            
-            // Create sanitized friendly filename
-            const originalName = path.basename(file.originalname, ext);
-            const sanitizedName = sanitizeFilename(originalName);
-            
-            // Add timestamp to avoid conflicts while keeping original name recognizable
-            const timestamp = Date.now();
-            const finalName = `${sanitizedName}-${timestamp}${ext}`;
+            const finalName = randomImageFilename(file.originalname);
             
             logger.info(`📄 Generated filename: ${finalName} (from: ${file.originalname})`);
             cb(null, finalName);
         } catch (error) {
             logger.error('❌ Error generating filename:', error);
-            // Fallback to simple naming
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            cb(null, 'part-' + uniqueSuffix + path.extname(file.originalname));
+            cb(null, randomImageFilename(file.originalname));
         }
     }
 });
@@ -956,14 +958,10 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif|webp/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-        
-        if (mimetype && extname) {
+        if (isAllowedImageMetadata(file)) {
             return cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed'));
+            cb(new Error('Only JPG, PNG, GIF, and WEBP image files are allowed'));
         }
     }
 });
@@ -979,8 +977,8 @@ const create = async (req, res) => {
                 name,
                 category,
                 brand,
-                price: parseFloat(price),
-                stock: parseInt(stock),
+                price: Number.parseFloat(price),
+                stock: Number.parseInt(stock, 10),
                 description: description || '',
                 specifications: parsedSpecifications,
                 tier
@@ -999,6 +997,9 @@ const create = async (req, res) => {
             logger.info(`🖼️ Generated image URL: ${image_url}`);
         }
 
+        let compatibilityWarnings = [];
+        let compatibilityMissingSpecs = [];
+
         // Parse specifications if it's a JSON string
         let parsedSpecifications = null;
         if (specifications) {
@@ -1014,6 +1015,19 @@ const create = async (req, res) => {
                 parsedSpecifications = null;
             }
         }
+
+        const canonical = buildCanonicalSpecs({
+            name,
+            category,
+            brand,
+            price,
+            stock,
+            description,
+            specifications: parsedSpecifications || {}
+        });
+        parsedSpecifications = canonical.specs;
+        compatibilityWarnings = canonical.warnings;
+        compatibilityMissingSpecs = canonical.missingSpecs;
 
         // Get the next available ID for this category
         const nextId = await getNextCategoryId(category);
@@ -1031,23 +1045,33 @@ const create = async (req, res) => {
                 INSERT INTO pc_parts (id, name, category, brand, price, stock, description, specifications, image_url, tier)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING *
-            `, [nextId, name, category, brand, parseFloat(price), parseInt(stock), description, parsedSpecifications, image_url, normalizedTier]);
+            `, [nextId, name, category, brand, Number.parseFloat(price), Number.parseInt(stock, 10), description, parsedSpecifications, image_url, normalizedTier]);
 
             // Insert into category-specific table if it exists and has specifications
             // DISABLED: We're using JSONB specifications in pc_parts table instead of separate category tables
             // if (categoryTable && parsedSpecifications) {
-            //     await insertIntoCategoryTable(categoryTable, nextId, name, parsedSpecifications, parseFloat(price));
+            //     await insertIntoCategoryTable(categoryTable, nextId, name, parsedSpecifications, Number.parseFloat(price));
             // }
 
             // Commit transaction
             await query('COMMIT');
 
+            const compatibilitySync = await syncProductCompatibilitySpecs(pcPartsResult.rows[0]);
+            compatibilityWarnings = compatibilitySync.warnings || compatibilityWarnings;
+            compatibilityMissingSpecs = compatibilitySync.missingSpecs || compatibilityMissingSpecs;
+
             logger.info(`New part created: ${name}`, { partId: nextId, category, categoryTable });
 
             res.status(201).json({
                 success: true,
-                data: pcPartsResult.rows[0],
-                message: 'Part created successfully'
+                data: {
+                    ...pcPartsResult.rows[0],
+                    compatibility_warnings: compatibilityWarnings,
+                    compatibility_missing_specs: compatibilityMissingSpecs
+                },
+                message: compatibilityWarnings.length
+                    ? 'Part created successfully with compatibility spec warnings'
+                    : 'Part created successfully'
             });
         } catch (innerError) {
             // Rollback transaction on error
@@ -1063,149 +1087,245 @@ const create = async (req, res) => {
     }
 };
 
+/**
+ * Category table field schemas — defines columns and type conversions for each table.
+ * Each field: { col: 'column_name', spec: 'spec_key', type: 'str'|'int'|'float'|'bool' }
+ * Special spec values: '_price' uses the price param, '_name' uses the name param.
+ */
+const CATEGORY_TABLE_SCHEMAS = {
+    pc_case: [
+        { col: 'name', spec: '_name' },
+        { col: 'category', spec: 'category' },
+        { col: 'color', spec: 'color' },
+        { col: 'fans_included', spec: 'fans_included', type: 'int' },
+        { col: 'price', spec: '_price' },
+        { col: 'case_category', spec: 'case_category' },
+        { col: 'max_gpu_length', spec: 'max_gpu_length' },
+        { col: 'max_cpu_cooler_height', spec: 'max_cpu_cooler_height' },
+        { col: 'motherboard_support', spec: 'motherboard_support' },
+        { col: 'tempered_glass', spec: 'tempered_glass', type: 'bool' },
+    ],
+    cpu: [
+        { col: 'name', spec: '_name' },
+        { col: 'socket', spec: 'socket' },
+        { col: 'series', spec: 'series' },
+        { col: 'base_clock', spec: 'base_clock', type: 'float' },
+        { col: 'turbo_clock', spec: 'turbo_clock', type: 'float' },
+        { col: 'cores', spec: 'cores', type: 'int' },
+        { col: 'threads', spec: 'threads', type: 'int' },
+        { col: 'integrated_gpu', spec: 'integrated_gpu', type: 'bool' },
+        { col: 'max_ram', spec: 'max_ram', type: 'int' },
+        { col: 'lithography', spec: 'lithography', type: 'int' },
+        { col: 'tdp', spec: 'tdp', type: 'int' },
+        { col: 'price', spec: '_price' },
+    ],
+    gpu: [
+        { col: 'name', spec: '_name' },
+        { col: 'memory_type', spec: 'memory_type' },
+        { col: 'memory_capacity', spec: 'memory_capacity', type: 'int' },
+        { col: 'core_clock', spec: 'core_clock', type: 'float' },
+        { col: 'boost_clock', spec: 'boost_clock', type: 'float' },
+        { col: 'effective_clock', spec: 'effective_clock', type: 'float' },
+        { col: 'interface', spec: 'interface' },
+        { col: 'frame_sync', spec: 'frame_sync' },
+        { col: 'length', spec: 'length', type: 'int' },
+        { col: 'tdp', spec: 'tdp', type: 'int' },
+        { col: 'pcie_8pin', spec: 'pcie_8pin', type: 'int' },
+        { col: 'ports_display', spec: 'ports_display', type: 'int' },
+        { col: 'ports_hdmi', spec: 'ports_hdmi', type: 'int' },
+        { col: 'fans', spec: 'fans' },
+        { col: 'price', spec: '_price' },
+    ],
+    ram: [
+        { col: 'name', spec: '_name' },
+        { col: 'memory_type', spec: 'memory_type' },
+        { col: 'configuration', spec: 'configuration' },
+        { col: 'speed', spec: 'speed', type: 'int' },
+        { col: 'voltage', spec: 'voltage', type: 'float' },
+        { col: 'cas_latency', spec: 'cas_latency' },
+        { col: 'total_capacity', spec: 'total_capacity' },
+        { col: 'price', spec: '_price' },
+    ],
+    storage: [
+        { col: 'name', spec: '_name' },
+        { col: 'capacity', spec: 'capacity' },
+        { col: 'interface', spec: 'interface' },
+        { col: 'form_factor', spec: 'form_factor' },
+        { col: 'read_speed', spec: 'read_speed' },
+        { col: 'write_speed', spec: 'write_speed' },
+    ],
+    motherboard: [
+        { col: 'name', spec: '_name' },
+        { col: 'socket', spec: 'socket' },
+        { col: 'chipset', spec: 'chipset' },
+        { col: 'form_factor', spec: 'form_factor' },
+        { col: 'ram_slots', spec: 'ram_slots', type: 'int' },
+        { col: 'max_ram', spec: 'max_ram' },
+    ],
+    psu: [
+        { col: 'name', spec: '_name' },
+        { col: 'wattage', spec: 'wattage', type: 'int' },
+        { col: 'efficiency', spec: 'efficiency' },
+        { col: 'modular', spec: 'modular', type: 'bool' },
+        { col: 'certification', spec: 'certification' },
+    ],
+    cooling: [
+        { col: 'name', spec: '_name' },
+        { col: 'type', spec: 'type' },
+        { col: 'socket_compatibility', spec: 'socket_compatibility' },
+        { col: 'max_tdp', spec: 'max_tdp', type: 'int' },
+        { col: 'noise_level', spec: 'noise_level' },
+    ],
+};
+
+/**
+ * Update-specific schemas for categories whose update columns differ from insert columns.
+ * Falls back to CATEGORY_TABLE_SCHEMAS if not defined here.
+ */
+const UPDATE_CATEGORY_TABLE_SCHEMAS = {
+    storage: [
+        { col: 'name', spec: '_name' },
+        { col: 'capacity', spec: 'capacity' },
+        { col: 'storage_type', spec: 'storage_type' },
+        { col: 'interface', spec: 'interface' },
+        { col: 'form_factor', spec: 'form_factor' },
+        { col: 'read_speed', spec: 'read_speed' },
+        { col: 'write_speed', spec: 'write_speed' },
+        { col: 'nvme_support', spec: 'nvme_support', type: 'bool' },
+        { col: 'cache', spec: 'cache' },
+        { col: 'm2_type', spec: 'm2_type' },
+        { col: 'price', spec: '_price' },
+    ],
+    motherboard: [
+        { col: 'name', spec: '_name' },
+        { col: 'socket', spec: 'socket' },
+        { col: 'chipset', spec: 'chipset' },
+        { col: 'memory_type', spec: 'memory_type' },
+        { col: 'max_ram', spec: 'max_ram', type: 'int' },
+        { col: 'ram_slots', spec: 'ram_slots', type: 'int' },
+        { col: 'm2_slots', spec: 'm2_slots', type: 'int' },
+        { col: 'ethernet_ports', spec: 'ethernet_ports', type: 'int' },
+        { col: 'wireless_networking', spec: 'wireless_networking', type: 'bool' },
+        { col: 'integrated_gpu_support', spec: 'integrated_gpu_support', type: 'bool' },
+        { col: 'price', spec: '_price' },
+    ],
+    psu: [
+        { col: 'name', spec: '_name' },
+        { col: 'form_factor', spec: 'form_factor' },
+        { col: 'efficiency_rating', spec: 'efficiency_rating' },
+        { col: 'wattage', spec: 'wattage', type: 'int' },
+        { col: 'length', spec: 'length', type: 'int' },
+        { col: 'modular', spec: 'modular', type: 'bool' },
+        { col: 'pcie_connectors', spec: 'pcie_connectors' },
+        { col: 'sata_connectors', spec: 'sata_connectors' },
+        { col: 'price', spec: '_price' },
+    ],
+    cooling: [
+        { col: 'name', spec: '_name' },
+        { col: 'max_rpm', spec: 'max_rpm', type: 'int' },
+        { col: 'max_noise', spec: 'max_noise', type: 'float' },
+        { col: 'height', spec: 'height', type: 'int' },
+        { col: 'water_cooled', spec: 'water_cooled', type: 'bool' },
+        { col: 'fanless', spec: 'fanless', type: 'bool' },
+        { col: 'price', spec: '_price' },
+    ],
+    monitor: [
+        { col: 'name', spec: '_name' },
+        { col: 'screen_size', spec: 'screen_size' },
+        { col: 'resolution', spec: 'resolution' },
+        { col: 'refresh_rate', spec: 'refresh_rate', type: 'int' },
+        { col: 'response_time', spec: 'response_time', type: 'float' },
+        { col: 'panel_type', spec: 'panel_type' },
+        { col: 'aspect_ratio', spec: 'aspect_ratio' },
+        { col: 'curved', spec: 'curved', type: 'bool' },
+        { col: 'vesa_mount', spec: 'vesa_mount' },
+        { col: 'price', spec: '_price' },
+    ],
+    keyboard: [
+        { col: 'name', spec: '_name' },
+        { col: 'style', spec: 'style' },
+        { col: 'switch_type', spec: 'switch_type' },
+        { col: 'backlit', spec: 'backlit', type: 'bool' },
+        { col: 'tenkeyless', spec: 'tenkeyless', type: 'bool' },
+        { col: 'connection_type', spec: 'connection_type' },
+        { col: 'color', spec: 'color' },
+        { col: 'polling_rate', spec: 'polling_rate' },
+        { col: 'price', spec: '_price' },
+    ],
+    mouse: [
+        { col: 'name', spec: '_name' },
+        { col: 'tracking_method', spec: 'tracking_method' },
+        { col: 'connection_type', spec: 'connection_type' },
+        { col: 'dpi', spec: 'dpi', type: 'int' },
+        { col: 'hand_orientation', spec: 'hand_orientation' },
+        { col: 'color', spec: 'color' },
+        { col: 'programmable_buttons', spec: 'programmable_buttons' },
+        { col: 'polling_rate', spec: 'polling_rate' },
+        { col: 'price', spec: '_price' },
+    ],
+    headphones: [
+        { col: 'name', spec: '_name' },
+        { col: 'type', spec: 'type' },
+        { col: 'frequency', spec: 'frequency' },
+        { col: 'microphone', spec: 'microphone', type: 'bool' },
+        { col: 'wireless', spec: 'wireless', type: 'bool' },
+        { col: 'enclosure', spec: 'enclosure' },
+        { col: 'color', spec: 'color' },
+        { col: 'price', spec: '_price' },
+    ],
+    speakers: [
+        { col: 'name', spec: '_name' },
+        { col: 'configuration', spec: 'configuration' },
+        { col: 'total_wattage', spec: 'total_wattage', type: 'int' },
+        { col: 'frequency_response', spec: 'frequency_response' },
+        { col: 'color', spec: 'color' },
+        { col: 'price', spec: '_price' },
+    ],
+    webcam: [
+        { col: 'name', spec: '_name' },
+        { col: 'resolution', spec: 'resolution' },
+        { col: 'connection', spec: 'connection' },
+        { col: 'focus_type', spec: 'focus_type' },
+        { col: 'operating_system', spec: 'operating_system' },
+        { col: 'fov_angle', spec: 'fov_angle', type: 'int' },
+        { col: 'frame_rate', spec: 'frame_rate' },
+        { col: 'microphone_builtin', spec: 'microphone_builtin', type: 'bool' },
+        { col: 'price', spec: '_price' },
+    ],
+};
+
+/** Convert a spec value according to its declared type */
+const convertSpecValue = (rawVal, type) => {
+    if (type === 'int') return rawVal ? Number.parseInt(rawVal, 10) : null;
+    if (type === 'float') return rawVal ? Number.parseFloat(rawVal) : null;
+    if (type === 'bool') return rawVal === 'true' || rawVal === true;
+    return rawVal || null;
+};
+
+/** Resolve a field's value from specifications, name, or price */
+const resolveFieldValue = (field, specifications, name, price) => {
+    if (field.spec === '_name') return name;
+    if (field.spec === '_price') return price;
+    return convertSpecValue(specifications[field.spec], field.type);
+};
+
 // Helper function to insert into category-specific tables
 const insertIntoCategoryTable = async (tableName, id, name, specifications, price) => {
+    const schema = CATEGORY_TABLE_SCHEMAS[tableName];
+    if (!schema) {
+        logger.info(`⚠️ No specific table handler for ${tableName}`);
+        return;
+    }
+
     try {
-        logger.info(`📝 Inserting into ${tableName} table:`, { id, name, specifications });
+        const cols = ['id', ...schema.map(f => f.col)];
+        const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
+        const values = [id, ...schema.map(f => resolveFieldValue(f, specifications, name, price))];
 
-        switch (tableName) {
-            case 'pc_case':
-                await query(`
-                    INSERT INTO pc_case (id, name, category, color, fans_included, price, case_category, max_gpu_length, max_cpu_cooler_height, motherboard_support, tempered_glass)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                `, [
-                    id,
-                    name,
-                    specifications.category || null,
-                    specifications.color || null,
-                    specifications.fans_included ? parseInt(specifications.fans_included) : null,
-                    price,
-                    specifications.case_category || null,
-                    specifications.max_gpu_length || null,
-                    specifications.max_cpu_cooler_height || null,
-                    specifications.motherboard_support || null,
-                    specifications.tempered_glass === 'true' || specifications.tempered_glass === true
-                ]);
-                break;
-
-            case 'cpu':
-                await query(`
-                    INSERT INTO cpu (id, name, socket, series, base_clock, turbo_clock, cores, threads, integrated_gpu, max_ram, lithography, tdp, price)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                `, [
-                    id, name,
-                    specifications.socket || null,
-                    specifications.series || null,
-                    specifications.base_clock ? parseFloat(specifications.base_clock) : null,
-                    specifications.turbo_clock ? parseFloat(specifications.turbo_clock) : null,
-                    specifications.cores ? parseInt(specifications.cores) : null,
-                    specifications.threads ? parseInt(specifications.threads) : null,
-                    specifications.integrated_gpu === 'true' || specifications.integrated_gpu === true,
-                    specifications.max_ram ? parseInt(specifications.max_ram) : null,
-                    specifications.lithography ? parseInt(specifications.lithography) : null,
-                    specifications.tdp ? parseInt(specifications.tdp) : null,
-                    price
-                ]);
-                break;
-
-            case 'gpu':
-                await query(`
-                    INSERT INTO gpu (id, name, memory_type, memory_capacity, core_clock, boost_clock, effective_clock, interface, frame_sync, length, tdp, pcie_8pin, ports_display, ports_hdmi, fans, price)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-                `, [
-                    id, name,
-                    specifications.memory_type || null,
-                    specifications.memory_capacity ? parseInt(specifications.memory_capacity) : null,
-                    specifications.core_clock ? parseFloat(specifications.core_clock) : null,
-                    specifications.boost_clock ? parseFloat(specifications.boost_clock) : null,
-                    specifications.effective_clock ? parseFloat(specifications.effective_clock) : null,
-                    specifications.interface || null,
-                    specifications.frame_sync || null,
-                    specifications.length ? parseInt(specifications.length) : null,
-                    specifications.tdp ? parseInt(specifications.tdp) : null,
-                    specifications.pcie_8pin ? parseInt(specifications.pcie_8pin) : null,
-                    specifications.ports_display ? parseInt(specifications.ports_display) : null,
-                    specifications.ports_hdmi ? parseInt(specifications.ports_hdmi) : null,
-                    specifications.fans || null,
-                    price
-                ]);
-                break;
-
-            case 'ram':
-                await query(`
-                    INSERT INTO ram (id, name, memory_type, configuration, speed, voltage, cas_latency, total_capacity, price)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                `, [
-                    id, name,
-                    specifications.memory_type || null,
-                    specifications.configuration || null,
-                    specifications.speed ? parseInt(specifications.speed) : null,
-                    specifications.voltage ? parseFloat(specifications.voltage) : null,
-                    specifications.cas_latency || null,
-                    specifications.total_capacity || null,
-                    price
-                ]);
-                break;
-
-            case 'storage':
-                await query(`
-                    INSERT INTO storage (id, name, capacity, interface, form_factor, read_speed, write_speed)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                `, [
-                    id, name,
-                    specifications.capacity || null,
-                    specifications.interface || null,
-                    specifications.form_factor || null,
-                    specifications.read_speed || null,
-                    specifications.write_speed || null
-                ]);
-                break;
-
-            case 'motherboard':
-                await query(`
-                    INSERT INTO motherboard (id, name, socket, chipset, form_factor, ram_slots, max_ram)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                `, [
-                    id, name,
-                    specifications.socket || null,
-                    specifications.chipset || null,
-                    specifications.form_factor || null,
-                    specifications.ram_slots ? parseInt(specifications.ram_slots) : null,
-                    specifications.max_ram || null
-                ]);
-                break;
-
-            case 'psu':
-                await query(`
-                    INSERT INTO psu (id, name, wattage, efficiency, modular, certification)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                `, [
-                    id, name,
-                    specifications.wattage ? parseInt(specifications.wattage) : null,
-                    specifications.efficiency || null,
-                    specifications.modular === 'true' || specifications.modular === true,
-                    specifications.certification || null
-                ]);
-                break;
-
-            case 'cooling':
-                await query(`
-                    INSERT INTO cooling (id, name, type, socket_compatibility, max_tdp, noise_level)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                `, [
-                    id, name,
-                    specifications.type || null,
-                    specifications.socket_compatibility || null,
-                    specifications.max_tdp ? parseInt(specifications.max_tdp) : null,
-                    specifications.noise_level || null
-                ]);
-                break;
-
-            // Add other category tables as needed
-            default:
-                logger.info(`⚠️ No specific table handler for ${tableName}`);
-        }
-
+        await query(
+            `INSERT INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders})`,
+            values
+        );
         logger.info(`✅ Successfully inserted into ${tableName} table`);
     } catch (error) {
         logger.error(`❌ Error inserting into ${tableName}:`, error);
@@ -1276,73 +1396,141 @@ const uploadImage = async (req, res) => {
     }
 };
 
+/**
+ * Build dynamic SET clause fields from request body for pc_parts update.
+ * Returns { updateFields, values, paramIndex } or null if no fields.
+ */
+const buildUpdateFields = (body, parsedSpecifications, image_url) => {
+    const { name, category, brand, price, stock, description, specifications, tier } = body;
+    const updateFields = [];
+    const values = [];
+    let paramIndex = 1;
+
+    const fieldDefs = [
+        { key: 'name', value: name },
+        { key: 'category', value: category },
+        { key: 'brand', value: brand },
+        { key: 'price', value: price === undefined ? undefined : Number.parseFloat(price), raw: price },
+        { key: 'stock', value: stock === undefined ? undefined : Number.parseInt(stock, 10), raw: stock },
+        { key: 'description', value: description },
+        { key: 'tier', value: tier === undefined ? undefined : normalizeTierValue(tier), raw: tier },
+        { key: 'specifications', value: specifications === undefined ? undefined : parsedSpecifications, raw: specifications },
+        { key: 'image_url', value: image_url },
+    ];
+
+    for (const fd of fieldDefs) {
+        const src = fd.raw === undefined ? fd.value : fd.raw;
+        if (src === undefined) continue;
+        updateFields.push(`${fd.key} = $${paramIndex++}`);
+        values.push(fd.value);
+    }
+
+    return updateFields.length > 0 ? { updateFields, values, paramIndex } : null;
+};
+
+/** Broadcast stock/price changes via WebSocket after update */
+const broadcastUpdateChanges = (id, currentItem, body, resultRow) => {
+    const { stock, price } = body;
+    try {
+        if (stock !== undefined && globalThis.websocketService) {
+            const oldStock = currentItem.stock;
+            const newStock = Number.parseInt(stock, 10);
+            if (oldStock !== newStock) {
+                globalThis.websocketService.broadcastStockUpdate(id, newStock, oldStock);
+            }
+        }
+        if (price !== undefined && globalThis.websocketService) {
+            const oldPrice = Number.parseFloat(currentItem.price);
+            const newPrice = Number.parseFloat(price);
+            if (oldPrice !== newPrice) {
+                const changePercent = ((newPrice - oldPrice) / oldPrice) * 100;
+                globalThis.websocketService.broadcastPriceChange(id, newPrice, oldPrice, changePercent);
+            }
+        }
+    } catch (wsError) {
+        logger.warn('⚠️ WebSocket broadcasting failed:', wsError.message);
+    }
+};
+
 // PATCH /api/stock/:id - Update part
+/** Handle update in test mode (in-memory storage) */
+const handleTestUpdate = (id, body, res) => {
+    const item = findPartById(id);
+    if (!item) {
+        return res.status(404).json({ success: false, message: 'Part not found' });
+    }
+    const { name, category, brand, price, stock, description, specifications, tier } = body;
+    let parsedSpecifications = specifications === undefined ? item.specifications : specifications;
+    if (typeof parsedSpecifications === 'string') {
+        parsedSpecifications = JSON.parse(parsedSpecifications);
+    }
+    updatePart(id, {
+        name: name ?? item.name,
+        category: category ?? item.category,
+        brand: brand ?? item.brand,
+        price: price === undefined ? item.price : Number.parseFloat(price),
+        stock: stock === undefined ? item.stock : Number.parseInt(stock, 10),
+        description: description === undefined ? item.description : description,
+        specifications: parsedSpecifications,
+        tier: tier ?? item.tier
+    });
+    return res.json({ success: true, data: findPartById(id), message: 'Part updated (test mode)' });
+};
+
+/** Parse and optionally convert specifications from request body */
+const parseUpdateSpecifications = async (specifications, category) => {
+    if (specifications === undefined) return undefined;
+    try {
+        let parsed = typeof specifications === 'string' ? JSON.parse(specifications) : specifications;
+        if (parsed && category) {
+            parsed = await convertSpecificationValues(category, parsed);
+        }
+        return parsed;
+    } catch (error) {
+        logger.error('❌ Error parsing specifications:', error);
+        return null;
+    }
+};
+
+/** Invalidate product caches after update */
+const invalidateProductCache = async (id) => {
+    try {
+        const { getQueryCache } = require('../utils/inMemoryCache');
+        const cache = getQueryCache();
+        if (cache && typeof cache.invalidate === 'function') {
+            await cache.invalidate(['products:*', 'search:*', 'stats:*']);
+            logger.info(`🧹 Explicit cache invalidated for product ${id} after update`);
+        }
+    } catch (cacheError) {
+        logger.warn('⚠️ Cache invalidation warning (non-critical):', cacheError.message);
+    }
+};
+
 const update = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, category, brand, price, stock, description, specifications, tier } = req.body;
+        const { name, category, brand, price, stock, description, specifications } = req.body;
 
         if (isTest) {
-            const item = findPartById(id);
-            if (!item) {
-                return res.status(404).json({ success: false, message: 'Part not found' });
-            }
-            const parsedSpecifications = specifications !== undefined
-                ? (typeof specifications === 'string' ? JSON.parse(specifications) : specifications)
-                : item.specifications;
-            updatePart(id, {
-                name: name ?? item.name,
-                category: category ?? item.category,
-                brand: brand ?? item.brand,
-                price: price !== undefined ? parseFloat(price) : item.price,
-                stock: stock !== undefined ? parseInt(stock) : item.stock,
-                description: description !== undefined ? description : item.description,
-                specifications: parsedSpecifications,
-                tier: tier ?? item.tier
-            });
-            const updated = findPartById(id);
-            return res.json({ success: true, data: updated, message: 'Part updated (test mode)' });
+            return handleTestUpdate(id, req.body, res);
         }
-        
-        // 🐛 DEBUG: Log all received data
-        logger.info('🔍 DEBUG - Update Request Data:');
-        logger.info('  ID:', id);
-        logger.info('  Name:', name);
-        logger.info('  Category:', category);
-        logger.info('  Brand:', brand);
-        logger.info('  Price:', price);
-        logger.info('  Stock:', stock);
-        logger.info('  Description:', description);
-        logger.info('  Description type:', typeof description);
-        logger.info('  Description length:', description ? description.length : 'null/undefined');
-        logger.info('  Specifications:', specifications);
-        logger.info('  Request body keys:', Object.keys(req.body));
-        logger.info('  Full req.body:', req.body);
-        
-        // Generate category-based image URL if file uploaded
-        let image_url = undefined;
+        logger.info('Stock update request received', sanitizeForLog({
+            id,
+            name,
+            category,
+            brand,
+            price,
+            stock,
+            descriptionLength: description ? String(description).length : 0,
+            specificationKeys: specifications && typeof specifications === 'object' ? Object.keys(specifications) : [],
+            requestBodyKeys: Object.keys(req.body)
+        }));
+// Generate category-based image URL if file uploaded
+        let image_url;
         if (req.file) {
             const categoryFolderName = getCategoryFolderName(category || 'other');
             image_url = `/assets/parts/${categoryFolderName}/${req.file.filename}`;
             logger.info(`🖼️ Generated update image URL: ${image_url}`);
-        }
-
-        // Parse specifications if it's a JSON string
-        let parsedSpecifications = undefined;
-        if (specifications !== undefined) {
-            try {
-                parsedSpecifications = typeof specifications === 'string' ? JSON.parse(specifications) : specifications;
-                logger.info('📋 Parsed specifications for update:', parsedSpecifications);
-                
-                // Convert specification values based on their types (if we have category info)
-                if (parsedSpecifications && category) {
-                    parsedSpecifications = await convertSpecificationValues(category, parsedSpecifications);
-                    logger.info('🔄 Converted specifications for update:', parsedSpecifications);
-                }
-            } catch (error) {
-                logger.error('❌ Error parsing specifications:', error);
-                parsedSpecifications = null;
-            }
         }
 
         // Get current item to know its category
@@ -1353,69 +1541,42 @@ const update = async (req, res) => {
                 message: 'Part not found'
             });
         }
+        const currentPart = currentItem.rows[0];
+        const effectiveCategory = category || currentPart.category;
 
-        const currentCategory = currentItem.rows[0].category;
-        const categoryTable = getCategoryTableMapping(currentCategory);
+        // Parse specifications if provided
+        let parsedSpecifications = await parseUpdateSpecifications(specifications, effectiveCategory);
+        let compatibilityWarnings = [];
+        let compatibilityMissingSpecs = [];
+
+        if (parsedSpecifications !== undefined) {
+            const canonical = buildCanonicalSpecs({
+                ...currentPart,
+                ...req.body,
+                category: effectiveCategory,
+                specifications: parsedSpecifications || {}
+            });
+            parsedSpecifications = canonical.specs;
+            compatibilityWarnings = canonical.warnings;
+            compatibilityMissingSpecs = canonical.missingSpecs;
+        }
 
         // Start transaction
         await query('BEGIN');
 
         try {
             // Build dynamic update query for pc_parts
-            let updateFields = [];
-            let values = [];
-            let paramIndex = 1;
+            const fields = buildUpdateFields(req.body, parsedSpecifications, image_url);
 
-            if (name !== undefined) {
-                updateFields.push(`name = $${paramIndex++}`);
-                values.push(name);
-            }
-            if (category !== undefined) {
-                updateFields.push(`category = $${paramIndex++}`);
-                values.push(category);
-            }
-            if (brand !== undefined) {
-                updateFields.push(`brand = $${paramIndex++}`);
-                values.push(brand);
-            }
-            if (price !== undefined) {
-                updateFields.push(`price = $${paramIndex++}`);
-                values.push(parseFloat(price));
-            }
-            if (stock !== undefined) {
-                updateFields.push(`stock = $${paramIndex++}`);
-                values.push(parseInt(stock));
-            }
-            if (description !== undefined) {
-                logger.info('🔍 DEBUG - Adding description to update fields:', description);
-                updateFields.push(`description = $${paramIndex++}`);
-                values.push(description);
-            }
-            if (tier !== undefined) {
-                const normalizedTier = normalizeTierValue(tier);
-                updateFields.push(`tier = $${paramIndex++}`);
-                values.push(normalizedTier);
-                logger.info('🏆 DEBUG - Adding tier to update:', tier, '→', normalizedTier);
-            }
-            if (specifications !== undefined) {
-                updateFields.push(`specifications = $${paramIndex++}`);
-                values.push(parsedSpecifications);
-            }
-            if (image_url !== undefined) {
-                updateFields.push(`image_url = $${paramIndex++}`);
-                values.push(image_url);
-            }
-
-            logger.info('🔍 DEBUG - Update fields:', updateFields);
-            logger.info('🔍 DEBUG - Update values:', values);
-
-            if (updateFields.length === 0) {
+            if (!fields) {
                 await query('ROLLBACK');
                 return res.status(400).json({
                     success: false,
                     message: 'No fields to update'
                 });
             }
+
+            const { updateFields, values, paramIndex } = fields;
 
             values.push(id);
             const updateQuery = `
@@ -1435,75 +1596,33 @@ const update = async (req, res) => {
             // Update category-specific table if specifications were updated
             // DISABLED: We're using JSONB specifications in pc_parts table instead of separate category tables
             // if (specifications !== undefined && parsedSpecifications && categoryTable) {
-            //     await updateCategoryTable(categoryTable, id, name || currentItem.rows[0].name, parsedSpecifications, price !== undefined ? parseFloat(price) : currentItem.rows[0].price);
+            //     await updateCategoryTable(categoryTable, id, name || currentItem.rows[0].name, parsedSpecifications, price !== undefined ? Number.parseFloat(price) : currentItem.rows[0].price);
             // }
 
             // Commit transaction
             await query('COMMIT');
 
-            // ⚡ EXPLICIT CACHE INVALIDATION FIX
-            // Force immediate cache invalidation for this product
-            // This prevents the 3-5 minute stale data issue
-            try {
-                const { getQueryCache } = require('../utils/inMemoryCache');
-                const cache = getQueryCache();
-                if (cache && typeof cache.invalidate === 'function') {
-                    await cache.invalidate([
-                        `products:*`,
-                        `search:*`,
-                        `stats:*`
-                    ]);
-                    logger.info(`🧹 Explicit cache invalidated for product ${id} after update`);
-                }
-            } catch (cacheError) {
-                logger.warn('⚠️ Cache invalidation warning (non-critical):', cacheError.message);
-            }
+            // ⚡ Explicit cache invalidation
+            await invalidateProductCache(id);
+            const compatibilitySync = await syncProductCompatibilitySpecs(result.rows[0]);
+            compatibilityWarnings = compatibilitySync.warnings || compatibilityWarnings;
+            compatibilityMissingSpecs = compatibilitySync.missingSpecs || compatibilityMissingSpecs;
 
             logger.info(`Part updated: ${result.rows[0].name}`, { partId: id });
 
-            // PHASE 3.2 WEEK 2: Broadcast stock update via WebSocket
-            try {
-                if (stock !== undefined && global.websocketService) {
-                    const oldStock = currentItem.rows[0].stock;
-                    const newStock = parseInt(stock);
-                    
-                    if (oldStock !== newStock) {
-                        global.websocketService.broadcastStockUpdate(id, newStock, oldStock);
-                        logger.info('📡 WebSocket: Stock update broadcasted', { 
-                            productId: id, 
-                            oldStock, 
-                            newStock,
-                            product: result.rows[0].name 
-                        });
-                    }
-                }
-                
-                // Broadcast price change via WebSocket
-                if (price !== undefined && global.websocketService) {
-                    const oldPrice = parseFloat(currentItem.rows[0].price);
-                    const newPrice = parseFloat(price);
-                    
-                    if (oldPrice !== newPrice) {
-                        const changePercent = ((newPrice - oldPrice) / oldPrice) * 100;
-                        global.websocketService.broadcastPriceChange(id, newPrice, oldPrice, changePercent);
-                        logger.info('💰 WebSocket: Price change broadcasted', { 
-                            productId: id, 
-                            oldPrice, 
-                            newPrice, 
-                            changePercent: changePercent.toFixed(2) + '%',
-                            product: result.rows[0].name 
-                        });
-                    }
-                }
-            } catch (wsError) {
-                logger.warn('⚠️ WebSocket broadcasting failed:', wsError.message);
-                // Don't fail the update if WebSocket fails
-            }
+            // PHASE 3.2 WEEK 2: Broadcast stock/price updates via WebSocket
+            broadcastUpdateChanges(id, currentItem.rows[0], req.body, result.rows[0]);
 
             res.json({
                 success: true,
-                data: result.rows[0],
-                message: 'Part updated successfully'
+                data: {
+                    ...result.rows[0],
+                    compatibility_warnings: compatibilityWarnings,
+                    compatibility_missing_specs: compatibilityMissingSpecs
+                },
+                message: compatibilityWarnings.length
+                    ? 'Part updated successfully with compatibility spec warnings'
+                    : 'Part updated successfully'
             });
         } catch (innerError) {
             // Rollback transaction on error
@@ -1521,409 +1640,21 @@ const update = async (req, res) => {
 
 // Helper function to update category-specific tables
 const updateCategoryTable = async (tableName, id, name, specifications, price) => {
+    const schema = UPDATE_CATEGORY_TABLE_SCHEMAS[tableName] || CATEGORY_TABLE_SCHEMAS[tableName];
+    if (!schema) {
+        logger.info(`⚠️ No specific table handler for ${tableName}`);
+        return;
+    }
+
     try {
-        logger.info(`📝 Updating ${tableName} table:`, { id, name, specifications });
+        const setClauses = schema.map((f, i) => `${f.col} = $${i + 2}`);
+        setClauses.push('updated_at = CURRENT_TIMESTAMP');
+        const values = [id, ...schema.map(f => resolveFieldValue(f, specifications, name, price))];
 
-        switch (tableName) {
-            case 'pc_case':
-                await query(`
-                    UPDATE pc_case SET 
-                        name = $2,
-                        category = $3,
-                        color = $4,
-                        fans_included = $5,
-                        price = $6,
-                        case_category = $7,
-                        max_gpu_length = $8,
-                        max_cpu_cooler_height = $9,
-                        motherboard_support = $10,
-                        tempered_glass = $11,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id,
-                    name,
-                    specifications.category || null,
-                    specifications.color || null,
-                    specifications.fans_included ? parseInt(specifications.fans_included) : null,
-                    price,
-                    specifications.case_category || null,
-                    specifications.max_gpu_length || null,
-                    specifications.max_cpu_cooler_height || null,
-                    specifications.motherboard_support || null,
-                    specifications.tempered_glass === 'true' || specifications.tempered_glass === true
-                ]);
-                break;
-
-            case 'cpu':
-                await query(`
-                    UPDATE cpu SET
-                        name = $2,
-                        socket = $3,
-                        series = $4,
-                        base_clock = $5,
-                        turbo_clock = $6,
-                        cores = $7,
-                        threads = $8,
-                        integrated_gpu = $9,
-                        max_ram = $10,
-                        lithography = $11,
-                        tdp = $12,
-                        price = $13,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.socket || null,
-                    specifications.series || null,
-                    specifications.base_clock ? parseFloat(specifications.base_clock) : null,
-                    specifications.turbo_clock ? parseFloat(specifications.turbo_clock) : null,
-                    specifications.cores ? parseInt(specifications.cores) : null,
-                    specifications.threads ? parseInt(specifications.threads) : null,
-                    specifications.integrated_gpu === 'true' || specifications.integrated_gpu === true,
-                    specifications.max_ram ? parseInt(specifications.max_ram) : null,
-                    specifications.lithography ? parseInt(specifications.lithography) : null,
-                    specifications.tdp ? parseInt(specifications.tdp) : null,
-                    price
-                ]);
-                break;
-
-            case 'gpu':
-                await query(`
-                    UPDATE gpu SET
-                        name = $2,
-                        memory_type = $3,
-                        memory_capacity = $4,
-                        core_clock = $5,
-                        boost_clock = $6,
-                        effective_clock = $7,
-                        interface = $8,
-                        frame_sync = $9,
-                        length = $10,
-                        tdp = $11,
-                        pcie_8pin = $12,
-                        ports_display = $13,
-                        ports_hdmi = $14,
-                        fans = $15,
-                        price = $16,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.memory_type || null,
-                    specifications.memory_capacity ? parseInt(specifications.memory_capacity) : null,
-                    specifications.core_clock ? parseFloat(specifications.core_clock) : null,
-                    specifications.boost_clock ? parseFloat(specifications.boost_clock) : null,
-                    specifications.effective_clock ? parseFloat(specifications.effective_clock) : null,
-                    specifications.interface || null,
-                    specifications.frame_sync || null,
-                    specifications.length ? parseInt(specifications.length) : null,
-                    specifications.tdp ? parseInt(specifications.tdp) : null,
-                    specifications.pcie_8pin ? parseInt(specifications.pcie_8pin) : null,
-                    specifications.ports_display ? parseInt(specifications.ports_display) : null,
-                    specifications.ports_hdmi ? parseInt(specifications.ports_hdmi) : null,
-                    specifications.fans || null,
-                    price
-                ]);
-                break;
-
-            case 'ram':
-                await query(`
-                    UPDATE ram SET
-                        name = $2,
-                        memory_type = $3,
-                        configuration = $4,
-                        speed = $5,
-                        voltage = $6,
-                        cas_latency = $7,
-                        total_capacity = $8,
-                        price = $9,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.memory_type || null,
-                    specifications.configuration || null,
-                    specifications.speed ? parseInt(specifications.speed) : null,
-                    specifications.voltage ? parseFloat(specifications.voltage) : null,
-                    specifications.cas_latency || null,
-                    specifications.total_capacity || null,
-                    price
-                ]);
-                break;
-
-            case 'storage':
-                await query(`
-                    UPDATE storage SET
-                        name = $2,
-                        capacity = $3,
-                        storage_type = $4,
-                        interface = $5,
-                        form_factor = $6,
-                        read_speed = $7,
-                        write_speed = $8,
-                        nvme_support = $9,
-                        cache = $10,
-                        m2_type = $11,
-                        price = $12,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.capacity || null,
-                    specifications.storage_type || null,
-                    specifications.interface || null,
-                    specifications.form_factor || null,
-                    specifications.read_speed || null,
-                    specifications.write_speed || null,
-                    specifications.nvme_support === 'true' || specifications.nvme_support === true,
-                    specifications.cache || null,
-                    specifications.m2_type || null,
-                    price
-                ]);
-                break;
-
-            case 'motherboard':
-                await query(`
-                    UPDATE motherboard SET
-                        name = $2,
-                        socket = $3,
-                        chipset = $4,
-                        memory_type = $5,
-                        max_ram = $6,
-                        ram_slots = $7,
-                        m2_slots = $8,
-                        ethernet_ports = $9,
-                        wireless_networking = $10,
-                        integrated_gpu_support = $11,
-                        price = $12,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.socket || null,
-                    specifications.chipset || null,
-                    specifications.memory_type || null,
-                    specifications.max_ram ? parseInt(specifications.max_ram) : null,
-                    specifications.ram_slots ? parseInt(specifications.ram_slots) : null,
-                    specifications.m2_slots ? parseInt(specifications.m2_slots) : null,
-                    specifications.ethernet_ports ? parseInt(specifications.ethernet_ports) : null,
-                    specifications.wireless_networking === 'true' || specifications.wireless_networking === true,
-                    specifications.integrated_gpu_support === 'true' || specifications.integrated_gpu_support === true,
-                    price
-                ]);
-                break;
-
-            case 'psu':
-                await query(`
-                    UPDATE psu SET
-                        name = $2,
-                        form_factor = $3,
-                        efficiency_rating = $4,
-                        wattage = $5,
-                        length = $6,
-                        modular = $7,
-                        pcie_connectors = $8,
-                        sata_connectors = $9,
-                        price = $10,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.form_factor || null,
-                    specifications.efficiency_rating || null,
-                    specifications.wattage ? parseInt(specifications.wattage) : null,
-                    specifications.length ? parseInt(specifications.length) : null,
-                    specifications.modular === 'true' || specifications.modular === true,
-                    specifications.pcie_connectors || null,
-                    specifications.sata_connectors || null,
-                    price
-                ]);
-                break;
-
-            case 'cooling':
-                await query(`
-                    UPDATE cooling SET
-                        name = $2,
-                        max_rpm = $3,
-                        max_noise = $4,
-                        height = $5,
-                        water_cooled = $6,
-                        fanless = $7,
-                        price = $8,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.max_rpm ? parseInt(specifications.max_rpm) : null,
-                    specifications.max_noise ? parseFloat(specifications.max_noise) : null,
-                    specifications.height ? parseInt(specifications.height) : null,
-                    specifications.water_cooled === 'true' || specifications.water_cooled === true,
-                    specifications.fanless === 'true' || specifications.fanless === true,
-                    price
-                ]);
-                break;
-
-            case 'monitor':
-                await query(`
-                    UPDATE monitor SET
-                        name = $2,
-                        screen_size = $3,
-                        resolution = $4,
-                        refresh_rate = $5,
-                        response_time = $6,
-                        panel_type = $7,
-                        aspect_ratio = $8,
-                        curved = $9,
-                        vesa_mount = $10,
-                        price = $11,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.screen_size || null,
-                    specifications.resolution || null,
-                    specifications.refresh_rate ? parseInt(specifications.refresh_rate) : null,
-                    specifications.response_time ? parseFloat(specifications.response_time) : null,
-                    specifications.panel_type || null,
-                    specifications.aspect_ratio || null,
-                    specifications.curved === 'true' || specifications.curved === true,
-                    specifications.vesa_mount || null,
-                    price
-                ]);
-                break;
-
-            case 'keyboard':
-                await query(`
-                    UPDATE keyboard SET
-                        name = $2,
-                        style = $3,
-                        switch_type = $4,
-                        backlit = $5,
-                        tenkeyless = $6,
-                        connection_type = $7,
-                        color = $8,
-                        polling_rate = $9,
-                        price = $10,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.style || null,
-                    specifications.switch_type || null,
-                    specifications.backlit === 'true' || specifications.backlit === true,
-                    specifications.tenkeyless === 'true' || specifications.tenkeyless === true,
-                    specifications.connection_type || null,
-                    specifications.color || null,
-                    specifications.polling_rate || null,
-                    price
-                ]);
-                break;
-
-            case 'mouse':
-                await query(`
-                    UPDATE mouse SET
-                        name = $2,
-                        tracking_method = $3,
-                        connection_type = $4,
-                        dpi = $5,
-                        hand_orientation = $6,
-                        color = $7,
-                        programmable_buttons = $8,
-                        polling_rate = $9,
-                        price = $10,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.tracking_method || null,
-                    specifications.connection_type || null,
-                    specifications.dpi ? parseInt(specifications.dpi) : null,
-                    specifications.hand_orientation || null,
-                    specifications.color || null,
-                    specifications.programmable_buttons || null,
-                    specifications.polling_rate || null,
-                    price
-                ]);
-                break;
-
-            case 'headphones':
-                await query(`
-                    UPDATE headphones SET
-                        name = $2,
-                        type = $3,
-                        frequency = $4,
-                        microphone = $5,
-                        wireless = $6,
-                        enclosure = $7,
-                        color = $8,
-                        price = $9,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.type || null,
-                    specifications.frequency || null,
-                    specifications.microphone === 'true' || specifications.microphone === true,
-                    specifications.wireless === 'true' || specifications.wireless === true,
-                    specifications.enclosure || null,
-                    specifications.color || null,
-                    price
-                ]);
-                break;
-
-            case 'speakers':
-                await query(`
-                    UPDATE speakers SET
-                        name = $2,
-                        configuration = $3,
-                        total_wattage = $4,
-                        frequency_response = $5,
-                        color = $6,
-                        price = $7,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.configuration || null,
-                    specifications.total_wattage ? parseInt(specifications.total_wattage) : null,
-                    specifications.frequency_response || null,
-                    specifications.color || null,
-                    price
-                ]);
-                break;
-
-            case 'webcam':
-                await query(`
-                    UPDATE webcam SET
-                        name = $2,
-                        resolution = $3,
-                        connection = $4,
-                        focus_type = $5,
-                        operating_system = $6,
-                        fov_angle = $7,
-                        frame_rate = $8,
-                        microphone_builtin = $9,
-                        price = $10,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                `, [
-                    id, name,
-                    specifications.resolution || null,
-                    specifications.connection || null,
-                    specifications.focus_type || null,
-                    specifications.operating_system || null,
-                    specifications.fov_angle ? parseInt(specifications.fov_angle) : null,
-                    specifications.frame_rate || null,
-                    specifications.microphone_builtin === 'true' || specifications.microphone_builtin === true,
-                    price
-                ]);
-                break;
-
-            default:
-                logger.info(`⚠️ No specific table handler for ${tableName}`);
-        }
-
+        await query(
+            `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE id = $1`,
+            values
+        );
         logger.info(`✅ Successfully updated ${tableName} table`);
     } catch (error) {
         logger.error(`❌ Error updating ${tableName}:`, error);
@@ -2059,7 +1790,7 @@ const getLowStock = async (req, res) => {
             ORDER BY stock ASC, name ASC
         `;
 
-        const result = await query(sqlQuery, [parseInt(threshold)]);
+        const result = await query(sqlQuery, [Number.parseInt(threshold, 10)]);
 
         res.json({
             success: true,
@@ -2217,7 +1948,7 @@ const makeOnSale = async (req, res) => {
             });
         }
 
-        const regularPrice = parseFloat(productResult.rows[0].price);
+        const regularPrice = Number.parseFloat(productResult.rows[0].price);
         if (salePrice >= regularPrice) {
             return res.status(400).json({
                 success: false,

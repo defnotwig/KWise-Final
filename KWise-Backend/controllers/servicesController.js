@@ -32,8 +32,8 @@ const getCleaningServices = async (req, res) => {
         const services = result.rows.map(service => ({
             id: service.id,
             name: service.name,
-            price: `₱${parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            priceNumeric: parseFloat(service.price),
+            price: `₱${Number.parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            priceNumeric: Number.parseFloat(service.price),
             icon: `/assets/services/${service.tier_level.toLowerCase()}clean.webp`, // Default icon path
             tier: service.tier_level,
             details: {
@@ -86,8 +86,8 @@ const getCheckupOptions = async (req, res) => {
         const services = result.rows.map(service => ({
             id: service.id,
             name: service.name,
-            price: `₱${parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            priceNumeric: parseFloat(service.price),
+            price: `₱${Number.parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            priceNumeric: Number.parseFloat(service.price),
             tier: service.tier_level,
             description: service.description,
             inclusions: service.inclusions || [],
@@ -158,7 +158,7 @@ const getDiagnosticIssues = async (req, res) => {
                 name: issue.issue_name,
                 description: issue.description,
                 estimatedTime: issue.estimated_fix_time,
-                estimatedCost: issue.estimated_cost ? `₱${parseFloat(issue.estimated_cost).toLocaleString()}` : 'Quote on inspection',
+                estimatedCost: issue.estimated_cost ? `₱${Number.parseFloat(issue.estimated_cost).toLocaleString()}` : 'Quote on inspection',
                 severity: issue.severity
             });
             
@@ -217,8 +217,8 @@ const getAllServices = async (req, res) => {
             acc[cat].push({
                 id: service.id,
                 name: service.name,
-                price: `₱${parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                priceNumeric: parseFloat(service.price),
+                price: `₱${Number.parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                priceNumeric: Number.parseFloat(service.price),
                 tier: service.tier_level,
                 description: service.description,
                 inclusions: service.inclusions || [],
@@ -272,8 +272,8 @@ const getFeaturedServices = async (req, res) => {
             id: service.id,
             name: service.name,
             category: service.category,
-            price: `₱${parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            priceNumeric: parseFloat(service.price),
+            price: `₱${Number.parseFloat(service.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            priceNumeric: Number.parseFloat(service.price),
             tier: service.tier_level,
             description: service.description,
             inclusions: service.inclusions || [],

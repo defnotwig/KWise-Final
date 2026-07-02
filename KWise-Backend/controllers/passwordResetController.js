@@ -34,8 +34,9 @@ async function recordThrottle(client, email, windowMs = 10 * 60 * 1000, max = 8)
             RETURNING attempt_count, window_start;`, [lower, windowMs]);
         const attempts = res.rows[0].attempt_count;
         return attempts <= max;
-    } catch (e) {
+    } catch (error) {
         // Fallback memory throttle if table absent
+        logger.debug('Throttle table unavailable, using memory fallback:', error.message);
         const now = Date.now();
         const rec = memoryThrottle.get(lower) || { count: 0, start: now };
         if (now - rec.start > windowMs) { rec.count = 0; rec.start = now; }
@@ -65,7 +66,7 @@ exports.requestReset = async (req, res, next) => {
         // Throttle rapid requests (DB first, else memory)
         const throttleOk = await recordThrottle(client, email);
         if (!throttleOk) {
-            try { await insertAuditLog(req.app, { userId: null, action: 'RESET_THROTTLE', entity: 'PASSWORD_RESET', description: `Throttle exceeded for email ${email}`, severity: 'warn', ipAddress: req.ip }); } catch(_) {}
+            try { await insertAuditLog(req.app, { userId: null, action: 'RESET_THROTTLE', entity: 'PASSWORD_RESET', description: `Throttle exceeded for email ${email}`, severity: 'warn', ipAddress: req.ip }); } catch(auditErr) { logger.warn('Audit log failed for RESET_THROTTLE:', auditErr.message); }
             return res.status(429).json({ status: 'fail', message: 'Too many reset attempts. Try again later.' });
         }
 
@@ -240,7 +241,7 @@ exports.verifyResetCode = async (req, res, next) => {
                 );
             }
 
-            try { await insertAuditLog(req.app, { userId: userId, action: 'RESET_CODE_INVALID', entity: 'PASSWORD_RESET', entityId: resetRow.id, description: 'Invalid reset code attempt', severity: 'warn', ipAddress: req.ip }); } catch(_) {}
+            try { await insertAuditLog(req.app, { userId: userId, action: 'RESET_CODE_INVALID', entity: 'PASSWORD_RESET', entityId: resetRow.id, description: 'Invalid reset code attempt', severity: 'warn', ipAddress: req.ip }); } catch(auditErr) { logger.warn('Audit log failed for RESET_CODE_INVALID:', auditErr.message); }
             return res.status(400).json({ status: 'fail', message: 'Invalid code or expired' });
         }
 
@@ -354,7 +355,7 @@ exports.resetPassword = async (req, res, next) => {
         }
 
     // Hash new password (adaptive cost)
-        const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+        const saltRounds = Number.parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
         const newHash = await bcrypt.hash(newPassword, saltRounds);
 
         // Update user password
@@ -374,7 +375,7 @@ exports.resetPassword = async (req, res, next) => {
         await client.query('COMMIT');
 
     logger.info({ event: 'password-reset-completed', resetId: resetRow.id, userId: resetRow.user_id, correlationId: resetRow.id });
-    try { await insertAuditLog(req.app, { userId: resetRow.user_id, action: 'PASSWORD_RESET', entity: 'USER', entityId: resetRow.user_id, description: 'User password reset via enhanced flow', severity: 'info', ipAddress: req.ip }); } catch(_) {}
+    try { await insertAuditLog(req.app, { userId: resetRow.user_id, action: 'PASSWORD_RESET', entity: 'USER', entityId: resetRow.user_id, description: 'User password reset via enhanced flow', severity: 'info', ipAddress: req.ip }); } catch(auditErr) { logger.warn('Audit log failed for PASSWORD_RESET:', auditErr.message); }
 
         return res.status(200).json({
             status: 'success',

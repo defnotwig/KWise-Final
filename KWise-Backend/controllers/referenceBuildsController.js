@@ -10,8 +10,8 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const path = require('path');
-const fs = require('fs').promises;
+const path = require('node:path');
+const fs = require('node:fs').promises;
 
 class ReferenceBuildsController {
   
@@ -256,9 +256,9 @@ class ReferenceBuildsController {
         query('SELECT COUNT(*) as count FROM pc_upgrade_budget_ranges WHERE is_active = true')
       ]);
 
-      const usageCount = parseInt(usageTypes.rows[0].count);
-      const yearCount = parseInt(yearRanges.rows[0].count);
-      const budgetCount = parseInt(budgetRanges.rows[0].count);
+      const usageCount = Number.parseInt(usageTypes.rows[0].count, 10);
+      const yearCount = Number.parseInt(yearRanges.rows[0].count, 10);
+      const budgetCount = Number.parseInt(budgetRanges.rows[0].count, 10);
       const expectedBuilds = usageCount * yearCount * budgetCount;
 
       logger.info('Starting reference builds regeneration', {
@@ -571,7 +571,7 @@ module.exports = REFERENCE_BUILDS;
         }
         
         const totalPrice = Object.values(build.components || {})
-          .reduce((sum, comp) => sum + parseFloat(comp.price || 0), 0);
+          .reduce((sum, comp) => sum + Number.parseFloat(comp.price || 0), 0);
         
         stats.averagePriceByUsage[build.usage].push(totalPrice);
 
@@ -598,9 +598,9 @@ module.exports = REFERENCE_BUILDS;
       ]);
 
       stats.expectedBuilds = 
-        parseInt(usageTypes.rows[0].count) * 
-        parseInt(yearRanges.rows[0].count) * 
-        parseInt(budgetRanges.rows[0].count);
+        Number.parseInt(usageTypes.rows[0].count, 10) * 
+        Number.parseInt(yearRanges.rows[0].count, 10) * 
+        Number.parseInt(budgetRanges.rows[0].count, 10);
 
       stats.isComplete = stats.totalBuilds === stats.expectedBuilds;
 
@@ -635,9 +635,9 @@ module.exports = REFERENCE_BUILDS;
       ]);
 
       const counts = {
-        usageTypes: parseInt(usageTypes.rows[0].count),
-        yearRanges: parseInt(yearRanges.rows[0].count),
-        budgetRanges: parseInt(budgetRanges.rows[0].count)
+        usageTypes: Number.parseInt(usageTypes.rows[0].count, 10),
+        yearRanges: Number.parseInt(yearRanges.rows[0].count, 10),
+        budgetRanges: Number.parseInt(budgetRanges.rows[0].count, 10)
       };
 
       // Calculate expected builds

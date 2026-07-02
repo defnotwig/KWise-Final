@@ -39,8 +39,8 @@ class PCCustomizedAIBuildsController {
         budgetRange: row.budget_range,
         performance: row.performance_preference,
         gamingPreference: row.gaming_preference,
-        targetBudget: parseFloat(row.target_budget),
-        totalPrice: parseFloat(row.total_price),
+        targetBudget: Number.parseFloat(row.target_budget),
+        totalPrice: Number.parseFloat(row.total_price),
         cpu_id: row.cpu_id,
         gpu_id: row.gpu_id,
         motherboard_id: row.motherboard_id,
@@ -61,9 +61,9 @@ class PCCustomizedAIBuildsController {
         },
         aiReasoning: row.ai_reasoning,
         scores: {
-          compatibility: parseFloat(row.compatibility_score),
-          performance: parseFloat(row.performance_score),
-          value: parseFloat(row.value_score)
+          compatibility: Number.parseFloat(row.compatibility_score),
+          performance: Number.parseFloat(row.performance_score),
+          value: Number.parseFloat(row.value_score)
         },
         generatedAt: row.generated_at,
         validationStatus: row.validation_status
@@ -110,14 +110,14 @@ class PCCustomizedAIBuildsController {
         SELECT COUNT(*) as count FROM pc_customized_usage_types 
         WHERE name = 'gaming' AND is_active = true
       `);
-      const hasGamingUsage = parseInt(gamingUsageResult.rows[0].count) > 0;
+      const hasGamingUsage = Number.parseInt(gamingUsageResult.rows[0].count, 10) > 0;
       
       // Calculate expected builds correctly
       let expectedBuilds;
-      const usageCount = parseInt(params.usage_types);
-      const budgetCount = parseInt(params.budget_ranges);
-      const perfCount = parseInt(params.performance_prefs);
-      const gamingPrefCount = parseInt(params.gaming_prefs);
+      const usageCount = Number.parseInt(params.usage_types, 10);
+      const budgetCount = Number.parseInt(params.budget_ranges, 10);
+      const perfCount = Number.parseInt(params.performance_prefs, 10);
+      const gamingPrefCount = Number.parseInt(params.gaming_prefs, 10);
       
       if (hasGamingUsage && gamingPrefCount > 0) {
         // Gaming usage gets multiplied by gaming preferences
@@ -135,7 +135,7 @@ class PCCustomizedAIBuildsController {
         SELECT COUNT(*) as count FROM pc_customized_ai_reference_builds WHERE is_active = true
       `);
       
-      const actualBuilds = parseInt(buildCountResult.rows[0].count);
+      const actualBuilds = Number.parseInt(buildCountResult.rows[0].count, 10);
 
       res.json({
         success: true,
@@ -144,10 +144,10 @@ class PCCustomizedAIBuildsController {
           expectedBuilds: expectedBuilds,
           isComplete: actualBuilds >= expectedBuilds,
           parameters: {
-            usageTypes: parseInt(params.usage_types),
-            budgetRanges: parseInt(params.budget_ranges),
-            performancePrefs: parseInt(params.performance_prefs),
-            gamingPrefs: parseInt(params.gaming_prefs)
+            usageTypes: Number.parseInt(params.usage_types, 10),
+            budgetRanges: Number.parseInt(params.budget_ranges, 10),
+            performancePrefs: Number.parseInt(params.performance_prefs, 10),
+            gamingPrefs: Number.parseInt(params.gaming_prefs, 10)
           }
         }
       });
@@ -251,7 +251,7 @@ class PCCustomizedAIBuildsController {
           success: true,
           data: {
             status: 'idle',
-            totalBuilds: parseInt(countResult.rows[0].count),
+            totalBuilds: Number.parseInt(countResult.rows[0].count, 10),
             lastGenerated: countResult.rows[0].last_generated
           }
         });

@@ -1,8 +1,530 @@
 const { query } = require('../config/db');
+const { inspect } = require('node:util');
 const logger = require('../utils/logger');
-const valueAnalyzer = require('../ai/services/valueAnalyzer');
-const aiConfig = require('../ai/config/aiConfig');
+const { sanitizeForLog } = require('../utils/securitySanitizer');
+const orderLockService = require('../services/orderLockService');
+const { compatibilityService } = require('../services/compatibilityService');
+const { getImageVariants } = require('../services/imageVariantService');
+const valueAnalyzer = {
+    generateValueForMoney: async (products, _context, limit = 8) => ({
+        valueForMoney: products.slice(0, limit),
+        analysis: { source: 'deterministic', code: 'AI_REMOVED' }
+    }),
+    generateHotPicks: async (products, _context, limit = 8) => ({
+        hotPicks: products.slice(0, limit),
+        analysis: { source: 'deterministic', code: 'AI_REMOVED' }
+    })
+};
+const aiConfig = { service: { enabled: false } };
 const upgradeService = require('../services/upgradeService');
+
+const CUSTOMIZED_SERVICE_TYPES = new Set([
+    'pc-customized',
+    'pc-customized-ai',
+    'prebuilt-pc',
+    'preset-pc',
+    'community-pc'
+]);
+
+const compareText = (left, right) => String(left ?? '').localeCompare(String(right ?? ''));
+
+const parseIntegerValue = (value, fallback = 0) => {
+    const parsedValue = Number.parseInt(String(value), 10);
+    return Number.isNaN(parsedValue) ? fallback : parsedValue;
+};
+
+const parseDecimalValue = (value, fallback = 0) => {
+    const parsedValue = Number.parseFloat(String(value));
+    return Number.isNaN(parsedValue) ? fallback : parsedValue;
+};
+
+const BUILD_COMPONENTS_CACHE_TTL_MS = Math.max(
+    parseIntegerValue(process.env.KIOSK_BUILD_COMPONENTS_CACHE_TTL_MS, 30000),
+    1000
+);
+let buildComponentsResponseCache = null;
+
+const parseCurrencyAmount = (value, fallback = 0) => {
+    return parseDecimalValue((value ?? 0).toString().replaceAll(/[^\d.]/g, ''), fallback);
+};
+
+const parseOptionalDecimalValue = (value) => {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    return parseDecimalValue(value, null);
+};
+
+const normalizePositiveInteger = (value, fallback) => Math.max(parseIntegerValue(value, fallback), 1);
+
+const toLowerCaseText = (value) => {
+    if (typeof value === 'string') {
+        return value.toLowerCase();
+    }
+
+    if (value && typeof value === 'object') {
+        return inspect(value, { depth: 5, breakLength: Infinity }).toLowerCase();
+    }
+
+    return String(value ?? '').toLowerCase();
+};
+
+const CATEGORY_ALIASES = {
+    cpu: 'CPU',
+    processor: 'CPU',
+    gpu: 'GPU',
+    graphics: 'GPU',
+    'graphics card': 'GPU',
+    motherboard: 'Motherboard',
+    mobo: 'Motherboard',
+    ram: 'RAM',
+    memory: 'RAM',
+    storage: 'Storage',
+    ssd: 'Storage',
+    hdd: 'Storage',
+    nvme: 'Storage',
+    psu: 'PSU',
+    'power supply': 'PSU',
+    'power supply unit': 'PSU',
+    case: 'Case',
+    chassis: 'Case',
+    cooling: 'Cooling',
+    cooler: 'Cooling',
+    'cpu cooler': 'Cooling',
+    monitor: 'Monitor',
+    keyboard: 'Keyboard',
+    mouse: 'Mouse',
+    headphones: 'Headphones',
+    headset: 'Headphones',
+    speakers: 'Speakers',
+    webcam: 'Webcam'
+};
+
+const CATEGORY_KEYS = {
+    CPU: 'cpu',
+    GPU: 'gpu',
+    Motherboard: 'motherboard',
+    RAM: 'ram',
+    Storage: 'storage',
+    PSU: 'psu',
+    Case: 'case',
+    Cooling: 'cooling',
+    Monitor: 'monitor',
+    Keyboard: 'keyboard',
+    Mouse: 'mouse',
+    Headphones: 'headphones',
+    Speakers: 'speakers',
+    Webcam: 'webcam'
+};
+
+const canonicalCategory = (category) => {
+    const raw = String(category || '').trim();
+    if (!raw) return '';
+
+    const normalized = raw
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
+        .replaceAll(/\s+/g, ' ')
+        .trim();
+
+    return CATEGORY_ALIASES[normalized] || CATEGORY_ALIASES[raw.toLowerCase()] || raw;
+};
+
+const categoryKey = (category) => (
+    CATEGORY_KEYS[canonicalCategory(category)]
+    || String(category || '').trim().toLowerCase().replaceAll(/\s+/g, '-')
+);
+
+const includesAny = (value, fragments = []) => fragments.some((fragment) => value.includes(fragment));
+
+const getSafeRatio = (numerator, denominator, fallback = 1) => (
+    denominator > 0 ? numerator / denominator : fallback
+);
+
+const normalizePurposesList = (purposes) => {
+    if (Array.isArray(purposes)) {
+        return purposes;
+    }
+
+    if (purposes) {
+        return [purposes];
+    }
+
+    return ['Gaming'];
+};
+
+const matchesSpecificationRule = (currentSpecs, upgradeSpecs, rule) => {
+    const upgradeMatches = (rule.upgrade || []).every((fragment) => upgradeSpecs.includes(fragment));
+    const currentMatches = (rule.current || []).every((fragment) => currentSpecs.includes(fragment));
+    const currentMissingMatches = (rule.currentMissing || []).every((fragment) => !currentSpecs.includes(fragment));
+
+    return upgradeMatches && currentMatches && currentMissingMatches;
+};
+
+const SPEC_ANALYSIS_RULES = {
+    Cooling: {
+        fallback: 'advanced cooling technology',
+        rules: [
+            { upgrade: ['360'], currentMissing: ['360'], result: 'larger 360mm radiator' },
+            { upgrade: ['rgb'], currentMissing: ['rgb'], result: 'advanced RGB lighting' },
+            { upgrade: ['aio'], currentMissing: ['aio'], result: 'liquid cooling technology' }
+        ]
+    },
+    GPU: {
+        fallback: 'next-generation graphics architecture',
+        rules: [
+            { upgrade: ['rtx'], current: ['gtx'], result: 'RTX ray tracing capabilities' },
+            { upgrade: ['16gb'], current: ['8gb'], result: '16GB VRAM vs 8GB' },
+            { upgrade: ['4080'], current: ['4060'], result: 'flagship GPU architecture' }
+        ]
+    },
+    CPU: {
+        fallback: 'higher core count and frequencies',
+        rules: [
+            { upgrade: ['i9'], current: ['i7'], result: 'i9 flagship performance' },
+            { upgrade: ['x3d'], currentMissing: ['x3d'], result: '3D V-Cache technology' },
+            { upgrade: ['14th'], current: ['13th'], result: '14th generation architecture' }
+        ]
+    },
+    RAM: {
+        fallback: 'higher capacity and faster speeds',
+        rules: [
+            { upgrade: ['ddr5'], current: ['ddr4'], result: 'DDR5 next-gen memory' },
+            { upgrade: ['32gb'], current: ['16gb'], result: '32GB capacity vs 16GB' },
+            { upgrade: ['6000'], currentMissing: ['6000'], result: '6000MHz high-speed' }
+        ]
+    },
+    Storage: {
+        fallback: 'faster NVMe technology',
+        rules: [
+            { upgrade: ['pcie 5'], currentMissing: ['pcie 5'], result: 'PCIe 5.0 interface' },
+            { upgrade: ['2tb'], current: ['1tb'], result: '2TB capacity vs 1TB' },
+            { upgrade: ['990'], current: ['980'], result: 'latest generation NVMe' }
+        ]
+    }
+};
+
+const PLATFORM_HINTS = {
+    intelLga1700: ['lga1700', 'z690', 'b660', 'h610', 'z790', 'b760', 'h770'],
+    intelLga1851: ['lga1851', 'z890', 'b860'],
+    amdAm5: ['am5', 'x670', 'b650', 'x870', 'b850', 'a620'],
+    amdAm4: ['am4', 'x570', 'b550', 'b450', 'a520']
+};
+
+const findCartItemByCategory = (cart, category) => (
+    cart.find((item) => toLowerCaseText(item.category) === category)
+);
+
+const getCpuPlatformHints = (cpuName) => {
+    const normalizedCpuName = toLowerCaseText(cpuName);
+
+    if (includesAny(normalizedCpuName, ['i3', 'i5', 'i7', 'i9'])) {
+        if (includesAny(normalizedCpuName, ['15', 'ultra 7', 'ultra 9', 'arrow lake'])) {
+            return PLATFORM_HINTS.intelLga1851;
+        }
+
+        if (includesAny(normalizedCpuName, ['12', '13', '14'])) {
+            return PLATFORM_HINTS.intelLga1700;
+        }
+    }
+
+    if (normalizedCpuName.includes('ryzen')) {
+        if (includesAny(normalizedCpuName, ['7000', '8000', '9000'])) {
+            return PLATFORM_HINTS.amdAm5;
+        }
+
+        if (includesAny(normalizedCpuName, ['3000', '5000'])) {
+            return PLATFORM_HINTS.amdAm4;
+        }
+    }
+
+    return null;
+};
+
+const matchesPlatformHints = (productName, platformHints) => (
+    !platformHints || includesAny(productName, platformHints)
+);
+
+const mapKioskProductRow = (row, options = {}) => {
+    const canonical = canonicalCategory(row.category);
+    const imagePath = row.image_url || row.image_path || row.file_path || '';
+    const imageVariants = getImageVariants(imagePath);
+    const product = {
+        id: row.id,
+        name: row.name,
+        category: canonical || row.category,
+        categoryKey: row.category_key || categoryKey(canonical || row.category),
+        brand: row.brand,
+        price: parseDecimalValue(row.price),
+        stock: parseIntegerValue(row.stock),
+        image: imagePath,
+        imagePath,
+        imageUrl: imagePath,
+        image_url: imagePath,
+        image_path: imagePath,
+        file_path: row.file_path || imagePath,
+        imageVariants,
+        image_variants: imageVariants,
+        specifications: row.specifications || {},
+        dimensions: row.dimensions || {},
+        description: row.description || '',
+        available: row.available ?? parseIntegerValue(row.stock) > 0
+    };
+
+    if (options.includeSalePricing) {
+        product.salePrice = row.sale_price == null
+            ? null
+            : parseDecimalValue(row.sale_price);
+        product.effectivePrice = getEffectivePrice(row);
+    }
+
+    if (options.includeOnSale) {
+        product.onSale = Boolean(row.on_sale);
+    }
+
+    if (options.includeTimestamps) {
+        product.createdAt = row.created_at;
+        product.updatedAt = row.updated_at;
+    }
+
+    [
+        'compatible',
+        'source',
+        'engine',
+        'aiEnabled',
+        'status',
+        'score',
+        'compatibility_score',
+        'compatibility_status',
+        'compatibility_reason',
+        'compatibility_issues',
+        'compatibility_notes',
+        'deterministic_issues',
+        'warnings',
+        'manualChecks',
+        'missingSpecs',
+        'rulesApplied',
+        'verdict',
+        'latencyMs',
+        'cache',
+        'detailed_analysis'
+    ].forEach((field) => {
+        if (row[field] !== undefined) product[field] = row[field];
+    });
+
+    return product;
+};
+
+const compactKioskCardProduct = (product) => ({
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    categoryKey: product.categoryKey,
+    brand: product.brand,
+    price: product.price,
+    salePrice: product.salePrice,
+    sale_price: product.salePrice,
+    effectivePrice: product.effectivePrice,
+    onSale: product.onSale,
+    stock: product.stock,
+    image: product.image,
+    imagePath: product.imagePath,
+    imageUrl: product.imageUrl,
+    image_url: product.image_url,
+    imageVariants: product.imageVariants,
+    image_variants: product.imageVariants,
+    available: product.available,
+    description: product.description || ''
+});
+
+const compactKioskCardProducts = (products) => products.map(compactKioskCardProduct);
+
+const getOrderItemsFromPayload = ({ items = [], selectedParts = [] } = {}) => {
+    return items.length > 0 ? items : selectedParts;
+};
+
+const getCommunityBuildTier = (totalAmount) => {
+    if (totalAmount >= 80000) {
+        return 'Elite';
+    }
+
+    if (totalAmount >= 50000) {
+        return 'High Tier';
+    }
+
+    if (totalAmount >= 25000) {
+        return 'Mid Tier';
+    }
+
+    return 'Entry';
+};
+
+const buildCustomizedCommunityBuildData = (serviceType, orderItems, totalAmount, orderId) => {
+    const components = orderItems.map((item) => ({
+        name: item.category || 'Component',
+        value: item.name || item.component || 'Unknown',
+        part_id: item.id || item.part_id,
+        price: parseDecimalValue(item.price || 0),
+        category: item.category || 'Other',
+        brand: item.brand || '',
+        specifications: item.specifications || {}
+    }));
+
+    const tier = getCommunityBuildTier(totalAmount);
+
+    logger.info(`🔥 TIER CALCULATION: totalAmount=${totalAmount}, tier="${tier}"`);
+
+    return {
+        buildName: `Customer ${serviceType === 'pc-customized-ai' ? 'AI' : 'Custom'} Build ${orderId}`,
+        components,
+        totalPrice: totalAmount,
+        tier,
+        purposes: ['Gaming'],
+        baseProductId: null,
+        customizations: {
+            orderType: serviceType,
+            orderId,
+            createdFrom: serviceType === 'pc-customized-ai' ? 'AI Suggestion' : 'Manual Selection'
+        }
+    };
+};
+
+const buildPresetCommunityBuildData = (orderItems, totalAmount, orderId) => {
+    const hasCustomizations = orderItems.some((item) => item.isCustomized || Object.keys(item.customizations || {}).length > 0);
+
+    if (!hasCustomizations) {
+        logger.info('ℹ️ Pre-Built order without customizations - skipping Community Build save');
+        return null;
+    }
+
+    const firstItem = orderItems[0] || {};
+    const components = orderItems
+        .filter((item) => item.category === 'prebuilt-component')
+        .map((item) => ({
+            name: item.componentType || item.category || 'Component',
+            value: item.componentValue || item.name || 'Unknown',
+            part_id: item.id || null,
+            price: parseDecimalValue(item.price || 0),
+            category: item.componentType || item.category || 'Other'
+        }));
+
+    logger.info(`📦 Components extracted: ${components.length}`);
+
+    return {
+        buildName: `Customer Customized Preset ${orderId}`,
+        components,
+        totalPrice: totalAmount,
+        tier: firstItem.tier || firstItem.buildType || 'Mid Tier',
+        purposes: firstItem.purposes || ['Gaming'],
+        baseProductId: firstItem.baseProductId || firstItem.product_id,
+        customizations: firstItem.customizations || {}
+    };
+};
+
+const buildCommunityBuildPayload = (serviceType, orderItems, totalAmount, orderId) => {
+    if (serviceType === 'pc-customized' || serviceType === 'pc-customized-ai') {
+        logger.info('✅ PC Customized order detected - will save to Community Builds');
+        return buildCustomizedCommunityBuildData(serviceType, orderItems, totalAmount, orderId);
+    }
+
+    if (serviceType === 'prebuilt-pc' || serviceType === 'preset-pc') {
+        logger.info('✅ Customized Pre-Built order detected - evaluating Community Build save');
+        return buildPresetCommunityBuildData(orderItems, totalAmount, orderId);
+    }
+
+    return null;
+};
+
+const validateCreateOrderRequest = (serviceType, totalAmount, orderItems) => {
+    if (!serviceType) {
+        return 'Service type is required';
+    }
+
+    if (totalAmount === undefined || totalAmount === null) {
+        return 'Total amount is required (can be 0 for diagnostic services)';
+    }
+
+    if (Number.isNaN(parseDecimalValue(totalAmount, Number.NaN))) {
+        return 'Total amount must be a valid number';
+    }
+
+    if (!Array.isArray(orderItems)) {
+        return 'Order items must be an array';
+    }
+
+    return null;
+};
+
+const buildQueueOrderData = ({
+    customerName,
+    email,
+    orderItems,
+    totalAmount,
+    paymentMethod,
+    serviceType,
+    transactionOrigin,
+    phoneNumber,
+    notes,
+    idempotencyKey
+}) => ({
+    customerName: customerName || null,
+    customerEmail: email,
+    items: orderItems,
+    totalAmount,
+    paymentMethod,
+    serviceType,
+    transactionOrigin: transactionOrigin || serviceType,
+    phoneNumber,
+    notes,
+    idempotencyKey
+});
+
+const runAfterResponse = (task) => {
+    const runner = async () => {
+        try {
+            await task();
+        } catch (error) {
+            logger.error('Deferred kiosk order side effect failed:', error);
+        }
+    };
+
+    if (typeof setImmediate === 'function') {
+        setImmediate(runner);
+        return;
+    }
+
+    setTimeout(runner, 0);
+};
+
+const saveCommunityBuildForOrder = async (serviceType, orderItems, totalAmount, orderId) => {
+    logger.info(`🔍 SERVICE TYPE CHECK: "${serviceType}" | Is in customizedServiceTypes: ${CUSTOMIZED_SERVICE_TYPES.has(serviceType)}`);
+
+    if (!CUSTOMIZED_SERVICE_TYPES.has(serviceType)) {
+        return null;
+    }
+
+    logger.info(`🔍 Checking if order ${orderId} should be saved to Community Builds...`);
+    logger.info(`📊 Service Type: "${serviceType}"`);
+    logger.info(`📦 Order Items Count: ${orderItems.length}`);
+    logger.info(`💰 Total Amount: ${totalAmount}`);
+
+    const buildData = buildCommunityBuildPayload(serviceType, orderItems, totalAmount, orderId);
+    if (!buildData) {
+        logger.warn('⚠️ Community Build NOT saved. shouldSave=false, hasBuildData=false');
+        return null;
+    }
+
+    logger.info('Attempting to save community build', {
+        buildName: buildData.buildName,
+        componentCount: Array.isArray(buildData.components) ? buildData.components.length : 0,
+        totalPrice: buildData.totalPrice,
+        tier: buildData.tier
+    });
+
+    return saveCommunityBuildInternal(buildData);
+};
 
 /**
  * GET /api/kiosk/categories - list active kiosk categories with counts
@@ -10,22 +532,33 @@ const upgradeService = require('../services/upgradeService');
 const getCategories = async (req, res) => {
     try {
         const result = await query(`
-            SELECT 
+            SELECT
                 category,
                 COUNT(*) as product_count,
                 SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) as in_stock_count,
                 MIN(price) as min_price,
-                MAX(price) as max_price
-            FROM pc_parts 
-            WHERE is_active = true 
+                MAX(price) as max_price,
+                MIN(COALESCE(kiosk_category_order, 999)) as category_order
+            FROM pc_parts
+            WHERE is_active = true
               AND (kiosk_visible IS NULL OR kiosk_visible = true)
             GROUP BY category
-            ORDER BY category
+            ORDER BY category_order, category
         `);
+
+        const categories = result.rows.map((row) => ({
+            category: row.category,
+            name: formatCategoryDisplayName(row.category),
+            productCount: parseIntegerValue(row.product_count),
+            inStockCount: parseIntegerValue(row.in_stock_count),
+            minPrice: parseDecimalValue(row.min_price),
+            maxPrice: parseDecimalValue(row.max_price),
+            order: parseIntegerValue(row.category_order, 999)
+        }));
 
         res.json({
             success: true,
-            data: result.rows,
+            data: categories,
             timestamp: new Date().toISOString()
         });
     } catch (error) {
@@ -55,9 +588,13 @@ const getCategoryProducts = async (req, res) => {
             inStock
         } = req.query;
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
-        const validSortBy = ['name', 'price', 'brand', 'created_at', 'updated_at'].includes(sortBy) ? sortBy : 'name';
-        const validSortOrder = ['asc', 'desc'].includes(String(sortOrder).toLowerCase()) ? sortOrder.toUpperCase() : 'ASC';
+        const currentPage = normalizePositiveInteger(page, 1);
+        const itemsPerPage = normalizePositiveInteger(limit, 20);
+        const offset = (currentPage - 1) * itemsPerPage;
+        const validSortBy = ['name', 'price', 'brand', 'created_at', 'updated_at'].includes(String(sortBy)) ? String(sortBy) : 'name';
+        const validSortOrder = ['asc', 'desc'].includes(String(sortOrder).toLowerCase()) ? String(sortOrder).toUpperCase() : 'ASC';
+        const minPriceValue = parseOptionalDecimalValue(minPrice);
+        const maxPriceValue = parseOptionalDecimalValue(maxPrice);
 
         const whereParts = [
             'is_active = true',
@@ -71,13 +608,13 @@ const getCategoryProducts = async (req, res) => {
             whereParts.push(`brand = $${paramIndex++}`);
             queryParams.push(brand);
         }
-        if (minPrice) {
+        if (minPriceValue !== null) {
             whereParts.push(`price >= $${paramIndex++}`);
-            queryParams.push(parseFloat(minPrice));
+            queryParams.push(minPriceValue);
         }
-        if (maxPrice) {
+        if (maxPriceValue !== null) {
             whereParts.push(`price <= $${paramIndex++}`);
-            queryParams.push(parseFloat(maxPrice));
+            queryParams.push(maxPriceValue);
         }
         if (inStock === 'true') {
             whereParts.push('stock > 0');
@@ -86,13 +623,13 @@ const getCategoryProducts = async (req, res) => {
         const whereClause = whereParts.join(' AND ');
 
         const mainQuery = `
-            SELECT 
+            SELECT
                 id, name, category, brand, price, sale_price, stock,
                 COALESCE(image_url, image_path) AS image_url,
                 specifications, dimensions, description, on_sale,
                 created_at, updated_at,
                 CASE WHEN stock > 0 THEN true ELSE false END as available
-            FROM pc_parts 
+            FROM pc_parts
             WHERE ${whereClause}
             ORDER BY ${validSortBy} ${validSortOrder}
             LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -104,33 +641,20 @@ const getCategoryProducts = async (req, res) => {
         `;
 
         const countParams = [...queryParams];
-        queryParams.push(parseInt(limit), offset);
+        queryParams.push(itemsPerPage, offset);
 
         const [result, countResult] = await Promise.all([
             query(mainQuery, queryParams),
             query(countQuery, countParams)
         ]);
 
-        const total = parseInt(countResult.rows[0].total || 0);
-        const totalPages = Math.max(1, Math.ceil(total / parseInt(limit)));
+        const total = parseIntegerValue(countResult.rows[0].total || 0);
+        const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
 
-        const products = result.rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            category: row.category,
-            brand: row.brand,
-            price: parseFloat(row.price),
-            salePrice: row.sale_price ? parseFloat(row.sale_price) : null,
-            effectivePrice: getEffectivePrice(row),
-            stock: parseInt(row.stock),
-            imageUrl: row.image_url,
-            specifications: row.specifications,
-            dimensions: row.dimensions,
-            description: row.description,
-            onSale: row.on_sale || false,
-            available: row.available,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at
+        const products = result.rows.map((row) => mapKioskProductRow(row, {
+            includeSalePricing: true,
+            includeOnSale: true,
+            includeTimestamps: true
         }));
 
         res.json({
@@ -138,18 +662,18 @@ const getCategoryProducts = async (req, res) => {
             data: {
                 items: products,
                 pagination: {
-                    currentPage: parseInt(page),
+                    currentPage,
                     totalPages,
                     totalItems: total,
-                    itemsPerPage: parseInt(limit),
-                    hasNext: parseInt(page) < totalPages,
-                    hasPrev: parseInt(page) > 1
+                    itemsPerPage,
+                    hasNext: currentPage < totalPages,
+                    hasPrev: currentPage > 1
                 },
                 filters: {
                     category,
                     brand,
-                    minPrice: minPrice ? parseFloat(minPrice) : null,
-                    maxPrice: maxPrice ? parseFloat(maxPrice) : null,
+                    minPrice: minPriceValue,
+                    maxPrice: maxPriceValue,
                     inStock
                 }
             },
@@ -167,41 +691,590 @@ const getCategoryProducts = async (req, res) => {
 };
 
 /**
+ * GET /api/kiosk/catalog/bootstrap?category=CPU
+ * Aggregates first-load catalog data to reduce kiosk request storms.
+ */
+const getCatalogBootstrap = async (req, res) => {
+    try {
+        const {
+            category,
+            page = 1,
+            limit = 60,
+            sort = 'name',
+            order = 'ASC',
+            includeSpecRanges = 'false'
+        } = req.query;
+
+        if (!category) {
+            return res.status(400).json({
+                success: false,
+                message: 'category is required'
+            });
+        }
+
+        const currentPage = normalizePositiveInteger(page, 1);
+        const itemsPerPage = Math.min(normalizePositiveInteger(limit, 60), 500);
+        const offset = (currentPage - 1) * itemsPerPage;
+        const shouldIncludeSpecRanges = String(includeSpecRanges).toLowerCase() === 'true';
+        const sortColumnMap = {
+            name: 'pp.name',
+            price: 'pp.price',
+            brand: 'pp.brand',
+            created_at: 'pp.created_at',
+            updated_at: 'pp.updated_at'
+        };
+        const safeSortColumn = sortColumnMap[String(sort)] || 'pp.name';
+        const safeOrder = String(order).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        const baseWhere = `
+            pp.is_active = true
+            AND (pp.kiosk_visible IS NULL OR pp.kiosk_visible = true)
+            AND pp.category = $1
+        `;
+
+        const productsSql = `
+            SELECT
+                pp.id, pp.name, pp.category, pp.brand, pp.price, pp.sale_price, pp.stock,
+                COALESCE(pp.image_url, pp.image_path) AS image_url,
+                COALESCE(
+                    pp.specifications || COALESCE((ps.normalized_specs->'specs')::jsonb, '{}'::jsonb),
+                    pp.specifications,
+                    '{}'::jsonb
+                ) AS specifications,
+                pp.dimensions, pp.description, pp.on_sale,
+                pp.created_at, pp.updated_at,
+                CASE WHEN pp.stock > 0 THEN true ELSE false END as available
+            FROM pc_parts pp
+            LEFT JOIN product_specs ps ON pp.id = ps.product_id
+            WHERE ${baseWhere}
+            ORDER BY ${safeSortColumn} ${safeOrder}
+            LIMIT $2 OFFSET $3
+        `;
+        const countSql = `SELECT COUNT(*) as total FROM pc_parts pp WHERE ${baseWhere}`;
+        const brandsSql = `
+            SELECT pp.brand, COUNT(*) as item_count
+            FROM pc_parts pp
+            WHERE ${baseWhere} AND pp.brand IS NOT NULL
+            GROUP BY pp.brand
+            ORDER BY pp.brand
+        `;
+        const priceSql = `
+            SELECT MIN(pp.price) AS min_price, MAX(pp.price) AS max_price
+            FROM pc_parts pp
+            WHERE ${baseWhere}
+        `;
+        const specFieldsSql = `
+            SELECT field_name, field_type, is_required, default_value
+            FROM specification_schemas
+            WHERE category = $1
+            ORDER BY field_name
+        `;
+
+        const [productsResult, countResult, brandsResult, priceResult, specFieldsResult] = await Promise.all([
+            query(productsSql, [category, itemsPerPage, offset]),
+            query(countSql, [category]),
+            query(brandsSql, [category]),
+            query(priceSql, [category]),
+            query(specFieldsSql, [category])
+        ]);
+
+        const specRanges = {};
+
+        if (shouldIncludeSpecRanges) {
+            const numericFields = specFieldsResult.rows
+                .filter((field) => field.field_type === 'number')
+                .map((field) => field.field_name);
+
+            await Promise.all(numericFields.map(async (fieldName) => {
+                const rangeResult = await query(`
+                    SELECT
+                        MIN(value::numeric) AS min_value,
+                        MAX(value::numeric) AS max_value,
+                        COUNT(*) AS total_items
+                    FROM (
+                        SELECT NULLIF(
+                            regexp_replace(
+                                COALESCE(pp.specifications->>$2, ps.normalized_specs->'specs'->>$2, ''),
+                                '[^0-9.]',
+                                '',
+                                'g'
+                            ),
+                            ''
+                        ) AS value
+                        FROM pc_parts pp
+                        LEFT JOIN product_specs ps ON pp.id = ps.product_id
+                        WHERE ${baseWhere}
+                    ) values_for_field
+                    WHERE value ~ '^[0-9]+(\\.[0-9]+)?$'
+                `, [category, fieldName]);
+
+                const row = rangeResult.rows[0] || {};
+                if (row.min_value !== null && row.max_value !== null) {
+                    specRanges[fieldName] = {
+                        min: parseDecimalValue(row.min_value),
+                        max: parseDecimalValue(row.max_value),
+                        totalItems: parseIntegerValue(row.total_items)
+                    };
+                }
+            }));
+        }
+
+        const total = parseIntegerValue(countResult.rows[0]?.total || 0);
+        const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
+        const priceRow = priceResult.rows[0] || {};
+        const brands = brandsResult.rows.map((row) => ({
+            name: row.brand,
+            count: parseIntegerValue(row.item_count)
+        }));
+
+        return res.json({
+            success: true,
+            data: {
+                category,
+                products: productsResult.rows.map((row) => mapKioskProductRow(row, {
+                    includeSalePricing: true,
+                    includeOnSale: true,
+                    includeTimestamps: true
+                })),
+                pagination: {
+                    currentPage,
+                    totalPages,
+                    totalItems: total,
+                    itemsPerPage,
+                    hasNext: currentPage < totalPages,
+                    hasPrev: currentPage > 1
+                },
+                brands,
+                totalItems: total,
+                priceRange: {
+                    min: parseDecimalValue(priceRow.min_price),
+                    max: parseDecimalValue(priceRow.max_price)
+                },
+                specFields: specFieldsResult.rows.map((row) => ({
+                    name: row.field_name,
+                    field_name: row.field_name,
+                    type: row.field_type,
+                    field_type: row.field_type,
+                    required: row.is_required,
+                    defaultValue: row.default_value
+                })),
+                specRanges,
+                cache: {
+                    ttlSeconds: Math.round(BUILD_COMPONENTS_CACHE_TTL_MS / 1000),
+                    source: 'database',
+                    generatedAt: new Date().toISOString()
+                }
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        logger.error('Error fetching kiosk catalog bootstrap:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch catalog bootstrap',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+const productDetailSql = `
+    SELECT
+        pp.id, pp.name, pp.category, pp.brand, pp.price, pp.sale_price, pp.stock,
+        COALESCE(pp.image_url, pp.image_path) AS image_url,
+        COALESCE(
+            pp.specifications || COALESCE((ps.normalized_specs->'specs')::jsonb, '{}'::jsonb),
+            pp.specifications,
+            '{}'::jsonb
+        ) AS specifications,
+        pp.dimensions, pp.description, pp.on_sale,
+        pp.created_at, pp.updated_at,
+        CASE WHEN pp.stock > 0 THEN true ELSE false END as available
+    FROM pc_parts pp
+    LEFT JOIN product_specs ps ON pp.id = ps.product_id
+`;
+
+async function fetchKioskProductByRouteId(routeId) {
+    const rawId = String(routeId || '').trim();
+    const isNumericId = /^\d+$/.test(rawId);
+    const legacyToken = !isNumericId ? rawId.match(/^(.+)-(\d+)$/) : null;
+    const numericId = isNumericId ? parseIntegerValue(rawId, 0) : 0;
+
+    if (!numericId && !legacyToken) {
+        return null;
+    }
+
+    if (legacyToken) {
+        const category = canonicalCategory(legacyToken[1]);
+        const routeIndex = Math.max(parseIntegerValue(legacyToken[2], 0), 0);
+        const result = await query(`
+            ${productDetailSql}
+            WHERE pp.category = $1
+              AND pp.is_active = true
+              AND (pp.kiosk_visible IS NULL OR pp.kiosk_visible = true)
+            ORDER BY pp.name ASC
+            LIMIT 1 OFFSET $2
+        `, [category, routeIndex]);
+        return result.rows[0] || null;
+    }
+
+    const result = await query(`
+        ${productDetailSql}
+        WHERE pp.id = $1
+          AND pp.is_active = true
+          AND (pp.kiosk_visible IS NULL OR pp.kiosk_visible = true)
+        LIMIT 1
+    `, [numericId]);
+    return result.rows[0] || null;
+}
+
+const COMPATIBLE_CATEGORY_MAP = {
+    CPU: ['Motherboard', 'Cooling', 'RAM', 'PSU', 'Case'],
+    Cooling: ['CPU', 'Motherboard', 'RAM', 'Case'],
+    Motherboard: ['CPU', 'Cooling', 'RAM', 'Storage', 'GPU', 'PSU', 'Case'],
+    GPU: ['Motherboard', 'PSU', 'Case'],
+    RAM: ['Motherboard', 'Cooling'],
+    Storage: ['Motherboard', 'Case'],
+    PSU: ['CPU', 'GPU', 'Case'],
+    Case: ['Motherboard', 'GPU', 'PSU', 'Cooling', 'Storage'],
+    Monitor: ['Webcam', 'Speakers'],
+    Keyboard: ['Mouse', 'Headphones'],
+    Mouse: ['Keyboard', 'Headphones'],
+    Headphones: ['Speakers', 'Mouse'],
+    Speakers: ['Headphones', 'Monitor'],
+    Webcam: ['Monitor', 'Headphones']
+};
+
+async function fetchCandidateProductsByCategories(categories, limitPerCategory, excludedId) {
+    if (!categories.length) return [];
+
+    const result = await query(`
+        WITH candidates AS (
+            SELECT
+                pp.id, pp.name, pp.category, pp.brand, pp.price, pp.sale_price, pp.stock,
+                COALESCE(pp.image_url, pp.image_path) AS image_url,
+                COALESCE(
+                    pp.specifications || COALESCE((ps.normalized_specs->'specs')::jsonb, '{}'::jsonb),
+                    pp.specifications,
+                    '{}'::jsonb
+                ) AS specifications,
+                pp.dimensions, pp.description, pp.on_sale,
+                pp.created_at, pp.updated_at,
+                CASE WHEN pp.stock > 0 THEN true ELSE false END as available,
+                ROW_NUMBER() OVER (
+                    PARTITION BY pp.category
+                    ORDER BY CASE WHEN pp.stock > 0 THEN 0 ELSE 1 END, pp.price ASC, pp.name ASC
+                ) AS category_rank
+            FROM pc_parts pp
+            LEFT JOIN product_specs ps ON pp.id = ps.product_id
+            WHERE pp.is_active = true
+              AND (pp.kiosk_visible IS NULL OR pp.kiosk_visible = true)
+              AND pp.category = ANY($1::text[])
+              AND pp.id <> $3
+        )
+        SELECT *
+        FROM candidates
+        WHERE category_rank <= $2
+        ORDER BY category, category_rank
+    `, [categories, limitPerCategory, excludedId || 0]);
+
+    return result.rows.map((row) => mapKioskProductRow(row, {
+        includeSalePricing: true,
+        includeOnSale: true,
+        includeTimestamps: true
+    }));
+}
+
+function summarizeCandidateResults(results = []) {
+    return {
+        total: results.length,
+        compatible: results.filter((product) => product.compatible !== false).length,
+        warnings: results.filter((product) => product.verdict === 'warning' || product.status === 'warning').length,
+        failed: results.filter((product) => product.compatible === false).length,
+        manualCheck: results.filter((product) => product.verdict === 'manual_check' || product.status === 'manual_check').length
+    };
+}
+
+/**
+ * GET /api/kiosk/products/:id - Stable kiosk product detail contract.
+ * Supports numeric IDs and legacy route tokens such as "Motherboard-9".
+ */
+const getProductById = async (req, res) => {
+    try {
+        const row = await fetchKioskProductByRouteId(req.params.id);
+        if (!row) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found'
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: mapKioskProductRow(row, {
+                includeSalePricing: true,
+                includeOnSale: true,
+                includeTimestamps: true
+            }),
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        logger.error('Error fetching kiosk product detail:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch product detail',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/kiosk/products/:id/compatible - Deterministic compatible product groups.
+ */
+const getProductCompatibleProducts = async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        const row = await fetchKioskProductByRouteId(req.params.id);
+        if (!row) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found'
+            });
+        }
+
+        const product = mapKioskProductRow(row, {
+            includeSalePricing: true,
+            includeOnSale: true,
+            includeTimestamps: true
+        });
+        const categories = COMPATIBLE_CATEGORY_MAP[product.category] || [];
+        const limitPerCategory = Math.min(normalizePositiveInteger(req.query.limitPerCategory, 4), 12);
+        const candidates = await fetchCandidateProductsByCategories(categories, limitPerCategory, product.id);
+        const results = categories.length > 0
+            ? await compatibilityService.analyzeBatch([product], candidates, {
+                mode: 'product_compatible',
+                targetCategory: product.category,
+                referenceProduct: product
+            })
+            : [];
+        const normalizedResults = results.map((candidate) => mapKioskProductRow(candidate, {
+            includeSalePricing: true,
+            includeOnSale: true,
+            includeTimestamps: true
+        }));
+        const groups = {};
+
+        for (const category of categories) {
+            groups[category] = normalizedResults.filter((candidate) => candidate.category === category);
+        }
+
+        return res.json({
+            success: true,
+            source: 'deterministic',
+            engine: 'deterministic',
+            aiEnabled: false,
+            data: {
+                product,
+                categories,
+                groups,
+                products: normalizedResults,
+                summary: summarizeCandidateResults(normalizedResults),
+                latencyMs: Date.now() - startedAt
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        logger.error('Error fetching compatible products:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch compatible products',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * POST /api/kiosk/compatibility/candidates - Kiosk candidate annotations.
+ */
+const checkCompatibilityCandidates = async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        const {
+            contextParts = [],
+            candidates = [],
+            mode = 'candidate_filter',
+            targetCategory,
+            referenceProduct
+        } = req.body || {};
+
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return res.json({
+                success: true,
+                source: 'deterministic',
+                engine: 'deterministic',
+                aiEnabled: false,
+                data: [],
+                results: [],
+                summary: summarizeCandidateResults([]),
+                latencyMs: Date.now() - startedAt
+            });
+        }
+
+        const limitedCandidates = candidates.slice(0, 500);
+        const results = await compatibilityService.analyzeBatch(contextParts, limitedCandidates, {
+            mode,
+            targetCategory,
+            referenceProduct,
+            strict: false,
+            includeManual: true,
+            includeFailed: true
+        });
+
+        return res.json({
+            success: true,
+            source: 'deterministic',
+            engine: 'deterministic',
+            aiEnabled: false,
+            mode,
+            targetCategory,
+            data: results,
+            results,
+            summary: summarizeCandidateResults(results),
+            latencyMs: Date.now() - startedAt
+        });
+    } catch (error) {
+        logger.error('Error checking kiosk candidate compatibility:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to check compatibility candidates',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+const buildReceiptItem = (row) => {
+    const item = row.item_data || row || {};
+    const price = parseDecimalValue(item.price ?? item.unit_price ?? 0);
+    const quantity = parseIntegerValue(item.quantity ?? 1, 1);
+    const amount = parseDecimalValue(item.amount ?? item.subtotal ?? (price * quantity));
+
+    return {
+        id: item.id,
+        name: item.item_name || item.component_name || item.name || 'Order Item',
+        componentName: item.component_name || item.item_name || item.name || 'Order Item',
+        quantity,
+        price,
+        amount,
+        description: item.description || '',
+        status: item.status || ''
+    };
+};
+
+const buildReceiptModel = (order, items) => {
+    const orderJson = order.order_data || order || {};
+    const receiptItems = items.map(buildReceiptItem);
+    const totalAmount = parseDecimalValue(
+        orderJson.total_amount ?? receiptItems.reduce((sum, item) => sum + item.amount, 0)
+    );
+
+    return {
+        orderId: orderJson.id,
+        orderNumber: orderJson.order_number || '',
+        orderIdFormatted: orderJson.order_id_formatted || orderJson.order_number || '',
+        transactionIdFormatted: orderJson.transaction_id_formatted || '',
+        queueNumber: orderJson.queue_number || '',
+        paymentMethod: orderJson.payment_method || '',
+        serviceType: orderJson.service_type || '',
+        status: orderJson.status || '',
+        queueStatus: orderJson.queue_status || '',
+        customerName: orderJson.customer_name || '',
+        totalAmount,
+        items: receiptItems,
+        createdAt: orderJson.created_at || null,
+        generatedAt: new Date().toISOString()
+    };
+};
+
+/**
+ * GET /api/kiosk/orders/:orderId/receipt - Pure receipt model for in-page fallback
+ * and reprint flows. Does not return HTML.
+ */
+const getOrderReceipt = async (req, res) => {
+    try {
+        const rawOrderId = String(req.params.orderId || '').trim();
+        const numericOrderId = parseIntegerValue(rawOrderId.replaceAll(/[^\d]/g, ''), 0);
+
+        if (!rawOrderId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Order id is required'
+            });
+        }
+
+        const orderResult = await query(`
+            SELECT to_jsonb(o) AS order_data
+            FROM orders o
+            WHERE ($1::integer > 0 AND o.id = $1::integer)
+               OR o.order_number = $2
+               OR to_jsonb(o)->>'order_id_formatted' = $2
+               OR to_jsonb(o)->>'transaction_id_formatted' = $2
+            ORDER BY o.created_at DESC
+            LIMIT 1
+        `, [numericOrderId, rawOrderId]);
+
+        if (orderResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order receipt not found'
+            });
+        }
+
+        const orderData = orderResult.rows[0].order_data || {};
+        const itemsResult = await query(`
+            SELECT to_jsonb(oi) AS item_data
+            FROM order_items oi
+            WHERE oi.order_id = $1
+            ORDER BY oi.id ASC
+        `, [orderData.id]);
+
+        return res.json({
+            success: true,
+            data: buildReceiptModel(orderResult.rows[0], itemsResult.rows),
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        logger.error('Error fetching kiosk order receipt:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch order receipt',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
  * GET /api/kiosk/featured - Get featured products for kiosk home screen
  * Returns hot picks, value for money, and on-sale items
  */
 const getFeaturedProducts = async (req, res) => {
     try {
         const { limit = 6 } = req.query;
+        const itemsPerPage = normalizePositiveInteger(limit, 6);
 
         const result = await query(`
-            SELECT 
+            SELECT
                 id, name, brand, category, price, stock,
                 COALESCE(image_url, image_path) AS image_url,
                 specifications, dimensions, description,
                 CASE WHEN stock > 0 THEN true ELSE false END as available
-            FROM pc_parts 
-            WHERE is_active = true 
-            AND kiosk_visible = true 
+            FROM pc_parts
+            WHERE is_active = true
+            AND kiosk_visible = true
             AND kiosk_featured = true
             AND stock > 0
             ORDER BY category, price DESC
             LIMIT $1
-        `, [parseInt(limit)]);
+        `, [itemsPerPage]);
 
-        const featuredProducts = result.rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            brand: row.brand,
-            category: row.category,
-            price: parseFloat(row.price),
-            stock: parseInt(row.stock),
-            imageUrl: row.image_url,
-            specifications: row.specifications,
-            dimensions: row.dimensions,
-            description: row.description,
-            available: row.available
-        }));
+        const featuredProducts = compactKioskCardProducts(result.rows.map((row) => mapKioskProductRow(row)));
 
         logger.info(`Kiosk featured products requested: ${featuredProducts.length} products found`);
 
@@ -222,93 +1295,181 @@ const getFeaturedProducts = async (req, res) => {
 };
 
 /**
+ * GET /api/kiosk/homepage - Aggregate kiosk home recommendations in one read
+ * Returns the same product contract used by the existing featured/on-sale endpoints.
+ */
+const getHomepageProducts = async (req, res) => {
+    try {
+        const itemsPerSection = normalizePositiveInteger(req.query.limit, 8);
+        const maxRows = 500;
+
+        const result = await query(`
+            SELECT
+                id, name, category, brand, price, sale_price, stock,
+                COALESCE(image_url, image_path) AS image_url,
+                specifications, dimensions, description,
+                kiosk_featured, on_sale, sale_start_date, sale_end_date,
+                CASE WHEN stock > 0 THEN true ELSE false END AS available
+            FROM pc_parts
+            WHERE is_active = true
+            AND (kiosk_visible IS NULL OR kiosk_visible = true)
+            AND stock > 0
+            AND COALESCE(image_url, image_path) IS NOT NULL
+            AND COALESCE(image_url, image_path) <> ''
+            ORDER BY kiosk_featured DESC NULLS LAST, stock DESC, price ASC
+            LIMIT $1
+        `, [maxRows]);
+
+        const products = result.rows.map((row) => mapKioskProductRow(row, {
+            includeSalePricing: true,
+            includeOnSale: true
+        }));
+
+        const isProductOnSale = (product) => {
+            const price = parseDecimalValue(product.price);
+            const salePrice = parseDecimalValue(product.salePrice || product.sale_price || product.effectivePrice);
+            return product.onSale === true || (price > 0 && salePrice > 0 && salePrice < price);
+        };
+
+        const onSale = products
+            .filter(isProductOnSale)
+            .sort((left, right) => parseDecimalValue(left.effectivePrice || left.salePrice || left.price) - parseDecimalValue(right.effectivePrice || right.salePrice || right.price))
+            .slice(0, itemsPerSection);
+
+        const valueForMoney = [...products]
+            .sort((left, right) => parseDecimalValue(left.effectivePrice || left.price) - parseDecimalValue(right.effectivePrice || right.price))
+            .slice(0, itemsPerSection);
+
+        const hotPicks = [...products]
+            .sort((left, right) => parseIntegerValue(right.stock) - parseIntegerValue(left.stock) || compareText(left.name, right.name))
+            .slice(0, itemsPerSection);
+
+        res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=30');
+        res.json({
+            success: true,
+            data: {
+                onSale: compactKioskCardProducts(onSale),
+                hotPicks: compactKioskCardProducts(hotPicks),
+                valueForMoney: compactKioskCardProducts(valueForMoney)
+            },
+            cache: {
+                source: 'backend-memory-or-db',
+                ttlSeconds: 30
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        logger.error('Error fetching kiosk homepage products:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch homepage products',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
  * GET /api/kiosk/build-components - Get components organized for PC builder
  * Returns products grouped by category for PC customization interface
  */
 const getBuildComponents = async (req, res) => {
     try {
-        logger.info('🔍 TRACE: getBuildComponents called');
-        
-        // Remove stock filter to show all products, not just those in stock
+        const requestedLimit = Math.min(normalizePositiveInteger(req.query.limit, 500), 1000);
+        const cacheKey = `limit:${requestedLimit}`;
+
+        if (
+            buildComponentsResponseCache
+            && buildComponentsResponseCache.key === cacheKey
+            && Date.now() < buildComponentsResponseCache.expiresAt
+        ) {
+            res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=30');
+            res.setHeader('X-KWise-Cache', 'hit');
+            res.type('application/json').send(buildComponentsResponseCache.body);
+            return;
+        }
+
+        const buildCategories = ['CPU', 'GPU', 'Motherboard', 'RAM', 'Storage', 'PSU', 'Case', 'Cooling'];
+
         const sqlQuery = `
-            SELECT 
-                id, name, category, brand, price, stock,
-                COALESCE(image_url, image_path) AS image_url,
-                specifications, dimensions, description,
-                CASE WHEN stock > 0 THEN true ELSE false END as available
-            FROM pc_parts 
-            WHERE is_active = true 
-            AND kiosk_visible = true
-            ORDER BY category, price ASC
+            SELECT
+                pp.id, pp.name, pp.category, pp.brand, pp.price, pp.sale_price, pp.stock,
+                COALESCE(pp.image_url, pp.image_path) AS image_url,
+                COALESCE(
+                    pp.specifications || COALESCE((ps.normalized_specs->'specs')::jsonb, '{}'::jsonb),
+                    pp.specifications,
+                    '{}'::jsonb
+                ) AS specifications,
+                pp.dimensions, pp.description, pp.on_sale,
+                pp.created_at, pp.updated_at,
+                CASE WHEN pp.stock > 0 THEN true ELSE false END as available,
+                ROW_NUMBER() OVER (PARTITION BY pp.category ORDER BY pp.price ASC, pp.name ASC) AS category_rank
+            FROM pc_parts pp
+            LEFT JOIN product_specs ps ON pp.id = ps.product_id
+            WHERE pp.is_active = true
+              AND (pp.kiosk_visible IS NULL OR pp.kiosk_visible = true)
+              AND pp.category = ANY($1::text[])
+            ORDER BY pp.category, pp.price ASC, pp.name ASC
         `;
-        
-        logger.info('🔍 TRACE: Executing SQL query...');
-        const result = await query(sqlQuery);
-        logger.info('🔍 TRACE: SQL result rows:', result.rows.length);
+
+        const result = await query(sqlQuery, [buildCategories]);
 
         // Group products by category
         const componentsByCategory = {};
         const brandsByCategory = {};
+        buildCategories.forEach((category) => {
+            const key = categoryKey(category);
+            componentsByCategory[key] = [];
+            brandsByCategory[key] = new Set();
+        });
 
-        result.rows.forEach((row, index) => {
-            logger.info(`🔍 TRACE: Processing row ${index + 1}/${result.rows.length} - ${row.category}: ${row.name}`);
-            const category = row.category.toLowerCase();
+        result.rows.forEach((row) => {
+            const category = categoryKey(row.category);
 
             if (!componentsByCategory[category]) {
                 componentsByCategory[category] = [];
                 brandsByCategory[category] = new Set();
-                logger.info(`🔍 TRACE: Created new category: ${category}`);
             }
 
-            const product = {
-                id: row.id,
-                name: row.name,
-                brand: row.brand,
-                price: parseFloat(row.price),
-                stock: parseInt(row.stock),
-                imageUrl: row.image_url,
-                specifications: row.specifications,
-                dimensions: row.dimensions,
-                description: row.description,
-                available: row.available
-            };
+            if (componentsByCategory[category].length >= requestedLimit) return;
+
+            const product = mapKioskProductRow(row, {
+                includeSalePricing: true,
+                includeOnSale: true,
+                includeTimestamps: true
+            });
 
             componentsByCategory[category].push(product);
-            brandsByCategory[category].add(row.brand);
-            
-            if (category === 'cpu') {
-                logger.info(`🔍 TRACE: Added CPU #${componentsByCategory[category].length}: ${row.name}`);
+            if (row.brand) {
+                brandsByCategory[category].add(row.brand);
             }
         });
 
-        logger.info('🔍 TRACE: Processing completed, building final structure...');
-        
         // Convert to final structure
         const buildComponents = {};
         Object.keys(componentsByCategory).forEach(category => {
             buildComponents[category] = {
                 products: componentsByCategory[category],
-                brands: Array.from(brandsByCategory[category]).sort()
+                brands: Array.from(brandsByCategory[category]).sort(compareText),
+                count: componentsByCategory[category].length
             };
-            logger.info(`🔍 TRACE: Final ${category}: ${buildComponents[category].products.length} products`);
         });
 
-        // Add debugging before sending response
-        logger.info('🔍 CONTROLLER DEBUG: CPU products count:', buildComponents.cpu?.products?.length || 0);
-        logger.info('🔍 CONTROLLER DEBUG: Total categories:', Object.keys(buildComponents).length);
-        
         const responseData = {
             success: true,
             data: buildComponents,
             timestamp: new Date().toISOString()
         };
-        
-        const responseString = JSON.stringify(responseData);
-        logger.info('🔍 CONTROLLER DEBUG: Response size (bytes):', responseString.length);
-        logger.info('🔍 CONTROLLER DEBUG: Response size (KB):', (responseString.length / 1024).toFixed(2));
 
-        logger.info('🔍 TRACE: Sending response...');
-        res.json(responseData);
+        const responseBody = JSON.stringify(responseData);
+        buildComponentsResponseCache = {
+            key: cacheKey,
+            expiresAt: Date.now() + BUILD_COMPONENTS_CACHE_TTL_MS,
+            body: responseBody
+        };
+
+        res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=30');
+        res.setHeader('X-KWise-Cache', 'miss');
+        res.type('application/json').send(responseBody);
 
     } catch (error) {
         logger.error('❌ TRACE: Error in getBuildComponents:', error);
@@ -328,6 +1489,7 @@ const getBuildComponents = async (req, res) => {
 const searchProducts = async (req, res) => {
     try {
         const { q, category, limit = 20 } = req.query;
+        const itemsPerPage = normalizePositiveInteger(limit, 20);
 
         if (!q || q.trim() === '') {
             return res.status(400).json({
@@ -352,36 +1514,24 @@ const searchProducts = async (req, res) => {
         }
 
         const searchQuery = `
-            SELECT 
+            SELECT
                 id, name, category, brand, price, stock,
                 COALESCE(image_url, image_path) AS image_url,
                 specifications, dimensions, description,
                 CASE WHEN stock > 0 THEN true ELSE false END as available
-            FROM pc_parts 
+            FROM pc_parts
             ${whereClause}
-            ORDER BY 
+            ORDER BY
                 CASE WHEN name ILIKE $1 THEN 1 ELSE 2 END,
                 name ASC
             LIMIT $${paramIndex}
         `;
 
-        queryParams.push(parseInt(limit));
+        queryParams.push(itemsPerPage);
 
         const result = await query(searchQuery, queryParams);
 
-        const products = result.rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            category: row.category,
-            brand: row.brand,
-            price: parseFloat(row.price),
-            stock: parseInt(row.stock),
-            imageUrl: row.image_url,
-            specifications: row.specifications,
-            dimensions: row.dimensions,
-            description: row.description,
-            available: row.available
-        }));
+        const products = result.rows.map((row) => mapKioskProductRow(row));
 
         res.json({
             success: true,
@@ -445,10 +1595,10 @@ const getEffectivePrice = (product) => {
         const saleEnd = product.sale_end_date ? new Date(product.sale_end_date) : new Date(8640000000000000);
 
         if (now >= saleStart && now <= saleEnd) {
-            return parseFloat(product.sale_price);
+            return parseDecimalValue(product.sale_price);
         }
     }
-    return parseFloat(product.price);
+    return parseDecimalValue(product.price);
 };
 
 /**
@@ -463,68 +1613,64 @@ const getOnSaleProducts = async (req, res) => {
             sortOrder = 'asc'
         } = req.query;
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
-        const validSortBy = ['name', 'price', 'sale_price', 'brand', 'category'].includes(sortBy) ? sortBy : 'name';
-        const validSortOrder = ['asc', 'desc'].includes(sortOrder.toLowerCase()) ? sortOrder.toUpperCase() : 'ASC';
+        const currentPage = normalizePositiveInteger(page, 1);
+        const itemsPerPage = normalizePositiveInteger(limit, 20);
+        const offset = (currentPage - 1) * itemsPerPage;
+        const validSortBy = ['name', 'price', 'sale_price', 'brand', 'category'].includes(String(sortBy)) ? String(sortBy) : 'name';
+        const validSortOrder = ['asc', 'desc'].includes(String(sortOrder).toLowerCase()) ? String(sortOrder).toUpperCase() : 'ASC';
 
         const mainQuery = `
-            SELECT 
+            SELECT
                 id, name, category, brand, price, sale_price, stock,
                 COALESCE(image_url, image_path) AS image_url,
                 specifications, dimensions, description, on_sale, sale_start_date, sale_end_date,
                 CASE WHEN stock > 0 THEN true ELSE false END as available
-            FROM pc_parts 
-            WHERE is_active = true 
-            AND kiosk_visible = true 
+            FROM pc_parts
+            WHERE is_active = true
+            AND kiosk_visible = true
             AND on_sale = true
             AND stock > 0
-            AND (sale_start_date IS NULL OR sale_start_date <= NOW())
-            AND (sale_end_date IS NULL OR sale_end_date >= NOW())
+            AND (
+                (sale_start_date IS NULL OR sale_start_date <= NOW())
+                AND (sale_end_date IS NULL OR sale_end_date >= NOW())
+                OR (sale_price IS NOT NULL AND sale_price > 0 AND sale_price < price)
+            )
             ORDER BY ${validSortBy} ${validSortOrder}
             LIMIT $1 OFFSET $2
         `;
 
         const countQuery = `
-            SELECT COUNT(*) as total FROM pc_parts 
-            WHERE is_active = true 
-            AND kiosk_visible = true 
+            SELECT COUNT(*) as total FROM pc_parts
+            WHERE is_active = true
+            AND kiosk_visible = true
             AND on_sale = true
             AND stock > 0
-            AND (sale_start_date IS NULL OR sale_start_date <= NOW())
-            AND (sale_end_date IS NULL OR sale_end_date >= NOW())
+            AND (
+                (sale_start_date IS NULL OR sale_start_date <= NOW())
+                AND (sale_end_date IS NULL OR sale_end_date >= NOW())
+                OR (sale_price IS NOT NULL AND sale_price > 0 AND sale_price < price)
+            )
         `;
 
         const [result, countResult] = await Promise.all([
-            query(mainQuery, [parseInt(limit), offset]),
+            query(mainQuery, [itemsPerPage, offset]),
             query(countQuery, [])
         ]);
 
-        const total = parseInt(countResult.rows[0].total);
-        const totalPages = Math.ceil(total / parseInt(limit));
+        const total = parseIntegerValue(countResult.rows[0].total);
+        const totalPages = Math.ceil(total / itemsPerPage);
 
-        const products = result.rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            category: row.category,
-            brand: row.brand,
-            price: parseFloat(row.price),
-            salePrice: parseFloat(row.sale_price),
-            effectivePrice: getEffectivePrice(row),
-            stock: parseInt(row.stock),
-            imageUrl: row.image_url,
-            specifications: row.specifications,
-            dimensions: row.dimensions,
-            description: row.description,
-            onSale: row.on_sale,
-            available: row.available
-        }));
+        const products = compactKioskCardProducts(result.rows.map((row) => mapKioskProductRow(row, {
+            includeSalePricing: true,
+            includeOnSale: true
+        })));
 
         res.json({
             success: true,
             data: products,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: currentPage,
+                limit: itemsPerPage,
                 total,
                 totalPages
             },
@@ -547,12 +1693,18 @@ const getOnSaleProducts = async (req, res) => {
  */
 const createOrder = async (req, res) => {
     try {
-        logger.info('Kiosk order creation request received:');
-        logger.info('Request body:', JSON.stringify(req.body, null, 2));
-        
-        const { 
-            customerName, 
-            serviceType, 
+        logger.info('Kiosk order creation request received', sanitizeForLog({
+            serviceType: req.body.serviceType,
+            itemCount: Array.isArray(req.body.items) ? req.body.items.length : 0,
+            selectedPartCount: Array.isArray(req.body.selectedParts) ? req.body.selectedParts.length : 0,
+            totalAmount: req.body.totalAmount,
+            paymentMethod: req.body.paymentMethod,
+            transactionOrigin: req.body.transactionOrigin
+        }));
+
+        const {
+            customerName,
+            serviceType,
             items = [],        // Changed from selectedParts to items
             selectedParts = [], // Keep as fallback for backward compatibility
             totalAmount,       // Remove default = 0 to properly detect if it's missing
@@ -562,9 +1714,13 @@ const createOrder = async (req, res) => {
             notes = null,
             transactionOrigin = null
         } = req.body;
+        const idempotencyKey = req.get('X-KWise-Idempotency-Key')
+            || req.body.idempotencyKey
+            || req.body.clientRequestId
+            || null;
 
-        // Use items if available, otherwise fall back to selectedParts
-        const orderItems = items.length > 0 ? items : selectedParts;
+        const orderItems = getOrderItemsFromPayload({ items, selectedParts });
+        const normalizedTotalAmount = parseDecimalValue(totalAmount, Number.NaN);
 
         logger.info('Validation check:', {
             hasServiceType: !!serviceType,
@@ -572,185 +1728,70 @@ const createOrder = async (req, res) => {
             hasTotalAmount: totalAmount !== undefined && totalAmount !== null,
             totalAmountValue: totalAmount,
             totalAmountType: typeof totalAmount,
+            normalizedTotalAmount,
             hasItems: orderItems.length > 0,
             itemsCount: orderItems.length
         });
 
-        // Validate required fields (customerName can be empty for kiosk orders)
-        // For diagnostic orders, totalAmount can be 0 or null
-        if (!serviceType) {
-            logger.error('Validation failed: Missing serviceType');
+        const validationMessage = validateCreateOrderRequest(serviceType, totalAmount, orderItems);
+        if (validationMessage) {
+            logger.error(`Validation failed: ${validationMessage}`);
             return res.status(400).json({
                 success: false,
-                message: 'Service type is required'
-            });
-        }
-
-        if (totalAmount === undefined || totalAmount === null) {
-            logger.error('Validation failed: totalAmount is undefined or null');
-            return res.status(400).json({
-                success: false,
-                message: 'Total amount is required (can be 0 for diagnostic services)'
+                message: validationMessage
             });
         }
 
         // Import queue manager
         const queueManager = require('../services/queueManagerService');
 
-        // Prepare order data for queue manager
-        const orderData = {
-            customerName: customerName || null, // Allow empty/null customer names for kiosk
-            customerEmail: email,
-            items: orderItems, // Use the correct items array
-            totalAmount: parseFloat(totalAmount) || 0, // Ensure it's a number, default to 0
+        const orderData = buildQueueOrderData({
+            customerName,
+            email,
+            orderItems,
+            totalAmount: normalizedTotalAmount,
             paymentMethod,
             serviceType,
-            transactionOrigin: transactionOrigin || serviceType, // Use transactionOrigin if provided
+            transactionOrigin,
             phoneNumber,
-            notes
-        };
+            notes,
+            idempotencyKey
+        });
 
-        logger.info('Prepared order data for queue manager:', JSON.stringify(orderData, null, 2));
-        logger.info('Order data validation:', {
+        logger.info('Prepared order data for queue manager', {
             hasCustomerName: !!orderData.customerName,
             hasItems: !!orderData.items && Array.isArray(orderData.items),
             itemsLength: orderData.items?.length || 0,
-            hasTotalAmount: !!orderData.totalAmount,
-            totalAmountValue: orderData.totalAmount
+            hasTotalAmount: !Number.isNaN(orderData.totalAmount),
+            totalAmountValue: orderData.totalAmount,
+            serviceType: orderData.serviceType,
+            idempotencyKeyPresent: Boolean(idempotencyKey)
         });
 
         // Create order with queue assignment using queue manager
-        const result = await queueManager.createOrderWithQueue(orderData);
-        
-        logger.info(`Kiosk order created: ID=${result.orderId}, Queue=${result.queueNumber}, Customer=${customerName}`);
-
-        // ✅ AUTO-SAVE TO COMMUNITY BUILDS
-        // Captures ALL customized PC orders: PC Customized, PC Customized AI, and Pre-Built Presets
-        const customizedServiceTypes = [
-            'pc-customized',      // PC Customized (manual selection)
-            'pc-customized-ai',   // PC Customized with AI suggestions
-            'prebuilt-pc',        // Pre-Built PC (may be customized)
-            'preset-pc',          // Pre-Built Preset
-            'community-pc'        // Community Build orders
-        ];
-
-        logger.info(`🔍 SERVICE TYPE CHECK: "${serviceType}" | Is in customizedServiceTypes: ${customizedServiceTypes.includes(serviceType)}`);
-        
-        if (customizedServiceTypes.includes(serviceType)) {
-            try {
-                logger.info(`🔍 Checking if order ${result.orderId} should be saved to Community Builds...`);
-                logger.info(`📊 Service Type: "${serviceType}"`);
-                logger.info(`📦 Order Items Count: ${orderItems.length}`);
-                logger.info(`💰 Total Amount: ${totalAmount}`);
-                
-                // For pc-customized and pc-customized-ai, ALL orders should be saved
-                // For prebuilt-pc, only save if there are customizations
-                let shouldSave = false;
-                let buildData = null;
-
-                if (serviceType === 'pc-customized' || serviceType === 'pc-customized-ai') {
-                    // PC Customized orders are ALWAYS community builds
-                    shouldSave = true;
-                    
-                    // Extract components from order items
-                    const components = orderItems.map(item => ({
-                        name: item.category || 'Component',
-                        value: item.name || item.component || 'Unknown',
-                        part_id: item.id || item.part_id,
-                        price: parseFloat(item.price || 0),
-                        category: item.category || 'Other',
-                        brand: item.brand || '',
-                        specifications: item.specifications || {}
-                    }));
-
-                    // Determine tier based on total price (using database constraint values)
-                    let tier = 'Mid Tier'; // Default to Mid Tier
-                    if (totalAmount >= 80000) tier = 'Elite';
-                    else if (totalAmount >= 50000) tier = 'High Tier';
-                    else if (totalAmount >= 25000) tier = 'Mid Tier';
-                    else tier = 'Entry';
-
-                    logger.info(`🔥 TIER CALCULATION: totalAmount=${totalAmount}, tier="${tier}"`);
-
-                    buildData = {
-                        buildName: `Customer ${serviceType === 'pc-customized-ai' ? 'AI' : 'Custom'} Build ${result.orderId}`,
-                        components: components,
-                        totalPrice: totalAmount,
-                        tier: tier,
-                        purposes: ['Gaming'], // Default purpose, can be enhanced later
-                        baseProductId: null,
-                        customizations: {
-                            orderType: serviceType,
-                            orderId: result.orderId,
-                            createdFrom: serviceType === 'pc-customized-ai' ? 'AI Suggestion' : 'Manual Selection'
-                        }
-                    };
-
-                    logger.info(`✅ PC Customized order detected - will save to Community Builds`);
-                } else if (serviceType === 'prebuilt-pc' || serviceType === 'preset-pc') {
-                    // Pre-Built orders: Only save if customizations exist
-                    const hasCustomizations = orderItems.some(item => 
-                        item.isCustomized || 
-                        (item.customizations && Object.keys(item.customizations).length > 0)
-                    );
-
-                    if (hasCustomizations) {
-                        shouldSave = true;
-                        
-                        const firstItem = orderItems[0];
-                        const tier = firstItem.tier || firstItem.buildType || 'Mid Tier';
-                        const purposes = firstItem.purposes || ['Gaming'];
-                        const baseProductId = firstItem.baseProductId || firstItem.product_id;
-                        
-                        // ✅ FIX: Extract component details from prebuilt-component items
-                        const components = orderItems
-                            .filter(item => item.category === 'prebuilt-component')
-                            .map(item => ({
-                                name: item.componentType || item.category || 'Component',
-                                value: item.componentValue || item.name || 'Unknown',
-                                part_id: item.id || null,
-                                price: parseFloat(item.price || 0),
-                                category: item.componentType || item.category || 'Other'
-                            }));
-
-                        buildData = {
-                            buildName: `Customer Customized Preset ${result.orderId}`,
-                            components: components,
-                            totalPrice: totalAmount,
-                            tier: tier,
-                            purposes: purposes,
-                            baseProductId: baseProductId,
-                            customizations: firstItem.customizations || {}
-                        };
-
-                        logger.info(`✅ Customized Pre-Built order detected - will save to Community Builds`);
-                        logger.info(`📦 Components extracted: ${components.length}`);
-                    } else {
-                        logger.info(`ℹ️ Pre-Built order without customizations - skipping Community Build save`);
-                    }
-                }
-
-                // Save to Community Builds if applicable
-                if (shouldSave && buildData) {
-                    logger.info(`💾 Attempting to save community build: ${buildData.buildName}`);
-                    logger.info(`📝 Build Data:`, JSON.stringify(buildData, null, 2));
-                    
-                    // ✅ CRITICAL FIX: Use internal function instead of HTTP endpoint handler
-                    const savedBuild = await saveCommunityBuildInternal(buildData);
-
-                    logger.info(`✅ Order ${result.orderId} auto-saved to Community Builds (Type: ${serviceType}, Build ID: ${savedBuild.id})`);
-                } else {
-                    logger.warn(`⚠️ Community Build NOT saved. shouldSave=${shouldSave}, hasBuildData=${!!buildData}`);
-                }
-            } catch (communityError) {
-                logger.error('Failed to auto-save to Community Builds:', communityError);
-                // Don't fail the order creation if Community Build save fails
-            }
+        const result = await orderLockService.executeWithLock(
+            () => queueManager.createOrderWithQueue(orderData),
+            orderData
+        );
+        if (result.isDuplicate && !result.orderId) {
+            return res.status(409).json({
+                success: false,
+                message: result.message || 'Duplicate order is already being processed'
+            });
         }
 
-        res.json({
+        logger.info('Kiosk order created', {
+            orderId: result.orderId,
+            queueNumber: result.queueNumber,
+            customerName,
+            duplicate: Boolean(result.isDuplicate)
+        });
+
+        const responseBody = {
             success: true,
-            message: 'Order created successfully with queue assignment',
+            message: result.isDuplicate
+                ? 'Order already submitted; returning existing queue assignment'
+                : 'Order created successfully with queue assignment',
             data: {
                 orderId: result.orderId,
                 orderIdFormatted: result.orderIdFormatted,
@@ -758,10 +1799,25 @@ const createOrder = async (req, res) => {
                 queueNumber: result.queueNumber,
                 customerName,
                 serviceType,
-                totalAmount,
+                totalAmount: normalizedTotalAmount,
                 createdAt: new Date().toISOString()
             }
-        });
+        };
+
+        res.json(responseBody);
+
+        if (!result.isDuplicate) {
+            runAfterResponse(async () => {
+                const savedBuild = await saveCommunityBuildForOrder(serviceType, orderItems, normalizedTotalAmount, result.orderId);
+                if (savedBuild) {
+                    logger.info('Order auto-saved to Community Builds', {
+                        orderId: result.orderId,
+                        serviceType,
+                        buildId: savedBuild.id
+                    });
+                }
+            });
+        }
 
     } catch (error) {
         logger.error('Error creating kiosk order:', error);
@@ -801,7 +1857,7 @@ const getAIHotPicks = async (req, res) => {
         // Handle future upgrade analysis
         if (filters.analysisType === 'future_upgrade') {
             const upgradeRecommendations = await generateFutureUpgradeRecommendations(products, budget, filters);
-            
+
             return res.json({
                 success: true,
                 data: {
@@ -817,7 +1873,7 @@ const getAIHotPicks = async (req, res) => {
         if (filters.analysisType === 'value_for_money') {
             logger.info('💰🤖 Generating Value for Money recommendations...');
             const result = await valueAnalyzer.generateValueForMoney(products, {}, filters.maxRecommendations || 8);
-            
+
             return res.json({
                 success: true,
                 data: {
@@ -866,19 +1922,19 @@ const getAIHotPicks = async (req, res) => {
 async function generateFutureUpgradeRecommendations(currentComponents, budget, filters) {
     try {
         logger.info('🚀 Starting enhanced future upgrade analysis...');
-        
+
         // Get actual stock data for intelligent recommendations
         const stockData = await getStockDataForUpgradeAnalysis();
-        
+
         const upgradePromises = currentComponents.map(async (component, index) => {
             // Generate 2 upgrade options per component: 1 from stock + 1 external market
             const upgrades = await generateDualUpgradeOptions(component, stockData, budget);
             return upgrades;
         });
-        
+
         const allUpgrades = await Promise.all(upgradePromises);
         return allUpgrades.flat(); // Flatten to get all upgrades
-        
+
     } catch (error) {
         logger.error('Enhanced future upgrade recommendations failed', error);
         return generateFallbackUpgradeRecommendations(currentComponents);
@@ -889,18 +1945,18 @@ async function generateFutureUpgradeRecommendations(currentComponents, budget, f
  * Generate dual upgrade options: stock + external market
  */
 async function generateDualUpgradeOptions(component, stockData, budget) {
-    const componentPrice = parseFloat((component.price || '0').toString().replace(/[^\d.]/g, '')) || 0;
+    const componentPrice = parseCurrencyAmount(component.price);
     const category = component.category || 'Component';
     const componentName = component.name || 'Unknown Component';
-    
+
     logger.info(`🔍 Analyzing upgrades for ${componentName} (${category})`);
-    
+
     // Find best stock upgrade in same category
     const stockUpgrade = findBestStockUpgrade(component, stockData, componentPrice);
-    
+
     // Generate external market upgrade using AI
     const externalUpgrade = await generateExternalMarketUpgrade(component, componentPrice);
-    
+
     return [stockUpgrade, externalUpgrade];
 }
 
@@ -910,24 +1966,24 @@ async function generateDualUpgradeOptions(component, stockData, budget) {
 function findBestStockUpgrade(component, stockData, currentPrice) {
     const category = component.category || 'Component';
     const categoryStock = stockData[category] || [];
-    
+
     // Find upgrades that are at least 30% more expensive (meaningful upgrade)
     const minUpgradePrice = currentPrice * 1.3;
-    const upgrades = categoryStock.filter(item => 
-        parseFloat(item.price) > minUpgradePrice && 
+    const upgrades = categoryStock.filter(item =>
+        parseDecimalValue(item.price) > minUpgradePrice &&
         item.name !== component.name
-    ).sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
-    
+    ).sort((a, b) => parseDecimalValue(b.price) - parseDecimalValue(a.price));
+
     // Get the best available upgrade
     const bestUpgrade = upgrades[0] || categoryStock[0];
-    
+
     if (bestUpgrade) {
-        const upgradePrice = parseFloat(bestUpgrade.price);
+        const upgradePrice = parseDecimalValue(bestUpgrade.price);
         const priceDiff = upgradePrice - currentPrice;
         const performanceGain = calculatePerformanceGain(component, bestUpgrade, category);
         const futureProofing = calculateFutureProofing(upgradePrice, currentPrice, bestUpgrade);
         const upgradeAnalysis = generateUpgradeAnalysis(component, bestUpgrade, category);
-        
+
         return {
             id: `stock-${category}-${Date.now()}`,
             type: 'stock_upgrade',
@@ -957,25 +2013,25 @@ function findBestStockUpgrade(component, stockData, currentPrice) {
  * Calculate performance gain based on component specifications and category
  */
 function calculatePerformanceGain(currentComponent, upgradeComponent, category) {
-    const currentPrice = parseFloat((currentComponent.price || '0').toString().replace(/[^\d.]/g, '')) || 0;
-    const upgradePrice = parseFloat(upgradeComponent.price);
-    const priceRatio = upgradePrice / currentPrice;
-    
+    const currentPrice = parseCurrencyAmount(currentComponent.price);
+    const upgradePrice = parseDecimalValue(upgradeComponent.price);
+
     // Category-specific performance calculations
     const categoryMultipliers = {
         'Cooling': { base: 25, multiplier: 0.8 },
         'GPU': { base: 40, multiplier: 1.2 },
-        'CPU': { base: 35, multiplier: 1.0 },
+        'CPU': { base: 35, multiplier: 1 },
         'RAM': { base: 30, multiplier: 0.9 },
         'Storage': { base: 50, multiplier: 1.1 },
         'Motherboard': { base: 20, multiplier: 0.7 },
         'PSU': { base: 15, multiplier: 0.6 },
         'Case': { base: 10, multiplier: 0.5 }
     };
-    
-    const categoryData = categoryMultipliers[category] || { base: 25, multiplier: 1.0 };
+
+    const categoryData = categoryMultipliers[category] || { base: 25, multiplier: 1 };
+    const priceRatio = getSafeRatio(upgradePrice, currentPrice, 1.5);
     const performanceIncrease = Math.round(categoryData.base + (priceRatio - 1) * 100 * categoryData.multiplier);
-    
+
     return `+${Math.min(Math.max(performanceIncrease, 15), 95)}%`;
 }
 
@@ -983,15 +2039,15 @@ function calculatePerformanceGain(currentComponent, upgradeComponent, category) 
  * Calculate future-proofing rating based on price difference and specifications
  */
 function calculateFutureProofing(upgradePrice, currentPrice, upgradeComponent) {
-    const priceRatio = upgradePrice / currentPrice;
-    const brand = upgradeComponent.brand?.toLowerCase() || '';
-    
+    const priceRatio = getSafeRatio(upgradePrice, currentPrice, 1);
+    const brand = toLowerCaseText(upgradeComponent.brand);
+
     // Premium brands get bonus
     const premiumBrands = ['asus', 'corsair', 'nzxt', 'msi', 'gigabyte', 'evga', 'seasonic'];
     const brandBonus = premiumBrands.some(pb => brand.includes(pb)) ? 0.5 : 0;
-    
+
     if (priceRatio >= 2.5 + brandBonus) return 'Excellent (4+ years)';
-    if (priceRatio >= 2.0 + brandBonus) return 'Very Good (3-4 years)';
+    if (priceRatio >= 2 + brandBonus) return 'Very Good (3-4 years)';
     if (priceRatio >= 1.5 + brandBonus) return 'Good (2-3 years)';
     return 'Moderate (1-2 years)';
 }
@@ -1004,21 +2060,21 @@ function generateUpgradeAnalysis(currentComponent, upgradeComponent, category) {
     const upgradeName = upgradeComponent.name || 'Upgrade Component';
     const currentSpecs = currentComponent.specifications || '';
     const upgradeSpecs = upgradeComponent.specifications || '';
-    
+
     // Extract key specifications for comparison
-    const analysis = analyzeSpecifications(currentSpecs, upgradeSpecs, category);
-    
+    const analysisSummary = analyzeSpecifications(currentSpecs, upgradeSpecs, category);
+
     const categoryBenefits = {
-        'Cooling': `Superior thermal management with ${analysis.cooling}. Enhanced RGB lighting and quieter operation compared to ${currentName}.`,
-        'GPU': `Significantly higher frame rates with ${analysis.gpu}. Better ray tracing performance and future game compatibility than ${currentName}.`,
-        'CPU': `Faster processing speeds with ${analysis.cpu}. Improved multitasking and content creation performance over ${currentName}.`,
-        'RAM': `Increased capacity and speed with ${analysis.ram}. Better system responsiveness and multitasking than ${currentName}.`,
-        'Storage': `Faster read/write speeds with ${analysis.storage}. Reduced loading times and better system performance than ${currentName}.`,
-        'Motherboard': `Enhanced connectivity with ${analysis.motherboard}. Better upgrade path and features compared to ${currentName}.`,
-        'PSU': `Higher efficiency and wattage with ${analysis.psu}. More stable power delivery and headroom than ${currentName}.`,
-        'Case': `Better airflow and build quality with ${analysis.case}. Improved cable management and aesthetics over ${currentName}.`
+        'Cooling': `Superior thermal management with ${analysisSummary}. Enhanced RGB lighting and quieter operation compared to ${currentName}.`,
+        'GPU': `Significantly higher frame rates with ${analysisSummary}. Better ray tracing performance and future game compatibility than ${currentName}.`,
+        'CPU': `Faster processing speeds with ${analysisSummary}. Improved multitasking and content creation performance over ${currentName}.`,
+        'RAM': `Increased capacity and speed with ${analysisSummary}. Better system responsiveness and multitasking than ${currentName}.`,
+        'Storage': `Faster read/write speeds with ${analysisSummary}. Reduced loading times and better system performance than ${currentName}.`,
+        'Motherboard': `Enhanced connectivity with ${analysisSummary}. Better upgrade path and features compared to ${currentName}.`,
+        'PSU': `Higher efficiency and wattage with ${analysisSummary}. More stable power delivery and headroom than ${currentName}.`,
+        'Case': `Better airflow and build quality with ${analysisSummary}. Improved cable management and aesthetics over ${currentName}.`
     };
-    
+
     return categoryBenefits[category] || `Professional upgrade featuring ${upgradeName} with enhanced specifications and superior build quality compared to ${currentName}. Provides significant performance improvements and excellent value for money.`;
 }
 
@@ -1026,43 +2082,16 @@ function generateUpgradeAnalysis(currentComponent, upgradeComponent, category) {
  * Analyze specifications to extract key upgrade points
  */
 function analyzeSpecifications(currentSpecs, upgradeSpecs, category) {
-    const current = currentSpecs.toLowerCase();
-    const upgrade = upgradeSpecs.toLowerCase();
-    
-    switch (category) {
-        case 'Cooling':
-            if (upgrade.includes('360') && !current.includes('360')) return 'larger 360mm radiator';
-            if (upgrade.includes('rgb') && !current.includes('rgb')) return 'advanced RGB lighting';
-            if (upgrade.includes('aio') && !current.includes('aio')) return 'liquid cooling technology';
-            return 'advanced cooling technology';
-            
-        case 'GPU':
-            if (upgrade.includes('rtx') && current.includes('gtx')) return 'RTX ray tracing capabilities';
-            if (upgrade.includes('16gb') && current.includes('8gb')) return '16GB VRAM vs 8GB';
-            if (upgrade.includes('4080') && current.includes('4060')) return 'flagship GPU architecture';
-            return 'next-generation graphics architecture';
-            
-        case 'CPU':
-            if (upgrade.includes('i9') && current.includes('i7')) return 'i9 flagship performance';
-            if (upgrade.includes('x3d') && !current.includes('x3d')) return '3D V-Cache technology';
-            if (upgrade.includes('14th') && current.includes('13th')) return '14th generation architecture';
-            return 'higher core count and frequencies';
-            
-        case 'RAM':
-            if (upgrade.includes('ddr5') && current.includes('ddr4')) return 'DDR5 next-gen memory';
-            if (upgrade.includes('32gb') && current.includes('16gb')) return '32GB capacity vs 16GB';
-            if (upgrade.includes('6000') && !current.includes('6000')) return '6000MHz high-speed';
-            return 'higher capacity and faster speeds';
-            
-        case 'Storage':
-            if (upgrade.includes('pcie 5') && !current.includes('pcie 5')) return 'PCIe 5.0 interface';
-            if (upgrade.includes('2tb') && current.includes('1tb')) return '2TB capacity vs 1TB';
-            if (upgrade.includes('990') && current.includes('980')) return 'latest generation NVMe';
-            return 'faster NVMe technology';
-            
-        default:
-            return 'enhanced specifications and features';
+    const current = toLowerCaseText(currentSpecs);
+    const upgrade = toLowerCaseText(upgradeSpecs);
+    const categoryRules = SPEC_ANALYSIS_RULES[category];
+
+    if (!categoryRules) {
+        return 'enhanced specifications and features';
     }
+
+    const matchingRule = categoryRules.rules.find((rule) => matchesSpecificationRule(current, upgrade, rule));
+    return matchingRule ? matchingRule.result : categoryRules.fallback;
 }
 
 /**
@@ -1071,7 +2100,7 @@ function analyzeSpecifications(currentSpecs, upgradeSpecs, category) {
 async function generateExternalMarketUpgrade(component, currentPrice) {
     const category = component.category || 'Component';
     const componentName = (component.name || 'Unknown Component').toLowerCase();
-    
+
     // Enhanced external market intelligence with latest 2025 components
     const externalMarketUpgrades = {
         'Cooling': [
@@ -1139,30 +2168,30 @@ async function generateExternalMarketUpgrade(component, currentPrice) {
             { name: 'Cooler Master HAF 700 EVO', specs: 'Full tower, Cryo-chamber cooling, Curved tempered glass, Extreme builds' }
         ]
     };
-    
+
     const externalOptions = externalMarketUpgrades[category] || [
         { name: `Premium ${category} Upgrade`, specs: 'Latest generation, Professional grade, Future-ready technology' }
     ];
-    
+
     // Enhanced intelligent selection based on current component analysis
     const selectedUpgrade = selectBestExternalUpgrade(component, externalOptions, currentPrice);
-    
+
     // Dynamic pricing based on component tier and market analysis
     let priceMultiplier = 1.5; // Base multiplier
-    
+
     // Adjust pricing based on component category and current price tier
     if (category === 'GPU' && currentPrice > 30000) priceMultiplier = 2.2; // High-end GPU premium
     else if (category === 'CPU' && currentPrice > 20000) priceMultiplier = 1.8; // High-end CPU premium
     else if (category === 'Cooling' && componentName.includes('air')) priceMultiplier = 2.5; // AIO upgrade premium
     else if (['Storage', 'RAM'].includes(category)) priceMultiplier = 1.4; // Storage/RAM modest premium
     else if (['Motherboard', 'PSU'].includes(category)) priceMultiplier = 1.6; // Platform components
-    
+
     const upgradePrice = Math.round(currentPrice * priceMultiplier);
     const priceDiff = upgradePrice - currentPrice;
     const performanceGain = calculateAdvancedPerformanceGain(component, selectedUpgrade, category);
     const futureProofing = calculateAdvancedFutureProofing(upgradePrice, currentPrice, selectedUpgrade, category);
     const upgradeReason = generateAdvancedUpgradeReason(component, selectedUpgrade, category, performanceGain);
-    
+
     return {
         id: `external-${category}-${Date.now()}`,
         type: 'external_upgrade',
@@ -1191,7 +2220,7 @@ async function generateExternalMarketUpgrade(component, currentPrice) {
 function selectBestExternalUpgrade(component, options, currentPrice) {
     const componentName = (component.name || '').toLowerCase();
     const category = component.category || '';
-    
+
     // Intelligent selection based on current component characteristics
     if (category === 'Cooling') {
         // If current is air cooler, recommend AIO
@@ -1201,7 +2230,7 @@ function selectBestExternalUpgrade(component, options, currentPrice) {
         // If current is basic AIO, recommend premium AIO
         return options.find(opt => opt.name.includes('LCD') || opt.name.includes('RGB')) || options[1];
     }
-    
+
     if (category === 'GPU') {
         // If current is RTX 40 series, recommend RTX 50 series
         if (componentName.includes('4060') || componentName.includes('4070')) {
@@ -1210,7 +2239,7 @@ function selectBestExternalUpgrade(component, options, currentPrice) {
         // If current is older, recommend latest generation
         return options[0];
     }
-    
+
     if (category === 'CPU') {
         // If current is Intel, recommend newer Intel
         if (componentName.includes('intel') || componentName.includes('i5') || componentName.includes('i7')) {
@@ -1219,7 +2248,7 @@ function selectBestExternalUpgrade(component, options, currentPrice) {
         // If current is AMD, recommend newer AMD
         return options.find(opt => opt.name.includes('AMD') && opt.name.includes('9')) || options[1];
     }
-    
+
     // Default selection for other categories
     return options[Math.floor(Math.random() * Math.min(options.length, 3))];
 }
@@ -1228,33 +2257,33 @@ function selectBestExternalUpgrade(component, options, currentPrice) {
  * Calculate advanced future-proofing with market trend analysis
  */
 function calculateAdvancedFutureProofing(upgradePrice, currentPrice, upgradeComponent, category) {
-    const priceRatio = upgradePrice / currentPrice;
-    const upgradeName = upgradeComponent.name.toLowerCase();
-    
+    const priceRatio = getSafeRatio(upgradePrice, currentPrice, 1);
+    const upgradeName = toLowerCaseText(upgradeComponent.name);
+
     // Technology tier analysis
     const tierBonuses = {
         'flagship': 1.5, // RTX 5080, i9-15900K
         'high_end': 1.2, // RTX 5070 Ti, i7-15700K
-        'mid_range': 1.0, // Standard tier
+        'mid_range': 1, // Standard tier
         'entry': 0.8    // Budget tier
     };
-    
+
     let tierBonus = tierBonuses.mid_range;
-    
+
     // Detect tier from product name
-    if (upgradeName.includes('5080') || upgradeName.includes('i9') || upgradeName.includes('9950x') || 
+    if (upgradeName.includes('5080') || upgradeName.includes('i9') || upgradeName.includes('9950x') ||
         upgradeName.includes('godlike') || upgradeName.includes('ax1600')) {
         tierBonus = tierBonuses.flagship;
     } else if (upgradeName.includes('5070 ti') || upgradeName.includes('i7') || upgradeName.includes('9800x') ||
                upgradeName.includes('strix') || upgradeName.includes('master')) {
         tierBonus = tierBonuses.high_end;
     }
-    
+
     const adjustedRatio = priceRatio * tierBonus;
-    
-    if (adjustedRatio >= 3.0) return 'Exceptional (5+ years)';
+
+    if (adjustedRatio >= 3) return 'Exceptional (5+ years)';
     if (adjustedRatio >= 2.5) return 'Excellent (4+ years)';
-    if (adjustedRatio >= 2.0) return 'Very Good (3-4 years)';
+    if (adjustedRatio >= 2) return 'Very Good (3-4 years)';
     if (adjustedRatio >= 1.5) return 'Good (2-3 years)';
     return 'Moderate (1-2 years)';
 }
@@ -1263,15 +2292,16 @@ function calculateAdvancedFutureProofing(upgradePrice, currentPrice, upgradeComp
  * Extract brand name from product name
  */
 function extractBrandFromName(productName) {
+    const normalizedProductName = String(productName ?? '');
     const brands = ['NVIDIA', 'AMD', 'Intel', 'Corsair', 'NZXT', 'ASUS', 'MSI', 'Gigabyte', 'ASRock', 'Seasonic', 'be quiet!', 'EVGA', 'Thermaltake', 'Lian Li', 'Fractal Design', 'Phanteks', 'Samsung', 'WD', 'Crucial', 'Seagate', 'Kingston', 'G.SKILL', 'TeamGroup'];
-    
+
     for (const brand of brands) {
-        if (productName.includes(brand)) {
+        if (normalizedProductName.includes(brand)) {
             return brand;
         }
     }
-    
-    return productName.split(' ')[0]; // First word as fallback
+
+    return normalizedProductName.split(' ')[0] || 'Unknown';
 }
 
 /**
@@ -1281,9 +2311,9 @@ async function getStockDataForUpgradeAnalysis() {
     try {
         const result = await query(`
             SELECT category, name, brand, price, specifications, stock
-            FROM pc_parts 
-            WHERE is_active = true 
-            AND kiosk_visible = true 
+            FROM pc_parts
+            WHERE is_active = true
+            AND kiosk_visible = true
             AND stock > 0
             ORDER BY category, price DESC
         `);
@@ -1297,9 +2327,9 @@ async function getStockDataForUpgradeAnalysis() {
             stockData[row.category].push({
                 name: row.name,
                 brand: row.brand,
-                price: parseFloat(row.price),
+                price: parseDecimalValue(row.price),
                 specifications: row.specifications || '',
-                stock: parseInt(row.stock)
+                stock: parseIntegerValue(row.stock)
             });
         });
 
@@ -1316,7 +2346,7 @@ async function getStockDataForUpgradeAnalysis() {
 function generateFallbackStockUpgrade(component, currentPrice, category) {
     const upgradePrice = currentPrice * 1.7;
     const priceDiff = upgradePrice - currentPrice;
-    
+
     return {
         id: `fallback-stock-${category}-${Date.now()}`,
         type: 'stock_upgrade',
@@ -1343,7 +2373,7 @@ function generateFallbackExternalUpgrade(component, currentPrice) {
     const category = component.category || 'Component';
     const upgradePrice = currentPrice * 1.9;
     const priceDiff = upgradePrice - currentPrice;
-    
+
     const latestTech = {
         'Cooling': 'AIO Liquid Cooler 360mm RGB',
         'CPU': 'Latest Generation Processor',
@@ -1354,7 +2384,7 @@ function generateFallbackExternalUpgrade(component, currentPrice) {
         'PSU': '80+ Gold Modular PSU',
         'Case': 'Mid-Tower RGB Case'
     };
-    
+
     return {
         id: `fallback-external-${category}-${Date.now()}`,
         type: 'external_upgrade',
@@ -1379,19 +2409,19 @@ function generateFallbackExternalUpgrade(component, currentPrice) {
  */
 function generateFallbackUpgradeRecommendations(currentComponents) {
     const upgrades = [];
-    
+
     currentComponents.forEach(component => {
-        const componentPrice = parseFloat((component.price || '0').toString().replace(/[^\d.]/g, '')) || 0;
-        
+        const componentPrice = parseCurrencyAmount(component.price);
+
         // Generate stock upgrade
         const stockUpgrade = generateFallbackStockUpgrade(component, componentPrice, component.category);
-        
-        // Generate external upgrade  
+
+        // Generate external upgrade
         const externalUpgrade = generateFallbackExternalUpgrade(component, componentPrice);
-        
+
         upgrades.push(stockUpgrade, externalUpgrade);
     });
-    
+
     return upgrades;
 }
 
@@ -1461,133 +2491,142 @@ function generateMarketAwareUpgrade(currentName, category) {
         `Premium ${category} 2024 Edition`,
         `Elite ${category} Series`
     ];
-    
+
     return categoryUpgrades[Math.floor(Math.random() * categoryUpgrades.length)];
 }
 
 /**
  * Calculate advanced performance gain with intelligent component analysis
  */
+const ADVANCED_PERFORMANCE_GAINS = {
+    'Cooling': {
+        'air_to_aio': '+75%',
+        'basic_aio_to_premium': '+45%',
+        'premium_upgrade': '+35%',
+        'default': '+55%'
+    },
+    'GPU': {
+        'rtx_4060_to_5080': '+85%',
+        'rtx_4070_to_5080': '+75%',
+        'old_gen_to_new': '+130%',
+        'mid_to_flagship': '+95%',
+        'default': '+105%'
+    },
+    'CPU': {
+        'intel_12_to_15': '+55%',
+        'amd_5000_to_9000': '+65%',
+        'generational_jump': '+75%',
+        'gaming_upgrade': '+45%',
+        'default': '+60%'
+    },
+    'RAM': {
+        'ddr4_to_ddr5': '+45%',
+        'capacity_double': '+35%',
+        'speed_increase': '+25%',
+        'default': '+40%'
+    },
+    'Storage': {
+        'hdd_to_nvme': '+200%',
+        'sata_to_nvme': '+120%',
+        'gen3_to_gen4': '+50%',
+        'gen4_to_gen5': '+25%',
+        'default': '+80%'
+    },
+    'Motherboard': {
+        'chipset_upgrade': '+30%',
+        'feature_upgrade': '+25%',
+        'connectivity_upgrade': '+20%',
+        'default': '+25%'
+    },
+    'PSU': {
+        'efficiency_upgrade': '+15%',
+        'wattage_upgrade': '+25%',
+        'modular_upgrade': '+20%',
+        'default': '+20%'
+    },
+    'Case': {
+        'airflow_upgrade': '+30%',
+        'size_upgrade': '+25%',
+        'premium_upgrade': '+20%',
+        'default': '+25%'
+    }
+};
+
+function getCoolingAdvancedPerformanceGain(currentName, upgradeName, categoryGains) {
+    if (includesAny(currentName, ['wraith', 'air', 'tower'])) {
+        return categoryGains.air_to_aio;
+    }
+
+    if (includesAny(currentName, ['h100', 'basic'])) {
+        return categoryGains.basic_aio_to_premium;
+    }
+
+    return categoryGains.premium_upgrade;
+}
+
+function getGpuAdvancedPerformanceGain(currentName, upgradeName, categoryGains) {
+    if (currentName.includes('4060') && upgradeName.includes('5080')) return categoryGains.rtx_4060_to_5080;
+    if (currentName.includes('4070') && upgradeName.includes('5080')) return categoryGains.rtx_4070_to_5080;
+    if (includesAny(currentName, ['3060', '3070', '2060'])) return categoryGains.old_gen_to_new;
+    if (includesAny(upgradeName, ['5080', 'flagship'])) return categoryGains.mid_to_flagship;
+    return categoryGains.default;
+}
+
+function getCpuAdvancedPerformanceGain(currentName, upgradeName, categoryGains) {
+    if (currentName.includes('i5') && upgradeName.includes('i9')) return categoryGains.generational_jump;
+    if (currentName.includes('12') && upgradeName.includes('15')) return categoryGains.intel_12_to_15;
+    if (currentName.includes('5000') && upgradeName.includes('9000')) return categoryGains.amd_5000_to_9000;
+    if (upgradeName.includes('x3d')) return categoryGains.gaming_upgrade;
+    return categoryGains.default;
+}
+
+function getStorageAdvancedPerformanceGain(currentName, upgradeName, categoryGains) {
+    if (includesAny(currentName, ['hdd', 'hard'])) return categoryGains.hdd_to_nvme;
+    if (currentName.includes('sata')) return categoryGains.sata_to_nvme;
+    if (currentName.includes('gen3') && upgradeName.includes('gen5')) return categoryGains.gen4_to_gen5;
+    if (!currentName.includes('nvme') && upgradeName.includes('nvme')) return categoryGains.gen3_to_gen4;
+    return categoryGains.default;
+}
+
+const ADVANCED_PERFORMANCE_GAIN_SELECTORS = {
+    'Cooling': getCoolingAdvancedPerformanceGain,
+    'GPU': getGpuAdvancedPerformanceGain,
+    'CPU': getCpuAdvancedPerformanceGain,
+    'Storage': getStorageAdvancedPerformanceGain
+};
+
 function calculateAdvancedPerformanceGain(currentComponent, upgradeComponent, category) {
-    const currentName = (currentComponent.name || '').toLowerCase();
-    const upgradeName = (upgradeComponent.name || '').toLowerCase();
-    
-    // Generation-based performance calculations with 2025 market analysis
-    const performanceGains = {
-        'Cooling': {
-            'air_to_aio': '+75%',
-            'basic_aio_to_premium': '+45%',
-            'premium_upgrade': '+35%',
-            'default': '+55%'
-        },
-        'GPU': {
-            'rtx_4060_to_5080': '+85%',
-            'rtx_4070_to_5080': '+75%',
-            'old_gen_to_new': '+130%',
-            'mid_to_flagship': '+95%',
-            'default': '+105%'
-        },
-        'CPU': {
-            'intel_12_to_15': '+55%',
-            'amd_5000_to_9000': '+65%',
-            'generational_jump': '+75%',
-            'gaming_upgrade': '+45%',
-            'default': '+60%'
-        },
-        'RAM': {
-            'ddr4_to_ddr5': '+45%',
-            'capacity_double': '+35%',
-            'speed_increase': '+25%',
-            'default': '+40%'
-        },
-        'Storage': {
-            'hdd_to_nvme': '+200%',
-            'sata_to_nvme': '+120%',
-            'gen3_to_gen4': '+50%',
-            'gen4_to_gen5': '+25%',
-            'default': '+80%'
-        },
-        'Motherboard': {
-            'chipset_upgrade': '+30%',
-            'feature_upgrade': '+25%',
-            'connectivity_upgrade': '+20%',
-            'default': '+25%'
-        },
-        'PSU': {
-            'efficiency_upgrade': '+15%',
-            'wattage_upgrade': '+25%',
-            'modular_upgrade': '+20%',
-            'default': '+20%'
-        },
-        'Case': {
-            'airflow_upgrade': '+30%',
-            'size_upgrade': '+25%',
-            'premium_upgrade': '+20%',
-            'default': '+25%'
-        }
-    };
-    
-    const categoryGains = performanceGains[category] || { default: '+50%' };
-    
-    // Intelligent gain selection based on component analysis
-    if (category === 'Cooling') {
-        if (currentName.includes('wraith') || currentName.includes('air') || currentName.includes('tower')) {
-            return categoryGains.air_to_aio;
-        } else if (currentName.includes('h100') || currentName.includes('basic')) {
-            return categoryGains.basic_aio_to_premium;
-        }
-        return categoryGains.premium_upgrade;
+    const currentName = toLowerCaseText(currentComponent.name);
+    const upgradeName = toLowerCaseText(upgradeComponent.name);
+    const categoryGains = ADVANCED_PERFORMANCE_GAINS[category] || { default: '+50%' };
+    const categorySelector = ADVANCED_PERFORMANCE_GAIN_SELECTORS[category];
+
+    if (categorySelector) {
+        return categorySelector(currentName, upgradeName, categoryGains);
     }
-    
-    if (category === 'GPU') {
-        if (currentName.includes('4060') && upgradeName.includes('5080')) return categoryGains.rtx_4060_to_5080;
-        if (currentName.includes('4070') && upgradeName.includes('5080')) return categoryGains.rtx_4070_to_5080;
-        if (currentName.includes('3060') || currentName.includes('3070') || currentName.includes('2060')) {
-            return categoryGains.old_gen_to_new;
-        }
-        if (upgradeName.includes('5080') || upgradeName.includes('flagship')) return categoryGains.mid_to_flagship;
-        return categoryGains.default;
-    }
-    
-    if (category === 'CPU') {
-        if (currentName.includes('i5') && upgradeName.includes('i9')) return categoryGains.generational_jump;
-        if (currentName.includes('12') && upgradeName.includes('15')) return categoryGains.intel_12_to_15;
-        if (currentName.includes('5000') && upgradeName.includes('9000')) return categoryGains.amd_5000_to_9000;
-        if (upgradeName.includes('x3d')) return categoryGains.gaming_upgrade;
-        return categoryGains.default;
-    }
-    
-    if (category === 'Storage') {
-        if (currentName.includes('hdd') || currentName.includes('hard')) return categoryGains.hdd_to_nvme;
-        if (currentName.includes('sata')) return categoryGains.sata_to_nvme;
-        if (currentName.includes('gen3') && upgradeName.includes('gen5')) return categoryGains.gen4_to_gen5;
-        if (!currentName.includes('nvme') && upgradeName.includes('nvme')) return categoryGains.gen3_to_gen4;
-        return categoryGains.default;
-    }
-    
+
     return categoryGains.default || '+50%';
 }
 
 /**
  * Generate advanced upgrade reasoning with technical analysis
  */
-function generateAdvancedUpgradeReason(currentComponent, upgradeComponent, category, performanceGain) {
+function generateAdvancedUpgradeReason(currentComponent, upgradeComponent, category, performanceGain = '+50%') {
     const currentName = currentComponent.name || 'Current component';
     const upgradeName = upgradeComponent.name || 'Upgraded component';
-    const gain = performanceGain || '+50%';
-    
+
     const advancedReasons = {
-        'Cooling': `${upgradeName} delivers superior thermal management with advanced pump technology and optimized radiator design. Features premium RGB lighting system and whisper-quiet operation compared to ${currentName}, providing ${gain} cooling efficiency enhancement with extended component lifespan.`,
-        'GPU': `${upgradeName} represents next-generation gaming excellence with cutting-edge architecture and enhanced ray tracing capabilities. Supports latest DirectX 12 Ultimate features and 4K+ gaming performance, delivering ${gain} graphics performance boost over ${currentName} with future-ready specifications.`,
-        'CPU': `${upgradeName} provides flagship-level processing power with advanced core architecture and intelligent boost technology. Delivers exceptional single-core and multi-core performance for gaming and productivity, offering ${gain} processing improvement compared to ${currentName}.`,
-        'RAM': `${upgradeName} offers high-bandwidth memory performance with optimized timings and enhanced overclocking capabilities. Provides improved system responsiveness and seamless multitasking experience, delivering ${gain} memory performance enhancement over ${currentName}.`,
-        'Storage': `${upgradeName} delivers ultra-fast storage performance with next-generation controller technology and premium NAND flash. Features reduced loading times and enhanced system boot speeds, providing ${gain} storage performance improvement compared to ${currentName}.`,
-        'Motherboard': `${upgradeName} features advanced connectivity options and premium power delivery system. Provides enhanced expansion capabilities and future upgrade paths, offering ${gain} platform enhancement over ${currentName} with professional-grade features.`,
-        'PSU': `${upgradeName} ensures rock-solid power delivery with industry-leading efficiency ratings and modular cable management. Features advanced protection circuits and silent operation, providing ${gain} power efficiency improvement compared to ${currentName}.`,
-        'Case': `${upgradeName} provides superior build quality with optimized airflow design and premium materials. Features enhanced cable management and thermal performance, delivering ${gain} cooling and aesthetics improvement over ${currentName}.`
+        'Cooling': `${upgradeName} delivers superior thermal management with advanced pump technology and optimized radiator design. Features premium RGB lighting system and whisper-quiet operation compared to ${currentName}, providing ${performanceGain} cooling efficiency enhancement with extended component lifespan.`,
+        'GPU': `${upgradeName} represents next-generation gaming excellence with cutting-edge architecture and enhanced ray tracing capabilities. Supports latest DirectX 12 Ultimate features and 4K+ gaming performance, delivering ${performanceGain} graphics performance boost over ${currentName} with future-ready specifications.`,
+        'CPU': `${upgradeName} provides flagship-level processing power with advanced core architecture and intelligent boost technology. Delivers exceptional single-core and multi-core performance for gaming and productivity, offering ${performanceGain} processing improvement compared to ${currentName}.`,
+        'RAM': `${upgradeName} offers high-bandwidth memory performance with optimized timings and enhanced overclocking capabilities. Provides improved system responsiveness and seamless multitasking experience, delivering ${performanceGain} memory performance enhancement over ${currentName}.`,
+        'Storage': `${upgradeName} delivers ultra-fast storage performance with next-generation controller technology and premium NAND flash. Features reduced loading times and enhanced system boot speeds, providing ${performanceGain} storage performance improvement compared to ${currentName}.`,
+        'Motherboard': `${upgradeName} features advanced connectivity options and premium power delivery system. Provides enhanced expansion capabilities and future upgrade paths, offering ${performanceGain} platform enhancement over ${currentName} with professional-grade features.`,
+        'PSU': `${upgradeName} ensures rock-solid power delivery with industry-leading efficiency ratings and modular cable management. Features advanced protection circuits and silent operation, providing ${performanceGain} power efficiency improvement compared to ${currentName}.`,
+        'Case': `${upgradeName} provides superior build quality with optimized airflow design and premium materials. Features enhanced cable management and thermal performance, delivering ${performanceGain} cooling and aesthetics improvement over ${currentName}.`
     };
-    
-    return advancedReasons[category] || `${upgradeName} represents a significant technological advancement over ${currentName}, offering ${gain} performance improvement with enhanced features and superior future-proofing capabilities.`;
+
+    return advancedReasons[category] || `${upgradeName} represents a significant technological advancement over ${currentName}, offering ${performanceGain} performance improvement with enhanced features and superior future-proofing capabilities.`;
 }
 
 /**
@@ -1598,7 +2637,7 @@ const getFutureUpgradeStock = async (req, res) => {
     try {
         // Support both old format (currentItem, currentPrice, category) and new format (buildConfiguration)
         let { currentItem, currentPrice, category, minUpgradeThreshold = 1.3, buildConfiguration, budget } = req.body;
-        
+
         // NEW FORMAT: Extract from buildConfiguration if provided
         if (buildConfiguration && !currentItem) {
             // Find first component in buildConfiguration to use as upgrade target
@@ -1611,7 +2650,10 @@ const getFutureUpgradeStock = async (req, res) => {
                 currentPrice = componentData.price || budget || 1;
             }
         }
-        
+
+        const normalizedCurrentPrice = parseDecimalValue(currentPrice, Number.NaN);
+        const minimumUpgradeThreshold = parseDecimalValue(minUpgradeThreshold, 1.3);
+
         // Input validation
         if (!currentItem || typeof currentItem !== 'object') {
             return res.status(400).json({
@@ -1620,7 +2662,7 @@ const getFutureUpgradeStock = async (req, res) => {
                 error: 'Invalid request format. Expected: { currentItem: { name: "..." }, currentPrice: 150, category: "CPU" } OR { buildConfiguration: { cpu: { name: "..." } }, budget: 50000 }'
             });
         }
-        
+
         if (!currentItem.name) {
             return res.status(400).json({
                 success: false,
@@ -1628,15 +2670,15 @@ const getFutureUpgradeStock = async (req, res) => {
                 error: 'Invalid request format. currentItem must have a name property'
             });
         }
-        
-        if (!currentPrice || typeof currentPrice !== 'number') {
+
+        if (Number.isNaN(normalizedCurrentPrice) || normalizedCurrentPrice <= 0) {
             return res.status(400).json({
                 success: false,
                 message: 'currentPrice or budget is required and must be a number',
                 error: 'Invalid request format. Expected: { currentItem: {...}, currentPrice: 150, category: "CPU" } OR { buildConfiguration: {...}, budget: 50000 }'
             });
         }
-        
+
         if (!category || typeof category !== 'string') {
             return res.status(400).json({
                 success: false,
@@ -1644,35 +2686,35 @@ const getFutureUpgradeStock = async (req, res) => {
                 error: 'Invalid request format. Expected: { currentItem: {...}, currentPrice: 150, category: "CPU" } OR { buildConfiguration: { cpu: {...} } }'
             });
         }
-        
+
         logger.info(`🗄️ Scanning database for ${category} upgrades for ${currentItem.name}`);
-        
+
         // Query database for all products in same category with higher price
         const result = await query(`
             SELECT name, brand, price, stock
-            FROM pc_parts 
-            WHERE category = $1 
-            AND stock > 0 
+            FROM pc_parts
+            WHERE category = $1
+            AND stock > 0
             AND price > $2
             ORDER BY price DESC
             LIMIT 10
-        `, [category, currentPrice * minUpgradeThreshold]);
-        
+        `, [category, normalizedCurrentPrice * minimumUpgradeThreshold]);
+
         if (result.rows.length === 0) {
             return res.json({
                 success: false,
-                message: `No upgrades found for ${category} above ₱${(currentPrice * minUpgradeThreshold).toLocaleString()}`,
+                message: `No upgrades found for ${category} above ₱${(normalizedCurrentPrice * minimumUpgradeThreshold).toLocaleString()}`,
                 upgrade: null
             });
         }
-        
+
         // Select best upgrade based on price
         const bestUpgrade = result.rows[0];
-        const upgradePrice = parseFloat(bestUpgrade.price);
-        const performanceGain = `+${Math.round((upgradePrice - currentPrice) / currentPrice * 50)}%`; // Simplified calculation
-        const futureProofing = upgradePrice > currentPrice * 2 ? 'Excellent (4+ years)' : 'Good (2-3 years)';
+        const upgradePrice = parseDecimalValue(bestUpgrade.price);
+        const performanceGain = `+${Math.round((upgradePrice - normalizedCurrentPrice) / normalizedCurrentPrice * 50)}%`; // Simplified calculation
+        const futureProofing = upgradePrice > normalizedCurrentPrice * 2 ? 'Excellent (4+ years)' : 'Good (2-3 years)';
         const upgradeReason = `Significant performance upgrade with ${bestUpgrade.name} at ₱${upgradePrice.toLocaleString()}`;
-        
+
         const upgradeData = {
             name: bestUpgrade.name,
             brand: bestUpgrade.brand,
@@ -1684,16 +2726,16 @@ const getFutureUpgradeStock = async (req, res) => {
             reason: upgradeReason,
             source: 'Database Scan'
         };
-        
+
         logger.info(`Database upgrade found for ${category}: ${bestUpgrade.name} at ₱${upgradePrice.toLocaleString()}`);
-        
+
         res.json({
             success: true,
             upgrade: upgradeData,
             scannedProducts: result.rows.length,
             category: category
         });
-        
+
     } catch (error) {
         logger.error('Database future upgrade scan failed:', error);
         res.status(500).json({
@@ -1708,143 +2750,13 @@ const getFutureUpgradeStock = async (req, res) => {
  * Get external market recommendations using Ollama DeepSeek R1
  * POST /api/kiosk/ollama-external-upgrade
  */
-const getOllamaExternalUpgrade = async (req, res) => {
-    try {
-        // Support both old format and new format (buildConfiguration)
-        let { currentItem, currentPrice, category, analysisType, marketRegion, performanceTarget, buildConfiguration, budget } = req.body;
-        
-        // NEW FORMAT: Extract from buildConfiguration if provided
-        if (buildConfiguration && !currentItem) {
-            const components = Object.entries(buildConfiguration);
-            if (components.length > 0) {
-                const [componentCategory, componentData] = components[0];
-                currentItem = componentData;
-                category = componentData.category || componentCategory.toUpperCase();
-                // Use component price, budget, or default to 1 for validation
-                currentPrice = componentData.price || budget || 1;
-            }
-        }
-        
-        // Input validation
-        if (!currentItem || typeof currentItem !== 'object') {
-            return res.status(400).json({
-                success: false,
-                message: 'currentItem or buildConfiguration is required',
-                error: 'Invalid request format. Expected: { currentItem: { name: "..." }, currentPrice: 150, category: "CPU" } OR { buildConfiguration: { cpu: { name: "..." } }, budget: 50000 }'
-            });
-        }
-        
-        if (!currentItem.name) {
-            return res.status(400).json({
-                success: false,
-                message: 'currentItem.name is required',
-                error: 'Invalid request format. currentItem must have a name property'
-            });
-        }
-        
-        if (!currentPrice || typeof currentPrice !== 'number') {
-            return res.status(400).json({
-                success: false,
-                message: 'currentPrice or budget is required and must be a number',
-                error: 'Invalid request format. Expected numeric currentPrice or budget'
-            });
-        }
-        
-        if (!category || typeof category !== 'string') {
-            return res.status(400).json({
-                success: false,
-                message: 'category is required and must be a string (or inferred from buildConfiguration)',
-                error: 'Invalid request format. Expected category string like "CPU", "GPU", etc. or buildConfiguration with category'
-            });
-        }
-        
-        // Set defaults for optional parameters
-        const _analysisType = analysisType || 'market-leader';
-        const _marketRegion = marketRegion || 'Philippines';
-        const _performanceTarget = performanceTarget || 'High-end';
-        
-        logger.info(`🦙 Ollama DeepSeek R1 analysis for ${category} external market trends...`);
-        
-        // Call Ollama DeepSeek R1 for intelligent external market analysis
-        const ollamaPrompt = `You are a PC hardware expert analyzing the latest 2025 market trends in ${_marketRegion}. 
-
-Current component: ${currentItem.name} (${category}) - ₱${currentPrice.toLocaleString()}
-
-Generate a cutting-edge ${category} upgrade recommendation with these requirements:
-- Must be from external market (not local stock)
-- Latest 2025 technology with superior specifications
-- Price range: ₱${(currentPrice * 1.5).toLocaleString()} - ₱${(currentPrice * 2.5).toLocaleString()}
-- Performance target: ${_performanceTarget}
-- Include specific technical specifications
-- Justify the upgrade with performance improvements
-
-Format your response as JSON:
-{
-  "name": "Exact product name",
-  "specifications": "Detailed technical specs",
-  "price": numerical_price,
-  "performanceGain": "percentage like +65%",
-  "reason": "Detailed upgrade justification",
-  "futureProofing": "Rating like 'Excellent (4+ years)'"
-}`;
-
-
-        try {
-            // Call Ollama API
-            const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'deepseek-r1:latest',
-                    prompt: ollamaPrompt,
-                    stream: false,
-                    options: {
-                        temperature: 0.7,
-                        top_p: 0.9,
-                        top_k: 40
-                    }
-                })
-            });
-            
-            if (ollamaResponse.ok) {
-                const ollamaData = await ollamaResponse.json();
-                try {
-                    const upgradeData = JSON.parse(ollamaData.response);
-                    
-                    logger.info(`Ollama external upgrade generated for ${category}: ${upgradeData.name}`);
-                    
-                    return res.json({
-                        success: true,
-                        upgrade: upgradeData,
-                        source: 'Ollama DeepSeek R1',
-                        analysisType: analysisType
-                    });
-                } catch (parseError) {
-                    logger.warn('Ollama response parsing failed, using enhanced fallback');
-                }
-            }
-        } catch (ollamaError) {
-            logger.warn('Ollama service unavailable:', ollamaError.message);
-        }
-        
-        // Enhanced fallback with 2025 market intelligence
-        const fallbackUpgrade = generateIntelligentExternalFallback(currentItem, currentPrice, category);
-        
-        res.json({
-            success: true,
-            upgrade: fallbackUpgrade,
-            source: 'Enhanced Market Intelligence',
-            analysisType: 'fallback_intelligent'
-        });
-        
-    } catch (error) {
-        logger.error('Ollama external upgrade failed:', error);
-        res.status(500).json({
-            success: false,
-            message: 'External market analysis failed',
-            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-        });
-    }
+const getOllamaExternalUpgrade = async (_req, res) => {
+    return res.status(410).json({
+        success: false,
+        code: 'AI_REMOVED',
+        source: 'deterministic',
+        message: 'Ollama external upgrade analysis is disabled in offline kiosk mode'
+    });
 };
 
 /**
@@ -1852,7 +2764,7 @@ Format your response as JSON:
  */
 function generateIntelligentExternalFallback(currentItem, currentPrice, category) {
     const upgradePrice = Math.round(currentPrice * (1.6 + Math.random() * 0.8)); // 60-140% increase
-    
+
     // Latest 2025 external market products
     const externalMarketIntelligence = {
         'Cooling': [
@@ -1896,16 +2808,16 @@ function generateIntelligentExternalFallback(currentItem, currentPrice, category
             { name: 'Phanteks Enthoo Elite Pro', specs: 'E-ATX tower, Dual system Pro, Premium materials, Advanced cooling Pro, Flagship grade' }
         ]
     };
-    
+
     const categoryProducts = externalMarketIntelligence[category] || [
         { name: `Next-Gen ${category} Pro 2025`, specs: 'Professional grade, Latest technology, Future-ready specifications' }
     ];
-    
+
     const selectedProduct = categoryProducts[Math.floor(Math.random() * categoryProducts.length)];
     const performanceGain = calculateAdvancedPerformanceGain(currentItem, selectedProduct, category);
     const futureProofing = 'Excellent (4+ years)';
     const reason = `${selectedProduct.name} represents the cutting-edge of ${category} technology in 2025. With ${performanceGain} performance improvement over ${currentItem.name}, this upgrade provides future-ready specifications and professional-grade capabilities for demanding workloads.`;
-    
+
     return {
         name: selectedProduct.name,
         specifications: selectedProduct.specs,
@@ -1919,7 +2831,7 @@ function generateIntelligentExternalFallback(currentItem, currentPrice, category
 /**
  * POST /api/kiosk/dual-upgrade - Get 1:2 ratio upgrade recommendations
  * Returns: { stockUpgrade, externalUpgrade } OR { externalUpgrades: [ext1, ext2] }
- * 
+ *
  * Request Body:
  * {
  *   component: { id, name, category, price, performance_index, ... },
@@ -1951,9 +2863,11 @@ const getDualUpgrade = async (req, res) => {
         });
 
         // TASK 6: Pass options to upgradeService
-        const result = await upgradeService.generateDualUpgrades(component, category, {
-            includeExternalMarket
-        });
+        const result = await Promise.resolve(
+            upgradeService.generateDualUpgrades(component, category, {
+                includeExternalMarket
+            })
+        );
 
         if (result.error) {
             return res.status(500).json({
@@ -2010,9 +2924,15 @@ const getDualUpgrade = async (req, res) => {
 const getPreBuiltProducts = async (req, res) => {
     try {
         const { category, minPrice, maxPrice, purposes, buildSource } = req.query;
+        const minimumPrice = parseOptionalDecimalValue(minPrice);
+        const maximumPrice = parseOptionalDecimalValue(maxPrice);
 
-        // Query pc_parts table where category = 'Pre-Built'
-        let whereClause = `WHERE category = 'Pre-Built' AND is_active = true AND kiosk_visible = true`;
+        // Query pc_parts table where category = 'Pre-Built'. Community builds
+        // are local kiosk content and may be hidden from normal stock browsing,
+        // so the community source is allowed through this dedicated route.
+        let whereClause = buildSource === 'community'
+            ? `WHERE category = 'Pre-Built'`
+            : `WHERE category = 'Pre-Built' AND is_active = true AND kiosk_visible = true`;
         const queryParams = [];
         let paramIndex = 1;
 
@@ -2029,14 +2949,14 @@ const getPreBuiltProducts = async (req, res) => {
         }
 
         // Filter by price range
-        if (minPrice) {
+        if (minimumPrice !== null) {
             whereClause += ` AND price >= $${paramIndex++}`;
-            queryParams.push(parseFloat(minPrice));
+            queryParams.push(minimumPrice);
         }
 
-        if (maxPrice) {
+        if (maximumPrice !== null) {
             whereClause += ` AND price <= $${paramIndex++}`;
-            queryParams.push(parseFloat(maxPrice));
+            queryParams.push(maximumPrice);
         }
 
         // Filter by purposes (Gaming, Work, Multimedia) from specifications
@@ -2052,7 +2972,7 @@ const getPreBuiltProducts = async (req, res) => {
         }
 
         const result = await query(`
-            SELECT 
+            SELECT
                 id,
                 name,
                 category,
@@ -2068,7 +2988,7 @@ const getPreBuiltProducts = async (req, res) => {
                 updated_at
             FROM pc_parts
             ${whereClause}
-            ORDER BY 
+            ORDER BY
                 CASE tier
                     WHEN 'Starter' THEN 1
                     WHEN 'Mid Tier' THEN 2
@@ -2083,7 +3003,7 @@ const getPreBuiltProducts = async (req, res) => {
         const enrichedProducts = result.rows.map(row => {
             const specs = row.specifications || {};
             let components = [];
-            
+
             // Get components from specifications.components
             if (specs.components && Array.isArray(specs.components)) {
                 components = specs.components.map(comp => ({
@@ -2108,11 +3028,13 @@ const getPreBuiltProducts = async (req, res) => {
             return {
                 id: row.id,
                 name: row.name,
-                price: parseFloat(row.price),
+                price: parseDecimalValue(row.price),
                 category: row.tier || 'Unknown',
                 tier: row.tier || 'Unknown',
                 purposes: specs.purposes || [],
                 image: row.image_url,
+                imageUrl: row.image_url,
+                image_url: row.image_url,
                 stock: row.stock || 10,
                 components: components,
                 description: row.description || '',
@@ -2167,58 +3089,58 @@ const getUpgradeCategories = async (req, res) => {
 
         // Define upgrade categories with proper database mapping
         const categories = [
-            { 
-                id: 'ram', 
-                name: 'RAM (MEMORY)', 
+            {
+                id: 'ram',
+                name: 'RAM (MEMORY)',
                 category: 'RAM',
                 icon: '/assets/upgrade/ram.webp',
                 order: 1
             },
-            { 
-                id: 'storage', 
-                name: 'STORAGE', 
+            {
+                id: 'storage',
+                name: 'STORAGE',
                 category: 'Storage',
                 icon: '/assets/upgrade/storage.webp',
                 order: 2
             },
-            { 
-                id: 'gpu', 
-                name: 'GPU', 
+            {
+                id: 'gpu',
+                name: 'GPU',
                 category: 'GPU',
                 icon: '/assets/upgrade/gpu.webp',
                 order: 3
             },
-            { 
-                id: 'processor', 
-                name: 'PROCESSOR', 
+            {
+                id: 'processor',
+                name: 'PROCESSOR',
                 category: 'CPU',
                 icon: '/assets/upgrade/cpu.webp',
                 order: 4
             },
-            { 
-                id: 'motherboard', 
-                name: 'MOTHERBOARD', 
+            {
+                id: 'motherboard',
+                name: 'MOTHERBOARD',
                 category: 'Motherboard',
                 icon: '/assets/upgrade/motherboard.webp',
                 order: 5
             },
-            { 
-                id: 'psu', 
-                name: 'PSU', 
+            {
+                id: 'psu',
+                name: 'PSU',
                 category: 'PSU',
                 icon: '/assets/upgrade/psu.webp',
                 order: 6
             },
-            { 
-                id: 'cpu-cooler', 
-                name: 'CPU COOLER', 
+            {
+                id: 'cpu-cooler',
+                name: 'CPU COOLER',
                 category: 'Cooling',
                 icon: '/assets/upgrade/cooler.webp',
                 order: 7
             },
-            { 
-                id: 'chassis', 
-                name: 'CHASSIS', 
+            {
+                id: 'chassis',
+                name: 'CHASSIS',
                 category: 'Case',
                 icon: '/assets/upgrade/case.webp',
                 order: 8
@@ -2229,14 +3151,14 @@ const getUpgradeCategories = async (req, res) => {
         const categoriesWithCounts = await Promise.all(
             categories.map(async (cat) => {
                 const result = await query(
-                    `SELECT COUNT(*) 
+                    `SELECT COUNT(*)
                      FROM pc_parts
                      WHERE category = $1 AND is_active = true AND stock > 0`,
                     [cat.category]
                 );
                 return {
                     ...cat,
-                    productCount: parseInt(result.rows[0].count)
+                    productCount: parseIntegerValue(result.rows[0].count)
                 };
             })
         );
@@ -2267,7 +3189,7 @@ const getUpgradeCategories = async (req, res) => {
  */
 const filterCompatibleProducts = async (req, res) => {
     try {
-        const { currentCategory, currentProduct, cart = [] } = req.body;
+        const { currentCategory, cart = [] } = req.body;
 
         if (!currentCategory) {
             return res.status(400).json({
@@ -2280,9 +3202,9 @@ const filterCompatibleProducts = async (req, res) => {
 
         // Get all products in the requested category
         const productsQuery = await query(`
-            SELECT 
+            SELECT
                 id, name, brand, price, stock, category, image_url
-            FROM pc_parts 
+            FROM pc_parts
             WHERE category = $1 AND stock > 0
             ORDER BY name ASC
         `, [currentCategory]);
@@ -2325,7 +3247,7 @@ const filterCompatibleProducts = async (req, res) => {
             try {
                 // Quick compatibility check using rule-based system
                 const isCompatible = await quickCompatibilityCheck(cart, categoryLower, product);
-                
+
                 if (isCompatible) {
                     compatibleProducts.push({
                         ...product,
@@ -2377,75 +3299,22 @@ const filterCompatibleProducts = async (req, res) => {
 /**
  * Quick rule-based compatibility check for filtering
  * Uses deterministic rules for fast filtering without AI
- * NOTE: Currently simplified - returns all products as compatible
- * TODO: Integrate with category-specific tables for detailed specs
+ * Uses lightweight platform heuristics until category-specific spec tables are available.
  */
 async function quickCompatibilityCheck(cart, category, product) {
-    // For now, return all products as compatible since we're using simplified pc_parts table
-    // This will be enhanced once we integrate with category-specific tables (cpu, motherboard, gpu, etc.)
-    
-    // Basic name-based compatibility hints (very simple heuristics)
-    const productName = (product.name || '').toLowerCase();
-    
-    // Extract components from cart
-    const cpu = cart.find(item => (item.category || '').toLowerCase() === 'cpu');
-    const motherboard = cart.find(item => (item.category || '').toLowerCase() === 'motherboard');
-    
-    // Very basic socket compatibility checking from product names
-    if (category === 'motherboard' && cpu) {
-        const cpuName = (cpu.name || '').toLowerCase();
-        
-        // Intel socket hints
-        if (cpuName.includes('i3') || cpuName.includes('i5') || cpuName.includes('i7') || cpuName.includes('i9')) {
-            // If CPU is 12th/13th gen (detected by model number), need LGA1700
-            if (cpuName.includes('12') || cpuName.includes('13')) {
-                if (!productName.includes('lga1700') && !productName.includes('z690') && !productName.includes('b660') && !productName.includes('h610')) {
-                    return false; // Likely socket mismatch
-                }
-            }
-        }
-        
-        // AMD socket hints
-        if (cpuName.includes('ryzen')) {
-            if (cpuName.includes('7000')) { // Ryzen 7000 series uses AM5
-                if (!productName.includes('am5') && !productName.includes('x670') && !productName.includes('b650')) {
-                    return false; // Likely socket mismatch
-                }
-            } else if (cpuName.includes('5000') || cpuName.includes('3000')) { // Ryzen 5000/3000 use AM4
-                if (!productName.includes('am4') && !productName.includes('x570') && !productName.includes('b550') && !productName.includes('b450')) {
-                    return false; // Likely socket mismatch
-                }
-            }
-        }
+    const normalizedCategory = toLowerCaseText(category);
+    const productName = toLowerCaseText(product.name);
+    const cpu = findCartItemByCategory(cart, 'cpu');
+    const motherboard = findCartItemByCategory(cart, 'motherboard');
+
+    if (normalizedCategory === 'motherboard' && cpu) {
+        return matchesPlatformHints(productName, getCpuPlatformHints(cpu.name));
     }
-    
-    if (category === 'cpu' && motherboard) {
-        const moboName = (motherboard.name || '').toLowerCase();
-        
-        // Intel compatibility
-        if (productName.includes('i3') || productName.includes('i5') || productName.includes('i7') || productName.includes('i9')) {
-            if (productName.includes('12') || productName.includes('13')) { // 12th/13th gen Intel
-                if (!moboName.includes('lga1700') && !moboName.includes('z690') && !moboName.includes('b660') && !moboName.includes('h610')) {
-                    return false;
-                }
-            }
-        }
-        
-        // AMD compatibility
-        if (productName.includes('ryzen')) {
-            if (productName.includes('7000')) { // Ryzen 7000
-                if (!moboName.includes('am5') && !moboName.includes('x670') && !moboName.includes('b650')) {
-                    return false;
-                }
-            } else if (productName.includes('5000') || productName.includes('3000')) { // Ryzen 5000/3000
-                if (!moboName.includes('am4') && !moboName.includes('x570') && !moboName.includes('b550') && !moboName.includes('b450')) {
-                    return false;
-                }
-            }
-        }
+
+    if (normalizedCategory === 'cpu' && motherboard) {
+        return matchesPlatformHints(toLowerCaseText(motherboard.name), getCpuPlatformHints(product.name));
     }
-    
-    // If basic checks pass, product is likely compatible
+
     return true;
 }
 
@@ -2462,7 +3331,13 @@ async function quickCompatibilityCheck(cart, category, product) {
 const saveCommunityBuildInternal = async (buildData) => {
     let { buildName, components, totalPrice, tier, purposes, baseProductId, customizations } = buildData;
 
-    logger.info(`🔥 saveCommunityBuildInternal CALLED with tier="${tier}", buildData=`, JSON.stringify(buildData, null, 2));
+    logger.info('saveCommunityBuildInternal called', {
+        buildName,
+        componentCount: Array.isArray(components) ? components.length : 0,
+        totalPrice,
+        tier,
+        baseProductId: baseProductId || null
+    });
 
     // Validation
     if (!buildName || !components || !Array.isArray(components) || components.length === 0) {
@@ -2501,7 +3376,7 @@ const saveCommunityBuildInternal = async (buildData) => {
         name: comp.name || comp.category,
         value: comp.value || comp.part_name || comp.name,
         part_id: comp.part_id || comp.id,
-        price: parseFloat(comp.price || comp.part_price || 0),
+        price: parseDecimalValue(comp.price || comp.part_price || 0),
         category: comp.category || comp.name,
         isCustomized: comp.isCustomized || false
     }));
@@ -2512,7 +3387,7 @@ const saveCommunityBuildInternal = async (buildData) => {
         buildSource: 'community',
         approvalStatus: 'pending',
         components: componentList,
-        purposes: Array.isArray(purposes) ? purposes : (purposes ? [purposes] : ['Gaming']),
+        purposes: normalizePurposesList(purposes),
         customizations: customizations || {},
         baseProductId: baseProductId || null,
         submittedAt: new Date().toISOString()
@@ -2520,15 +3395,15 @@ const saveCommunityBuildInternal = async (buildData) => {
 
     // Generate unique name with tier
     const nameResult = await query(`
-        SELECT COUNT(*) as count 
-        FROM pc_parts 
-        WHERE category = 'Pre-Built' 
+        SELECT COUNT(*) as count
+        FROM pc_parts
+        WHERE category = 'Pre-Built'
           AND specifications->>'buildSource' = 'community'
           AND specifications->>'buildType' = $1
     `, [tier]);
 
-    const count = parseInt(nameResult.rows[0].count || 0);
-    const letter = String.fromCharCode(65 + (count % 26)); // A, B, C, ...
+    const count = parseIntegerValue(nameResult.rows[0].count || 0);
+    const letter = String.fromCodePoint(65 + (count % 26)); // A, B, C, ...
     const communityBuildName = `COMMUNITY ${tier.toUpperCase()} BUILD ${letter}`;
 
     // Default image for community builds
@@ -2537,14 +3412,14 @@ const saveCommunityBuildInternal = async (buildData) => {
     // Insert into pc_parts table as Pre-Built with buildSource='community'
     const result = await query(`
         INSERT INTO pc_parts (
-            name, 
-            brand, 
-            category, 
-            price, 
-            stock, 
+            name,
+            brand,
+            category,
+            price,
+            stock,
             tier,
-            description, 
-            image_url, 
+            description,
+            image_url,
             specifications,
             is_active,
             kiosk_visible,
@@ -2596,11 +3471,17 @@ const saveCommunityBuild = async (req, res) => {
 module.exports = {
     getCategories,
     getCategoryProducts,
+    getCatalogBootstrap,
+    getProductById,
+    getProductCompatibleProducts,
+    checkCompatibilityCandidates,
     getFeaturedProducts,
+    getHomepageProducts,
     getBuildComponents,
     searchProducts,
     getOnSaleProducts,
     createOrder,
+    getOrderReceipt,
     getAIHotPicks,
     getFutureUpgradeStock,
     getOllamaExternalUpgrade,

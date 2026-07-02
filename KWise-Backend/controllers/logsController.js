@@ -5,8 +5,8 @@ const logger = require('../utils/logger');
 // Get all logs with pagination and filtering
 const getAllLogs = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Number.parseInt(req.query.page, 10) || 1;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
         const skip = (page - 1) * limit;
 
         const { search, role, action, status, startDate, endDate } = req.query;
@@ -74,8 +74,8 @@ const getAllLogs = async (req, res) => {
 const getLogsByUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Number.parseInt(req.query.page, 10) || 1;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
         const skip = (page - 1) * limit;
 
         const [logs, total] = await Promise.all([
@@ -112,8 +112,8 @@ const getLogsByUser = async (req, res) => {
 const getLogsByAction = async (req, res) => {
     try {
         const { action } = req.params;
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Number.parseInt(req.query.page, 10) || 1;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
         const skip = (page - 1) * limit;
 
         const [logs, total] = await Promise.all([
@@ -150,8 +150,8 @@ const getLogsByAction = async (req, res) => {
 const getLogsByDateRange = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Number.parseInt(req.query.page, 10) || 1;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
         const skip = (page - 1) * limit;
 
         const filter = {
@@ -194,8 +194,8 @@ const getLogsByDateRange = async (req, res) => {
 // Get system logs
 const getSystemLogs = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Number.parseInt(req.query.page, 10) || 1;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
         const skip = (page - 1) * limit;
 
         const filter = {
@@ -241,8 +241,8 @@ const getSystemLogs = async (req, res) => {
 // Get error logs
 const getErrorLogs = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = Number.parseInt(req.query.page, 10) || 1;
+        const limit = Number.parseInt(req.query.limit, 10) || 20;
         const skip = (page - 1) * limit;
 
         const filter = { status: 'error' };
@@ -351,7 +351,7 @@ const exportLogs = async (req, res) => {
 // Clear old logs
 const clearOldLogs = async (req, res) => {
     try {
-        const days = parseInt(req.query.days) || 30;
+        const days = Number.parseInt(req.query.days, 10) || 30;
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
 
