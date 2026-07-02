@@ -27,6 +27,29 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 
+const HOT_PATH_ACTIVITY_INTERVAL_MS = Number.parseInt(process.env.IP_HOT_PATH_ACTIVITY_INTERVAL_MS || '5000', 10);
+const HOT_PATH_ACCESS_LOG_SAMPLE_RATE = Math.max(0, Math.min(1, Number.parseFloat(process.env.IP_HOT_PATH_ACCESS_LOG_SAMPLE_RATE || '0')));
+const hotPathActivityLastSeen = new Map();
+
+const TRUSTED_PROXY_IPS = new Set(
+    (process.env.TRUSTED_PROXY_IPS || '127.0.0.1,::1,::ffff:127.0.0.1')
+        .split(',')
+        .map(ip => ip.trim())
+        .filter(Boolean)
+);
+
+const normalizeIP = (ip = '') => {
+    if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+        return '127.0.0.1';
+    }
+    return ip.startsWith('::ffff:') ? ip.substring(7) : ip;
+};
+
+const isTrustedProxyRequest = (req) => {
+    const remoteAddress = normalizeIP(req.socket?.remoteAddress || req.connection?.remoteAddress || '');
+    return TRUSTED_PROXY_IPS.has(remoteAddress);
+};
+
 /**
  * Extract true client IP address
  * Handles: X-Forwarded-For, X-Real-IP, Cloudflare, proxies
@@ -41,13 +64,13 @@ const extractClientIP = (req) => {
 
     let clientIP;
 
-    if (xForwardedFor) {
+    if (isTrustedProxyRequest(req) && xForwardedFor) {
         // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
         // First IP is the original client
         clientIP = xForwardedFor.split(',')[0].trim();
-    } else if (cfConnectingIP) {
+    } else if (isTrustedProxyRequest(req) && cfConnectingIP) {
         clientIP = cfConnectingIP;
-    } else if (xRealIP) {
+    } else if (isTrustedProxyRequest(req) && xRealIP) {
         clientIP = xRealIP;
     } else if (socketIP) {
         clientIP = socketIP;
@@ -57,17 +80,7 @@ const extractClientIP = (req) => {
         clientIP = req.ip || 'unknown';
     }
 
-    // Normalize IPv6 localhost to IPv4
-    if (clientIP === '::1' || clientIP === '::ffff:127.0.0.1') {
-        clientIP = '127.0.0.1';
-    }
-
-    // Remove IPv6 prefix if present
-    if (clientIP.startsWith('::ffff:')) {
-        clientIP = clientIP.substring(7);
-    }
-
-    return clientIP;
+    return normalizeIP(clientIP);
 };
 
 /**
@@ -102,36 +115,42 @@ const parseUserAgent = (userAgent) => {
     }
 
     const ua = userAgent.toLowerCase();
-    let deviceType = 'Desktop';
-    let os = 'Unknown OS';
-    let browser = 'Unknown Browser';
 
     // Detect device type
-    if (ua.includes('mobile') || ua.includes('android')) {
-        deviceType = 'Mobile';
-    } else if (ua.includes('tablet') || ua.includes('ipad')) {
-        deviceType = 'Tablet';
+    const deviceType = (ua.includes('mobile') || ua.includes('android'))
+        ? 'Mobile'
+        : (ua.includes('tablet') || ua.includes('ipad')) ? 'Tablet' : 'Desktop'; // NOSONAR - simple ternary
+
+    // Detect OS via ordered rules
+    const osRules = [
+        ['windows nt 10', 'Windows 10'],
+        ['windows nt 11', 'Windows 11'],
+        ['windows', 'Windows'],
+        ['mac os x', 'macOS'],
+        ['iphone', 'iOS (iPhone)'],
+        ['ipad', 'iOS (iPad)'],
+        ['android 15', 'Android 15'],
+        ['android 14', 'Android 14'],
+        ['android 13', 'Android 13'],
+        ['android', 'Android'],
+        ['linux', 'Linux']
+    ];
+    const os = (osRules.find(([key]) => ua.includes(key)) || [null, 'Unknown OS'])[1];
+
+    // Detect browser via ordered rules
+    const browserRules = [
+        ['edg/', 'Microsoft Edge'],
+        ['chrome/', 'Google Chrome'],
+        ['firefox/', 'Firefox'],
+        ['opera/', 'Opera']
+    ];
+    let browser = 'Unknown Browser';
+    const matchedBrowser = browserRules.find(([key]) => ua.includes(key));
+    if (matchedBrowser) {
+        browser = matchedBrowser[1];
+    } else if (ua.includes('safari/') && !ua.includes('chrome')) {
+        browser = 'Safari';
     }
-
-    // Detect OS
-    if (ua.includes('windows nt 10')) os = 'Windows 10';
-    else if (ua.includes('windows nt 11')) os = 'Windows 11';
-    else if (ua.includes('windows')) os = 'Windows';
-    else if (ua.includes('mac os x')) os = 'macOS';
-    else if (ua.includes('iphone')) os = 'iOS (iPhone)';
-    else if (ua.includes('ipad')) os = 'iOS (iPad)';
-    else if (ua.includes('android 15')) os = 'Android 15';
-    else if (ua.includes('android 14')) os = 'Android 14';
-    else if (ua.includes('android 13')) os = 'Android 13';
-    else if (ua.includes('android')) os = 'Android';
-    else if (ua.includes('linux')) os = 'Linux';
-
-    // Detect browser
-    if (ua.includes('edg/')) browser = 'Microsoft Edge';
-    else if (ua.includes('chrome/')) browser = 'Google Chrome';
-    else if (ua.includes('safari/') && !ua.includes('chrome')) browser = 'Safari';
-    else if (ua.includes('firefox/')) browser = 'Firefox';
-    else if (ua.includes('opera/')) browser = 'Opera';
 
     const deviceName = `${deviceType} - ${os} (${browser})`;
 
@@ -181,6 +200,39 @@ const shouldBypassFirewall = (req) => {
     return bypassRoutes.some(route => req.path.startsWith(route));
 };
 
+const isHotReadPath = (req) => {
+    if (req.method === 'GET') {
+        return /^\/api\/(health|kiosk|stock)(\/|$)/.test(req.path || '');
+    }
+
+    if (req.method === 'POST') {
+        return /^\/api\/compatibility\/(analyze|batch|batch-analyze|ram-slots|storage-slots|matrix\/quick-check)(\/|$)/.test(req.path || '');
+    }
+
+    return false;
+};
+
+const runInBackground = (label, task) => {
+    setImmediate(() => {
+        task().catch((error) => {
+            logger.error(`${label} failed:`, error.message);
+        });
+    });
+};
+
+const shouldSampleHotPathAccess = () => HOT_PATH_ACCESS_LOG_SAMPLE_RATE > 0 && Math.random() < HOT_PATH_ACCESS_LOG_SAMPLE_RATE;
+
+const shouldUpdateHotPathActivity = (ipControlId) => {
+    const now = Date.now();
+    const lastSeen = hotPathActivityLastSeen.get(ipControlId) || 0;
+    if ((now - lastSeen) < HOT_PATH_ACTIVITY_INTERVAL_MS) {
+        return false;
+    }
+
+    hotPathActivityLastSeen.set(ipControlId, now);
+    return true;
+};
+
 /**
  * Log IP access attempt to database
  */
@@ -192,10 +244,10 @@ const logIPAccess = async (ipControlId, req, success, blockedReason = null) => {
         const userId = req.user?.id || null;
         
         // Determine action type
-        let actionType = 'api_call';
+        let actionType;
         if (req.path.includes('/auth/login')) actionType = 'login_attempt';
-        else if (!success) actionType = 'access_blocked';
-        else actionType = 'access_granted';
+        else if (success) actionType = 'access_granted';
+        else actionType = 'access_blocked';
         
         await query(`
             INSERT INTO ip_logs (
@@ -256,6 +308,22 @@ const updateIPActivity = async (ipControlId, req) => {
         ]);
     } catch (error) {
         logger.error('IP activity update failed:', error.message);
+    }
+};
+
+const recordAllowedAccess = async (ipControlId, req) => {
+    if (!isHotReadPath(req)) {
+        await updateIPActivity(ipControlId, req);
+        await logIPAccess(ipControlId, req, true);
+        return;
+    }
+
+    if (shouldUpdateHotPathActivity(ipControlId)) {
+        runInBackground('IP hot-path activity update', () => updateIPActivity(ipControlId, req));
+    }
+
+    if (shouldSampleHotPathAccess()) {
+        runInBackground('IP hot-path access log', () => logIPAccess(ipControlId, req, true));
     }
 };
 
@@ -378,6 +446,92 @@ const invalidateIPCache = (clientIP) => {
 };
 
 /**
+ * Handle registration of a new IP (not seen before)
+ */
+const handleNewIPRegistration = async (clientIP, isLocalhost, req) => {
+    let ipControl;
+    if (isLocalhost) {
+        ipControl = await registerWhitelistedIP(clientIP, req);
+    } else {
+        ipControl = await registerNewIP(clientIP, req);
+    }
+
+    if (!ipControl) {
+        logger.warn(`IP ${clientIP} registration failed - allowing request`);
+        return null;
+    }
+
+    ipCache.set(clientIP, { data: ipControl, timestamp: Date.now() });
+    logger.info(`🆕 New IP detected: ${clientIP} - registered as ${isLocalhost ? 'ALLOWED (localhost)' : 'PENDING'}`);
+
+    if (globalThis.io) {
+        globalThis.io.emit('newIPDetected', {
+            ip: clientIP,
+            userAgent: req.headers['user-agent'],
+            path: req.path,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    return ipControl;
+};
+
+/**
+ * Handle blocked IP response
+ */
+const handleBlockedIP = async (ipControl, clientIP, req, res) => {
+    logger.warn(`🚫 BLOCKED IP attempt: ${clientIP} - Reason: ${ipControl.blocked_reason}`);
+    await logIPAccess(ipControl.id, req, false, ipControl.blocked_reason);
+
+    if (globalThis.io) {
+        globalThis.io.emit('blockedIPAttempt', {
+            ip: clientIP,
+            reason: ipControl.blocked_reason,
+            path: req.path,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    return res.status(403).json({
+        error: 'Access Denied',
+        message: 'Your device has been blocked from accessing this system.',
+        code: 'IP_BLOCKED',
+        ip: clientIP,
+        timestamp: new Date().toISOString()
+    });
+};
+
+/**
+ * Handle pending IP access check
+ */
+const handlePendingIP = async (ipControl, clientIP, req, res) => {
+    const allowedForPending = [
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/auth/forgot-password',
+        '/api/health',
+        '/api/products',
+        '/api/kiosk/categories',
+        '/api/kiosk/featured'
+    ];
+
+    const isAllowedPath = allowedForPending.some(route => req.path.startsWith(route));
+
+    if (!isAllowedPath) {
+        logger.warn(`⏳ PENDING IP restricted: ${clientIP} - Path: ${req.path}`);
+        await logIPAccess(ipControl.id, req, false, 'Pending IP - limited access');
+        return res.status(403).json({
+            error: 'Access Restricted',
+            message: 'Your device is pending approval. Please contact administrator.',
+            code: 'IP_PENDING',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    return null; // allowed
+};
+
+/**
  * Main IP Firewall Middleware
  * MUST run BEFORE authentication and route handlers
  */
@@ -385,164 +539,54 @@ const ipFirewall = async (req, res, next) => {
     const startTime = Date.now();
     
     try {
-        // Extract client IP
         const clientIP = extractClientIP(req);
-        req.clientIP = clientIP; // Attach to request for downstream use
+        req.clientIP = clientIP;
         
-        // ============================================
-        // 🔍 DETAILED IP DETECTION LOGGING
-        // ============================================
-        logger.info(`\n🌐 ================ IP DETECTION ================`);
-        logger.info(`📍 Detected IP: ${clientIP}`);
-        logger.info(`📋 Headers:`);
-        logger.info(`   - X-Forwarded-For: ${req.headers['x-forwarded-for'] || 'not set'}`);
-        logger.info(`   - X-Real-IP: ${req.headers['x-real-ip'] || 'not set'}`);
-        logger.info(`   - Socket Remote Address: ${req.socket?.remoteAddress || 'not set'}`);
-        logger.info(`   - Connection Remote Address: ${req.connection?.remoteAddress || 'not set'}`);
-        logger.info(`   - req.ip: ${req.ip || 'not set'}`);
-        logger.info(`🛣️  Path: ${req.method} ${req.path}`);
-        logger.info(`🖥️  User-Agent: ${req.headers['user-agent'] || 'not set'}`);
-        logger.info(`===============================================\n`);
+        logger.debug(`🌐 IP Detection: ${clientIP} | ${req.method} ${req.path}`);
         
-        // Check if route should bypass firewall
         if (shouldBypassFirewall(req)) {
             return next();
         }
         
-        // Only localhost is truly whitelisted - check DB for all others
         const isLocalhost = isWhitelistedIP(clientIP);
-        
-        // Get IP status from cache or database
-        // CRITICAL: Always check database for blocked status to ensure instant enforcement
         let ipControl = await getIPStatus(clientIP);
         
-        // If cached and recently checked, re-verify blocked status from database
-        if (ipControl && ipControl.status === 'allowed') {
-            // Double-check database for blocked status (cache might be stale)
-            const freshStatus = await query(`
-                SELECT id, ip_address, status, blocked_reason, failed_login_attempts
-                FROM ip_access_control
-                WHERE ip_address = $1
-            `, [clientIP]);
-            
-            if (freshStatus.rows[0]) {
-                ipControl = freshStatus.rows[0];
-                // Update cache with fresh data
-                ipCache.set(clientIP, { data: ipControl, timestamp: Date.now() });
-            }
-        }
-        
         if (!ipControl) {
-            // New IP - register as pending (or allowed if localhost)
-            if (isLocalhost) {
-                // Only localhost gets auto-approved
-                ipControl = await registerWhitelistedIP(clientIP, req);
-            } else {
-                // ALL other IPs (including local network) start as pending
-                ipControl = await registerNewIP(clientIP, req);
-            }
-            
-            if (!ipControl) {
-                // Registration failed - fail-open (allow but log)
-                logger.warn(`IP ${clientIP} registration failed - allowing request`);
-                return next();
-            }
-            
-            // Update cache with new IP
-            ipCache.set(clientIP, { data: ipControl, timestamp: Date.now() });
-            
-            logger.info(`🆕 New IP detected: ${clientIP} - registered as ${isLocalhost ? 'ALLOWED (localhost)' : 'PENDING'}`);
-            
-            // Broadcast real-time notification to admins
-            if (global.io) {
-                global.io.emit('newIPDetected', {
-                    ip: clientIP,
-                    userAgent: req.headers['user-agent'],
-                    path: req.path,
-                    timestamp: new Date().toISOString()
-                });
-            }
+            ipControl = await handleNewIPRegistration(clientIP, isLocalhost, req);
+            if (!ipControl) return next();
         }
         
-        // Update activity tracking
-        await updateIPActivity(ipControl.id, req);
-        
-        // ONLY localhost always gets through (but is still tracked)
         if (isLocalhost) {
-            await logIPAccess(ipControl.id, req, true);
+            await recordAllowedAccess(ipControl.id, req);
             req.ipControl = ipControl;
             return next();
         }
         
-        // Check IP status
         if (ipControl.status === 'blocked') {
-            // BLOCKED - Deny access IMMEDIATELY
-            logger.warn(`🚫 BLOCKED IP attempt: ${clientIP} - Reason: ${ipControl.blocked_reason}`);
-            logger.warn(`🚫 BLOCKING REQUEST TO: ${req.method} ${req.path}`);
-            
-            await logIPAccess(ipControl.id, req, false, ipControl.blocked_reason);
-            
-            // Broadcast blocked attempt notification
-            if (global.io) {
-                global.io.emit('blockedIPAttempt', {
-                    ip: clientIP,
-                    reason: ipControl.blocked_reason,
-                    path: req.path,
-                    timestamp: new Date().toISOString()
-                });
-            }
-            
-            // CRITICAL: Return 403 IMMEDIATELY - do not continue
-            return res.status(403).json({
-                error: 'Access Denied',
-                message: 'Your device has been blocked from accessing this system.',
-                code: 'IP_BLOCKED',
-                ip: clientIP,
-                timestamp: new Date().toISOString()
-            });
+            await updateIPActivity(ipControl.id, req);
+            return handleBlockedIP(ipControl, clientIP, req, res);
         }
         
         if (ipControl.status === 'pending') {
-            // PENDING - Limited access (only login and public endpoints)
-            const allowedForPending = [
-                '/api/auth/login',
-                '/api/auth/register',
-                '/api/auth/forgot-password',
-                '/api/health',
-                '/api/products',
-                '/api/kiosk/categories',
-                '/api/kiosk/featured'
-            ];
-            
-            const isAllowedPath = allowedForPending.some(route => req.path.startsWith(route));
-            
-            if (!isAllowedPath) {
-                logger.warn(`⏳ PENDING IP restricted: ${clientIP} - Path: ${req.path}`);
-                
-                await logIPAccess(ipControl.id, req, false, 'Pending IP - limited access');
-                
-                return res.status(403).json({
-                    error: 'Access Restricted',
-                    message: 'Your device is pending approval. Please contact administrator.',
-                    code: 'IP_PENDING',
-                    timestamp: new Date().toISOString()
-                });
-            }
+            await updateIPActivity(ipControl.id, req);
+            const denied = await handlePendingIP(ipControl, clientIP, req, res);
+            if (denied) return;
         }
         
-        // ALLOWED - Full access
-        await logIPAccess(ipControl.id, req, true);
-        
-        // Attach IP control info to request
+        await recordAllowedAccess(ipControl.id, req);
         req.ipControl = ipControl;
-        
         next();
         
     } catch (error) {
         logger.error('IP Firewall error:', error);
-        
-        // Fail-open: Allow request on error but log it
-        logger.warn('IP Firewall check failed - allowing request');
+        const protectedPath = /^\/api\/(admin|auth|users|settings|rules|system|metrics|cache)/.test(req.path || '');
+        if (protectedPath) {
+            return res.status(503).json({
+                success: false,
+                message: 'Security access check is temporarily unavailable'
+            });
+        }
+        logger.warn('IP Firewall check failed - allowing public kiosk request only');
         next();
     } finally {
         const duration = Date.now() - startTime;

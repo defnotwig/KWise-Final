@@ -7,6 +7,7 @@
 const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
 const logger = require('../utils/logger');
+const { sanitizeForLog } = require('../utils/securitySanitizer');
 
 const ajv = new Ajv({ allErrors: true, removeAdditional: true });
 addFormats(ajv);
@@ -266,6 +267,7 @@ const compatibilityAnalysisSchema = {
         },
         targetCategory: { type: 'string' },
         upgradeCategory: { type: 'string' },
+        mode: { type: 'string' },
         excludeCategories: {
             type: 'array',
             items: { type: 'string' }
@@ -442,7 +444,7 @@ const validateCompatibilityAnalysis = (req, res, next) => {
     
     if (!valid) {
         logger.error('❌ Compatibility analysis validation failed:');
-        logger.error('Request body:', JSON.stringify(req.body, null, 2));
+        logger.error('Request body summary:', JSON.stringify(sanitizeForLog(req.body), null, 2));
         logger.error('Validation errors:', JSON.stringify(validators.compatibilityAnalysis.errors, null, 2));
         
         return res.status(400).json({
@@ -465,7 +467,7 @@ const validateFullBuildAnalysis = (req, res, next) => {
     
     if (!valid) {
         logger.error('❌ Full build analysis validation failed');
-        logger.error('📦 Request body:', JSON.stringify(req.body, null, 2));
+        logger.error('Request body summary:', JSON.stringify(sanitizeForLog(req.body), null, 2));
         logger.error('🔍 Validation errors:', JSON.stringify(validators.fullBuildAnalysis.errors, null, 2));
         
         // ✅ ENHANCED: Detailed debugging for empty components object

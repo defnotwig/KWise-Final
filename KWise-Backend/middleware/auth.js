@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { promisify } = require('util');
+const { promisify } = require('node:util');
 const db = require('../config/db');
 const config = require('../config/config');
 const logger = require('../utils/logger');
@@ -22,13 +22,16 @@ exports.protect = async (req, res, next) => {
 
     // 1) Get token
     let token;
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer')
-    ) {
-      token = req.headers.authorization.split(' ')[1];
-    } else if (req.cookies && req.cookies.jwt) {
+    const allowLegacyBearerAuth = process.env.NODE_ENV === 'test' || process.env.ALLOW_LEGACY_BEARER_AUTH === 'true';
+    if (req.cookies?.jwt) {
       token = req.cookies.jwt;
+    } else if (
+      allowLegacyBearerAuth &&
+      req.headers.authorization?.startsWith('Bearer')
+    ) {
+      // Use regex to handle any whitespace variant between Bearer and token
+      const match = req.headers.authorization.match(/^Bearer\s+(\S+)$/i);
+      token = match?.[1];
     }
 
     if (!token) {
@@ -38,8 +41,8 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    // 2) Verify token
-    const decoded = await promisify(jwt.verify)(token, config.jwt.secret);
+    // 2) Verify token — PHASE 6: Enforce HS256 algorithm to prevent algorithm confusion attacks
+    const decoded = await promisify(jwt.verify)(token, config.jwt.secret, { algorithms: ['HS256'] });
 
     // 3) Check if user still exists and get enhanced profile (Phase 3)
     const result = await db.query(`
@@ -60,17 +63,17 @@ exports.protect = async (req, res, next) => {
 
     const currentUser = result.rows[0];
 
-    // 4) Update last_active_at timestamp (throttled to once per minute)
+    // 4) Update last_active_at timestamp — atomic SQL prevents race condition
+    //    The WHERE clause ensures only one concurrent request wins the update
     try {
-      const oneMinuteAgo = new Date(Date.now() - 60000);
-      const shouldUpdate = !currentUser.last_active_at || new Date(currentUser.last_active_at) < oneMinuteAgo;
-      
-      if (shouldUpdate) {
-        await db.query(
-          `UPDATE users SET last_active_at = NOW() 
-           WHERE id = $1`,
-          [decoded.id]
-        );
+      const updateResult = await db.query(
+        `UPDATE users SET last_active_at = NOW()
+         WHERE id = $1
+           AND (last_active_at IS NULL
+                OR last_active_at < NOW() - INTERVAL '1 minute')`,
+        [decoded.id]
+      );
+      if (updateResult.rowCount > 0) {
         logger.info(`Updated last_active_at for user ${currentUser.name} (ID: ${currentUser.id})`);
       }
     } catch (activityErr) {
@@ -117,7 +120,8 @@ exports.authenticateToken = exports.protect;
  */
 exports.restrictTo = (...roles) => {
 return (req, res, next) => {
-  if (process.env.BYPASS_AUTH_FOR_TESTS === 'true') {
+  // PHASE 6: Auth bypass only allowed in test environment
+  if (process.env.NODE_ENV === 'test' && process.env.BYPASS_AUTH_FOR_TESTS === 'true') {
     return next();
   }
     // Check if user has one of the allowed roles

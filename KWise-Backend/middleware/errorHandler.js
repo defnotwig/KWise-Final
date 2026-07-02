@@ -60,8 +60,8 @@ const response = {
     status: statusCode >= 500 ? 'error' : 'fail',
     message,
 };
-  // Add stack trace in development mode
-if (config.server.env === 'development' && err.stack) {
+  // Add stack trace in development mode only (double-gated for safety)
+if (config.server.env === 'development' && process.env.NODE_ENV === 'development' && err.stack) {
     response.stack = err.stack.split('\n');
 }
     res.status(statusCode).json(response);

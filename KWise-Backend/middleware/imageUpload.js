@@ -1,7 +1,7 @@
 const multer = require('multer');
 const logger = require('../utils/logger');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../uploads');

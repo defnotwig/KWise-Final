@@ -1,5 +1,6 @@
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
+const { sanitizeForLog } = require('../utils/securitySanitizer');
 
 /**
  * Audit logging middleware to track all user actions
@@ -59,8 +60,8 @@ class AuditLogger {
                 tableName,
                 tableName, // Use tableName as entity for compatibility
                 recordId?.toString() || null,
-                oldValues ? JSON.stringify(oldValues) : null,
-                newValues ? JSON.stringify(newValues) : null,
+                oldValues ? JSON.stringify(sanitizeForLog(oldValues)) : null,
+                newValues ? JSON.stringify(sanitizeForLog(newValues)) : null,
                 ipAddress,
                 userAgent,
                 `${userName || 'System'} performed ${action} on ${tableName}${recordId ? ` (ID: ${recordId})` : ''}`,
@@ -116,7 +117,7 @@ class AuditLogger {
                         action,
                         tableName,
                         recordId,
-                        newValues: method === 'POST' ? req.body : (method === 'PUT' || method === 'PATCH' ? req.body : null),
+                        newValues: method === 'POST' ? sanitizeForLog(req.body) : (method === 'PUT' || method === 'PATCH' ? sanitizeForLog(req.body) : null),
                         req
                     }).catch(err => {
                         logger.error('Audit logging failed:', err);
@@ -268,7 +269,7 @@ class AuditLogger {
 
             return {
                 logs: logsResult.rows,
-                total: parseInt(countResult.rows[0]?.total || 0),
+                total: Number.parseInt(countResult.rows[0]?.total || 0, 10),
                 limit,
                 offset
             };
