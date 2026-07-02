@@ -29,7 +29,7 @@ async function testStockData() {
     try {
         // Test pc_parts count
         const pcPartsResult = await query('SELECT COUNT(*) as count FROM pc_parts');
-        const pcPartsCount = parseInt(pcPartsResult.rows[0].count);
+        const pcPartsCount = Number.parseInt(pcPartsResult.rows[0].count, 10);
         console.log(`   ✅ pc_parts table: ${pcPartsCount} items`);
 
         // Test component tables
@@ -38,7 +38,7 @@ async function testStockData() {
         for (const table of componentTables) {
             try {
                 const result = await query(`SELECT COUNT(*) as count FROM ${table}`);
-                const count = parseInt(result.rows[0].count);
+                const count = Number.parseInt(result.rows[0].count, 10);
                 console.log(`   ✅ ${table}: ${count} items`);
             } catch (error) {
                 console.log(`   ⚠️ ${table}: Error - ${error.message}`);
@@ -57,7 +57,7 @@ async function testUserData() {
     console.log('\n3. Testing User Data Retrieval...');
     try {
         const result = await query('SELECT COUNT(*) as count FROM users');
-        const userCount = parseInt(result.rows[0].count);
+        const userCount = Number.parseInt(result.rows[0].count, 10);
         console.log(`   ✅ Users table: ${userCount} users`);
 
         // Get sample user
@@ -79,7 +79,7 @@ async function testSettingsData() {
     console.log('\n4. Testing Settings Data...');
     try {
         const result = await query('SELECT COUNT(*) as count FROM settings');
-        const settingsCount = parseInt(result.rows[0].count);
+        const settingsCount = Number.parseInt(result.rows[0].count, 10);
         console.log(`   ✅ Settings table: ${settingsCount} items`);
 
         // Get sample settings
@@ -100,7 +100,7 @@ async function testAuditLogs() {
     console.log('\n5. Testing Audit Logs...');
     try {
         const result = await query('SELECT COUNT(*) as count FROM audit_logs');
-        const logsCount = parseInt(result.rows[0].count);
+        const logsCount = Number.parseInt(result.rows[0].count, 10);
         console.log(`   ✅ Audit logs: ${logsCount} entries`);
 
         if (logsCount > 0) {
@@ -126,7 +126,7 @@ async function testEmptyTables() {
         for (const table of emptyTables) {
             try {
                 const result = await query(`SELECT COUNT(*) as count FROM ${table}`);
-                const count = parseInt(result.rows[0].count);
+                const count = Number.parseInt(result.rows[0].count, 10);
                 if (count === 0) {
                     console.log(`   ✅ ${table}: 0 rows (safe to remove)`);
                 } else {

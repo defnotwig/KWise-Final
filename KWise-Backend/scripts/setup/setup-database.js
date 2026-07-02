@@ -15,15 +15,15 @@
  */
 
 const { Pool, Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const DB_CONFIG = {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
+    port: Number.parseInt(process.env.DB_PORT, 10) || 5432,
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'humbleludwig13',
     database: process.env.DB_NAME || 'KWiseDB'
@@ -88,7 +88,7 @@ async function isSchemaPopulated(pool) {
         const result = await pool.query(`
             SELECT count(*) AS cnt FROM pg_tables WHERE schemaname = 'public'
         `);
-        return parseInt(result.rows[0].cnt, 10) > 5;
+        return Number.parseInt(result.rows[0].cnt, 10) > 5;
     } catch {
         return false;
     }
@@ -162,17 +162,17 @@ async function verifySetup(pool) {
     log('🔎', 'Verifying database setup...');
     
     const checks = [
-        { label: 'Tables exist', query: `SELECT count(*) AS cnt FROM pg_tables WHERE schemaname = 'public'`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 50 },
-        { label: 'Users seeded', query: `SELECT count(*) AS cnt FROM users`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'Categories seeded', query: `SELECT count(*) AS cnt FROM categories`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'PC Parts seeded', query: `SELECT count(*) AS cnt FROM pc_parts`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 100 },
-        { label: 'CPUs seeded', query: `SELECT count(*) AS cnt FROM cpu`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'GPUs seeded', query: `SELECT count(*) AS cnt FROM gpu`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'Motherboards seeded', query: `SELECT count(*) AS cnt FROM motherboard`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'Settings seeded', query: `SELECT count(*) AS cnt FROM settings`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'System settings seeded', query: `SELECT count(*) AS cnt FROM system_settings`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'Compatibility rules', query: `SELECT count(*) AS cnt FROM compatibility_rules`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
-        { label: 'Prebuilt PCs', query: `SELECT count(*) AS cnt FROM prebuilt_pcs`, expect: (r) => parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Tables exist', query: `SELECT count(*) AS cnt FROM pg_tables WHERE schemaname = 'public'`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 50 },
+        { label: 'Users seeded', query: `SELECT count(*) AS cnt FROM users`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Categories seeded', query: `SELECT count(*) AS cnt FROM categories`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'PC Parts seeded', query: `SELECT count(*) AS cnt FROM pc_parts`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 100 },
+        { label: 'CPUs seeded', query: `SELECT count(*) AS cnt FROM cpu`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'GPUs seeded', query: `SELECT count(*) AS cnt FROM gpu`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Motherboards seeded', query: `SELECT count(*) AS cnt FROM motherboard`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Settings seeded', query: `SELECT count(*) AS cnt FROM settings`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'System settings seeded', query: `SELECT count(*) AS cnt FROM system_settings`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Compatibility rules', query: `SELECT count(*) AS cnt FROM compatibility_rules`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
+        { label: 'Prebuilt PCs', query: `SELECT count(*) AS cnt FROM prebuilt_pcs`, expect: (r) => Number.parseInt(r.rows[0].cnt, 10) > 0 },
     ];
     
     let passed = 0;

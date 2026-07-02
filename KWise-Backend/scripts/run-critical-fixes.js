@@ -6,8 +6,8 @@
  */
 
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { query } = require('../config/db');
 
 async function runMigration() {

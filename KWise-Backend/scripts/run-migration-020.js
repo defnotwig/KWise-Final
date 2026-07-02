@@ -3,8 +3,8 @@
  * Adds JSON indexes and optimizes compatibility query performance
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const db = require('../config/db');
 
 async function runMigration() {

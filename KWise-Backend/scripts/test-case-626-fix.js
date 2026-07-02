@@ -59,11 +59,11 @@ async function testCase626Fix() {
             console.log(`   Form Factor: ${mbSpecs.form_factor || 'Not specified'}`);
             
             const mbFormFactor = (mbSpecs.form_factor || 'ATX').toUpperCase().replace(/[^A-Z-]/g, '');
-            const normalizedMB = mbFormFactor.replace(/-/g, '');
+            const normalizedMB = mbFormFactor.replaceAll('-', '');
             
             // Check compatibility
             const compatible = supportedFormFactors.some(supported => {
-                const normalizedSupported = supported.replace(/-/g, '');
+                const normalizedSupported = supported.replaceAll('-', '');
                 return normalizedMB === normalizedSupported || 
                        normalizedMB.includes(normalizedSupported) || 
                        normalizedSupported.includes(normalizedMB);

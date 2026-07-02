@@ -4,8 +4,8 @@
  * This ensures all profile images are accessible via the /uploads route
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const assetsDir = path.join(__dirname, '../public/assets/users');
 const uploadsDir = path.join(__dirname, '../uploads');

@@ -3,8 +3,8 @@
  * Executes the database schema expansion migration
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const pool = require('../config/db');
 
 async function runMigration() {
