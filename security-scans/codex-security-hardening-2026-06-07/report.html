@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>K-Wise Codex Security Hardening Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.5; margin: 32px; color: #1f2937; }
+    h1, h2, h3 { color: #111827; }
+    code { background: #f3f4f6; padding: 2px 4px; border-radius: 4px; }
+    .status { font-weight: 700; color: #047857; }
+    .risk { font-weight: 700; color: #b45309; }
+    ul { padding-left: 24px; }
+  </style>
+</head>
+<body>
+  <h1>K-Wise Codex Security Hardening Report</h1>
+  <p><strong>Generated:</strong> 2026-06-07</p>
+  <p><strong>Scope:</strong> repository-wide frontend, backend, kiosk routes, admin routes, database-facing services, dependency manifests, and live localhost smoke checks.</p>
+
+  <h2>Baseline</h2>
+  <p>Controls were mapped to OWASP API Security Top 10 2023, OWASP CSRF, OWASP Logging, Express production security, and deterministic PC compatibility kiosk patterns.</p>
+
+  <h2>Fixed Findings</h2>
+  <ul>
+    <li><strong>Frontend localStorage auth trust:</strong> admin identity now comes from <code>/api/auth/me</code>; legacy auth storage is cleared; Bearer headers are stripped.</li>
+    <li><strong>Credential transport and CSRF:</strong> login uses HttpOnly cookie auth plus CSRF token; mutating admin calls require CSRF.</li>
+    <li><strong>Route exposure:</strong> admin-like mutation/stat/cache/history/settings/rule endpoints now require backend auth/RBAC.</li>
+    <li><strong>Sensitive leaks:</strong> response/log sanitizers mask secrets and body logs were removed from kiosk order/upload hot paths.</li>
+    <li><strong>Uploads/static files:</strong> magic-byte image validation, SVG rejection, random filenames, folder allowlists, size limits, cleanup, and safe static headers are enforced.</li>
+    <li><strong>SQL hardening:</strong> spec-table identifiers are allowlisted and pagination/search inputs are capped.</li>
+    <li><strong>Performance-safe security:</strong> pool defaults are capped outside load-test mode, rate limits are tightened, health checks avoid self-DoS, and canceled probes are silent.</li>
+  </ul>
+
+  <h2>Verification</h2>
+  <ul>
+    <li class="status">Backend full Jest: 37 suites, 108 tests passed.</li>
+    <li class="status">Frontend Jest: 9 suites, 68 tests passed.</li>
+    <li class="status">Frontend production build passed with existing CompareProducts hook warning only.</li>
+    <li class="status">Backend npm audit --omit=dev: 0 vulnerabilities.</li>
+    <li class="status">Compatibility audit: 343ms, 312 files, 133 tables, 3,200 enabled rules, aiEnabled:false.</li>
+    <li class="status">Browser smoke: kiosk/admin/legacy AI redirect routes had no fresh console errors; warm page loads were under 2s.</li>
+  </ul>
+
+  <h2>Residual Risks</h2>
+  <ul>
+    <li class="risk"><code>KWise-Backend/.env</code> has <code>LOAD_TEST_MODE=true</code>; set false for kiosk production.</li>
+    <li class="risk">Frontend CRA/react-scripts transitive advisories remain; force fix would break the app by installing <code>react-scripts@0.0.0</code>.</li>
+    <li class="risk">Legacy AI-named disabled files and mixed spec keys remain as cleanup debt.</li>
+    <li class="risk">Existing large SVG build deopt notes and <code>CompareProducts.js</code> hook warning remain unchanged.</li>
+  </ul>
+</body>
+</html>

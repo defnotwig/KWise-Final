@@ -1,0 +1,128 @@
+import { del, get, post, put } from "@/lib/api-client";
+
+import {
+  AccountActionResponseSchema,
+  AccountAliasRequestSchema,
+  AccountAliasResponseSchema,
+  AccountExportResponseSchema,
+  AccountOpenCodeAuthExportResponseSchema,
+  AccountImportResponseSchema,
+  AccountLimitWarmupUpdateRequestSchema,
+  AccountLimitWarmupUpdateResponseSchema,
+  AccountsResponseSchema,
+  AccountTrendsResponseSchema,
+  ManualOauthCallbackRequestSchema,
+  ManualOauthCallbackResponseSchema,
+  OauthCompleteRequestSchema,
+  OauthCompleteResponseSchema,
+  OauthStartRequestSchema,
+  OauthStartResponseSchema,
+  OauthStatusResponseSchema,
+  RuntimeConnectAddressResponseSchema,
+} from "@/features/accounts/schemas";
+
+const ACCOUNTS_BASE_PATH = "/api/accounts";
+const OAUTH_BASE_PATH = "/api/oauth";
+
+export function listAccounts() {
+  return get(ACCOUNTS_BASE_PATH, AccountsResponseSchema);
+}
+
+export function importAccount(file: File) {
+  const formData = new FormData();
+  formData.append("auth_json", file);
+  return post(`${ACCOUNTS_BASE_PATH}/import`, AccountImportResponseSchema, {
+    body: formData,
+  });
+}
+
+export function pauseAccount(accountId: string) {
+  return post(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/pause`,
+    AccountActionResponseSchema,
+  );
+}
+
+export function reactivateAccount(accountId: string) {
+  return post(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/reactivate`,
+    AccountActionResponseSchema,
+  );
+}
+
+export function setAccountAlias(accountId: string, alias: string | null) {
+  const validated = AccountAliasRequestSchema.parse({ alias });
+  return put(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/alias`,
+    AccountAliasResponseSchema,
+    { body: validated },
+  );
+}
+
+export function updateAccountLimitWarmup(accountId: string, enabled: boolean) {
+  const payload = AccountLimitWarmupUpdateRequestSchema.parse({ enabled });
+  return put(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/limit-warmup`,
+    AccountLimitWarmupUpdateResponseSchema,
+    { body: payload },
+  );
+}
+
+export function getAccountTrends(accountId: string) {
+  return get(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/trends`,
+    AccountTrendsResponseSchema,
+  );
+}
+
+export function exportAccountOpenCodeAuth(accountId: string) {
+  return post(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/export/opencode-auth`,
+    AccountOpenCodeAuthExportResponseSchema,
+  );
+}
+
+export function deleteAccount(accountId: string, deleteHistory = false) {
+  const qs = deleteHistory ? "?delete_history=true" : "";
+  return del(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}${qs}`,
+    AccountActionResponseSchema,
+  );
+}
+
+export function exportAccount(accountId: string) {
+  return post(
+    `${ACCOUNTS_BASE_PATH}/${encodeURIComponent(accountId)}/export`,
+    AccountExportResponseSchema,
+    { cache: "no-store" },
+  );
+}
+
+export function startOauth(payload: unknown) {
+  const validated = OauthStartRequestSchema.parse(payload);
+  return post(`${OAUTH_BASE_PATH}/start`, OauthStartResponseSchema, {
+    body: validated,
+  });
+}
+
+export function getOauthStatus(flowId?: string) {
+  const query = flowId ? `?flowId=${encodeURIComponent(flowId)}` : "";
+  return get(`${OAUTH_BASE_PATH}/status${query}`, OauthStatusResponseSchema);
+}
+
+export function completeOauth(payload?: unknown) {
+  const validated = OauthCompleteRequestSchema.parse(payload ?? {});
+  return post(`${OAUTH_BASE_PATH}/complete`, OauthCompleteResponseSchema, {
+    body: validated,
+  });
+}
+export function submitManualOauthCallback(payload: unknown) {
+  const validated = ManualOauthCallbackRequestSchema.parse(payload);
+  return post(`${OAUTH_BASE_PATH}/manual-callback`, ManualOauthCallbackResponseSchema, {
+    body: validated,
+  });
+}
+
+export function getRuntimeConnectAddress() {
+  return get("/api/settings/runtime/connect-address", RuntimeConnectAddressResponseSchema);
+}
