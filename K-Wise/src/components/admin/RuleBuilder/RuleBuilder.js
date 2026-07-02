@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FiPlus, FiSave, FiRefreshCw, FiAlertCircle } from 'react-icons/fi';
+import { getServerBaseUrl } from '../../../utils/networkConfig';
 import ComponentSelector from './ComponentSelector';
 import ConditionBuilder from './ConditionBuilder';
 import RulePreview from './RulePreview';
@@ -63,7 +64,7 @@ const RuleBuilder = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/rules');
+      const response = await fetch(`${getServerBaseUrl()}/api/rules`);
       if (!response.ok) throw new Error('Failed to load rules');
       const data = await response.json();
       setRuleList(data.data || []);
@@ -82,7 +83,7 @@ const RuleBuilder = () => {
     if (!selectedComponents.component1 || !selectedComponents.component2) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/rules/conflicts', {
+      const response = await fetch(`${getServerBaseUrl()}/api/rules/conflicts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,8 +185,8 @@ const RuleBuilder = () => {
       };
 
       const url = currentRule.id 
-        ? `http://localhost:5000/api/rules/${currentRule.id}/update`
-        : 'http://localhost:5000/api/rules/create';
+        ? `${getServerBaseUrl()}/api/rules/${currentRule.id}/update`
+        : `${getServerBaseUrl()}/api/rules/create`;
       
       const method = currentRule.id ? 'PUT' : 'POST';
 
@@ -219,10 +220,10 @@ const RuleBuilder = () => {
    * Delete rule
    */
   const handleDeleteRule = async (ruleId) => {
-    if (!window.confirm('Are you sure you want to delete this rule?')) return;
+    if (!globalThis.confirm('Are you sure you want to delete this rule?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/rules/${ruleId}`, {
+      const response = await fetch(`${getServerBaseUrl()}/api/rules/${ruleId}`, {
         method: 'DELETE'
       });
 
@@ -299,7 +300,7 @@ const RuleBuilder = () => {
    */
   const handleTestRule = async (testData) => {
     try {
-      const response = await fetch('http://localhost:5000/api/rules/test', {
+      const response = await fetch(`${getServerBaseUrl()}/api/rules/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -412,8 +413,9 @@ const RuleBuilder = () => {
               <h2>Rule Information</h2>
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Rule Name *</label>
+                  <label htmlFor="rule-name-input">Rule Name *</label>
                   <input
+                    id="rule-name-input"
                     type="text"
                     value={currentRule.name}
                     onChange={(e) => setCurrentRule(prev => ({ ...prev, name: e.target.value }))}
@@ -421,8 +423,9 @@ const RuleBuilder = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Category</label>
+                  <label htmlFor="rule-category-input">Category</label>
                   <input
+                    id="rule-category-input"
                     type="text"
                     value={currentRule.category}
                     onChange={(e) => setCurrentRule(prev => ({ ...prev, category: e.target.value }))}
@@ -431,8 +434,9 @@ const RuleBuilder = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Action</label>
+                  <label htmlFor="rule-action-select">Action</label>
                   <select
+                    id="rule-action-select"
                     value={currentRule.action}
                     onChange={(e) => setCurrentRule(prev => ({ ...prev, action: e.target.value }))}
                   >
@@ -442,18 +446,20 @@ const RuleBuilder = () => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Priority (1-10)</label>
+                  <label htmlFor="rule-priority-input">Priority (1-10)</label>
                   <input
+                    id="rule-priority-input"
                     type="number"
                     min="1"
                     max="10"
                     value={currentRule.priority}
-                    onChange={(e) => setCurrentRule(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
+                    onChange={(e) => setCurrentRule(prev => ({ ...prev, priority: Number.parseInt(e.target.value, 10) }))}
                   />
                 </div>
                 <div className="form-group full-width">
-                  <label>Description</label>
+                  <label htmlFor="rule-description-textarea">Description</label>
                   <textarea
+                    id="rule-description-textarea"
                     value={currentRule.description}
                     onChange={(e) => setCurrentRule(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Describe what this rule does and why..."

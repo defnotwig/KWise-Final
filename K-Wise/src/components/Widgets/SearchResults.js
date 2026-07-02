@@ -152,7 +152,7 @@ const SearchResults = () => {
                                                 <div className="result-metadata">
                                                     {result.metadata.price && (
                                                         <span className="metadata-item">
-                                                            <FiDollarSign size={12} /> ₱{parseFloat(result.metadata.price).toLocaleString()}
+                                                            <FiDollarSign size={12} /> ₱{Number.parseFloat(result.metadata.price).toLocaleString()}
                                                         </span>
                                                     )}
                                                     {result.metadata.stock !== undefined && (

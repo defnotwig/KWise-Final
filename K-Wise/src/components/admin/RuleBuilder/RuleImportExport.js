@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { FiDownload, FiUpload, FiFile, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { getServerBaseUrl } from '../../../utils/networkConfig';
 
 /**
  * RuleImportExport - Bulk import/export operations
@@ -38,7 +40,7 @@ const RuleImportExport = ({ rules, onImportComplete }) => {
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ...rows.map(row => row.map(cell => `"${String(cell).replaceAll('"', '""')}"`).join(','))
     ].join('\n');
 
     const dataBlob = new Blob([csvContent], { type: 'text/csv' });
@@ -70,7 +72,13 @@ const RuleImportExport = ({ rules, onImportComplete }) => {
       let rulesToImport;
 
       if (file.name.endsWith('.json')) {
-        rulesToImport = JSON.parse(text);
+        try {
+          rulesToImport = JSON.parse(text);
+        } catch {
+          setImportResult({ success: false, message: 'Invalid JSON file — could not parse' });
+          setImporting(false);
+          return;
+        }
       } else {
         throw new Error('Only JSON files are supported for import');
       }
@@ -80,7 +88,7 @@ const RuleImportExport = ({ rules, onImportComplete }) => {
       }
 
       // Send to backend
-      const response = await fetch('http://localhost:5000/api/rules/import', {
+      const response = await fetch(`${getServerBaseUrl()}/api/rules/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rules: rulesToImport })
@@ -126,8 +134,9 @@ const RuleImportExport = ({ rules, onImportComplete }) => {
 
           <div className="export-controls">
             <div className="form-group">
-              <label>Export Format</label>
+              <label htmlFor="export-format">Export Format</label>
               <select 
+                id="export-format"
                 value={exportFormat} 
                 onChange={(e) => setExportFormat(e.target.value)}
               >
@@ -284,6 +293,11 @@ const RuleImportExport = ({ rules, onImportComplete }) => {
       </div>
     </div>
   );
+};
+
+RuleImportExport.propTypes = {
+  rules: PropTypes.arrayOf(PropTypes.object).isRequired,
+  onImportComplete: PropTypes.func,
 };
 
 export default RuleImportExport;

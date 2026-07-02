@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { usersAPI } from '../services/api';
 import './UserManagement.css';
 
 const UserManagement = () => {
-    const { user } = useContext(AuthContext);
+    const { currentUser: user } = useContext(AuthContext);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -54,31 +54,7 @@ const UserManagement = () => {
 
     const [searchInput, setSearchInput] = useState(''); // debounced input
 
-    useEffect(() => {
-        loadUsers();
-        loadAvailableRoles();
-    }, [filters, pagination.page, sortConfig]);
-
-    // Auto-polling every 30s when enabled
-    useEffect(() => {
-        if (!autoRefresh) return;
-        const interval = setInterval(() => {
-            loadUsers();
-            setLastRefreshed(new Date());
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [autoRefresh, filters, pagination.page, sortConfig]);
-
-    // Debounce search input -> filters.search
-    useEffect(() => {
-        const t = setTimeout(() => {
-            setFilters(prev => prev.search === searchInput ? prev : { ...prev, search: searchInput });
-            if (pagination.page !== 1) setPagination(prev => ({ ...prev, page: 1 }));
-        }, 400);
-        return () => clearTimeout(t);
-    }, [searchInput]);
-
-    const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
         try {
             setLoading(true);
             setError('');
@@ -103,21 +79,45 @@ const UserManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters.role, filters.search, filters.status, pagination.limit, pagination.page, sortConfig.direction, sortConfig.field]);
 
-    const loadAvailableRoles = async () => {
+    const loadAvailableRoles = useCallback(async () => {
         try {
             const { data } = await usersAPI.getAvailableRoles();
             setAvailableRoles(data?.data || []);
-        } catch (e) {
-            console.warn('Failed to load roles metadata (fallback to defaults)');
+        } catch (err) {
+            console.warn('Failed to load roles metadata (fallback to defaults):', err.message);
             setAvailableRoles([
                 { value: 'superadmin', label: 'Super Admin', description: 'Full access' },
                 { value: 'admin', label: 'Admin', description: 'Management access' },
                 { value: 'developer', label: 'Developer', description: 'Developer scope' }
             ]);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadUsers();
+        loadAvailableRoles();
+    }, [loadAvailableRoles, loadUsers]);
+
+    // Auto-polling every 30s when enabled
+    useEffect(() => {
+        if (!autoRefresh) return undefined;
+        const interval = setInterval(() => {
+            loadUsers();
+            setLastRefreshed(new Date());
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [autoRefresh, loadUsers]);
+
+    // Debounce search input -> filters.search
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setFilters(prev => prev.search === searchInput ? prev : { ...prev, search: searchInput });
+            if (pagination.page !== 1) setPagination(prev => ({ ...prev, page: 1 }));
+        }, 400);
+        return () => clearTimeout(t);
+    }, [pagination.page, searchInput]);
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
@@ -284,8 +284,8 @@ const UserManagement = () => {
                         ↻
                     </button>
                     <label style={{display:'flex', alignItems:'center', gap:'0.25rem', fontSize:'0.75rem'}}>
-                        <input type="checkbox" checked={autoRefresh} onChange={e=>setAutoRefresh(e.target.checked)} />
-                        Auto (30s)
+                        <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
+                        <span>Auto (30s)</span>
                     </label>
                     {lastRefreshed && <span style={{fontSize:'0.65rem', color:'#666'}}>Updated {lastRefreshed.toLocaleTimeString()}</span>}
                     {canCreateUsers() && (
@@ -504,33 +504,30 @@ const UserManagement = () => {
                         <form onSubmit={handleCreateUser}>
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label>Name</label>
+                                    <label htmlFor="create-name">Name</label>
                                     <input
+                                        id="create-name"
                                         type="text"
-                                        className="form-control"
-                                        value={createForm.name}
                                         onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
                                         required
                                     />
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Email</label>
+                                    <label htmlFor="create-email">Email</label>
                                     <input
+                                        id="create-email"
                                         type="email"
-                                        className="form-control"
-                                        value={createForm.email}
                                         onChange={(e) => setCreateForm(prev => ({ ...prev, email: e.target.value }))}
                                         required
                                     />
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Password <small style={{fontWeight:'normal'}}>min 8 chars, letters & numbers</small></label>
+                                    <label htmlFor="create-password">Password <small style={{fontWeight:'normal'}}>min 8 chars, letters & numbers</small></label>
                                     <input
+                                        id="create-password"
                                         type="password"
-                                        className="form-control"
-                                        value={createForm.password}
                                         onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
                                         required
                                         minLength="6"
@@ -538,8 +535,9 @@ const UserManagement = () => {
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Role</label>
+                                    <label htmlFor="create-role">Role</label>
                                     <select
+                                        id="create-role"
                                         className="form-control"
                                         value={createForm.role}
                                         onChange={(e) => setCreateForm(prev => ({ ...prev, role: e.target.value }))}
@@ -586,30 +584,29 @@ const UserManagement = () => {
                         <form onSubmit={handleEditUser}>
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label>Name</label>
+                                    <label htmlFor="edit-name">Name</label>
                                     <input
+                                        id="edit-name"
                                         type="text"
-                                        className="form-control"
-                                        value={editForm.name}
                                         onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
                                         required
                                     />
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Email</label>
+                                    <label htmlFor="edit-email">Email</label>
                                     <input
+                                        id="edit-email"
                                         type="email"
-                                        className="form-control"
-                                        value={editForm.email}
                                         onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
                                         required
                                     />
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Role</label>
+                                    <label htmlFor="edit-role">Role</label>
                                     <select
+                                        id="edit-role"
                                         className="form-control"
                                         value={editForm.role}
                                         onChange={(e) => setEditForm(prev => ({ ...prev, role: e.target.value }))}
@@ -624,19 +621,21 @@ const UserManagement = () => {
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>
+                                    <label htmlFor="edit-active-checkbox">
                                         <input
+                                            id="edit-active-checkbox"
                                             type="checkbox"
                                             checked={editForm.is_active}
                                             onChange={(e) => setEditForm(prev => ({ ...prev, is_active: e.target.checked }))}
                                         />
-                                        Active User
+                                        {' '}Active User
                                     </label>
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Password Editing Disabled</label>
+                                    <label htmlFor="edit-password-disabled">Password Editing Disabled</label>
                                     <input
+                                        id="edit-password-disabled"
                                         type="password"
                                         className="form-control"
                                         value="********"

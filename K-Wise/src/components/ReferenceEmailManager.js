@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { FiMail, FiShield, FiCheck, FiAlertCircle } from 'react-icons/fi';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import './ReferenceEmailManager.css';
 
 const ReferenceEmailManager = ({ currentUser, onUpdateComplete }) => {
@@ -12,7 +14,7 @@ const ReferenceEmailManager = ({ currentUser, onUpdateComplete }) => {
         setIsUpdating(true);
         setMessage({ type: '', text: '' });
 
-        if (!referenceEmail || !referenceEmail.trim()) {
+        if (!referenceEmail?.trim()) {
             setMessage({ type: 'error', text: 'Please enter a reference email address' });
             setIsUpdating(false);
             return;
@@ -33,7 +35,7 @@ const ReferenceEmailManager = ({ currentUser, onUpdateComplete }) => {
         }
 
         try {
-            const response = await fetch('http://localhost:5000/api/auth/update-reference-email', {
+            const response = await fetch(`${getServerBaseUrl()}/api/auth/update-reference-email`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -81,19 +83,19 @@ const ReferenceEmailManager = ({ currentUser, onUpdateComplete }) => {
                 <h3><FiMail /> Current Account Information</h3>
                 <div className="info-grid">
                     <div className="info-item">
-                        <label>Login Email:</label>
+                        <strong>Login Email:</strong>
                         <span>{currentUser?.email}</span>
                     </div>
                     <div className="info-item">
-                        <label>Name:</label>
+                        <strong>Name:</strong>
                         <span>{currentUser?.name}</span>
                     </div>
                     <div className="info-item">
-                        <label>Role:</label>
+                        <strong>Role:</strong>
                         <span className="role-badge">{currentUser?.role}</span>
                     </div>
                     <div className="info-item">
-                        <label>Current Reference Email:</label>
+                        <strong>Current Reference Email:</strong>
                         <span className={currentUser?.referenceEmail ? 'has-reference' : 'no-reference'}>
                             {currentUser?.referenceEmail || 'Not set'}
                         </span>
@@ -175,6 +177,17 @@ const ReferenceEmailManager = ({ currentUser, onUpdateComplete }) => {
             </div>
         </div>
     );
+};
+
+ReferenceEmailManager.propTypes = {
+    currentUser: PropTypes.shape({
+        email: PropTypes.string,
+        name: PropTypes.string,
+        role: PropTypes.string,
+        referenceEmail: PropTypes.string,
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    }),
+    onUpdateComplete: PropTypes.func,
 };
 
 export default ReferenceEmailManager;

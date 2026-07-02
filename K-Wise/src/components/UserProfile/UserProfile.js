@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { FiX, FiUser, FiCamera, FiSave } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './UserProfile.css';
 
 const UserProfile = ({ isOpen, onClose }) => {
@@ -22,7 +24,7 @@ const UserProfile = ({ isOpen, onClose }) => {
             const formatBirthDate = (dateValue) => {
                 if (!dateValue) return '';
                 const date = new Date(dateValue);
-                if (isNaN(date.getTime())) return '';
+                if (Number.isNaN(date.getTime())) return '';
                 
                 // Get local date components to avoid timezone issues
                 const year = date.getFullYear();
@@ -41,7 +43,7 @@ const UserProfile = ({ isOpen, onClose }) => {
             // Set existing profile image if available
             if (currentUser.profileImage || currentUser.profile_image) {
                 const imagePath = currentUser.profileImage || currentUser.profile_image;
-                setImagePreview(`http://localhost:5000/uploads/${imagePath}`);
+                setImagePreview(`${getServerBaseUrl()}/uploads/${imagePath}`);
             } else {
                 // Clear preview if no image
                 setImagePreview('');
@@ -89,6 +91,46 @@ const UserProfile = ({ isOpen, onClose }) => {
         }
     };
 
+    const updateBirthDate = (target, serverData) => {
+        const birthDate = serverData.birth_date || serverData.birthDate;
+        if (birthDate) {
+            target.birthDate = birthDate;
+            target.birth_date = birthDate;
+        } else if (currentUser.role === 'superadmin' && formData.birthDate) {
+            target.birthDate = formData.birthDate;
+            target.birth_date = formData.birthDate;
+        }
+    };
+
+    const applyProfileUpdate = (data) => {
+        setSuccess('Profile updated successfully!');
+        
+        // Update context with new data
+        if (updateCurrentUser) {
+            const updatedUser = {
+                ...currentUser,
+                name: formData.name,
+                displayName: formData.displayName,
+                display_name: formData.displayName,
+                profileImage: data.data.profileImage || data.data.profile_image,
+                profile_image: data.data.profileImage || data.data.profile_image
+            };
+            
+            updateBirthDate(updatedUser, data.data);
+            updateCurrentUser(updatedUser);
+        }
+
+        // Update image preview with full URL if image exists
+        if (data.data.profileImage) {
+            setImagePreview(`${getServerBaseUrl()}/uploads/${data.data.profileImage}`);
+        }
+
+        // Close modal after success message (no page reload needed)
+        setTimeout(() => {
+            onClose();
+        }, 1500);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -109,71 +151,16 @@ const UserProfile = ({ isOpen, onClose }) => {
                 formPayload.append('profileImage', formData.imageFile);
             }
 
-            const response = await fetch(`http://localhost:5000/api/users/${currentUser.id}/profile`, {
+            const response = await fetch(`${getServerBaseUrl()}/api/users/${currentUser.id}/profile`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
+                credentials: "include",
                 body: formPayload
             });
 
             const data = await response.json();
 
             if (data.success) {
-                setSuccess('Profile updated successfully!');
-                
-                // Update context with new data
-                if (updateCurrentUser) {
-                    const updatedUser = {
-                        ...currentUser,
-                        name: formData.name,
-                        displayName: formData.displayName,
-                        display_name: formData.displayName,
-                        profileImage: data.data.profileImage || data.data.profile_image,
-                        profile_image: data.data.profileImage || data.data.profile_image
-                    };
-                    
-                    // Update birth date from server response if available
-                    if (data.data.birth_date || data.data.birthDate) {
-                        updatedUser.birthDate = data.data.birth_date || data.data.birthDate;
-                        updatedUser.birth_date = data.data.birth_date || data.data.birthDate;
-                    } else if (currentUser.role === 'superadmin' && formData.birthDate) {
-                        // Fallback to form data if not in response
-                        updatedUser.birthDate = formData.birthDate;
-                        updatedUser.birth_date = formData.birthDate;
-                    }
-                    
-                    updateCurrentUser(updatedUser);
-                }
-
-                // Update localStorage with correct key that Navbar uses
-                const currentUserData = JSON.parse(localStorage.getItem('currentUser') || '{}');
-                currentUserData.name = formData.name;
-                currentUserData.displayName = formData.displayName;
-                currentUserData.display_name = formData.displayName; // Alternative field name
-                if (data.data.profileImage) {
-                    currentUserData.profileImage = data.data.profileImage;
-                    currentUserData.profile_image = data.data.profileImage;
-                }
-                // Update birth date in localStorage
-                if (data.data.birth_date || data.data.birthDate) {
-                    currentUserData.birthDate = data.data.birth_date || data.data.birthDate;
-                    currentUserData.birth_date = data.data.birth_date || data.data.birthDate;
-                } else if (currentUser.role === 'superadmin' && formData.birthDate) {
-                    currentUserData.birthDate = formData.birthDate;
-                    currentUserData.birth_date = formData.birthDate;
-                }
-                localStorage.setItem('currentUser', JSON.stringify(currentUserData));
-
-                // Update image preview with full URL if image exists
-                if (data.data.profileImage) {
-                    setImagePreview(`http://localhost:5000/uploads/${data.data.profileImage}`);
-                }
-
-                // Close modal after success message (no page reload needed)
-                setTimeout(() => {
-                    onClose();
-                }, 1500);
+                applyProfileUpdate(data);
             } else {
                 setError(data.message || 'Failed to update profile');
             }
@@ -296,6 +283,11 @@ const UserProfile = ({ isOpen, onClose }) => {
             </div>
         </div>
     );
+};
+
+UserProfile.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
 };
 
 export default UserProfile;

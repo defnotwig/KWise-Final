@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import { 
   FiActivity, FiDatabase, FiCpu, FiTrendingUp, FiZap, 
   FiRefreshCw, FiCheckCircle, FiAlertTriangle 
@@ -37,7 +38,7 @@ const CachePerformanceDashboard = () => {
   // Fetch cache statistics from backend
   const fetchCacheStats = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/cache/stats', {
+      const response = await fetch(`${getServerBaseUrl()}/api/cache/stats`, {
         credentials: 'include'
       });
       
@@ -55,7 +56,7 @@ const CachePerformanceDashboard = () => {
         setPerformanceHistory(prev => {
           const newHistory = [...prev, {
             timestamp: new Date().toLocaleTimeString(),
-            hitRate: parseFloat(data.data.hitRate) || 0,
+            hitRate: Number.parseFloat(data.data.hitRate) || 0,
             hits: data.data.hits || 0,
             misses: data.data.misses || 0,
             currentSize: data.data.currentSize || 0,
@@ -90,7 +91,7 @@ const CachePerformanceDashboard = () => {
 
   // Calculate performance rating
   const getPerformanceRating = (hitRate) => {
-    const rate = parseFloat(hitRate) || 0;
+    const rate = Number.parseFloat(hitRate) || 0;
     if (rate >= 80) return { label: 'EXCELLENT', color: '#10b981', icon: FiCheckCircle };
     if (rate >= 60) return { label: 'GOOD', color: '#06b6d4', icon: FiTrendingUp };
     if (rate >= 40) return { label: 'FAIR', color: '#f59e0b', icon: FiAlertTriangle };
@@ -99,7 +100,7 @@ const CachePerformanceDashboard = () => {
 
   // Calculate fill percentage color
   const getFillColor = (percentage) => {
-    const pct = parseFloat(percentage) || 0;
+    const pct = Number.parseFloat(percentage) || 0;
     if (pct >= 90) return '#ef4444'; // Red - Critical
     if (pct >= 70) return '#f59e0b'; // Orange - Warning
     if (pct >= 50) return '#06b6d4'; // Cyan - Good
@@ -180,12 +181,7 @@ const CachePerformanceDashboard = () => {
         </div>
       </div>
 
-      {!cacheStats ? (
-        <div className="no-data">
-          <FiDatabase />
-          <p>No cache statistics available</p>
-        </div>
-      ) : (
+      {cacheStats ? (
         <>
           {/* Performance Overview Cards */}
           <div className="stats-grid">
@@ -304,9 +300,9 @@ const CachePerformanceDashboard = () => {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {pieData.map((entry, index) => (
+                    {pieData.map((entry) => (
                       <Cell 
-                        key={`cell-${index}`} 
+                        key={`cell-${entry.name}`} 
                         fill={entry.name === 'Hits' ? COLORS.hits : COLORS.misses} 
                       />
                     ))}
@@ -389,13 +385,13 @@ const CachePerformanceDashboard = () => {
                 <FiTrendingUp /> Performance Recommendations
               </h3>
               <ul>
-                {parseFloat(cacheStats.hitRate) < 40 && (
+                {Number.parseFloat(cacheStats.hitRate) < 40 && (
                   <li>
                     <FiAlertTriangle className="warning" />
                     Cache hit rate is low. Consider increasing TTL for frequently accessed data.
                   </li>
                 )}
-                {parseFloat(cacheStats.fillPercentage) > 90 && (
+                {Number.parseFloat(cacheStats.fillPercentage) > 90 && (
                   <li>
                     <FiAlertTriangle className="warning" />
                     Cache is nearly full. Consider increasing max capacity or reviewing eviction policy.
@@ -407,7 +403,7 @@ const CachePerformanceDashboard = () => {
                     High eviction rate detected. Increase cache size for better performance.
                   </li>
                 )}
-                {parseFloat(cacheStats.hitRate) >= 40 && parseFloat(cacheStats.hitRate) < 80 && (
+                {Number.parseFloat(cacheStats.hitRate) >= 40 && Number.parseFloat(cacheStats.hitRate) < 80 && (
                   <li>
                     <FiTrendingUp className="info" />
                     Cache performing well. Monitor for trends and adjust TTL as needed.
@@ -417,6 +413,11 @@ const CachePerformanceDashboard = () => {
             </div>
           )}
         </>
+      ) : (
+        <div className="no-data">
+          <FiDatabase />
+          <p>No cache statistics available</p>
+        </div>
       )}
     </div>
   );

@@ -10,36 +10,7 @@ import './Sidebar.css';
 
 const Sidebar = () => {
     const { currentUser, logout } = useAuth();
-
-    // Initialize user role from localStorage
-    const [userRole, setUserRole] = useState(() => {
-        try {
-            // First try from currentUser
-            if (currentUser?.role) {
-                return currentUser.role;
-            }
-
-            // Then try from direct localStorage for currentUser
-            const storedUser = localStorage.getItem('currentUser');
-            if (storedUser) {
-                const parsedUser = JSON.parse(storedUser);
-                if (parsedUser?.role) {
-                    return parsedUser.role;
-                }
-            }
-
-            // Then fall back to separate userRole in localStorage
-            const role = localStorage.getItem('userRole');
-            if (role) {
-                return role;
-            }
-        } catch (e) {
-            console.error('Error getting user role:', e);
-        }
-
-        // Default fallback role
-        return 'admin';
-    });
+    const [userRole, setUserRole] = useState(currentUser?.role || null);
 
     const navItems = [
         {
@@ -112,36 +83,10 @@ const Sidebar = () => {
             roles: ['admin', 'superadmin', 'developer'],
             description: 'Configure system settings'
         },
-        {
-            to: '/admin/developer-tools',
-            icon: <FiTool />,
-            label: 'Developer Tools',
-            roles: ['superadmin', 'developer'],
-            description: 'Access development and debugging tools'
-        },
     ];
-
-    // Update role when currentUser changes
+    // Update role only from the verified AuthContext session.
     useEffect(() => {
-        if (currentUser?.role) {
-            console.log('Setting userRole from currentUser:', currentUser.role);
-            setUserRole(currentUser.role);
-            localStorage.setItem('userRole', currentUser.role);
-        } else {
-            try {
-                const storedUser = localStorage.getItem('currentUser');
-                if (storedUser) {
-                    const parsedUser = JSON.parse(storedUser);
-                    if (parsedUser?.role) {
-                        console.log('Setting userRole from localStorage:', parsedUser.role);
-                        setUserRole(parsedUser.role);
-                        localStorage.setItem('userRole', parsedUser.role);
-                    }
-                }
-            } catch (e) {
-                console.error('Error updating user role:', e);
-            }
-        }
+        setUserRole(currentUser?.role || null);
     }, [currentUser]);
 
     const handleLogout = () => {

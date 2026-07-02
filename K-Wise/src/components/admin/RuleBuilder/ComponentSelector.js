@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { FiSearch, FiX, FiPackage } from 'react-icons/fi';
+import { getServerBaseUrl } from '../../../utils/networkConfig';
 
 /**
  * ComponentSelector - Drag-and-drop component picker
@@ -22,8 +24,8 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
     setLoading(true);
     try {
       const url = categoryFilter === 'all'
-        ? 'http://localhost:5000/api/stock'
-        : `http://localhost:5000/api/stock?category=${categoryFilter}`;
+        ? `${getServerBaseUrl()}/api/stock`
+        : `${getServerBaseUrl()}/api/stock?category=${categoryFilter}`;
 
       const response = await fetch(url);
       const data = await response.json();
@@ -99,8 +101,8 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
 
       {/* Category Filter */}
       <div className="category-filter">
-        <label>Filter by Category:</label>
-        <div className="category-buttons">
+        <label htmlFor="category-filter">Filter by Category:</label>
+        <div className="category-buttons" id="category-filter">
           {categories.map(cat => (
             <button
               key={cat}
@@ -139,14 +141,16 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
               </div>
             </div>
           ) : (
-            <div
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+            <section
+              aria-label="Drop zone for component 1"
               className="drop-zone"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, 'component1')}
             >
               <FiPackage size={48} />
               <p>Drag component here or search below</p>
-            </div>
+            </section>
           )}
 
           {/* Search for Component 1 */}
@@ -162,11 +166,11 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
                 />
               </div>
               <div className="component-list">
-                {loading ? (
-                  <div className="loading-spinner">Loading...</div>
-                ) : filteredComponents1.length > 0 ? (
-                  filteredComponents1.slice(0, 10).map(component => (
-                    <div
+                {(() => {
+                  if (loading) return <div className="loading-spinner">Loading...</div>;
+                  if (filteredComponents1.length > 0) return (<>{filteredComponents1.slice(0, 10).map(component => (
+                    <button
+                      type="button"
                       key={component.id}
                       className="component-item"
                       draggable
@@ -181,13 +185,14 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
                           {component.category} {component.model && `| ${component.model}`}
                         </span>
                       </div>
+                    </button>
+                  ))}</>);
+                  return (
+                    <div className="no-results">
+                      {searchTerm1 ? 'No components found' : 'Type to search components'}
                     </div>
-                  ))
-                ) : (
-                  <div className="no-results">
-                    {searchTerm1 ? 'No components found' : 'Type to search components'}
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -218,14 +223,16 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
               </div>
             </div>
           ) : (
-            <div
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+            <section
+              aria-label="Drop zone for component 2"
               className="drop-zone"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, 'component2')}
             >
               <FiPackage size={48} />
               <p>Drag component here or search below</p>
-            </div>
+            </section>
           )}
 
           {/* Search for Component 2 */}
@@ -241,11 +248,11 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
                 />
               </div>
               <div className="component-list">
-                {loading ? (
-                  <div className="loading-spinner">Loading...</div>
-                ) : filteredComponents2.length > 0 ? (
-                  filteredComponents2.slice(0, 10).map(component => (
-                    <div
+                {(() => {
+                  if (loading) return <div className="loading-spinner">Loading...</div>;
+                  if (filteredComponents2.length > 0) return (<>{filteredComponents2.slice(0, 10).map(component => (
+                    <button
+                      type="button"
                       key={component.id}
                       className="component-item"
                       draggable
@@ -260,13 +267,14 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
                           {component.category} {component.model && `| ${component.model}`}
                         </span>
                       </div>
+                    </button>
+                  ))}</>);
+                  return (
+                    <div className="no-results">
+                      {searchTerm2 ? 'No components found' : 'Type to search components'}
                     </div>
-                  ))
-                ) : (
-                  <div className="no-results">
-                    {searchTerm2 ? 'No components found' : 'Type to search components'}
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -297,6 +305,22 @@ const ComponentSelector = ({ selectedComponents, onComponentSelect }) => {
       )}
     </div>
   );
+};
+
+ComponentSelector.propTypes = {
+  selectedComponents: PropTypes.shape({
+    component1: PropTypes.shape({
+      name: PropTypes.string,
+      category: PropTypes.string,
+      model: PropTypes.string,
+    }),
+    component2: PropTypes.shape({
+      name: PropTypes.string,
+      category: PropTypes.string,
+      model: PropTypes.string,
+    }),
+  }).isRequired,
+  onComponentSelect: PropTypes.func.isRequired,
 };
 
 export default ComponentSelector;
