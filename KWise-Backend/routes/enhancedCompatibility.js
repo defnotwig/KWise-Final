@@ -5,7 +5,7 @@
  * Features:
  * - Enhanced ProductPage "Compatible With" with detailed tooltips
  * - Order Summary compatibility notes with bottleneck analysis
- * - Future Upgrade suggestions (In Stock + External AI)
+ * - Future Upgrade suggestions (In Stock only in offline kiosk mode)
  * - Real-time compatibility filtering
  * - PCPartPicker-level detail
  * 
@@ -17,9 +17,7 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const db = require('../config/db');
 const advancedCompatibilityService = require('../services/advancedCompatibilityService');
-const aiCompatibilityService = require('../services/aiCompatibilityService');
-const enhancedPrompts = require('../ai/prompts/enhancedCompatibilityPrompts');
-const ollamaService = require('../ai/services/ollamaService');
+const { compatibilityService } = require('../services/compatibilityService');
 
 /**
  * ENHANCED: Get compatible products for ProductPage "Compatible With"
@@ -100,6 +98,12 @@ router.post('/product-page', async (req, res) => {
         // Analyze compatibility for each product
         for (const targetProduct of products.rows) {
           try {
+            const [rankedProduct] = await compatibilityService.analyzeCompatibility(product, [targetProduct]);
+            if (rankedProduct && rankedProduct.compatible !== false && rankedProduct.compatibility_score > 0) {
+              compatibleProducts.push(rankedProduct);
+            }
+            continue;
+
             // Build compatibility check object
             const components = {
               [category.toLowerCase()]: product,
@@ -225,7 +229,7 @@ router.post('/product-page', async (req, res) => {
         },
         totalCategories: compatibleCategories.length,
         totalProducts: compatibleProducts.length,
-        analysisMethod: 'enhanced_pairwise_with_ai'
+        analysisMethod: 'deterministic'
       }
     });
     
@@ -241,94 +245,15 @@ router.post('/product-page', async (req, res) => {
 
 /**
  * ENHANCED: Future Upgrade - External Component Suggestions
- * Uses AI to suggest components not in database
- * 
- * POST /api/compatibility/enhanced/future-upgrade-external
- * Body: { currentComponent, targetCategory, budget }
+ * Disabled for offline kiosk mode.
  */
 router.post('/future-upgrade-external', async (req, res) => {
-  try {
-    const { currentComponent, targetCategory, budget } = req.body;
-    
-    logger.info(`🔮 [External Upgrade] Suggesting ${targetCategory} upgrades for budget: ₱${budget}`);
-    
-    // Generate enhanced AI prompt for external suggestions
-    const prompt = enhancedPrompts.generateExternalSuggestionPrompt(
-      currentComponent,
-      targetCategory,
-      budget
-    );
-    
-    // Call Ollama AI for suggestions
-    const aiResponse = await ollamaService.generateResponse(prompt, null, {
-      temperature: 0.7,
-      max_tokens: 2000
-    });
-    
-    // Validate and parse AI response
-    let suggestions = [];
-    try {
-      const parsed = enhancedPrompts.validateJSONResponse(aiResponse);
-      suggestions = parsed.suggestions || [];
-      
-      logger.info(`✅ AI suggested ${suggestions.length} external components`);
-      
-      res.json({
-        success: true,
-        data: {
-          suggestions: suggestions,
-          market_analysis: parsed.market_analysis || null,
-          source: 'ai_powered',
-          currentComponent: {
-            name: currentComponent.name,
-            category: currentComponent.category
-          },
-          budget: budget,
-          targetCategory: targetCategory
-        }
-      });
-      
-    } catch (parseError) {
-      logger.error('❌ Failed to parse AI response:', parseError);
-      
-      // Fallback: Return generic upgrade suggestions with correct field names
-      const fallbackSuggestions = [
-        {
-          name: `Recommended ${targetCategory} within ₱${budget.toLocaleString()}`,
-          brand: 'Various Brands',
-          model: `${targetCategory} Upgrade`,
-          category: targetCategory,
-          price: budget,
-          estimated_price_php: budget,
-          availability: 'in stock',
-          retailer: 'PCHub',
-          retailers: ['PCHub', 'PCWorx', 'Lazada', 'Shopee'],
-          performance_tier: budget > 30000 ? 'high-tier' : budget > 15000 ? 'mid-tier' : 'entry',
-          compatibility_score: 75,
-          compatibility_notes: 'Check specifications before purchase',
-          recommendation_priority: 3,
-          value_score: 70
-        }
-      ];
-      
-      res.json({
-        success: true,
-        data: {
-          suggestions: fallbackSuggestions,
-          source: 'fallback',
-          note: 'AI analysis unavailable, showing generic suggestions'
-        }
-      });
-    }
-    
-  } catch (error) {
-    logger.error('❌ Error in external upgrade suggestions:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate external upgrade suggestions',
-      details: error.message
-    });
-  }
+  return res.status(410).json({
+    success: false,
+    code: 'AI_REMOVED',
+    source: 'deterministic',
+    message: 'External AI suggestions are disabled in offline kiosk mode'
+  });
 });
 
 /**
@@ -374,7 +299,7 @@ router.post('/future-upgrade-instock', async (req, res) => {
         
         if (!currentComponent) continue;
         
-        const currentPrice = parseFloat(currentComponent.price || 0);
+        const currentPrice = Number.parseFloat(currentComponent.price || 0);
         const currentTier = currentComponent.performance_tier || 'mid-tier';
         
         // Find better components within budget
@@ -393,7 +318,7 @@ router.post('/future-upgrade-instock', async (req, res) => {
         `, [componentCategory, currentPrice, currentPrice + budget]);
         
         for (const upgrade of upgrades.rows) {
-          const cost = parseFloat(upgrade.price);
+          const cost = Number.parseFloat(upgrade.price);
           const estimatedResaleValue = currentPrice * 0.6; // Estimate 60% resale value
           const netCost = cost - estimatedResaleValue;
           
@@ -405,7 +330,7 @@ router.post('/future-upgrade-instock', async (req, res) => {
               cost: cost,
               resale_value: estimatedResaleValue,
               net_cost: netCost,
-              performance_gain_percentage: this.estimatePerformanceGain(currentTier, upgrade.performance_tier),
+              performance_gain_percentage: router.estimatePerformanceGain(currentTier, upgrade.performance_tier),
               compatibility_verified: true,
               value_score: Math.round((budget - netCost) / budget * 100),
               details: upgrade

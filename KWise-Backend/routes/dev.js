@@ -4,8 +4,8 @@ const devToolsController = require('../controllers/devToolsController');
 const { protect, restrictTo } = require('../middleware/auth');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('node:fs').promises;
+const path = require('node:path');
 
 const isTestMode = process.env.NODE_ENV === 'test';
 
@@ -83,7 +83,7 @@ router.get('/system-status', restrictTo('admin', 'superadmin', 'developer'), asy
         }
 
         // Get system resource usage
-        const os = require('os');
+        const os = require('node:os');
         systemStatus.system = {
             totalMemory: os.totalmem(),
             freeMemory: os.freemem(),
@@ -147,7 +147,7 @@ router.get('/database/stats', restrictTo('admin', 'superadmin', 'developer'), as
             FROM pg_stat_activity 
             WHERE state = 'active'
         `);
-        dbInfo.activeConnections = parseInt(connectionsResult.rows[0].active_connections);
+        dbInfo.activeConnections = Number.parseInt(connectionsResult.rows[0].active_connections, 10);
 
         // Get recent query performance
         // Attempt to read pg_stat_statements (may not be enabled in some environments)
@@ -225,7 +225,7 @@ router.get('/system-logs', restrictTo('admin', 'superadmin', 'developer'), async
         }
 
         baseQuery += ` ORDER BY l.created_at DESC LIMIT $${paramCount}`;
-        queryParams.push(parseInt(limit));
+        queryParams.push(Number.parseInt(limit, 10));
 
         const result = await query(baseQuery, queryParams);
 
@@ -307,8 +307,8 @@ router.post('/test-endpoint', restrictTo('admin', 'superadmin', 'developer'), as
 router.post('/clear-cache', restrictTo('superadmin'), async (req, res) => {
     try {
         // Clear any in-memory caches
-        if (global.gc) {
-            global.gc();
+        if (globalThis.gc) {
+            globalThis.gc();
         }
 
         // Clear database query cache (if using connection pooling)
@@ -510,6 +510,7 @@ router.post('/maintenance/optimize-db', restrictTo('developer', 'superadmin'), a
 router.get('/logs/analysis', restrictTo('developer', 'superadmin'), async (req, res) => {
     try {
         const { days = 7 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 7;
 
         // Analyze recent logs for patterns
         const logAnalysis = await query(`
@@ -518,10 +519,10 @@ router.get('/logs/analysis', restrictTo('developer', 'superadmin'), async (req, 
                 COUNT(*) as count,
                 DATE(created_at) as log_date
             FROM audit_logs 
-            WHERE created_at >= NOW() - INTERVAL '${days} days'
+            WHERE created_at >= NOW() - $1 * INTERVAL '1 day'
             GROUP BY severity, DATE(created_at)
             ORDER BY log_date DESC, severity
-        `);
+        `, [safeDays]);
 
         res.json({
             success: true,

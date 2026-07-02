@@ -93,35 +93,35 @@ router.get('/stats', async (req, res) => {
     const stats = {
             // Order Statistics
             orders: {
-                total: parseInt(totalOrdersResult.rows[0]?.count || 0),
-                completed: parseInt(completedOrdersResult.rows[0]?.count || 0),
-                pending: parseInt(pendingOrdersResult.rows[0]?.count || 0),
-                cancelled: parseInt(cancelledOrdersResult.rows[0]?.count || 0),
-                today: parseInt(todaysOrdersResult.rows[0]?.count || 0),
-                thisWeek: parseInt(weekOrdersResult.rows[0]?.count || 0),
-                monthlyGrowth: parseFloat(monthlyGrowth)
+                total: Number.parseInt(totalOrdersResult.rows[0]?.count || 0, 10),
+                completed: Number.parseInt(completedOrdersResult.rows[0]?.count || 0, 10),
+                pending: Number.parseInt(pendingOrdersResult.rows[0]?.count || 0, 10),
+                cancelled: Number.parseInt(cancelledOrdersResult.rows[0]?.count || 0, 10),
+                today: Number.parseInt(todaysOrdersResult.rows[0]?.count || 0, 10),
+                thisWeek: Number.parseInt(weekOrdersResult.rows[0]?.count || 0, 10),
+                monthlyGrowth: Number.parseFloat(monthlyGrowth)
             },
             
             // User Statistics
             users: {
-                total: parseInt(totalUsersResult.rows[0]?.count || 0),
-                active: parseInt(activeUsersResult.rows[0]?.count || 0),
+                total: Number.parseInt(totalUsersResult.rows[0]?.count || 0, 10),
+                active: Number.parseInt(activeUsersResult.rows[0]?.count || 0, 10),
                 byRole: usersByRoleResult.rows.reduce((acc, row) => {
-                    acc[row.role] = parseInt(row.count);
+                    acc[row.role] = Number.parseInt(row.count, 10);
                     return acc;
                 }, {})
             },
             
             // Product/Inventory Statistics
             products: {
-                total: parseInt(totalProductsResult.rows[0]?.count || 0),
-                lowStock: parseInt(lowStockProductsResult.rows[0]?.count || 0),
-                totalValue: parseFloat(totalInventoryValueResult.rows[0]?.total_value || 0)
+                total: Number.parseInt(totalProductsResult.rows[0]?.count || 0, 10),
+                lowStock: Number.parseInt(lowStockProductsResult.rows[0]?.count || 0, 10),
+                totalValue: Number.parseFloat(totalInventoryValueResult.rows[0]?.total_value || 0)
             },
             
             // Financial Statistics
             revenue: {
-                total: parseFloat(revenueResult.rows[0]?.total_revenue || 0),
+                total: Number.parseFloat(revenueResult.rows[0]?.total_revenue || 0),
                 monthly: monthlyGrowth
             },
             
@@ -194,7 +194,7 @@ router.get('/activity', restrictTo('admin', 'superadmin', 'developer'), async (r
             WHERE al.created_at >= CURRENT_DATE - INTERVAL '7 days'
             ORDER BY al.created_at DESC 
             LIMIT $1
-        `, [parseInt(limit)]);
+        `, [Number.parseInt(limit, 10)]);
 
         res.json({
             success: true,

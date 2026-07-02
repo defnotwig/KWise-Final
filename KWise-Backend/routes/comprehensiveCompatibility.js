@@ -12,14 +12,10 @@ const { protect } = require('../middleware/auth');
 
 // Optional authentication middleware - allows both guest and authenticated users
 const optionalAuth = (req, res, next) => {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-
-    if (token && token !== 'null' && token !== 'undefined') {
-        // If token exists, try to verify it
+    if (req.cookies?.jwt) {
         return protect(req, res, next);
     }
 
-    // No token - allow as guest
     req.user = null;
     next();
 };
@@ -478,7 +474,7 @@ async function checkGPUCompatibility(build, result) {
             if (!gpuLength && gpu.description) {
                 const lengthMatch = gpu.description.match(/(\d{2,3})\s*mm|Length[:\s]*(\d{2,3})/i);
                 if (lengthMatch) {
-                    gpuLength = parseInt(lengthMatch[1] || lengthMatch[2]);
+                    gpuLength = Number.parseInt(lengthMatch[1] || lengthMatch[2], 10);
                     logger.info(`📏 Extracted GPU length from description: ${gpuLength}mm for ${gpu.name}`);
                 }
             }
@@ -504,7 +500,7 @@ async function checkGPUCompatibility(build, result) {
                 if (!caseMaxGPU && pcCase.description) {
                     const gpuMatch = pcCase.description.match(/GPU[:\s]*(?:up to\s*)?(\d{2,3})\s*mm|max.*gpu.*?(\d{2,3})\s*mm/i);
                     if (gpuMatch) {
-                        caseMaxGPU = parseInt(gpuMatch[1] || gpuMatch[2]);
+                        caseMaxGPU = Number.parseInt(gpuMatch[1] || gpuMatch[2], 10);
                         logger.info(`📏 Extracted case GPU clearance from description: ${caseMaxGPU}mm for ${pcCase.name}`);
                     }
                 }
@@ -874,12 +870,12 @@ function extractChipset(name, description = '') {
 function extractTDP(name, description = '') {
     const text = `${name} ${description}`;
     const match = text.match(/(\d+)\s?W(?:att)?/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function extractVRM(description = '') {
     const match = description.match(/(\d+)[\s-]?phase/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function detectRAMType(name, description = '') {
@@ -892,23 +888,23 @@ function detectRAMType(name, description = '') {
 
 function extractRAMSpeed(text = '') {
     const match = text.match(/(\d{4,5})\s?MHz/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function extractLength(name, description = '') {
     const text = `${name} ${description}`;
     const match = text.match(/(\d{3})\s?mm/);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function extractHeight(description = '') {
     const match = description.match(/(\d{2,3})\s?mm.*height/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function extractWattage(name) {
     const match = name.match(/(\d{3,4})\s?W/);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function extractMaxGPULength(description = '') {
@@ -923,14 +919,14 @@ function extractMaxGPULength(description = '') {
     ];
     for (const pattern of patterns) {
         const match = description.match(pattern);
-        if (match) return parseInt(match[1]);
+        if (match) return Number.parseInt(match[1], 10);
     }
     return null;
 }
 
 function extractMaxCoolerHeight(description = '') {
     const match = description.match(/cooler.*?(\d{2,3})\s?mm/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function extractFormFactor(name = '', description = '') {

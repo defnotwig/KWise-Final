@@ -7,7 +7,12 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
+const { protect, restrictTo } = require('../middleware/auth');
+
+const requireCacheAdmin = [protect, restrictTo('admin', 'superadmin', 'developer')];
+const requireCacheMutation = [protect, restrictTo('admin', 'superadmin')];
+const requireCacheClear = [protect, restrictTo('superadmin')];
 
 /**
  * Generate cache key from build configuration
@@ -20,9 +25,9 @@ function generateCacheKey(buildParts) {
 /**
  * @route   POST /api/compatibility/cache
  * @desc    Store compatibility analysis result in cache
- * @access  Public
+ * @access  Admin
  */
-router.post('/', async (req, res) => {
+router.post('/', requireCacheMutation, async (req, res) => {
     try {
         const {
             build_parts,
@@ -168,9 +173,9 @@ router.post('/check', async (req, res) => {
 /**
  * @route   GET /api/compatibility/cache/stats
  * @desc    Get cache effectiveness statistics
- * @access  Public
+ * @access  Admin
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', requireCacheAdmin, async (req, res) => {
     try {
         const stats = await pool.query('SELECT * FROM cache_metrics');
 
@@ -220,9 +225,9 @@ router.get('/stats', async (req, res) => {
 /**
  * @route   DELETE /api/compatibility/cache/expired
  * @desc    Clean up expired cache entries
- * @access  Public
+ * @access  Admin
  */
-router.delete('/expired', async (req, res) => {
+router.delete('/expired', requireCacheMutation, async (req, res) => {
     try {
         const result = await pool.query(`
             DELETE FROM compatibility_cache
@@ -253,9 +258,9 @@ router.delete('/expired', async (req, res) => {
 /**
  * @route   DELETE /api/compatibility/cache/all
  * @desc    Clear all cache entries
- * @access  Admin (will add auth later)
+ * @access  Superadmin
  */
-router.delete('/all', async (req, res) => {
+router.delete('/all', requireCacheClear, async (req, res) => {
     try {
         const result = await pool.query('DELETE FROM compatibility_cache RETURNING id');
 
@@ -281,9 +286,9 @@ router.delete('/all', async (req, res) => {
 /**
  * @route   GET /api/compatibility/cache/top
  * @desc    Get most frequently accessed cache entries
- * @access  Public
+ * @access  Admin
  */
-router.get('/top', async (req, res) => {
+router.get('/top', requireCacheAdmin, async (req, res) => {
     try {
         const { limit = 10 } = req.query;
 
@@ -301,7 +306,7 @@ router.get('/top', async (req, res) => {
             WHERE hit_count > 0
             ORDER BY hit_count DESC
             LIMIT $1
-        `, [parseInt(limit)]);
+        `, [Number.parseInt(limit, 10)]);
 
         res.json({
             success: true,

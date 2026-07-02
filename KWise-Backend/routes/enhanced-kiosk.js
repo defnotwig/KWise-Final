@@ -1,6 +1,6 @@
 /**
  * Enhanced Kiosk Routes
- * Adds product comparison and AI compatibility endpoints
+ * Adds product comparison and local compatibility endpoints.
  */
 
 const express = require('express');
@@ -8,10 +8,9 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const { query } = require('../config/db');
 const productComparisonService = require('../services/productComparisonService');
-const aiCompatibilityService = require('../services/aiCompatibilityService');
 const enhancedSessionLockService = require('../services/enhancedSessionLockService');
 
-// POST /api/kiosk/compare - Compare two products with AI analysis
+// POST /api/kiosk/compare - Compare two products with deterministic local analysis
 router.post('/compare', async (req, res) => {
     try {
         const { product1Id, product2Id, sessionId } = req.body;
@@ -34,8 +33,8 @@ router.post('/compare', async (req, res) => {
 
         // Perform comparison
         const comparison = await productComparisonService.compareProducts(
-            parseInt(product1Id),
-            parseInt(product2Id),
+            Number.parseInt(product1Id, 10),
+            Number.parseInt(product2Id, 10),
             sessionId
         );
 
@@ -59,7 +58,7 @@ router.get('/compare/history', async (req, res) => {
         const { limit = 20 } = req.query;
 
         const history = await productComparisonService.getComparisonHistory(
-            parseInt(limit)
+            Number.parseInt(limit, 10)
         );
 
         res.json({

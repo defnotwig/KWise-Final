@@ -66,7 +66,7 @@ router.get('/detailed', async (req, res) => {
         pool_total: pool.totalCount,
         pool_idle: pool.idleCount,
         pool_waiting: pool.waitingCount,
-        user_count: parseInt(dbResult.rows[0].count)
+        user_count: Number.parseInt(dbResult.rows[0].count, 10)
       };
     } catch (dbError) {
       healthStatus.status = 'degraded';
@@ -140,7 +140,7 @@ router.get('/detailed', async (req, res) => {
     // 4. CPU Metrics
     healthStatus.metrics.cpu = {
       usage_percent: process.cpuUsage().user / 1000000, // Convert to seconds
-      load_average: require('os').loadavg()
+      load_average: require('node:os').loadavg()
     };
 
     // 5. System Info

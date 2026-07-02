@@ -54,7 +54,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
 router.get('/component/:componentId', async (req, res) => {
   try {
     const { componentId } = req.params;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Number.parseInt(req.query.limit, 10) || 10;
 
     const feedback = await realWorldDataService.getComponentFeedback(componentId, limit);
 
@@ -345,14 +345,14 @@ router.post('/similar-builds', async (req, res) => {
         build_type: build.build_type,
         user: build.username,
         components: JSON.parse(build.components_json),
-        total_price: parseFloat(build.total_price),
+        total_price: Number.parseFloat(build.total_price),
         ratings: {
-          performance: parseFloat(build.performance_rating),
-          stability: parseFloat(build.stability_rating),
-          satisfaction: parseFloat(build.satisfaction_rating),
-          average: parseFloat(build.avg_rating)
+          performance: Number.parseFloat(build.performance_rating),
+          stability: Number.parseFloat(build.stability_rating),
+          satisfaction: Number.parseFloat(build.satisfaction_rating),
+          average: Number.parseFloat(build.avg_rating)
         },
-        match_count: parseInt(build.match_count),
+        match_count: Number.parseInt(build.match_count, 10),
         use_case: build.use_case,
         notes: build.notes,
         created_at: build.created_at
@@ -453,7 +453,7 @@ router.post('/compatibility-confidence', async (req, res) => {
  */
 router.get('/admin/pending', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = Number.parseInt(req.query.limit, 10) || 20;
 
     const result = await query(
       `SELECT 
