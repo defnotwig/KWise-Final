@@ -341,7 +341,7 @@ Provide comprehensive market analysis in this EXACT JSON format:
 
     products.forEach(product => {
       const category = product.category;
-      const price = parseFloat(product.price?.toString().replace(/[₱,]/g, '')) || 0;
+      const price = Number.parseFloat(product.price?.toString().replace(/[₱,]/g, '')) || 0;
 
       if (!stats[category]) {
         stats[category] = {
@@ -757,8 +757,8 @@ Provide comprehensive market analysis in this EXACT JSON format:
 
     // Sort by price (ascending) for value picks
     const sortedByPrice = [...products].sort((a, b) => {
-      const priceA = parseFloat(a.price?.toString().replace(/[₱,]/g, '')) || 0;
-      const priceB = parseFloat(b.price?.toString().replace(/[₱,]/g, '')) || 0;
+      const priceA = Number.parseFloat(a.price?.toString().replace(/[₱,]/g, '')) || 0;
+      const priceB = Number.parseFloat(b.price?.toString().replace(/[₱,]/g, '')) || 0;
       return priceA - priceB;
     });
 
@@ -909,7 +909,7 @@ Provide response in this EXACT JSON format:
    */
   getFallbackUpgradeRecommendations(currentComponents) {
     return currentComponents.map(component => {
-      const componentPrice = parseFloat((component.price || '0').toString().replace(/[^\d.]/g, '')) || 0;
+      const componentPrice = Number.parseFloat((component.price || '0').toString().replace(/[^\d.]/g, '')) || 0;
       const upgradePrice = componentPrice * 1.8; // 80% price increase for significant upgrade
 
       return {

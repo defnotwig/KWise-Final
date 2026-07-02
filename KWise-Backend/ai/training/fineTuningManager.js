@@ -3,10 +3,10 @@
  * Creates Modelfile and manages fine-tuning process for Ollama
  */
 
-const fs = require('fs').promises;
-const path = require('path');
-const { exec } = require('child_process');
-const util = require('util');
+const fs = require('node:fs').promises;
+const path = require('node:path');
+const { exec } = require('node:child_process');
+const util = require('node:util');
 const logger = require('../../utils/logger');
 
 const execPromise = util.promisify(exec);

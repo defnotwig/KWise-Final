@@ -5,8 +5,8 @@
  */
 
 const { query } = require('../../config/db');
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('node:fs').promises;
+const path = require('node:path');
 const logger = require('../../utils/logger');
 
 class DatasetGenerator {

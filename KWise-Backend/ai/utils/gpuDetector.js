@@ -1,4 +1,4 @@
-/**
+ai/**
  * GPU Detection and Model Selection for Production Deployment
  * 
  * PRODUCTION HARDWARE SUPPORT:
@@ -9,9 +9,9 @@
  * Automatically detects GPU VRAM and selects the best compatible model
  */
 
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const os = require('os');
+const { exec } = require('node:child_process');
+const { promisify } = require('node:util');
+const os = require('node:os');
 const logger = require('../../utils/logger');
 
 const execAsync = promisify(exec);
@@ -71,7 +71,7 @@ class GPUDetector {
       const lines = stdout.trim().split('\n');
       if (lines.length > 0) {
         const [gpuName, vramMB] = lines[0].split(',').map(s => s.trim());
-        const vramGB = Math.floor(parseInt(vramMB) / 1024);
+        const vramGB = Math.floor(Number.parseInt(vramMB, 10) / 1024);
         
         this.detectedGPU = gpuName;
         this.detectedVRAM = vramGB;
@@ -112,7 +112,7 @@ class GPUDetector {
       const lines = stdout.trim().split('\n');
       if (lines.length > 0) {
         const [gpuName, vramMB] = lines[0].split(',').map(s => s.trim());
-        const vramGB = Math.floor(parseInt(vramMB) / 1024);
+        const vramGB = Math.floor(Number.parseInt(vramMB, 10) / 1024);
         
         this.detectedGPU = gpuName;
         this.detectedVRAM = vramGB;

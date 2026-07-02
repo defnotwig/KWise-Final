@@ -9,9 +9,9 @@
 
 const axios = require('axios');
 const { LRUCache } = require('lru-cache');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.DISABLE_INTERVALS_FOR_TESTS === 'true';
 
@@ -291,6 +291,12 @@ class OllamaService {
       clearInterval(this.keepAliveInterval);
       this.keepAliveInterval = null;
       logger.info('🛑 Keep-alive pings stopped');
+    }
+    // FIX #12: Also clear health monitoring interval
+    if (this.healthMonitorInterval) {
+      clearInterval(this.healthMonitorInterval);
+      this.healthMonitorInterval = null;
+      logger.info('🛑 Health monitoring stopped');
     }
   }
 
@@ -786,7 +792,8 @@ class OllamaService {
     if (isTestEnv || !aiConfig.service.enabled) {
       return;
     }
-    setInterval(async () => {
+    // FIX #12: Store interval handle to prevent leak on shutdown
+    this.healthMonitorInterval = setInterval(async () => {
       try {
         await this.checkHealth();
       } catch (error) {
@@ -811,7 +818,7 @@ class OllamaService {
     const combined = JSON.stringify({
       prompt: prompt.slice(0, 500), // Limit prompt length for key
       system: systemPrompt ? systemPrompt.slice(0, 200) : null,
-      model: this.model,
+      model: this.selectedModel || this.model, // FIX #11: Use runtime model, not initial default
       options: {
         temperature: options.temperature,
         top_p: options.top_p,

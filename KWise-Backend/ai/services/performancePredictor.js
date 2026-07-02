@@ -260,8 +260,8 @@ class PerformancePredictor {
       const cpuFactor = cpu.gaming / 100;
       
       // RAM factor
-      const ramCapacity = parseInt(build.ram?.capacity || 16);
-      const ramSpeed = parseInt(build.ram?.speed || 3200);
+      const ramCapacity = Number.parseInt(build.ram?.capacity || 16, 10);
+      const ramSpeed = Number.parseInt(build.ram?.speed || 3200, 10);
       const ramCapFactor = RAM_PERFORMANCE_FACTORS.capacity[ramCapacity] || RAM_PERFORMANCE_FACTORS.capacity[16];
       const ramSpeedFactor = RAM_PERFORMANCE_FACTORS.speed[ramSpeed] || RAM_PERFORMANCE_FACTORS.speed[3200];
       const ramFactor = (ramCapFactor.gaming * ramSpeedFactor.factor);
@@ -319,7 +319,7 @@ class PerformancePredictor {
       }
       
       // RAM factor for productivity
-      const ramCapacity = parseInt(build.ram?.capacity || 16);
+      const ramCapacity = Number.parseInt(build.ram?.capacity || 16, 10);
       const ramFactor = RAM_PERFORMANCE_FACTORS.capacity[ramCapacity] || RAM_PERFORMANCE_FACTORS.capacity[16];
       
       // CPU rendering score (Cinebench R23)

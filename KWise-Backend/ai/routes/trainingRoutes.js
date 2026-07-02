@@ -6,7 +6,7 @@
 
 const express = require('express');
 const router = express.Router();
-const path = require('path');
+const path = require('node:path');
 const { protect, restrictTo } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const DatasetGenerator = require('../training/datasetGenerator');
@@ -337,7 +337,7 @@ router.get(
   statusRateLimit,
   async (req, res) => {
     try {
-      const fs = require('fs').promises;
+      const fs = require('node:fs').promises;
       const summaryPath = path.join(
         __dirname,
         '..',

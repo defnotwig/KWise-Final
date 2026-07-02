@@ -465,7 +465,7 @@ Provide response in this EXACT JSON format:
     
     Object.values(buildConfig).forEach(component => {
       if (component && component.price) {
-        const price = parseFloat(component.price.toString().replace(/[₱,]/g, '')) || 0;
+        const price = Number.parseFloat(component.price.toString().replace(/[₱,]/g, '')) || 0;
         totalCost += price;
       }
     });

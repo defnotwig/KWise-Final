@@ -189,7 +189,7 @@ router.get('/gpu-database', (req, res) => {
     }
     
     if (minFps1080p) {
-      const minFps = parseInt(minFps1080p);
+      const minFps = Number.parseInt(minFps1080p, 10);
       gpus = gpus.filter(gpu => gpu['1080p'] >= minFps);
     }
     
@@ -243,12 +243,12 @@ router.get('/cpu-database', (req, res) => {
     const { minCores, minGaming, brand } = req.query;
     
     if (minCores) {
-      const cores = parseInt(minCores);
+      const cores = Number.parseInt(minCores, 10);
       cpus = cpus.filter(cpu => cpu.cores >= cores);
     }
     
     if (minGaming) {
-      const gaming = parseInt(minGaming);
+      const gaming = Number.parseInt(minGaming, 10);
       cpus = cpus.filter(cpu => cpu.gaming >= gaming);
     }
     
