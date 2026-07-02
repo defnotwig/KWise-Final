@@ -38,7 +38,7 @@ static async getAll() {
         if (setting.type === 'boolean') {
             value = value === 'true';
         } else if (setting.type === 'number') {
-            value = value !== null ? parseFloat(value) : null;
+            value = value !== null ? Number.parseFloat(value) : null;
         } else if (setting.type === 'json') {
             try {
             value = value !== null ? JSON.parse(value) : null;
@@ -86,7 +86,7 @@ static async getByKey(key) {
         if (setting.type === 'boolean') {
         value = value === 'true';
         } else if (setting.type === 'number') {
-        value = value !== null ? parseFloat(value) : null;
+        value = value !== null ? Number.parseFloat(value) : null;
         } else if (setting.type === 'json') {
         try {
             value = value !== null ? JSON.parse(value) : null;

@@ -12,7 +12,9 @@
 
 const redisCache = require('../config/redis');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
+
+const WRITE_OPERATION_PATTERN = /^(insert|update|delete|create|alter|drop)/;
 
 class QueryCache {
     constructor() {
@@ -38,6 +40,25 @@ class QueryCache {
             'UPDATE compatibility_rules': ['compatibility:*'],
             'DELETE FROM compatibility_rules': ['compatibility:*']
         };
+
+        this.ready = null;
+    }
+
+    async ensureReady() {
+        if (this.ready) {
+            await this.ready;
+            return;
+        }
+
+        this.ready = redisCache.connect()
+            .catch((error) => {
+                logger.warn('⚠️ Redis query cache connection failed, using memory fallback only:', error.message);
+            })
+            .finally(() => {
+                this.ready = null;
+            });
+
+        await this.ready;
     }
 
     /**
@@ -59,12 +80,12 @@ class QueryCache {
      * Normalize SQL query for consistent caching
      */
     normalizeQuery(sql) {
-        return sql
+        return String(sql ?? '')
             .toLowerCase()
             .trim()
-            .replace(/\s+/g, ' ')
-            .replace(/--.*$/gm, '')  // Remove comments
-            .replace(/\/\*.*?\*\//g, '');  // Remove block comments
+            .replaceAll(/\s+/g, ' ')
+            .replaceAll(/--.*$/gm, '')
+            .replaceAll(/\/\*.*?\*\//g, '');
     }
 
     /**
@@ -94,7 +115,7 @@ class QueryCache {
         const normalized = this.normalizeQuery(sql);
         
         // Don't cache write operations
-        if (normalized.match(/^(insert|update|delete|create|alter|drop)/)) {
+        if (WRITE_OPERATION_PATTERN.exec(normalized)) {
             return false;
         }
 
@@ -121,6 +142,8 @@ class QueryCache {
             await this.invalidateByQuery(sql);
             return result;
         }
+
+        await this.ensureReady();
 
         const key = this.generateKey(sql, params);
         
@@ -207,6 +230,10 @@ class QueryCache {
         logger.info('🗑️  All query cache cleared');
     }
 
+    async clearCache() {
+        await this.clearAll();
+    }
+
     /**
      * Get cache statistics
      */
@@ -215,7 +242,5 @@ class QueryCache {
     }
 }
 
-// Singleton instance
-const queryCache = new QueryCache();
-
-module.exports = queryCache;
+module.exports = QueryCache;
+module.exports.QueryCache = QueryCache;

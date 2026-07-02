@@ -115,7 +115,7 @@ class Log {
             // Get total count
             const countQuery = `SELECT COUNT(*) FROM audit_logs ${whereClause}`;
             const countResult = await db.query(countQuery, queryParams);
-            const totalItems = parseInt(countResult.rows[0].count);
+            const totalItems = Number.parseInt(countResult.rows[0].count, 10);
 
             // Get paginated results
             const dataQuery = `
@@ -141,8 +141,8 @@ class Log {
                     formattedTimestamp: new Date(row.created_at).toLocaleString()
                 })),
                 pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: Number.parseInt(page, 10),
+                    limit: Number.parseInt(limit, 10),
                     total: totalItems,
                     pages: Math.ceil(totalItems / limit)
                 }
@@ -207,10 +207,10 @@ class Log {
                     formattedTimestamp: new Date(row.created_at).toLocaleString()
                 })),
                 pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    total: parseInt(countResult.rows[0].count),
-                    pages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
+                    page: Number.parseInt(page, 10),
+                    limit: Number.parseInt(limit, 10),
+                    total: Number.parseInt(countResult.rows[0].count, 10),
+                    pages: Math.ceil(Number.parseInt(countResult.rows[0].count, 10) / limit)
                 }
             };
         } catch (error) {
@@ -274,11 +274,12 @@ class Log {
      */
     static async clearOldLogs(daysToKeep = 90) {
         try {
+            const safeDays = Number.parseInt(daysToKeep, 10) || 90;
             const result = await db.query(`
         DELETE FROM audit_logs 
-        WHERE created_at < NOW() - INTERVAL '${daysToKeep} days'
+        WHERE created_at < NOW() - $1 * INTERVAL '1 day'
         RETURNING id
-      `);
+      `, [safeDays]);
 
             return result.rowCount;
         } catch (error) {
@@ -296,13 +297,13 @@ class Log {
         if (seconds < 60) return `${seconds} seconds ago`;
 
         const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
 
         const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
 
         const days = Math.floor(hours / 24);
-        return `${days} day${days !== 1 ? 's' : ''} ago`;
+        return `${days} day${days === 1 ? '' : 's'} ago`;
     }
 
     /**
@@ -332,7 +333,7 @@ class Log {
             ]);
 
             const csvContent = [headers, ...rows]
-                .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                .map(row => row.map(field => `"${String(field).replaceAll('"', '""')}"`).join(','))
                 .join('\n');
 
             return csvContent;
