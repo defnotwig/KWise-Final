@@ -4,8 +4,8 @@
  */
 
 const db = require('../config/db');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const colors = {
   reset: '\x1b[0m',

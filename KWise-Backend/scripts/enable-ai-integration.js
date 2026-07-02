@@ -3,8 +3,8 @@
  * Enables AI in all compatibility checks and caching
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const db = require('../config/db');
 
 const colors = {

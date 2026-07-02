@@ -23,7 +23,7 @@ async function debugSatisfaction() {
     const result = await pool.query('SELECT * FROM get_component_satisfaction_score($1)', [componentId]);
     console.log('📊 Satisfaction score result:', result.rows[0]);
     
-    const score = parseFloat(result.rows[0].satisfaction_score);
+    const score = Number.parseFloat(result.rows[0].satisfaction_score);
     console.log(`\n🎯 Final score: ${score}`);
     console.log(`   Expected: >= 75`);
     console.log(`   Test passes: ${score >= 75 ? '✅ YES' : '❌ NO'}`);

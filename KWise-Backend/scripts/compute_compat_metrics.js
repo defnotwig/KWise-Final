@@ -5,14 +5,14 @@
  * Usage: from repo root run `node KWise-Backend/scripts/compute_compat_metrics.js`
  */
 
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { Pool } = require('pg');
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
+  port: Number.parseInt(process.env.DB_PORT || '5432', 10),
   database: process.env.DB_NAME || 'KWiseDB',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || ''
@@ -37,7 +37,7 @@ async function getSampleRow() {
 async function totalChecks() {
   const q = `SELECT COUNT(*)::bigint AS total_checks FROM compatibility_logs`;
   const r = await pool.query(q);
-  return parseInt(r.rows[0].total_checks, 10);
+  return Number.parseInt(r.rows[0].total_checks, 10);
 }
 
 async function computeBuildLevelMetrics(sampleRow) {
@@ -54,7 +54,7 @@ async function computeBuildLevelMetrics(sampleRow) {
       if (present) {
         const q = `SELECT COUNT(*) FILTER (WHERE ((rules_verdict->>$1))::int = 0) AS zero_fail_builds, COUNT(*) AS total_builds FROM compatibility_logs`;
         const r = await conn.query(q, [present]);
-        return { zero_fail_builds: parseInt(r.rows[0].zero_fail_builds, 10), total_builds: parseInt(r.rows[0].total_builds, 10) };
+        return { zero_fail_builds: Number.parseInt(r.rows[0].zero_fail_builds, 10), total_builds: Number.parseInt(r.rows[0].total_builds, 10) };
       }
     }
   }
@@ -72,14 +72,14 @@ async function computeBuildLevelMetrics(sampleRow) {
       FROM compatibility_logs
     `;
     const r = await conn.query(q);
-    return { zero_fail_builds: parseInt(r.rows[0].zero_fail_builds, 10), total_builds: parseInt(r.rows[0].total_builds, 10) };
+    return { zero_fail_builds: Number.parseInt(r.rows[0].zero_fail_builds, 10), total_builds: Number.parseInt(r.rows[0].total_builds, 10) };
   }
 
   // 3) Generic fallback: look for a top-level column 'outcome_quality' where 'good' or 'success' indicates pass
   try {
     const q = `SELECT COUNT(*) FILTER (WHERE outcome_quality IN ('success','good','passed','ok')) AS zero_fail_builds, COUNT(*) AS total_builds FROM compatibility_logs`;
     const r = await conn.query(q);
-    return { zero_fail_builds: parseInt(r.rows[0].zero_fail_builds, 10), total_builds: parseInt(r.rows[0].total_builds, 10) };
+    return { zero_fail_builds: Number.parseInt(r.rows[0].zero_fail_builds, 10), total_builds: Number.parseInt(r.rows[0].total_builds, 10) };
   } catch (err) {
     return { zero_fail_builds: 0, total_builds: 0 };
   }
@@ -103,7 +103,7 @@ async function computeRuleLevelMetrics() {
       `).catch(() => null);
 
       if (tryCompat && tryCompat.rows && (tryCompat.rows[0].matched_rules !== null || tryCompat.rows[0].total_rules !== null)) {
-        return { matched_rules: parseInt(tryCompat.rows[0].matched_rules || 0, 10), total_rules: parseInt(tryCompat.rows[0].total_rules || 0, 10) };
+        return { matched_rules: Number.parseInt(tryCompat.rows[0].matched_rules || 0, 10), total_rules: Number.parseInt(tryCompat.rows[0].total_rules || 0, 10) };
       }
 
       // Fallback: try 'passed'/'total' keys
@@ -114,7 +114,7 @@ async function computeRuleLevelMetrics() {
         FROM compatibility_logs
       `).catch(() => null);
       if (tryAgg && tryAgg.rows && tryAgg.rows[0]) {
-        return { matched_rules: parseInt(tryAgg.rows[0].passed_rules || 0, 10), total_rules: parseInt(tryAgg.rows[0].total_rules || 0, 10) };
+        return { matched_rules: Number.parseInt(tryAgg.rows[0].passed_rules || 0, 10), total_rules: Number.parseInt(tryAgg.rows[0].total_rules || 0, 10) };
       }
 
       return { matched_rules: 0, total_rules: 0 };
@@ -132,7 +132,7 @@ async function computeRuleLevelMetrics() {
       FROM exploded;
     `;
     const r = await client.query(q);
-    return { matched_rules: parseInt(r.rows[0].matched_rules || 0, 10), total_rules: parseInt(r.rows[0].total_rules || 0, 10) };
+    return { matched_rules: Number.parseInt(r.rows[0].matched_rules || 0, 10), total_rules: Number.parseInt(r.rows[0].total_rules || 0, 10) };
   } catch (err) {
     return { matched_rules: 0, total_rules: 0 };
   }

@@ -4,8 +4,8 @@
  */
 
 const db = require('../config/db');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // Import services
 const historicalPatternMiner = require('../services/historicalPatternMiner');
@@ -169,7 +169,7 @@ async function phase3_historicalPatternMining() {
     const stats = await historicalPatternMiner.getPatternStatistics();
     log.info(`\nPattern Statistics:`);
     for (const stat of stats) {
-      log.info(`   ${stat.pattern_type}: ${stat.total_patterns} patterns (avg confidence: ${parseFloat(stat.avg_confidence).toFixed(2)})`);
+      log.info(`   ${stat.pattern_type}: ${stat.total_patterns} patterns (avg confidence: ${Number.parseFloat(stat.avg_confidence).toFixed(2)})`);
     }
 
     results.phases['phase3'] = { 
@@ -333,7 +333,7 @@ async function phase7_userPersonaSystem() {
 
     results.phases['phase7'] = { 
       status: 'completed',
-      personas_count: parseInt(personaCheck.rows[0].count)
+      personas_count: Number.parseInt(personaCheck.rows[0].count, 10)
     };
     log.success('Phase 7: COMPLETED\n');
     return true;
@@ -412,7 +412,7 @@ async function phase9_feedbackLoop() {
 
     results.phases['phase9'] = { 
       status: 'completed',
-      feedback_count: parseInt(feedbackCheck.rows[0].count)
+      feedback_count: Number.parseInt(feedbackCheck.rows[0].count, 10)
     };
     log.success('Phase 9: COMPLETED\n');
     return true;

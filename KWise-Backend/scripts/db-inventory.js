@@ -1,6 +1,6 @@
 const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // Get database configuration
 require('dotenv').config();
@@ -12,6 +12,36 @@ const pool = new Pool({
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password'
 });
+
+function classifyTable(tableName) {
+    const name = tableName.toLowerCase();
+
+    if (name.includes('ai') || name.includes('ollama') || name.includes('rag') || name.includes('embedding') || name.includes('ml_')) {
+        return 'legacy-ai-rag-ml';
+    }
+
+    if (name.includes('compatibility') || name.includes('product_spec') || name.includes('rule')) {
+        return 'compatibility-spec';
+    }
+
+    if (name.includes('order') || name.includes('queue') || name.includes('payment') || name.includes('transaction')) {
+        return 'transactional';
+    }
+
+    if (name.includes('user') || name.includes('auth') || name.includes('session') || name.includes('token')) {
+        return 'identity-access';
+    }
+
+    if (name.includes('log') || name.includes('audit') || name.includes('metric') || name.includes('event')) {
+        return 'audit-observability';
+    }
+
+    if (name.includes('backup') || name.includes('old') || name.includes('temp')) {
+        return 'backup-or-temp';
+    }
+
+    return 'active-or-unknown';
+}
 
 async function runDatabaseInventory() {
     console.log('🔍 Running Database Inventory...\n');
@@ -32,8 +62,8 @@ async function runDatabaseInventory() {
         results.push(`Generated: ${new Date().toISOString()}\n`);
         
         results.push('## Tables Overview');
-        results.push('| Table Name | Type | Columns | Rows | Size |');
-        results.push('|------------|------|---------|------|------|');
+        results.push('| Table Name | Class | Type | Columns | Rows | Size |');
+        results.push('|------------|-------|------|---------|------|------|');
         
         // 2. Get detailed info for each table
         for (const table of tablesResult.rows) {
@@ -59,26 +89,30 @@ async function runDatabaseInventory() {
                 const rows = rowResult.rows[0].row_count;
                 const size = sizeResult.rows[0].size;
                 
-                results.push(`| ${tableName} | ${table.table_type} | ${cols} | ${rows} | ${size} |`);
+                results.push(`| ${tableName} | ${classifyTable(tableName)} | ${table.table_type} | ${cols} | ${rows} | ${size} |`);
                 
                 console.log(`✓ ${tableName}: ${rows} rows, ${cols} columns`);
                 
             } catch (error) {
                 console.log(`✗ Error scanning ${tableName}: ${error.message}`);
-                results.push(`| ${tableName} | ${table.table_type} | ERROR | ERROR | ERROR |`);
+                results.push(`| ${tableName} | ${classifyTable(tableName)} | ${table.table_type} | ERROR | ERROR | ERROR |`);
             }
         }
         
         // 3. Find empty tables
         results.push('\n## Empty Tables');
-        const emptyTables = tablesResult.rows.filter(async (table) => {
+        const emptyTables = [];
+
+        for (const table of tablesResult.rows) {
             try {
                 const result = await pool.query(`SELECT COUNT(*) as count FROM "${table.table_name}";`);
-                return result.rows[0].count === '0';
+                if (Number.parseInt(result.rows[0].count, 10) === 0) {
+                    emptyTables.push(table);
+                }
             } catch {
-                return false;
+                // Ignore tables that cannot be counted; they are already marked in the overview.
             }
-        });
+        }
         
         if (emptyTables.length > 0) {
             results.push('Empty tables found:');

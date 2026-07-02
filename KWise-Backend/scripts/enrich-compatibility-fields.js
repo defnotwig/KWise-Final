@@ -111,7 +111,7 @@ async function enrichMotherboards() {
       
       // Fallback: Use generic defaults based on existing pcie_x16_slots
       if (!enrichmentData) {
-        const existingSlots = parseInt(specs.pcie_x16_slots || specs.pcie_slots || 1);
+        const existingSlots = Number.parseInt(specs.pcie_x16_slots || specs.pcie_slots || 1, 10);
         enrichmentData = {
           electrical: Math.min(existingSlots, 1), // Assume only 1 true x16 for unknown chipsets
           physical: existingSlots,
@@ -194,7 +194,7 @@ async function enrichGPUs() {
       
       // Fallback: Estimate based on TDP
       if (!powerData) {
-        const tdp = parseInt(specs.tdp || specs.power_consumption || 150);
+        const tdp = Number.parseInt(specs.tdp || specs.power_consumption || 150, 10);
         powerData = {
           has_12vhpwr: false,
           pcie_8pin: tdp > 225 ? 2 : tdp > 150 ? 1 : 0,
@@ -343,7 +343,7 @@ async function enrichPSUs() {
       }
       
       // Estimate connectors based on wattage
-      const wattage = parseInt(specs.wattage || specs.power || 650);
+      const wattage = Number.parseInt(specs.wattage || specs.power || 650, 10);
       
       let has12vhpwr = false;
       let pcie8pin = 2;
