@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const logger = require('../utils/logger');
+const { protect, restrictTo } = require('../middleware/auth');
 
 /**
  * Default preferences template
@@ -28,12 +29,23 @@ const DEFAULT_PREFERENCES = {
     }
 };
 
+const isAdminUser = (user = {}) => ['admin', 'superadmin', 'developer'].includes(user.role);
+const canAccessIdentifier = (req, identifier) => isAdminUser(req.user) || String(identifier) === String(req.user?.id);
+const safePreferenceDto = (row, isDefault = false) => ({
+    id: row?.id,
+    user_id: row?.user_id,
+    preferences: row?.preferences || DEFAULT_PREFERENCES,
+    updated_at: row?.updated_at,
+    last_accessed_at: row?.last_accessed_at,
+    is_default: isDefault
+});
+
 /**
  * @route   POST /api/preferences
  * @desc    Save or update user preferences
- * @access  Public
+ * @access  Authenticated
  */
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const { user_id, session_id, preferences } = req.body;
 
@@ -45,12 +57,14 @@ router.post('/', async (req, res) => {
             });
         }
 
-        if (!user_id && !session_id) {
+        if (session_id && !isAdminUser(req.user)) {
             return res.status(400).json({
                 success: false,
-                error: 'Either user_id or session_id is required'
+                error: 'Anonymous session preferences are not accepted on this endpoint'
             });
         }
+
+        const effectiveUserId = isAdminUser(req.user) ? (user_id || req.user.id) : req.user.id;
 
         // Merge with defaults
         const mergedPreferences = {
@@ -60,7 +74,7 @@ router.post('/', async (req, res) => {
 
         // Upsert preferences
         let result;
-        if (user_id) {
+        if (effectiveUserId) {
             result = await pool.query(`
                 INSERT INTO user_preferences (user_id, preferences)
                 VALUES ($1, $2)
@@ -70,7 +84,7 @@ router.post('/', async (req, res) => {
                     updated_at = CURRENT_TIMESTAMP,
                     last_accessed_at = CURRENT_TIMESTAMP
                 RETURNING *
-            `, [user_id, mergedPreferences]);
+            `, [effectiveUserId, mergedPreferences]);
         } else {
             result = await pool.query(`
                 INSERT INTO user_preferences (session_id, preferences)
@@ -84,12 +98,12 @@ router.post('/', async (req, res) => {
             `, [session_id, mergedPreferences]);
         }
 
-        logger.info(`Preferences saved for ${user_id || session_id}`);
+        logger.info(`Preferences saved for ${effectiveUserId || session_id}`);
 
         res.json({
             success: true,
             message: 'Preferences saved successfully',
-            data: result.rows[0]
+            data: safePreferenceDto(result.rows[0])
         });
 
     } catch (error) {
@@ -105,15 +119,22 @@ router.post('/', async (req, res) => {
 /**
  * @route   GET /api/preferences/:identifier
  * @desc    Load user preferences by user_id or session_id
- * @access  Public
+ * @access  Authenticated
  */
-router.get('/:identifier', async (req, res) => {
+router.get('/:identifier', protect, async (req, res) => {
     try {
         const { identifier } = req.params;
 
+        if (!canAccessIdentifier(req, identifier)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to read these preferences'
+            });
+        }
+
         const result = await pool.query(`
-            SELECT * FROM user_preferences
-            WHERE user_id = $1 OR session_id = $1
+            SELECT id, user_id, preferences, updated_at, last_accessed_at FROM user_preferences
+            WHERE user_id = $1
         `, [identifier]);
 
         if (result.rows.length === 0) {
@@ -121,8 +142,7 @@ router.get('/:identifier', async (req, res) => {
             return res.json({
                 success: true,
                 data: {
-                    preferences: DEFAULT_PREFERENCES,
-                    is_default: true
+                    ...safePreferenceDto(null, true)
                 }
             });
         }
@@ -131,14 +151,13 @@ router.get('/:identifier', async (req, res) => {
         await pool.query(`
             UPDATE user_preferences
             SET last_accessed_at = CURRENT_TIMESTAMP
-            WHERE user_id = $1 OR session_id = $1
+            WHERE user_id = $1
         `, [identifier]);
 
         res.json({
             success: true,
             data: {
-                ...result.rows[0],
-                is_default: false
+                ...safePreferenceDto(result.rows[0], false)
             }
         });
 
@@ -154,9 +173,9 @@ router.get('/:identifier', async (req, res) => {
 /**
  * @route   PUT /api/preferences/:identifier
  * @desc    Update specific preference fields
- * @access  Public
+ * @access  Authenticated
  */
-router.put('/:identifier', async (req, res) => {
+router.put('/:identifier', protect, async (req, res) => {
     try {
         const { identifier } = req.params;
         const { preferences: updates } = req.body;
@@ -171,7 +190,7 @@ router.put('/:identifier', async (req, res) => {
         // Get current preferences
         const current = await pool.query(`
             SELECT preferences FROM user_preferences
-            WHERE user_id = $1 OR session_id = $1
+            WHERE user_id = $1
         `, [identifier]);
 
         let currentPreferences = current.rows.length > 0 
@@ -189,7 +208,7 @@ router.put('/:identifier', async (req, res) => {
             UPDATE user_preferences
             SET preferences = $1,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $2 OR session_id = $2
+            WHERE user_id = $2
             RETURNING *
         `, [mergedPreferences, identifier]);
 
@@ -205,7 +224,7 @@ router.put('/:identifier', async (req, res) => {
         res.json({
             success: true,
             message: 'Preferences updated successfully',
-            data: result.rows[0]
+            data: safePreferenceDto(result.rows[0])
         });
 
     } catch (error) {
@@ -220,17 +239,24 @@ router.put('/:identifier', async (req, res) => {
 /**
  * @route   DELETE /api/preferences/:identifier
  * @desc    Reset preferences to default
- * @access  Public
+ * @access  Authenticated
  */
-router.delete('/:identifier', async (req, res) => {
+router.delete('/:identifier', protect, async (req, res) => {
     try {
         const { identifier } = req.params;
+
+        if (!canAccessIdentifier(req, identifier)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to reset these preferences'
+            });
+        }
 
         const result = await pool.query(`
             UPDATE user_preferences
             SET preferences = $1,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $2 OR session_id = $2
+            WHERE user_id = $2
             RETURNING *
         `, [DEFAULT_PREFERENCES, identifier]);
 
@@ -246,7 +272,7 @@ router.delete('/:identifier', async (req, res) => {
         res.json({
             success: true,
             message: 'Preferences reset to default',
-            data: result.rows[0]
+            data: safePreferenceDto(result.rows[0])
         });
 
     } catch (error) {
@@ -273,9 +299,9 @@ router.get('/defaults/get', async (req, res) => {
 /**
  * @route   PATCH /api/preferences/:identifier/field/:field
  * @desc    Update a single preference field
- * @access  Public
+ * @access  Authenticated
  */
-router.patch('/:identifier/field/:field', async (req, res) => {
+router.patch('/:identifier/field/:field', protect, async (req, res) => {
     try {
         const { identifier, field } = req.params;
         const { value } = req.body;
@@ -287,10 +313,24 @@ router.patch('/:identifier/field/:field', async (req, res) => {
             });
         }
 
+        if (!canAccessIdentifier(req, identifier)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to update these preferences'
+            });
+        }
+
+        if (!Object.prototype.hasOwnProperty.call(DEFAULT_PREFERENCES, field)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Preference field is not allowed'
+            });
+        }
+
         // Get current preferences
         const current = await pool.query(`
             SELECT preferences FROM user_preferences
-            WHERE user_id = $1 OR session_id = $1
+            WHERE user_id = $1
         `, [identifier]);
 
         let currentPreferences = current.rows.length > 0 
@@ -305,7 +345,7 @@ router.patch('/:identifier/field/:field', async (req, res) => {
             UPDATE user_preferences
             SET preferences = $1,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $2 OR session_id = $2
+            WHERE user_id = $2
             RETURNING *
         `, [currentPreferences, identifier]);
 

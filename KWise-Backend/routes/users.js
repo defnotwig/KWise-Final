@@ -7,8 +7,36 @@ const { notifyUserActivity } = require('../utils/notificationHelper');
 const logger = require('../utils/logger');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
+const path = require('node:path');
+const fs = require('node:fs').promises;
+const {
+    isAllowedImageMetadata,
+    randomImageFilename,
+    validateUploadedImageMagic
+} = require('../middleware/secureImageUpload');
+
+const sanitizeUser = (user = {}) => {
+    const {
+        password: _password,
+        password_hash: _passwordHash,
+        password_reset_token: _passwordResetToken,
+        password_reset_expires: _passwordResetExpires,
+        reset_token: _resetToken,
+        reset_token_expires: _resetTokenExpires,
+        reset_attempts: _resetAttempts,
+        reset_status: _resetStatus,
+        email_verification_token: _emailVerificationToken,
+        two_factor_secret: _twoFactorSecret,
+        two_factor_recovery_codes: _twoFactorRecoveryCodes,
+        refresh_token: _refreshToken,
+        session_token: _sessionToken,
+        api_key: _apiKey,
+        api_key_hash: _apiKeyHash,
+        ...safeUser
+    } = user;
+
+    return safeUser;
+};
 
 // Configure multer for profile image uploads
 const storage = multer.diskStorage({
@@ -25,9 +53,7 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         const userId = req.params.id || req.user?.id;
-        const ext = path.extname(file.originalname);
-        const filename = `profile_${userId}_${Date.now()}${ext}`;
-        cb(null, filename);
+        cb(null, `profile_${userId}_${randomImageFilename(file.originalname)}`);
     }
 });
 
@@ -37,10 +63,10 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024 // 5MB limit
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        if (isAllowedImageMetadata(file)) {
             cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed'), false);
+            cb(new Error('Only JPG, PNG, GIF, and WEBP image files are allowed'), false);
         }
     }
 });
@@ -83,12 +109,28 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), async (req, res)
         } = req.query;
 
         const offset = (page - 1) * limit;
-        const limitNum = Math.min(parseInt(limit), 100);
+        const limitNum = Math.min(Number.parseInt(limit, 10), 100);
 
         // Enhanced query with proper status tracking
         let baseQuery = `
             SELECT 
-                u.*,
+                u.id,
+                u.name,
+                u.email,
+                u.username,
+                u.role,
+                u.display_name,
+                u.profile_image,
+                u.profile_picture,
+                u.birth_date,
+                u.is_active,
+                u.created_at,
+                u.updated_at,
+                u.last_login,
+                u.is_online,
+                u.online_status,
+                u.last_activity,
+                u.last_active_at,
                 COUNT(DISTINCT l.id) as login_count,
                 MAX(CASE WHEN l.action = 'login' THEN l.created_at END) as last_login_from_logs,
                 COUNT(DISTINCT a.id) as action_count,
@@ -130,9 +172,9 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), async (req, res)
         baseQuery += ` GROUP BY u.id`;
 
         // Get total count
-        const countQuery = baseQuery.replace(/SELECT.*FROM/, 'SELECT COUNT(DISTINCT u.id) as count FROM');
+        const countQuery = `SELECT COUNT(*) as count FROM (${baseQuery}) counted_users`;
         const countResult = await query(countQuery, queryParams);
-        const total = parseInt(countResult.rows[0].count);
+        const total = Number.parseInt(countResult.rows[0].count, 10);
 
         // Add sorting and pagination
         baseQuery += ` ORDER BY u.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
@@ -143,7 +185,7 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), async (req, res)
 
         // Process and format user data
         const formattedUsers = result.rows.map(user => ({
-            ...user,
+            ...sanitizeUser(user),
             status: user.current_status,
             last_login: user.last_login_from_logs || user.last_login || 'Never',
             is_online: user.current_status === 'online',
@@ -158,7 +200,7 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), async (req, res)
             success: true,
             data: formattedUsers,
             pagination: {
-                page: parseInt(page),
+                page: Number.parseInt(page, 10),
                 limit: limitNum,
                 total,
                 pages
@@ -214,7 +256,23 @@ router.get('/:id', restrictTo('admin', 'superadmin', 'developer'), async (req, r
 
         const result = await query(`
             SELECT 
-                u.*,
+                u.id,
+                u.name,
+                u.email,
+                u.username,
+                u.role,
+                u.display_name,
+                u.profile_image,
+                u.profile_picture,
+                u.birth_date,
+                u.is_active,
+                u.created_at,
+                u.updated_at,
+                u.last_login,
+                u.is_online,
+                u.online_status,
+                u.last_activity,
+                u.last_active_at,
                 COUNT(l.id) as login_count,
                 MAX(l.created_at) as last_login,
                 COUNT(a.id) as action_count
@@ -241,7 +299,7 @@ router.get('/:id', restrictTo('admin', 'superadmin', 'developer'), async (req, r
             LIMIT 10
         `, [id]);
 
-        const user = result.rows[0];
+        const user = sanitizeUser(result.rows[0]);
         user.recent_actions = actionsResult.rows;
 
         res.json({
@@ -271,6 +329,9 @@ router.post('/', restrictTo('admin', 'superadmin'), async (req, res) => {
         if (!roleWhitelist.includes(role)) {
             return res.status(400).json({ success: false, message: 'Invalid role specified' });
         }
+        if (role === 'superadmin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ success: false, message: 'Only superadmins can create superadmin accounts' });
+        }
         if (name.length < 2 || name.length > 120) {
             return res.status(400).json({ success: false, message: 'Name must be between 2 and 120 characters' });
         }
@@ -290,7 +351,7 @@ router.post('/', restrictTo('admin', 'superadmin'), async (req, res) => {
             return res.status(400).json({ success: false, message: 'User with this email already exists' });
         }
 
-        const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+        const saltRounds = Number.parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         // Generate username from email (before @ symbol)
@@ -320,12 +381,23 @@ router.put('/:id', restrictTo('admin', 'superadmin'), async (req, res) => {
         const { name, email, role, is_active } = req.body;
 
         // Check if user exists
-        const existingUser = await query('SELECT * FROM users WHERE id = $1', [id]);
+        const existingUser = await query('SELECT id, role FROM users WHERE id = $1', [id]);
         if (existingUser.rows.length === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
             });
+        }
+
+        const targetUser = existingUser.rows[0];
+        if (targetUser.role === 'superadmin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ success: false, message: 'Only superadmins can edit superadmin accounts' });
+        }
+        if (role === 'superadmin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ success: false, message: 'Only superadmins can assign the superadmin role' });
+        }
+        if (Number(id) === Number(req.user.id) && role && role !== req.user.role) {
+            return res.status(400).json({ success: false, message: 'Use another superadmin account to change your own role' });
         }
 
         // Disallow password changes here (dedicated password reset flow required)
@@ -404,7 +476,7 @@ router.delete('/:id', restrictTo('superadmin'), async (req, res) => {
         const { id } = req.params;
 
         // Check if user exists
-        const existingUser = await query('SELECT * FROM users WHERE id = $1', [id]);
+        const existingUser = await query('SELECT id, name, email, role FROM users WHERE id = $1', [id]);
         if (existingUser.rows.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -450,7 +522,7 @@ router.get('/:id/activity', restrictTo('admin', 'superadmin', 'developer'), asyn
         const { page = 1, limit = 20 } = req.query;
 
         const offset = (page - 1) * limit;
-        const limitNum = Math.min(parseInt(limit), 100);
+        const limitNum = Math.min(Number.parseInt(limit, 10), 100);
 
         // Get user activity logs
         const result = await query(`
@@ -463,7 +535,7 @@ router.get('/:id/activity', restrictTo('admin', 'superadmin', 'developer'), asyn
 
         // Get total count
         const countResult = await query('SELECT COUNT(*) as count FROM audit_logs WHERE user_id = $1', [id]);
-        const total = parseInt(countResult.rows[0].count);
+        const total = Number.parseInt(countResult.rows[0].count, 10);
 
         // Calculate pagination
         const pages = Math.ceil(total / limitNum);
@@ -472,7 +544,7 @@ router.get('/:id/activity', restrictTo('admin', 'superadmin', 'developer'), asyn
             success: true,
             data: result.rows,
             pagination: {
-                page: parseInt(page),
+                page: Number.parseInt(page, 10),
                 limit: limitNum,
                 total,
                 pages
@@ -493,7 +565,7 @@ router.get('/:id/activity', restrictTo('admin', 'superadmin', 'developer'), asyn
 // =====================================================
 
 // Update user login status (called on login/logout)
-router.post('/update-status', async (req, res) => {
+router.post('/update-status', restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
         const { status = 'online' } = req.body;
         const userId = req.user.id;
@@ -568,13 +640,13 @@ router.get('/realtime/stats', restrictTo('admin', 'superadmin'), async (req, res
 // (Removed earlier duplicate /online route; unified definition retained below with broader access)
 
 // Update user profile (name, display name, profile image, birth date)
-router.put('/:id/profile', upload.single('profileImage'), async (req, res) => {
+router.put('/:id/profile', upload.single('profileImage'), validateUploadedImageMagic, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, displayName, birthDate } = req.body;
 
         // Check if user can edit this profile (self or admin)
-        if (req.user.id !== parseInt(id) && !['admin', 'superadmin'].includes(req.user.role)) {
+        if (req.user.id !== Number.parseInt(id, 10) && !['admin', 'superadmin'].includes(req.user.role)) {
             return res.status(403).json({
                 success: false,
                 message: 'You can only edit your own profile'

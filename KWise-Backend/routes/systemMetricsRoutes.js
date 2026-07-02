@@ -5,8 +5,12 @@
 
 const express = require('express');
 const router = express.Router();
-const os = require('os');
+const os = require('node:os');
 const db = require('../config/db');
+const { protect, restrictTo } = require('../middleware/auth');
+
+router.use(protect);
+router.use(restrictTo('admin', 'superadmin', 'developer'));
 
 // Store metrics history in memory
 const metricsHistory = {
@@ -128,7 +132,7 @@ router.get('/metrics', async (req, res) => {
         FROM information_schema.tables 
         WHERE table_schema = 'public'
       `);
-      dbMetrics.tables = parseInt(tablesResult.rows[0]?.count || 0);
+      dbMetrics.tables = Number.parseInt(tablesResult.rows[0]?.count || 0, 10);
       
       // Get connection count
       const connectionsResult = await db.query(`
@@ -136,7 +140,7 @@ router.get('/metrics', async (req, res) => {
         FROM pg_stat_activity
         WHERE state = 'active'
       `);
-      dbMetrics.connections.active = parseInt(connectionsResult.rows[0]?.active || 0);
+      dbMetrics.connections.active = Number.parseInt(connectionsResult.rows[0]?.active || 0, 10);
       
       // Simulate query time metrics (in production, track actual query times)
       const queryStart = Date.now();
@@ -251,7 +255,7 @@ router.post('/metrics/error', (req, res) => {
 // GET /api/system/metrics/history - Get metrics history
 router.get('/metrics/history', (req, res) => {
   try {
-    const duration = parseInt(req.query.duration) || 60; // minutes
+    const duration = Number.parseInt(req.query.duration, 10) || 60; // minutes
     const cutoff = Date.now() - (duration * 60 * 1000);
     
     const history = {
@@ -277,7 +281,7 @@ router.get('/metrics/history', (req, res) => {
 });
 
 // DELETE /api/system/metrics/reset - Reset metrics (admin only)
-router.delete('/metrics/reset', (req, res) => {
+router.delete('/metrics/reset', restrictTo('superadmin'), (req, res) => {
   try {
     requestCount = 0;
     errorCount = 0;

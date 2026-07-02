@@ -4,6 +4,7 @@ const { protect, restrictTo } = require('../middleware/auth');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 const { insertAuditLog } = require('../utils/auditLogHelper');
+const { sanitizeSettingsObject, sanitizeSettingsValue } = require('../utils/securitySanitizer');
 
 // Apply authentication to all settings routes
 router.use(protect);
@@ -40,7 +41,7 @@ router.get('/app', async (req, res) => {
 
         res.json({
             success: true,
-            data: appSettings
+            data: sanitizeSettingsObject(appSettings)
         });
 
     } catch (error) {
@@ -55,7 +56,7 @@ router.get('/app', async (req, res) => {
 // Unified system stats route (consolidated – removes previous duplicates & mock data)
 router.get('/system-stats', restrictTo('admin', 'superadmin', 'developer'), async (req, res) => {
     try {
-        const os = require('os');
+        const os = require('node:os');
 
         const [
             totalUsersResult,
@@ -84,10 +85,10 @@ router.get('/system-stats', restrictTo('admin', 'superadmin', 'developer'), asyn
                 arch: os.arch()
             },
             database: {
-                totalUsers: parseInt(totalUsersResult.rows[0]?.count || 0),
-                activeUsers: parseInt(activeUsersResult.rows[0]?.count || 0),
-                totalOrders: parseInt(totalOrdersResult.rows[0]?.count || 0),
-                totalProducts: parseInt(totalProductsResult.rows[0]?.count || 0)
+                totalUsers: Number.parseInt(totalUsersResult.rows[0]?.count || 0, 10),
+                activeUsers: Number.parseInt(activeUsersResult.rows[0]?.count || 0, 10),
+                totalOrders: Number.parseInt(totalOrdersResult.rows[0]?.count || 0, 10),
+                totalProducts: Number.parseInt(totalProductsResult.rows[0]?.count || 0, 10)
             },
             performance: {
                 // Placeholder deterministic values (remove randomness)
@@ -147,7 +148,7 @@ router.put('/app', restrictTo('admin', 'superadmin', 'developer'), async (req, r
 
         await insertAuditLog(req.app, { userId: req.user.id, action: 'UPDATE', entity: 'APP_SETTINGS', description: 'Updated application settings', severity: 'info', ipAddress: req.ip });
 
-        res.json({ success: true, message: 'Settings updated successfully', data: updatedSettings });
+        res.json({ success: true, message: 'Settings updated successfully', data: sanitizeSettingsObject(updatedSettings) });
 
     } catch (error) {
         logger.error('Error updating app settings:', error);
@@ -188,7 +189,7 @@ router.get('/smtp/config', restrictTo('admin', 'superadmin'), async (req, res) =
 
         res.json({
             success: true,
-            data: smtpConfig
+            data: sanitizeSettingsObject(smtpConfig)
         });
 
     } catch (error) {
@@ -216,7 +217,7 @@ router.put('/smtp/config', restrictTo('admin', 'superadmin'), async (req, res) =
         const smtpConfig = {
             configured: true,
             host,
-            port: parseInt(port),
+            port: Number.parseInt(port, 10),
             secure: Boolean(secure),
             auth: {
                 user: auth.user,
@@ -235,7 +236,7 @@ router.put('/smtp/config', restrictTo('admin', 'superadmin'), async (req, res) =
         res.json({
             success: true,
             message: 'SMTP configuration updated successfully',
-            data: smtpConfig
+            data: sanitizeSettingsObject(smtpConfig)
         });
 
     } catch (error) {
@@ -301,9 +302,9 @@ router.get('/', restrictTo('admin', 'superadmin', 'developer'), async (req, res)
         const settings = {};
         result.rows.forEach(row => {
             try {
-                settings[row.key] = JSON.parse(row.value);
+                settings[row.key] = sanitizeSettingsValue(row.key, JSON.parse(row.value));
             } catch (e) {
-                settings[row.key] = row.value;
+                settings[row.key] = sanitizeSettingsValue(row.key, row.value);
             }
         });
 
@@ -346,7 +347,7 @@ router.get('/:key', restrictTo('admin', 'superadmin', 'developer'), async (req, 
             success: true,
             data: {
                 key: result.rows[0].key,
-                value: value,
+                value: sanitizeSettingsValue(result.rows[0].key, value),
                 updated_at: result.rows[0].updated_at
             }
         });
@@ -397,7 +398,7 @@ router.put('/:key', restrictTo('admin', 'superadmin'), async (req, res) => {
             success: true,
             data: {
                 key: setting.key,
-                value: typeof value === 'object' ? value : jsonValue,
+                value: sanitizeSettingsValue(setting.key, typeof value === 'object' ? value : jsonValue),
                 description: setting.description,
                 updated_at: setting.updated_at
             },
@@ -432,7 +433,7 @@ router.delete('/:key', restrictTo('superadmin'), async (req, res) => {
 
         res.json({
             success: true,
-            data: result.rows[0],
+            data: sanitizeSettingsObject(result.rows[0]),
             message: 'Setting deleted successfully'
         });
 
@@ -515,7 +516,7 @@ router.post('/reset/defaults', restrictTo('superadmin'), async (req, res) => {
         res.json({
             success: true,
             message: 'Settings reset to defaults successfully',
-            data: defaultSettings
+            data: sanitizeSettingsObject(defaultSettings)
         });
 
     } catch (error) {
@@ -535,9 +536,9 @@ router.get('/export/json', restrictTo('admin', 'superadmin'), async (req, res) =
         const settings = {};
         result.rows.forEach(row => {
             try {
-                settings[row.key] = JSON.parse(row.value);
+                settings[row.key] = sanitizeSettingsValue(row.key, JSON.parse(row.value));
             } catch (e) {
-                settings[row.key] = row.value;
+                settings[row.key] = sanitizeSettingsValue(row.key, row.value);
             }
         });
 

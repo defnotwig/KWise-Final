@@ -148,7 +148,7 @@ router.get('/global', protect, async (req, res) => {
                 id: p.id,
                 title: p.name,
                 subtitle: `${p.category} - ${p.brand}`,
-                description: `₱${parseFloat(p.price).toLocaleString()} | Stock: ${p.stock}`,
+                description: `₱${Number.parseFloat(p.price).toLocaleString()} | Stock: ${p.stock}`,
                 image: p.image_url,
                 type: 'product',
                 navigationPath: `/admin/stock/${p.category}`,
@@ -162,7 +162,7 @@ router.get('/global', protect, async (req, res) => {
                 id: o.id,
                 title: `Order #${o.id}`,
                 subtitle: o.customer_name,
-                description: `${o.status} | ₱${parseFloat(o.price).toLocaleString()} | ${new Date(o.created_at).toLocaleDateString()}`,
+                description: `${o.status} | ₱${Number.parseFloat(o.price).toLocaleString()} | ${new Date(o.created_at).toLocaleDateString()}`,
                 type: 'order',
                 navigationPath: '/admin/orders',
                 metadata: {
