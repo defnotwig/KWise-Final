@@ -7,7 +7,7 @@ describe('Stock Specifications API', () => {
     let testItemId;
 
     beforeAll(async () => {
-        // Login to get auth token
+        // Login to get auth token using test credentials
         const loginResponse = await request(app)
             .post('/api/auth/login')
             .send({
@@ -31,31 +31,19 @@ describe('Stock Specifications API', () => {
             .expect(200);
 
         expect(response.body.success).toBe(true);
-        expect(Array.isArray(response.body.data)).toBe(true);
-        expect(response.body.data.length).toBeGreaterThan(0);
+        // Controller wraps fields under data.fields (both test-stub and real DB paths)
+        const fields = response.body.data?.fields;
+        expect(Array.isArray(fields)).toBe(true);
+        expect(fields.length).toBeGreaterThan(0);
 
         // Check that fields have proper structure
-        const field = response.body.data[0];
+        const field = fields[0];
         expect(field).toHaveProperty('name');
         expect(field).toHaveProperty('type');
         expect(field).toHaveProperty('required');
     });
 
     test('POST /api/stock creates item with boolean specifications', async () => {
-        const formData = new FormData();
-        formData.append('name', 'Test CPU with Integrated Graphics');
-        formData.append('category', 'CPU');
-        formData.append('brand', 'Test Brand');
-        formData.append('price', '299.99');
-        formData.append('stock', '10');
-        formData.append('specifications', JSON.stringify({
-            socket: 'AM4',
-            cores: 6,
-            threads: 12,
-            integrated_gpu: true,
-            base_clock: '3.6 GHz'
-        }));
-
         const response = await request(app)
             .post('/api/stock')
             .set('Authorization', `Bearer ${authToken}`)

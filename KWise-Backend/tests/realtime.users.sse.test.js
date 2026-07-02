@@ -16,11 +16,12 @@ jest.mock('../config/db', () => ({
   })
 }));
 
-const { startServer } = require('../server');
+const { startServer, app: serverApp } = require('../server');
 
 describe('Realtime Users SSE', () => {
   let app;
   beforeAll(async () => {
+    serverApp.set('broadcastUserStats', undefined);
     app = await startServer({ listen: false });
   });
 

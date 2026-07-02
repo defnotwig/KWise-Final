@@ -43,7 +43,7 @@ describe('Logs SSE E2E', () => {
 
       // Safety timeout to fail fast if event not received
       const to = setTimeout(() => {
-        try { req.abort(); } catch(_) {}
+        try { req.abort(); } catch(cleanupErr) { console.debug('SSE cleanup:', cleanupErr.message); }
         reject(new Error('Timed out waiting for log-entry event'));
       }, 3000);
 
@@ -92,7 +92,7 @@ describe('Logs SSE E2E', () => {
               }
             }
           } catch (e) {
-            try { req.abort(); } catch(_) {}
+            try { req.abort(); } catch(cleanupErr) { console.debug('SSE cleanup:', cleanupErr.message); }
             clearTimeout(to);
             reject(e);
           }

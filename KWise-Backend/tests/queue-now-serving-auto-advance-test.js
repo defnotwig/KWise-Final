@@ -92,8 +92,8 @@ async function testQueueAutoAdvance() {
         
         // STEP 5: Verify the auto-advance function exists
         console.log('\n🔍 STEP 5: Verify auto-advance logic is implemented...');
-        const fs = require('fs');
-        const queueRoutesPath = require('path').join(__dirname, '../routes/queue.js');
+        const fs = require('node:fs');
+        const queueRoutesPath = require('node:path').join(__dirname, '../routes/queue.js');
         const queueRoutesContent = fs.readFileSync(queueRoutesPath, 'utf8');
         
         if (queueRoutesContent.includes('autoAdvanceNowServing')) {

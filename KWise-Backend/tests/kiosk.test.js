@@ -209,29 +209,88 @@ describe('Kiosk API Endpoints', () => {
     });
 
     describe('Error Handling', () => {
-        test('should handle invalid category gracefully', async () => {
+        test('should return valid response for categories endpoint', async () => {
             const response = await request(app)
-                .get('/api/kiosk/categories/InvalidCategory/products')
+                .get('/api/kiosk/categories')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(Array.isArray(response.body.data)).toBe(true);
+            expect(response.body).toHaveProperty('timestamp');
+        });
+
+        test('should handle malformed pagination parameters', async () => {
+            const response = await request(app)
+                .get('/api/kiosk/categories/CPU/products?page=abc&limit=-1')
+                .expect(200);
+
+            expect(response.body.success).toBe(true);
+            // Test-mode routes return items array directly (no pagination wrapper for invalid params)
+            expect(Array.isArray(response.body.data.items) || Array.isArray(response.body.data)).toBe(true);
+        });
+
+        test('should handle invalid limit parameter for featured products', async () => {
+            const response = await request(app)
+                .get('/api/kiosk/featured?limit=invalid')
+                .expect(200);
+
+            // Should handle invalid limit gracefully with defaults
+            expect(response.body.success).toBe(true);
+            expect(Array.isArray(response.body.data)).toBe(true);
+        });
+
+        test('should return empty items for invalid category', async () => {
+            const response = await request(app)
+                .get('/api/kiosk/categories/NonExistentCategory/products')
                 .expect(200);
 
             expect(response.body.success).toBe(true);
             expect(response.body.data.items).toEqual([]);
-        });
-
-        test('should handle database errors gracefully', async () => {
-            // This test would require mocking database failure
-            // For now, we'll just ensure the endpoint structure is correct
-            expect(true).toBe(true);
+            expect(response.body.data.pagination.totalItems).toBe(0);
         });
     });
 });
 
 // Integration test for real-time updates
 describe('Real-time Stock Updates', () => {
-    test('should reflect stock changes immediately', async () => {
-        // This would test WebSocket updates when stock changes
-        // Implementation depends on WebSocket setup
-        expect(true).toBe(true);
+    test('should create order and return queue assignment', async () => {
+        const orderData = {
+            customerName: 'Test Customer',
+            items: [{ id: 1, name: 'Test Item', price: 100, quantity: 1 }],
+            total: 100
+        };
+
+        const response = await request(app)
+            .post('/api/kiosk/orders')
+            .send(orderData)
+            .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toHaveProperty('orderId');
+        expect(response.body.data).toHaveProperty('queueNumber');
+        expect(response.body.data).toHaveProperty('orderNumber');
+        expect(typeof response.body.data.queueNumber).toBe('number');
+    });
+
+    test('should handle empty order body gracefully', async () => {
+        const response = await request(app)
+            .post('/api/kiosk/orders')
+            .send({})
+            .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toHaveProperty('orderId');
+        expect(response.body.data).toHaveProperty('queueNumber');
+    });
+
+    test('should handle order with missing items array', async () => {
+        const response = await request(app)
+            .post('/api/kiosk/orders')
+            .send({ customerName: 'Test' })
+            .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toHaveProperty('orderId');
     });
 });
 

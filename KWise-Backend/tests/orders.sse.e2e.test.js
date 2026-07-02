@@ -44,7 +44,7 @@ describe('Orders SSE E2E', () => {
       reqSse.on('error', () => {});
 
       const to = setTimeout(() => {
-        try { reqSse.abort(); } catch (_) {}
+        try { reqSse.abort(); } catch (cleanupErr) { console.debug('SSE cleanup:', cleanupErr.message); }
         reject(new Error('Timeout waiting for order-updated event'));
       }, 3000);
 
@@ -71,7 +71,7 @@ describe('Orders SSE E2E', () => {
               expect(payload).toHaveProperty('type', 'order-updated');
               expect(payload).toHaveProperty('data');
               expect(payload.data).toHaveProperty('id', 999);
-              try { reqSse.abort(); } catch (_) {}
+              try { reqSse.abort(); } catch (cleanupErr) { console.debug('SSE cleanup:', cleanupErr.message); }
               clearTimeout(to);
               resolve();
               return;

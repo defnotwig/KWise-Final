@@ -18,7 +18,7 @@ describe('Orders SSE progress', () => {
       reqSse.on('error', () => {});
 
       const to = setTimeout(() => {
-        try { reqSse.abort(); } catch (_) {}
+        try { reqSse.abort(); } catch (cleanupErr) { console.debug('SSE abort cleanup:', cleanupErr.message); }
         reject(new Error('Timeout waiting for order-progress event'));
       }, 2500);
 
@@ -43,7 +43,7 @@ describe('Orders SSE progress', () => {
               expect(got).toHaveProperty('type', 'order-progress');
               expect(got).toHaveProperty('data');
               expect(got.data).toMatchObject(payload);
-              try { reqSse.abort(); } catch (_) {}
+              try { reqSse.abort(); } catch (cleanupErr) { console.debug('SSE abort cleanup:', cleanupErr.message); }
               clearTimeout(to);
               resolve();
               return;

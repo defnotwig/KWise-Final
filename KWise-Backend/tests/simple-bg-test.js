@@ -3,8 +3,8 @@
  */
 
 const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs').promises;
+const path = require('node:path');
+const fs = require('node:fs').promises;
 
 async function simpleTest() {
     console.log('🧪 SIMPLE BACKGROUND REMOVAL TEST\n');

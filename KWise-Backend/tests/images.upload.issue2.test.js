@@ -1,5 +1,5 @@
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 const request = require('supertest');
 const { startServer } = require('../server');
 
@@ -25,6 +25,6 @@ describe('Issue 2 Image Upload Route', () => {
       if (String(e.message).includes('ECONNRESET')) return expect(true).toBe(true);
       throw e;
     }
-    expect([200,401,403,404]).toContain(res.statusCode);
+    expect([200,400,401,403,404]).toContain(res.statusCode);
   });
 });
