@@ -27,7 +27,7 @@ const AutoGenerateOrders = () => {
         const { name, value, type, checked } = e.target;
         setConfig(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : type === 'number' ? parseInt(value) : value
+            [name]: type === 'checkbox' ? checked : type === 'number' ? Number.parseInt(value, 10) : value
         }));
     };
 

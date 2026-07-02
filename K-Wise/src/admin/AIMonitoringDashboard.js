@@ -26,10 +26,8 @@ const AIMonitoringDashboard = () => {
 
   // Fetch monitoring data
   const fetchMonitoringData = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
+    try {      const config = {
+        withCredentials: true
       };
 
       // Fetch all monitoring endpoints in parallel

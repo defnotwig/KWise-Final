@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import './CorrectionForm.css';
 
 const CorrectionForm = ({ suggestion, onSubmitSuccess, onCancel }) => {
@@ -29,13 +31,9 @@ const CorrectionForm = ({ suggestion, onSubmitSuccess, onCancel }) => {
       return;
     }
 
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/admin/ai-corrections', {
+    try {      const response = await fetch(`${getServerBaseUrl()}/api/admin/ai-corrections`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        headers: {          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           suggestion_id: suggestion.id,
@@ -113,7 +111,7 @@ const CorrectionForm = ({ suggestion, onSubmitSuccess, onCancel }) => {
 
         <div className="form-group">
           <label htmlFor="corrected_text">
-            Corrected Suggestion Text *
+            Corrected Suggestion Text *{' '}
             <span className="field-hint">Provide the correct suggestion that the AI should have given</span>
           </label>
           <textarea
@@ -129,7 +127,7 @@ const CorrectionForm = ({ suggestion, onSubmitSuccess, onCancel }) => {
 
         <div className="form-group">
           <label htmlFor="correction_reason">
-            Correction Reason *
+            Correction Reason *{' '}
             <span className="field-hint">Explain why this correction is needed and what the AI missed</span>
           </label>
           <textarea
@@ -156,7 +154,7 @@ const CorrectionForm = ({ suggestion, onSubmitSuccess, onCancel }) => {
               max="5"
               step="1"
               value={formData.confidence_score}
-              onChange={(e) => setFormData(prev => ({ ...prev, confidence_score: parseInt(e.target.value) }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, confidence_score: Number.parseInt(e.target.value, 10) }))}
               disabled={submitting}
             />
             <div className="confidence-labels">
@@ -201,6 +199,19 @@ const CorrectionForm = ({ suggestion, onSubmitSuccess, onCancel }) => {
       </div>
     </div>
   );
+};
+
+CorrectionForm.propTypes = {
+  suggestion: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    original_text: PropTypes.string,
+    confidence_score: PropTypes.number,
+    reasoning: PropTypes.string,
+    type: PropTypes.string,
+    priority: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  }).isRequired,
+  onSubmitSuccess: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
 };
 
 export default CorrectionForm;

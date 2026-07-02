@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CorrectionForm from './CorrectionForm';
 import FeedbackStats from './FeedbackStats';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import './AdminFeedbackPanel.css';
 
 const AdminFeedbackPanel = () => {
@@ -20,31 +21,20 @@ const AdminFeedbackPanel = () => {
     total: 0
   });
 
-  // Fetch pending suggestions
-  useEffect(() => {
-    if (activeTab === 'pending') {
-      fetchPendingSuggestions();
-    }
-  }, [activeTab, pagination.page, filters]);
-
-  const fetchPendingSuggestions = async () => {
+  const fetchPendingSuggestions = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    try {
-      const token = localStorage.getItem('authToken');
-      const queryParams = new URLSearchParams({
+    try {      const queryParams = new URLSearchParams({
         page: pagination.page,
         limit: pagination.limit,
         ...filters
       });
 
       const response = await fetch(
-        `http://localhost:5000/api/admin/ai-suggestions/pending?${queryParams}`,
+        `${getServerBaseUrl()}/api/admin/ai-suggestions/pending?${queryParams}`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           }
         }
       );
@@ -66,18 +56,21 @@ const AdminFeedbackPanel = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, pagination.limit, pagination.page]);
+
+  // Fetch pending suggestions
+  useEffect(() => {
+    if (activeTab === 'pending') {
+      fetchPendingSuggestions();
+    }
+  }, [activeTab, fetchPendingSuggestions]);
 
   const handleAssignToMe = async (suggestionId) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:5000/api/admin/ai-suggestions/${suggestionId}/assign`,
+    try {      const response = await fetch(
+        `${getServerBaseUrl()}/api/admin/ai-suggestions/${suggestionId}/assign`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           }
         }
       );
@@ -110,8 +103,9 @@ const AdminFeedbackPanel = () => {
       {/* Filters */}
       <div className="filters-bar">
         <div className="filter-group">
-          <label>Status:</label>
+          <label htmlFor="status-filter">Status:</label>
           <select 
+            id="status-filter"
             value={filters.status}
             onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
           >
@@ -123,8 +117,9 @@ const AdminFeedbackPanel = () => {
         </div>
 
         <div className="filter-group">
-          <label>Priority:</label>
+          <label htmlFor="priority-filter">Priority:</label>
           <select 
+            id="priority-filter"
             value={filters.priority}
             onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
           >
@@ -136,8 +131,9 @@ const AdminFeedbackPanel = () => {
         </div>
 
         <div className="filter-group">
-          <label>Type:</label>
+          <label htmlFor="type-filter">Type:</label>
           <select 
+            id="type-filter"
             value={filters.type}
             onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
           >
@@ -157,16 +153,19 @@ const AdminFeedbackPanel = () => {
       </div>
 
       {/* Suggestions List */}
-      {loading ? (
+      {loading && (
         <div className="loading">Loading suggestions...</div>
-      ) : error ? (
+      )}
+      {!loading && error && (
         <div className="error">Error: {error}</div>
-      ) : pendingSuggestions.length === 0 ? (
+      )}
+      {!loading && !error && pendingSuggestions.length === 0 && (
         <div className="empty-state">
           <p>✅ No pending suggestions to review!</p>
           <p>All AI suggestions have been reviewed.</p>
         </div>
-      ) : (
+      )}
+      {!loading && !error && pendingSuggestions.length > 0 && (
         <>
           <div className="suggestions-list">
             {pendingSuggestions.map((suggestion) => (

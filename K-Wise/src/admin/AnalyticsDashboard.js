@@ -5,14 +5,48 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import axios from 'axios';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import './AnalyticsDashboard.css';
 
 const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#fa709a', '#fee140'];
+
+const formatCurrency = (value) => {
+  return `₱${Number.parseFloat(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload?.length) {
+    return (
+      <div className="custom-tooltip">
+        <p className="label">{label}</p>
+        {payload.map((entry) => (
+          <p key={`${entry.name}-${entry.value}`} style={{ color: entry.color }}>
+            {entry.name}: {entry.name.includes('Revenue') || entry.name.includes('Value') ? formatCurrency(entry.value) : entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+CustomTooltip.propTypes = {
+  active: PropTypes.bool,
+  payload: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      color: PropTypes.string,
+    })
+  ),
+  label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
 
 const AnalyticsDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -29,11 +63,7 @@ const AnalyticsDashboard = () => {
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-
-      const [
+    try {      const [
         trendsRes,
         productsRes,
         categoriesRes,
@@ -41,12 +71,12 @@ const AnalyticsDashboard = () => {
         insightsRes,
         patternsRes
       ] = await Promise.all([
-        axios.get(`http://localhost:5000/api/admin/analytics/revenue-trends?period=${period}&limit=30`, { headers }),
-        axios.get(`http://localhost:5000/api/admin/analytics/top-products?limit=10&timeframe=${timeframe}`, { headers }),
-        axios.get('http://localhost:5000/api/admin/analytics/category-performance', { headers }),
-        axios.get('http://localhost:5000/api/admin/analytics/order-status', { headers }),
-        axios.get('http://localhost:5000/api/admin/analytics/customer-insights', { headers }),
-        axios.get('http://localhost:5000/api/admin/analytics/order-patterns', { headers })
+        axios.get(`${getServerBaseUrl()}/api/admin/analytics/revenue-trends?period=${period}&limit=30`, { withCredentials: true }),
+        axios.get(`${getServerBaseUrl()}/api/admin/analytics/top-products?limit=10&timeframe=${timeframe}`, { withCredentials: true }),
+        axios.get(`${getServerBaseUrl()}/api/admin/analytics/category-performance`, { withCredentials: true }),
+        axios.get(`${getServerBaseUrl()}/api/admin/analytics/order-status`, { withCredentials: true }),
+        axios.get(`${getServerBaseUrl()}/api/admin/analytics/customer-insights`, { withCredentials: true }),
+        axios.get(`${getServerBaseUrl()}/api/admin/analytics/order-patterns`, { withCredentials: true })
       ]);
 
       setAnalytics({
@@ -68,26 +98,6 @@ const AnalyticsDashboard = () => {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const formatCurrency = (value) => {
-    return `₱${parseFloat(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="custom-tooltip">
-          <p className="label">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }}>
-              {entry.name}: {entry.name.includes('Revenue') || entry.name.includes('Value') ? formatCurrency(entry.value) : entry.value}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (loading) {
     return (
       <div className="analytics-dashboard">
@@ -105,8 +115,8 @@ const AnalyticsDashboard = () => {
         <h1>📊 Analytics Dashboard</h1>
         <div className="analytics-filters">
           <div className="filter-group">
-            <label>Revenue Period:</label>
-            <select value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <label htmlFor="revenue-period">Revenue Period:</label>
+            <select id="revenue-period" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
@@ -114,8 +124,8 @@ const AnalyticsDashboard = () => {
             </select>
           </div>
           <div className="filter-group">
-            <label>Products Timeframe:</label>
-            <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
+            <label htmlFor="products-timeframe">Products Timeframe:</label>
+            <select id="products-timeframe" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
               <option value="all">All Time</option>
               <option value="month">Last Month</option>
               <option value="week">Last Week</option>
@@ -193,7 +203,7 @@ const AnalyticsDashboard = () => {
                 dataKey="count"
               >
                 {analytics.orderStatus.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell key={`cell-${entry.status}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
@@ -245,7 +255,7 @@ const AnalyticsDashboard = () => {
               dataKey="customerCount"
             >
               {analytics.customerInsights.orderFrequency.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell key={`cell-${entry.customerType}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />

@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './AdminKnownIssues.css';
 
 const AdminKnownIssues = () => {
@@ -44,19 +45,15 @@ const AdminKnownIssues = () => {
     setLoading(true);
     setError(null);
 
-    try {
-      const token = localStorage.getItem('authToken');
-      
+    try {      
       // Build component IDs array (empty for all)
       const componentIds = [];
       
       const response = await fetch(
-        `http://localhost:5000/api/feedback/check-issues`,
+        `${getServerBaseUrl()}/api/feedback/check-issues`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ component_ids: componentIds })
         }
@@ -105,15 +102,11 @@ const AdminKnownIssues = () => {
   };
 
   const handleVerifyIssue = async (issueId) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:5000/api/feedback/known-issue/${issueId}/verify`,
+    try {      const response = await fetch(
+        `${getServerBaseUrl()}/api/feedback/known-issue/${issueId}/verify`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           }
         }
       );
@@ -147,15 +140,11 @@ const AdminKnownIssues = () => {
       return;
     }
 
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:5000/api/feedback/known-issue/${selectedIssue.id}/resolve`,
+    try {      const response = await fetch(
+        `${getServerBaseUrl()}/api/feedback/known-issue/${selectedIssue.id}/resolve`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           },
           body: JSON.stringify(resolveData)
         }
@@ -302,19 +291,25 @@ const AdminKnownIssues = () => {
 
       {/* Issues List */}
       <div className="issues-list">
-        {loading && issues.length === 0 ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading issues...</p>
-          </div>
-        ) : issues.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">✅</div>
-            <h3>No issues found</h3>
-            <p>No compatibility issues match your filters</p>
-          </div>
-        ) : (
-          issues.map((issue) => (
+        {(() => {
+          if (loading && issues.length === 0) {
+            return (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <p>Loading issues...</p>
+              </div>
+            );
+          }
+          if (issues.length === 0) {
+            return (
+              <div className="empty-state">
+                <div className="empty-icon">✅</div>
+                <h3>No issues found</h3>
+                <p>No compatibility issues match your filters</p>
+              </div>
+            );
+          }
+          return (<>{issues.map((issue) => (
             <div key={issue.id} className="issue-card">
               <div className="issue-header">
                 <div className="issue-badges">
@@ -412,14 +407,14 @@ const AdminKnownIssues = () => {
                 </div>
               </div>
             </div>
-          ))
-        )}
+          ))}</>);
+        })()}
       </div>
 
       {/* Resolve Modal */}
       {resolveModal && selectedIssue && (
-        <div className="modal-overlay" onClick={() => setResolveModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-overlay" onClick={() => setResolveModal(false)}>
+          <dialog open className="modal-content">
             <div className="modal-header">
               <h3>✅ Resolve Issue</h3>
               <button 
@@ -494,8 +489,8 @@ const AdminKnownIssues = () => {
                 💾 Save Solution
               </button>
             </div>
-          </div>
-        </div>
+          </dialog>
+        </button>
       )}
     </div>
   );

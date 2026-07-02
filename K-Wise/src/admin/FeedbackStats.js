@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getServerBaseUrl } from '../utils/networkConfig';
 import './FeedbackStats.css';
 
 const FeedbackStats = () => {
@@ -8,23 +9,14 @@ const FeedbackStats = () => {
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState(7); // days
 
-  useEffect(() => {
-    fetchStats();
-    fetchMonthlyStats();
-  }, [timeRange]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:5000/api/admin/ai-stats?days=${timeRange}`,
+    try {      const response = await fetch(
+        `${getServerBaseUrl()}/api/admin/ai-stats?days=${timeRange}`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           }
         }
       );
@@ -41,17 +33,13 @@ const FeedbackStats = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
 
-  const fetchMonthlyStats = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        'http://localhost:5000/api/admin/ai-stats/monthly',
+  const fetchMonthlyStats = useCallback(async () => {
+    try {      const response = await fetch(
+        `${getServerBaseUrl()}/api/admin/ai-stats/monthly`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           }
         }
       );
@@ -65,7 +53,12 @@ const FeedbackStats = () => {
     } catch (err) {
       console.error('Error fetching monthly stats:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    fetchMonthlyStats();
+  }, [fetchMonthlyStats, fetchStats]);
 
   const calculateAccuracyColor = (accuracy) => {
     if (accuracy >= 90) return '#4caf50'; // Green
@@ -91,10 +84,11 @@ const FeedbackStats = () => {
       <div className="stats-header">
         <h3>📊 AI Feedback Statistics</h3>
         <div className="time-range-selector">
-          <label>Time Range:</label>
+          <label htmlFor="time-range-select">Time Range:</label>
           <select 
+            id="time-range-select"
             value={timeRange}
-            onChange={(e) => setTimeRange(parseInt(e.target.value))}
+            onChange={(e) => setTimeRange(Number.parseInt(e.target.value, 10))}
           >
             <option value={7}>Last 7 Days</option>
             <option value={30}>Last 30 Days</option>
@@ -157,8 +151,8 @@ const FeedbackStats = () => {
         <div className="stats-section">
           <h4>Corrections by Type</h4>
           <div className="type-breakdown">
-            {stats.corrections_by_type.map((item, index) => (
-              <div key={index} className="type-item">
+            {stats.corrections_by_type.map((item) => (
+              <div key={item.type} className="type-item">
                 <div className="type-header">
                   <span className="type-name">{item.type}</span>
                   <span className="type-count">{item.count} corrections</span>
@@ -168,8 +162,11 @@ const FeedbackStats = () => {
                     className="type-bar-fill"
                     style={{
                       width: `${(item.count / stats.total_corrections) * 100}%`,
-                      backgroundColor: item.type === 'upgrade' ? '#2196f3' : 
-                                     item.type === 'compatibility' ? '#4caf50' : '#ff9800'
+                      backgroundColor: (() => {
+                        if (item.type === 'upgrade') return '#2196f3';
+                        if (item.type === 'compatibility') return '#4caf50';
+                        return '#ff9800';
+                      })()
                     }}
                   />
                 </div>
@@ -184,9 +181,9 @@ const FeedbackStats = () => {
         <div className="stats-section">
           <h4>🏆 Top Contributors</h4>
           <div className="leaderboard">
-            {stats.top_correctors.map((corrector, index) => (
-              <div key={index} className="leaderboard-item">
-                <div className="rank">{index + 1}</div>
+            {stats.top_correctors.map((corrector) => (
+              <div key={corrector.admin_id} className="leaderboard-item">
+                <div className="rank">{stats.top_correctors.indexOf(corrector) + 1}</div>
                 <div className="corrector-info">
                   <span className="corrector-name">
                     Admin {corrector.admin_id}
@@ -210,8 +207,8 @@ const FeedbackStats = () => {
         <div className="stats-section">
           <h4>📈 Monthly Trends</h4>
           <div className="monthly-chart">
-            {monthlyData.map((month, index) => (
-              <div key={index} className="month-column">
+            {monthlyData.map((month) => (
+              <div key={month.month} className="month-column">
                 <div className="month-bars">
                   <div
                     className="bar total-bar"
@@ -252,8 +249,8 @@ const FeedbackStats = () => {
         <div className="stats-section">
           <h4>🕐 Recent Corrections</h4>
           <div className="recent-activity">
-            {stats.recent_corrections.slice(0, 5).map((correction, index) => (
-              <div key={index} className="activity-item">
+            {stats.recent_corrections.slice(0, 5).map((correction) => (
+              <div key={correction.id || correction.created_at} className="activity-item">
                 <div className="activity-icon">✏️</div>
                 <div className="activity-content">
                   <div className="activity-header">

@@ -55,13 +55,13 @@ const BatchOperations = ({ selectedProducts, onClose, onComplete }) => {
                     const priceUpdates = selectedProducts.map(p => {
                         let newPrice = p.price;
                         if (priceAdjustment.type === 'fixed') {
-                            newPrice = parseFloat(priceAdjustment.value);
+                            newPrice = Number.parseFloat(priceAdjustment.value);
                         } else if (priceAdjustment.type === 'increase') {
-                            newPrice = p.price + parseFloat(priceAdjustment.value);
+                            newPrice = p.price + Number.parseFloat(priceAdjustment.value);
                         } else if (priceAdjustment.type === 'decrease') {
-                            newPrice = p.price - parseFloat(priceAdjustment.value);
+                            newPrice = p.price - Number.parseFloat(priceAdjustment.value);
                         } else if (priceAdjustment.type === 'percent') {
-                            newPrice = p.price * (1 + parseFloat(priceAdjustment.value) / 100);
+                            newPrice = p.price * (1 + Number.parseFloat(priceAdjustment.value) / 100);
                         }
                         return { id: p.id, newPrice: Math.max(0, newPrice) };
                     });
@@ -72,11 +72,11 @@ const BatchOperations = ({ selectedProducts, onClose, onComplete }) => {
                     const stockUpdates = selectedProducts.map(p => {
                         let newStock = p.stock || 0;
                         if (stockAdjustment.type === 'set') {
-                            newStock = parseInt(stockAdjustment.value);
+                            newStock = Number.parseInt(stockAdjustment.value, 10);
                         } else if (stockAdjustment.type === 'increase') {
-                            newStock = newStock + parseInt(stockAdjustment.value);
+                            newStock = newStock + Number.parseInt(stockAdjustment.value, 10);
                         } else if (stockAdjustment.type === 'decrease') {
-                            newStock = newStock - parseInt(stockAdjustment.value);
+                            newStock = newStock - Number.parseInt(stockAdjustment.value, 10);
                         }
                         return { id: p.id, newStock: Math.max(0, newStock) };
                     });

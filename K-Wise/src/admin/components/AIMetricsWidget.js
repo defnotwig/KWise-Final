@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import './AIMetricsWidget.css';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './AIMetricsWidget.css';
 
 const AIMetricsWidget = () => {
@@ -20,16 +20,9 @@ const AIMetricsWidget = () => {
 
   // Fetch metrics from API
   const fetchMetrics = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetch('http://localhost:5000/api/ai-metrics/summary', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    try {      const response = await fetch(`${getServerBaseUrl()}/api/ai-metrics/summary`, {
+        credentials: 'include',
+        headers: {          'Content-Type': 'application/json'
         }
       });
 
@@ -118,7 +111,7 @@ const AIMetricsWidget = () => {
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
+            />{' '}
             Auto-refresh (30s)
           </label>
           <button onClick={fetchMetrics} className="refresh-button" disabled={loading}>

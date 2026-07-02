@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import axios from 'axios';
 import './AIAnalyticsDashboard.css';
 
@@ -24,11 +25,8 @@ const AIAnalyticsDashboard = () => {
   const fetchAIAnalytics = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      const token = localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
+      setError(null);      const config = {
+        withCredentials: true
       };
 
       // Fetch all AI analytics in parallel
@@ -201,7 +199,7 @@ const BusinessInsightsTab = ({ insights }) => {
         </div>
         <ul className="recommendations-list">
           {insights.recommendations?.map((rec, index) => (
-            <li key={index} className="recommendation-item">
+            <li key={`rec-${index}-${rec.slice(0, 20)}`} className="recommendation-item">
               <span className="rec-number">{index + 1}</span>
               <span className="rec-text">{rec}</span>
             </li>
@@ -217,7 +215,7 @@ const BusinessInsightsTab = ({ insights }) => {
           </div>
           <ul className="alerts-list">
             {insights.alerts.map((alert, index) => (
-              <li key={index} className="alert-item">
+              <li key={`alert-${index}-${alert.slice(0, 20)}`} className="alert-item">
                 {alert}
               </li>
             ))}
@@ -233,7 +231,7 @@ const BusinessInsightsTab = ({ insights }) => {
           </div>
           <ul className="opportunities-list">
             {insights.opportunities.map((opp, index) => (
-              <li key={index} className="opportunity-item">
+              <li key={`opp-${index}-${opp.slice(0, 20)}`} className="opportunity-item">
                 {opp}
               </li>
             ))}
@@ -250,6 +248,19 @@ const BusinessInsightsTab = ({ insights }) => {
   );
 };
 
+BusinessInsightsTab.propTypes = {
+  insights: PropTypes.shape({
+    revenueTrend: PropTypes.string,
+    trendDescription: PropTypes.string,
+    topPerformingCategory: PropTypes.string,
+    recommendations: PropTypes.arrayOf(PropTypes.string),
+    alerts: PropTypes.arrayOf(PropTypes.string),
+    opportunities: PropTypes.arrayOf(PropTypes.string),
+    generatedAt: PropTypes.string,
+    confidence: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  }).isRequired,
+};
+
 // ==================== INVENTORY PREDICTIONS TAB ====================
 const InventoryPredictionsTab = ({ predictions }) => {
   return (
@@ -262,7 +273,7 @@ const InventoryPredictionsTab = ({ predictions }) => {
         </div>
         <div className="items-grid">
           {predictions.criticalItems?.map((item, index) => (
-            <div key={index} className="critical-item">
+            <div key={`critical-${item.name}-${index}`} className="critical-item">
               <div className="item-header">
                 <h4>{item.name}</h4>
                 <span className="priority-badge">HIGH PRIORITY</span>
@@ -286,7 +297,7 @@ const InventoryPredictionsTab = ({ predictions }) => {
         </div>
         <div className="trending-categories">
           {predictions.trendingCategories?.map((category, index) => (
-            <div key={index} className="trending-category">
+            <div key={`trending-${category}`} className="trending-category">
               <span className="category-icon">🔥</span>
               <span className="category-name">{category}</span>
             </div>
@@ -301,7 +312,7 @@ const InventoryPredictionsTab = ({ predictions }) => {
         </div>
         <ol className="restock-list">
           {predictions.restockPriority?.slice(0, 10).map((product, index) => (
-            <li key={index} className="restock-item">
+            <li key={`restock-${index}-${product.slice(0, 15)}`} className="restock-item">
               <span className="priority-number">#{index + 1}</span>
               <span className="product-name">{product}</span>
             </li>
@@ -329,6 +340,22 @@ const InventoryPredictionsTab = ({ predictions }) => {
   );
 };
 
+InventoryPredictionsTab.propTypes = {
+  predictions: PropTypes.shape({
+    criticalItems: PropTypes.arrayOf(
+      PropTypes.shape({
+        name: PropTypes.string,
+        reason: PropTypes.string,
+        recommendedStock: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      })
+    ),
+    trendingCategories: PropTypes.arrayOf(PropTypes.string),
+    restockPriority: PropTypes.arrayOf(PropTypes.string),
+    salesData: PropTypes.array,
+    generatedAt: PropTypes.string,
+  }).isRequired,
+};
+
 // ==================== CUSTOMER BEHAVIOR TAB ====================
 const CustomerBehaviorTab = ({ behavior }) => {
   return (
@@ -341,7 +368,7 @@ const CustomerBehaviorTab = ({ behavior }) => {
         </div>
         <div className="customer-list">
           {behavior.loyalCustomers?.map((customer, index) => (
-            <div key={index} className="customer-item loyal">
+            <div key={`loyal-${customer}`} className="customer-item loyal">
               <span className="customer-icon">👑</span>
               <span className="customer-name">{customer}</span>
             </div>
@@ -361,7 +388,7 @@ const CustomerBehaviorTab = ({ behavior }) => {
           </div>
           <div className="customer-list">
             {behavior.atRiskCustomers.map((customer, index) => (
-              <div key={index} className="customer-item at-risk">
+              <div key={`atrisk-${customer}`} className="customer-item at-risk">
                 <span className="customer-icon">⚠️</span>
                 <span className="customer-name">{customer}</span>
               </div>
@@ -391,7 +418,7 @@ const CustomerBehaviorTab = ({ behavior }) => {
         </div>
         <ul className="strategies-list">
           {behavior.retentionStrategies?.map((strategy, index) => (
-            <li key={index} className="strategy-item">
+            <li key={`strategy-${index}-${strategy.slice(0, 15)}`} className="strategy-item">
               <span className="strategy-number">{index + 1}</span>
               <span className="strategy-text">{strategy}</span>
             </li>
@@ -422,6 +449,18 @@ const CustomerBehaviorTab = ({ behavior }) => {
       </div>
     </div>
   );
+};
+
+CustomerBehaviorTab.propTypes = {
+  behavior: PropTypes.shape({
+    loyalCustomers: PropTypes.arrayOf(PropTypes.string),
+    atRiskCustomers: PropTypes.arrayOf(PropTypes.string),
+    highValueSegments: PropTypes.string,
+    avgCustomerLifetimeValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    retentionStrategies: PropTypes.arrayOf(PropTypes.string),
+    totalAnalyzed: PropTypes.number,
+    generatedAt: PropTypes.string,
+  }).isRequired,
 };
 
 export default AIAnalyticsDashboard;

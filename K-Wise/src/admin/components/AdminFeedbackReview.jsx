@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import './AdminFeedbackReview.css';
 
 const AdminFeedbackReview = () => {
@@ -42,19 +43,15 @@ const AdminFeedbackReview = () => {
     setLoading(true);
     setError(null);
 
-    try {
-      const token = localStorage.getItem('authToken');
-      const params = new URLSearchParams({
+    try {      const params = new URLSearchParams({
         limit: 50,
         ...filters
       });
 
       const response = await fetch(
-        `http://localhost:5000/api/feedback/admin/pending?${params}`,
+        `${getServerBaseUrl()}/api/feedback/admin/pending?${params}`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           }
         }
       );
@@ -89,15 +86,11 @@ const AdminFeedbackReview = () => {
       return;
     }
 
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:5000/api/feedback/admin/${selectedFeedback.id}/review`,
+    try {      const response = await fetch(
+        `${getServerBaseUrl()}/api/feedback/admin/${selectedFeedback.id}/review`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+          headers: {            'Content-Type': 'application/json'
           },
           body: JSON.stringify(reviewData)
         }
@@ -162,6 +155,84 @@ const AdminFeedbackReview = () => {
     return date.toLocaleDateString();
   };
 
+  const renderFeedbackQueue = () => {
+    if (loading && feedbackQueue.length === 0) {
+      return (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Loading feedback...</p>
+        </div>
+      );
+    }
+    if (feedbackQueue.length === 0) {
+      return (
+        <div className="empty-state">
+          <div className="empty-icon">✅</div>
+          <h3>All caught up!</h3>
+          <p>No pending feedback to review</p>
+        </div>
+      );
+    }
+    return (<>
+      {feedbackQueue.map((feedback) => (
+        <div key={feedback.id} className="feedback-card">
+        <div className="feedback-header">
+          <div className="feedback-meta">
+            {getSeverityBadge(feedback.severity)}
+            <span className="category-tag">{feedback.component_category}</span>
+            <span className="time-ago">{formatDate(feedback.created_at)}</span>
+          </div>
+          <div className="feedback-votes">
+            <span className="vote-count">👍 {feedback.helpful_votes || 0} helpful</span>
+          </div>
+        </div>
+
+        <div className="feedback-content">
+          <div className="component-info">
+            <strong>Component:</strong> {feedback.component_name}
+          </div>
+          <div className="issue-type">
+            <strong>Type:</strong> {feedback.issue_type}
+          </div>
+          {feedback.title && (
+            <h4 className="feedback-title">{feedback.title}</h4>
+          )}
+          <p className="feedback-description">{feedback.description}</p>
+          
+          {feedback.rating && (
+            <div className="feedback-rating">
+              <strong>Rating:</strong>
+              <span className="stars">{'⭐'.repeat(feedback.rating)}</span>
+              <span className="rating-num">({feedback.rating}/5)</span>
+            </div>
+          )}
+
+          {feedback.build_context && (
+            <details className="build-context">
+              <summary>🔧 Build Context</summary>
+              <pre>{JSON.stringify(feedback.build_context, null, 2)}</pre>
+            </details>
+          )}
+        </div>
+
+        <div className="feedback-footer">
+          <div className="user-info">
+            <span className="username">👤 {feedback.username}</span>
+          </div>
+          <div className="review-actions">
+            <button 
+              onClick={() => handleReview(feedback)}
+              className="btn-review"
+            >
+              ✏️ Review
+            </button>
+          </div>
+        </div>
+        </div>
+      ))}
+    </>);
+  };
+
   return (
     <div className="admin-feedback-review">
       <div className="review-header">
@@ -221,81 +292,13 @@ const AdminFeedbackReview = () => {
 
       {/* Feedback Queue */}
       <div className="feedback-queue">
-        {loading && feedbackQueue.length === 0 ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading feedback...</p>
-          </div>
-        ) : feedbackQueue.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">✅</div>
-            <h3>All caught up!</h3>
-            <p>No pending feedback to review</p>
-          </div>
-        ) : (
-          feedbackQueue.map((feedback) => (
-            <div key={feedback.id} className="feedback-card">
-              <div className="feedback-header">
-                <div className="feedback-meta">
-                  {getSeverityBadge(feedback.severity)}
-                  <span className="category-tag">{feedback.component_category}</span>
-                  <span className="time-ago">{formatDate(feedback.created_at)}</span>
-                </div>
-                <div className="feedback-votes">
-                  <span className="vote-count">👍 {feedback.helpful_votes || 0} helpful</span>
-                </div>
-              </div>
-
-              <div className="feedback-content">
-                <div className="component-info">
-                  <strong>Component:</strong> {feedback.component_name}
-                </div>
-                <div className="issue-type">
-                  <strong>Type:</strong> {feedback.issue_type}
-                </div>
-                {feedback.title && (
-                  <h4 className="feedback-title">{feedback.title}</h4>
-                )}
-                <p className="feedback-description">{feedback.description}</p>
-                
-                {feedback.rating && (
-                  <div className="feedback-rating">
-                    <strong>Rating:</strong>
-                    <span className="stars">{'⭐'.repeat(feedback.rating)}</span>
-                    <span className="rating-num">({feedback.rating}/5)</span>
-                  </div>
-                )}
-
-                {feedback.build_context && (
-                  <details className="build-context">
-                    <summary>🔧 Build Context</summary>
-                    <pre>{JSON.stringify(feedback.build_context, null, 2)}</pre>
-                  </details>
-                )}
-              </div>
-
-              <div className="feedback-footer">
-                <div className="user-info">
-                  <span className="username">👤 {feedback.username}</span>
-                </div>
-                <div className="review-actions">
-                  <button 
-                    onClick={() => handleReview(feedback)}
-                    className="btn-review"
-                  >
-                    ✏️ Review
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
+        {renderFeedbackQueue()}
       </div>
 
       {/* Review Modal */}
       {reviewModal && selectedFeedback && (
-        <div className="modal-overlay" onClick={() => setReviewModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-overlay" aria-label="Close modal" onClick={(e) => { if (e.target === e.currentTarget) setReviewModal(false); }} onKeyDown={(e) => { if (e.key === 'Escape') setReviewModal(false); }}>
+          <dialog className="modal-content" open>
             <div className="modal-header">
               <h3>📝 Review Feedback</h3>
               <button 
@@ -335,7 +338,7 @@ const AdminFeedbackReview = () => {
               </div>
 
               <div className="review-form">
-                <label>
+                <div>
                   <strong>Decision:</strong>
                   <div className="decision-buttons">
                     <button
@@ -351,11 +354,12 @@ const AdminFeedbackReview = () => {
                       ❌ Reject
                     </button>
                   </div>
-                </label>
+                </div>
 
-                <label>
+                <label htmlFor="admin-notes-textarea">
                   <strong>Admin Notes:</strong>
                   <textarea
+                    id="admin-notes-textarea"
                     value={reviewData.admin_notes}
                     onChange={(e) => setReviewData({ ...reviewData, admin_notes: e.target.value })}
                     placeholder="Add notes about this review (optional)..."
@@ -381,8 +385,8 @@ const AdminFeedbackReview = () => {
                 💾 Submit Review
               </button>
             </div>
-          </div>
-        </div>
+          </dialog>
+        </button>
       )}
     </div>
   );
