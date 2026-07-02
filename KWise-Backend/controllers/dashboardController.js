@@ -54,28 +54,28 @@ const getStats = async (req, res) => {
         // Structure data exactly as frontend expects
         const stats = {
             // Frontend expects these exact field names
-            totalOrders: parseInt(totalOrders.rows[0]?.count || 0),
-            todayOrders: parseInt(todayOrders.rows[0]?.count || 0),
-            weekOrders: parseInt(weekOrders.rows[0]?.count || 0),
-            monthOrders: parseInt(monthOrders.rows[0]?.count || 0),
-            completedOrders: parseInt(completedOrders.rows[0]?.count || 0),
-            pendingOrders: parseInt(pendingOrders.rows[0]?.count || 0),
-            cancelledOrders: parseInt(cancelledOrders.rows[0]?.count || 0),
+            totalOrders: Number.parseInt(totalOrders.rows[0]?.count || 0, 10),
+            todayOrders: Number.parseInt(todayOrders.rows[0]?.count || 0, 10),
+            weekOrders: Number.parseInt(weekOrders.rows[0]?.count || 0, 10),
+            monthOrders: Number.parseInt(monthOrders.rows[0]?.count || 0, 10),
+            completedOrders: Number.parseInt(completedOrders.rows[0]?.count || 0, 10),
+            pendingOrders: Number.parseInt(pendingOrders.rows[0]?.count || 0, 10),
+            cancelledOrders: Number.parseInt(cancelledOrders.rows[0]?.count || 0, 10),
             
-            totalProducts: parseInt(totalProducts.rows[0]?.count || 0),
-            lowStockProducts: parseInt(lowStockProducts.rows[0]?.count || 0),
-            inventoryValue: parseFloat(inventoryValue.rows[0]?.total || 0),
+            totalProducts: Number.parseInt(totalProducts.rows[0]?.count || 0, 10),
+            lowStockProducts: Number.parseInt(lowStockProducts.rows[0]?.count || 0, 10),
+            inventoryValue: Number.parseFloat(inventoryValue.rows[0]?.total || 0),
             
-            totalUsers: parseInt(totalUsers.rows[0]?.count || 0),
-            activeUsers: parseInt(activeUsers.rows[0]?.count || 0),
+            totalUsers: Number.parseInt(totalUsers.rows[0]?.count || 0, 10),
+            activeUsers: Number.parseInt(activeUsers.rows[0]?.count || 0, 10),
             
-            totalRevenue: parseFloat(totalRevenue.rows[0]?.total || 0),
-            monthlyRevenue: parseFloat(monthRevenue.rows[0]?.total || 0),
-            todayRevenue: parseFloat(todayRevenue.rows[0]?.total || 0),
-            weekRevenue: parseFloat(weekRevenue.rows[0]?.total || 0),
+            totalRevenue: Number.parseFloat(totalRevenue.rows[0]?.total || 0),
+            monthlyRevenue: Number.parseFloat(monthRevenue.rows[0]?.total || 0),
+            todayRevenue: Number.parseFloat(todayRevenue.rows[0]?.total || 0),
+            weekRevenue: Number.parseFloat(weekRevenue.rows[0]?.total || 0),
             
             timestamp: new Date().toISOString(),
-            hasOrders: parseInt(totalOrders.rows[0]?.count || 0) > 0,
+            hasOrders: Number.parseInt(totalOrders.rows[0]?.count || 0, 10) > 0,
             uptime: process.uptime()
         };
 
@@ -114,7 +114,7 @@ const getStats = async (req, res) => {
 // Get recent orders
 const getRecentOrders = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = Number.parseInt(req.query.limit, 10) || 10;
 
         const result = await query(`
             SELECT o.*, u.name as customer_name, u.email as customer_email
@@ -140,7 +140,7 @@ const getRecentOrders = async (req, res) => {
 // Get top products
 const getTopProducts = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = Number.parseInt(req.query.limit, 10) || 10;
 
         const result = await query(`
             SELECT p.*, COUNT(oi.id) as order_count
@@ -168,7 +168,7 @@ const getTopProducts = async (req, res) => {
 // Get sales chart data
 const getSalesChart = async (req, res) => {
     try {
-        const days = parseInt(req.query.days) || 30;
+        const days = Number.parseInt(req.query.days, 10) || 30;
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
@@ -214,11 +214,11 @@ const getRevenueStats = async (req, res) => {
         ]);
 
         const revenue = {
-            today: parseFloat(todayRev.rows[0]?.total || 0),
-            week: parseFloat(weekRev.rows[0]?.total || 0),
-            month: parseFloat(monthRev.rows[0]?.total || 0),
-            year: parseFloat(yearRev.rows[0]?.total || 0),
-            total: parseFloat(totalRev.rows[0]?.total || 0)
+            today: Number.parseFloat(todayRev.rows[0]?.total || 0),
+            week: Number.parseFloat(weekRev.rows[0]?.total || 0),
+            month: Number.parseFloat(monthRev.rows[0]?.total || 0),
+            year: Number.parseFloat(yearRev.rows[0]?.total || 0),
+            total: Number.parseFloat(totalRev.rows[0]?.total || 0)
         };
 
         res.json({
@@ -362,17 +362,17 @@ const getDashboardSummary = async (req, res) => {
 
         const summary = {
             overview: {
-                totalOrders: parseInt(totalOrders.rows[0]?.count || 0),
-                todayOrders: parseInt(todayOrders.rows[0]?.count || 0),
-                totalProducts: parseInt(totalProducts.rows[0]?.count || 0),
-                lowStockProducts: parseInt(lowStockProducts.rows[0]?.count || 0),
-                totalUsers: parseInt(totalUsers.rows[0]?.count || 0),
-                pendingOrders: parseInt(pendingOrders.rows[0]?.count || 0),
-                completedOrders: parseInt(completedOrders.rows[0]?.count || 0)
+                totalOrders: Number.parseInt(totalOrders.rows[0]?.count || 0, 10),
+                todayOrders: Number.parseInt(todayOrders.rows[0]?.count || 0, 10),
+                totalProducts: Number.parseInt(totalProducts.rows[0]?.count || 0, 10),
+                lowStockProducts: Number.parseInt(lowStockProducts.rows[0]?.count || 0, 10),
+                totalUsers: Number.parseInt(totalUsers.rows[0]?.count || 0, 10),
+                pendingOrders: Number.parseInt(pendingOrders.rows[0]?.count || 0, 10),
+                completedOrders: Number.parseInt(completedOrders.rows[0]?.count || 0, 10)
             },
             revenue: {
-                total: parseFloat(totalRevenue.rows[0]?.total || 0),
-                month: parseFloat(monthRevenue.rows[0]?.total || 0)
+                total: Number.parseFloat(totalRevenue.rows[0]?.total || 0),
+                month: Number.parseFloat(monthRevenue.rows[0]?.total || 0)
             },
             recentOrders: recentOrders.rows,
             topProducts: topProducts.rows,

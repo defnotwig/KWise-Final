@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ============================================================================
  * REDIS CACHE CONFIGURATION
  * ============================================================================
@@ -14,45 +14,58 @@ const redis = require('redis');
 const logger = require('../utils/logger');
 
 class RedisCache {
-    constructor() {
-        this.client = null;
-        this.isConnected = false;
-        this.l1Cache = new Map(); // Memory cache (L1)
-        this.l1MaxSize = 1000; // Max items in L1 cache
-        this.l1TTL = 60 * 1000; // 60 seconds for L1
-        this.stats = {
-            l1Hits: 0,
-            l2Hits: 0,
-            misses: 0,
-            errors: 0,
-            totalRequests: 0
-        };
-    }
+    client = null;
+    isConnected = false;
+    connectionPromise = null;
+    l1Cache = new Map();
+    l1MaxSize = 1000;
+    l1TTL = 60 * 1000;
+    stats = {
+        l1Hits: 0,
+        l2Hits: 0,
+        misses: 0,
+        errors: 0,
+        totalRequests: 0
+    };
 
     /**
      * Initialize Redis connection
      */
     async connect() {
+        if (this.isConnected) {
+            return;
+        }
+
+        if (this.connectionPromise) {
+            return this.connectionPromise;
+        }
+
         try {
             // Only attempt Redis if enabled in environment
             if (process.env.REDIS_ENABLED !== 'true') {
-                logger.info('⚠️  Redis caching disabled. Using memory-only cache.');
+                logger.info('âš ï¸  Redis caching disabled. Using memory-only cache.');
                 this.isConnected = false;
                 return;
             }
 
+            const host = process.env.REDIS_HOST || 'localhost';
+            const port = Number.parseInt(process.env.REDIS_PORT || '6379', 10);
+            const database = Number.parseInt(process.env.REDIS_DB || '0', 10);
             const redisConfig = {
-                host: process.env.REDIS_HOST || 'localhost',
-                port: process.env.REDIS_PORT || 6379,
-                password: process.env.REDIS_PASSWORD || undefined,
-                db: process.env.REDIS_DB || 0,
-                retryStrategy: (times) => {
-                    if (times > 10) {
-                        logger.error('Redis: Max retry attempts reached');
-                        return null;
+                socket: {
+                    host,
+                    port,
+                    reconnectStrategy: (retries) => {
+                        if (retries > 10) {
+                            logger.error('Redis: Max retry attempts reached');
+                            throw new Error('Redis: Max retry attempts reached');
+                        }
+
+                        return Math.min(retries * 100, 3000);
                     }
-                    return Math.min(times * 100, 3000);
-                }
+                },
+                password: process.env.REDIS_PASSWORD || undefined,
+                database
             };
 
             this.client = redis.createClient(redisConfig);
@@ -62,23 +75,37 @@ class RedisCache {
                 this.stats.errors++;
             });
 
-            this.client.on('connect', () => {
-                logger.info('✅ Redis connected successfully');
+            this.client.on('ready', () => {
+                logger.info('âœ… Redis connected successfully');
                 this.isConnected = true;
             });
 
             this.client.on('reconnecting', () => {
-                logger.warn('🔄 Redis reconnecting...');
+                logger.warn('ðŸ”„ Redis reconnecting...');
             });
 
-            await this.client.connect();
-            
-            // Test connection
-            await this.client.ping();
-            logger.info(`📊 Redis cache initialized (${redisConfig.host}:${redisConfig.port})`);
+            this.client.on('end', () => {
+                this.isConnected = false;
+            });
+
+            this.connectionPromise = this.client.connect()
+                .then(async () => {
+                    await this.client.ping();
+                    logger.info(`ðŸ“Š Redis cache initialized (${host}:${port})`);
+                })
+                .catch((error) => {
+                    logger.warn('âš ï¸  Redis unavailable, falling back to memory-only cache:', error.message);
+                    this.isConnected = false;
+                    this.client = null;
+                })
+                .finally(() => {
+                    this.connectionPromise = null;
+                });
+
+            await this.connectionPromise;
             
         } catch (error) {
-            logger.warn('⚠️  Redis unavailable, falling back to memory-only cache:', error.message);
+            logger.warn('âš ï¸  Redis unavailable, falling back to memory-only cache:', error.message);
             this.isConnected = false;
             this.client = null;
         }
@@ -119,10 +146,14 @@ class RedisCache {
     }
 
     /**
-     * Get value from cache (L1 → L2 → null)
+     * Get value from cache (L1 â†’ L2 â†’ null)
      */
     async get(key) {
         this.stats.totalRequests++;
+
+        if (!this.isConnected && process.env.REDIS_ENABLED === 'true') {
+            await this.connect();
+        }
         
         // Try L1 (Memory) first
         const l1Data = this._getL1(key);
@@ -160,6 +191,10 @@ class RedisCache {
         // Set in L1
         this._setL1(key, value, Math.min(ttl * 1000, this.l1TTL));
 
+        if (!this.isConnected && process.env.REDIS_ENABLED === 'true') {
+            await this.connect();
+        }
+
         // Set in L2 (Redis)
         if (this.isConnected && this.client) {
             try {
@@ -177,6 +212,10 @@ class RedisCache {
     async del(key) {
         this._deleteL1(key);
 
+        if (!this.isConnected && process.env.REDIS_ENABLED === 'true') {
+            await this.connect();
+        }
+
         if (this.isConnected && this.client) {
             try {
                 await this.client.del(key);
@@ -188,22 +227,44 @@ class RedisCache {
 
     /**
      * Delete multiple keys matching pattern
+     * Uses SCAN instead of KEYS to avoid blocking Redis event loop (O(N) â†’ O(1) per iteration)
      */
     async delPattern(pattern) {
         // Clear matching L1 entries
+        const l1Pattern = String(pattern || '').replaceAll('*', '');
         for (const key of this.l1Cache.keys()) {
-            if (key.includes(pattern)) {
+            if (key.includes(l1Pattern)) {
                 this.l1Cache.delete(key);
             }
         }
 
-        // Clear matching L2 entries
+        if (!this.isConnected && process.env.REDIS_ENABLED === 'true') {
+            await this.connect();
+        }
+
+        // Clear matching L2 entries using non-blocking SCAN
         if (this.isConnected && this.client) {
             try {
-                const keys = await this.client.keys(pattern);
-                if (keys.length > 0) {
-                    await this.client.del(keys);
-                    logger.info(`🗑️  Cleared ${keys.length} Redis keys matching: ${pattern}`);
+                let cursor = '0';
+                let deletedCount = 0;
+                const batchSize = 100;
+
+                do {
+                    const result = await this.client.scan(cursor, {
+                        MATCH: pattern,
+                        COUNT: batchSize,
+                    });
+                    cursor = result.cursor;
+                    const keys = result.keys;
+
+                    if (keys.length > 0) {
+                        await this.client.del(keys);
+                        deletedCount += keys.length;
+                    }
+                } while (cursor !== '0');
+
+                if (deletedCount > 0) {
+                    logger.info(`ðŸ—‘ï¸  Cleared ${deletedCount} Redis keys matching: ${pattern}`);
                 }
             } catch (error) {
                 logger.error(`Redis DEL pattern error for ${pattern}:`, error.message);
@@ -212,16 +273,21 @@ class RedisCache {
     }
 
     /**
-     * Flush all cache tiers
+     * Flush all cache tiers (L1 memory + L2 Redis only â€” never production data)
+     * Safety: Only flushes the configured Redis DB number, never FLUSHALL
      */
     async flush() {
         this.l1Cache.clear();
-        logger.info('🗑️  L1 cache cleared');
+        logger.info('ðŸ—‘ï¸  L1 cache cleared');
+
+        if (!this.isConnected && process.env.REDIS_ENABLED === 'true') {
+            await this.connect();
+        }
 
         if (this.isConnected && this.client) {
             try {
                 await this.client.flushDb();
-                logger.info('🗑️  L2 (Redis) cache cleared');
+                logger.info('ðŸ—‘ï¸  L2 (Redis) cache cleared (DB only, not FLUSHALL)');
             } catch (error) {
                 logger.error('Redis FLUSH error:', error.message);
             }
@@ -264,20 +330,23 @@ class RedisCache {
             errors: 0,
             totalRequests: 0
         };
-        logger.info('📊 Cache statistics reset');
+        logger.info('ðŸ“Š Cache statistics reset');
     }
 
     /**
-     * Close Redis connection
+     * Gracefully close Redis connection
      */
     async disconnect() {
         if (this.client && this.isConnected) {
-            await this.client.quit();
-            logger.info('👋 Redis disconnected');
+            try {
+                await this.client.quit();
+                logger.info('ðŸ‘‹ Redis disconnected');
+            } catch (error) {
+                logger.warn('Redis disconnect error:', error.message);
+            }
         }
     }
 }
-
 // Singleton instance
 const redisCache = new RedisCache();
 

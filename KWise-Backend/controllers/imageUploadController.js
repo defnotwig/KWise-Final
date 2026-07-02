@@ -1,8 +1,14 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
+const {
+    normalizeUploadFolder,
+    isAllowedImageMetadata,
+    randomImageFilename
+} = require('../middleware/secureImageUpload');
+const { generateImageVariants } = require('../services/imageVariantService');
 
 /**
  * Enhanced Image Upload Controller for K-Wise Stock Management
@@ -40,21 +46,12 @@ const createCategoryDirs = () => {
 // Initialize directory structure
 createCategoryDirs();
 
-// Sanitize filename while preserving friendly name
-const sanitizeFilename = (filename) => {
-    // Remove unsafe characters but keep readable format
-    return filename
-        .replace(/[^\w\s.-]/g, '') // Remove special chars except word chars, spaces, dots, dashes
-        .replace(/\s+/g, '-') // Replace spaces with dashes
-        .toLowerCase();
-};
-
 // Enhanced multer configuration with per-category folders
 const storage = multer.diskStorage({
     destination: async (req, file, cb) => {
         try {
             // Get category from request body or query params
-            const category = (req.body.category || req.query.category || 'other').toLowerCase();
+            const category = normalizeUploadFolder(req.body.category || req.query.category, 'other');
             const categoryDir = path.join(__dirname, '..', 'public', 'assets', 'parts', category);
             
             // Ensure category directory exists
@@ -69,18 +66,7 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         try {
-            // Extract file extension
-            const ext = path.extname(file.originalname).toLowerCase();
-            
-            // Create sanitized friendly filename
-            const originalName = path.basename(file.originalname, ext);
-            const sanitizedName = sanitizeFilename(originalName);
-            
-            // Add timestamp to avoid conflicts
-            const timestamp = Date.now();
-            const finalName = `${sanitizedName}-${timestamp}${ext}`;
-            
-            cb(null, finalName);
+            cb(null, randomImageFilename(file.originalname));
         } catch (error) {
             cb(error);
         }
@@ -89,14 +75,10 @@ const storage = multer.diskStorage({
 
 // File filter for images only
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
+    if (isAllowedImageMetadata(file)) {
         return cb(null, true);
     } else {
-        cb(new Error('Only image files (JPEG, PNG, GIF, WebP) are allowed'));
+        cb(new Error('Only JPG, PNG, GIF, and WEBP image files are allowed'));
     }
 };
 
@@ -113,7 +95,7 @@ const upload = multer({
 const uploadStockImage = async (req, res) => {
     try {
         console.log('📸 Image upload request received');
-        console.log('   Body:', req.body);
+        console.log('   Body keys:', Object.keys(req.body || {}));
         console.log('   File:', req.file ? req.file.filename : 'No file');
         
         if (!req.file) {
@@ -124,6 +106,7 @@ const uploadStockImage = async (req, res) => {
         }
 
         const { id, category } = req.body;
+        const normalizedCategory = normalizeUploadFolder(category, 'other');
         
         if (!id) {
             // Clean up uploaded file
@@ -136,7 +119,7 @@ const uploadStockImage = async (req, res) => {
 
         // Build relative path for database storage
         // This MUST match what frontend expects and what server.js serves
-        const relativePath = `/assets/parts/${category}/${req.file.filename}`;
+        const relativePath = `/assets/parts/${normalizedCategory}/${req.file.filename}`;
         
         console.log('💾 Saving image to database:');
         console.log(`   Physical path: ${req.file.path}`);
@@ -154,6 +137,11 @@ const uploadStockImage = async (req, res) => {
         
         console.log('✅ File exists on disk, updating database...');
         
+        const variantResult = await generateImageVariants(relativePath).catch((error) => {
+            logger.warn('Image variants were not generated:', error.message);
+            return { skipped: true, reason: error.message, variants: { original: relativePath } };
+        });
+
         // Update database with image path
         const result = await query(`
             UPDATE pc_parts 
@@ -193,6 +181,7 @@ const uploadStockImage = async (req, res) => {
                 product: product,
                 image: {
                     path: relativePath,
+                    variants: variantResult.variants || { original: relativePath },
                     filename: req.file.filename,
                     originalName: req.file.originalname,
                     size: req.file.size,

@@ -27,7 +27,7 @@ const getAllIPs = async (req, res) => {
             sortOrder = 'DESC'
         } = req.query;
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const offset = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
         
         // Build WHERE clause
         const conditions = [];
@@ -58,10 +58,10 @@ const getAllIPs = async (req, res) => {
             `SELECT COUNT(*) as total FROM ip_access_control ${whereClause}`,
             values
         );
-        const totalItems = parseInt(countResult.rows[0].total);
+        const totalItems = Number.parseInt(countResult.rows[0].total, 10);
 
         // Get paginated results
-        values.push(parseInt(limit), offset);
+        values.push(Number.parseInt(limit, 10), offset);
         const result = await query(`
             SELECT 
                 id,
@@ -89,10 +89,10 @@ const getAllIPs = async (req, res) => {
             data: {
                 items: result.rows,
                 pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: Number.parseInt(page, 10),
+                    limit: Number.parseInt(limit, 10),
                     total: totalItems,
-                    totalPages: Math.ceil(totalItems / parseInt(limit))
+                    totalPages: Math.ceil(totalItems / Number.parseInt(limit, 10))
                 }
             },
             timestamp: new Date().toISOString()
@@ -135,7 +135,7 @@ const getIPStats = async (req, res) => {
 
         const stats = {
             ...statsResult.rows[0],
-            recent_logs: parseInt(recentLogsResult.rows[0].recent_logs)
+            recent_logs: Number.parseInt(recentLogsResult.rows[0].recent_logs, 10)
         };
 
         res.json({
@@ -418,7 +418,7 @@ const getIPLogs = async (req, res) => {
             endDate
         } = req.query;
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const offset = (Number.parseInt(page, 10) - 1) * Number.parseInt(limit, 10);
         
         const conditions = [];
         const values = [];
@@ -461,10 +461,10 @@ const getIPLogs = async (req, res) => {
             `SELECT COUNT(*) as total FROM ip_logs ${whereClause}`,
             values
         );
-        const totalItems = parseInt(countResult.rows[0].total);
+        const totalItems = Number.parseInt(countResult.rows[0].total, 10);
 
         // Get logs
-        values.push(parseInt(limit), offset);
+        values.push(Number.parseInt(limit, 10), offset);
         const result = await query(`
             SELECT 
                 l.*,
@@ -481,10 +481,10 @@ const getIPLogs = async (req, res) => {
             data: {
                 items: result.rows,
                 pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: Number.parseInt(page, 10),
+                    limit: Number.parseInt(limit, 10),
                     total: totalItems,
-                    totalPages: Math.ceil(totalItems / parseInt(limit))
+                    totalPages: Math.ceil(totalItems / Number.parseInt(limit, 10))
                 }
             },
             timestamp: new Date().toISOString()

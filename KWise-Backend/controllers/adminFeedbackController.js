@@ -147,25 +147,30 @@ exports.getPendingSuggestions = async (req, res) => {
 
     // Get total count
     let countQuery = `SELECT COUNT(*) FROM ai_pending_reviews WHERE status = $1`;
-    const countParams = [status];
     if (priority) countQuery += ` AND priority = $2`;
-    if (type) countQuery += ` AND suggestion_type = $${countParams.length + 1}`;
+    if (type) countQuery += ` AND suggestion_type = $${priority ? 3 : 2}`;
     
-    const countResult = await pool.query(countQuery, 
-      priority && type ? [status, priority, type] : 
-      priority ? [status, priority] :
-      type ? [status, type] : 
-      [status]
-    );
+    let countParams;
+    if (priority && type) {
+      countParams = [status, priority, type];
+    } else if (priority) {
+      countParams = [status, priority];
+    } else if (type) {
+      countParams = [status, type];
+    } else {
+      countParams = [status];
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
 
     res.status(200).json({
       success: true,
       data: result.rows,
       pagination: {
-        total: parseInt(countResult.rows[0].count),
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        hasMore: parseInt(offset) + result.rows.length < parseInt(countResult.rows[0].count)
+        total: Number.parseInt(countResult.rows[0].count, 10),
+        limit: Number.parseInt(limit, 10),
+        offset: Number.parseInt(offset, 10),
+        hasMore: Number.parseInt(offset, 10) + result.rows.length < Number.parseInt(countResult.rows[0].count, 10)
       },
       timestamp: new Date().toISOString()
     });
@@ -187,6 +192,7 @@ exports.getPendingSuggestions = async (req, res) => {
 exports.getFeedbackStats = async (req, res) => {
   try {
     const { period = 'daily', days = 30 } = req.query;
+    const safeDays = Number.parseInt(days, 10) || 30;
 
     // Get dashboard quick stats
     const dashboardStats = await pool.query(
@@ -203,8 +209,9 @@ exports.getFeedbackStats = async (req, res) => {
         improvement_percentage,
         corrections_by_type
        FROM ai_feedback_stats
-       WHERE period >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
-       ORDER BY period DESC`
+       WHERE period >= CURRENT_DATE - $1 * INTERVAL '1 day'
+       ORDER BY period DESC`,
+      [safeDays]
     );
 
     // Get correction distribution by type
@@ -214,9 +221,10 @@ exports.getFeedbackStats = async (req, res) => {
         COUNT(*) as count,
         AVG(confidence_score) as avg_confidence
        FROM ai_corrections
-       WHERE created_at >= NOW() - INTERVAL '${parseInt(days)} days'
+       WHERE created_at >= NOW() - $1 * INTERVAL '1 day'
        GROUP BY suggestion_type
-       ORDER BY count DESC`
+       ORDER BY count DESC`,
+      [safeDays]
     );
 
     // Get top correctors
@@ -228,18 +236,20 @@ exports.getFeedbackStats = async (req, res) => {
         AVG(c.confidence_score) as avg_confidence
        FROM ai_corrections c
        JOIN users u ON c.admin_user_id = u.id
-       WHERE c.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
+       WHERE c.created_at >= NOW() - $1 * INTERVAL '1 day'
        GROUP BY u.id, u.username, u.full_name
        ORDER BY correction_count DESC
-       LIMIT 10`
+       LIMIT 10`,
+      [safeDays]
     );
 
     // Calculate overall accuracy
     const overallAccuracy = await pool.query(
       `SELECT calculate_ai_accuracy(
-        CURRENT_DATE - INTERVAL '${parseInt(days)} days',
+        CURRENT_DATE - $1 * INTERVAL '1 day',
         CURRENT_DATE
-      )`
+      )`,
+      [safeDays]
     );
 
     res.status(200).json({
@@ -252,8 +262,8 @@ exports.getFeedbackStats = async (req, res) => {
         overall_accuracy: overallAccuracy.rows[0] || {},
         period: {
           type: period,
-          days: parseInt(days),
-          start_date: new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000).toISOString(),
+          days: Number.parseInt(days, 10),
+          start_date: new Date(Date.now() - Number.parseInt(days, 10) * 24 * 60 * 60 * 1000).toISOString(),
           end_date: new Date().toISOString()
         }
       },

@@ -266,7 +266,7 @@ function calculateTotalPrice(build) {
     let total = 0;
     Object.values(build.components).forEach(component => {
       if (component && component.price) {
-        total += parseFloat(component.price);
+        total += Number.parseFloat(component.price);
       }
     });
     return total;

@@ -113,10 +113,10 @@ const getDatabaseStats = async (req, res) => {
             query('SELECT COUNT(*) as count FROM logs')
         ]);
 
-        const totalUsers = parseInt(usersResult.rows[0]?.count || 0);
-        const totalOrders = parseInt(ordersResult.rows[0]?.count || 0);
-        const totalProducts = parseInt(stockResult.rows[0]?.count || 0);
-        const totalLogs = parseInt(logsResult.rows[0]?.count || 0);
+        const totalUsers = Number.parseInt(usersResult.rows[0]?.count || 0, 10);
+        const totalOrders = Number.parseInt(ordersResult.rows[0]?.count || 0, 10);
+        const totalProducts = Number.parseInt(stockResult.rows[0]?.count || 0, 10);
+        const totalLogs = Number.parseInt(logsResult.rows[0]?.count || 0, 10);
 
         // Get database size (approximate)
         const dbSizeResult = await query(`
@@ -179,7 +179,7 @@ const getDatabaseStats = async (req, res) => {
 // Get recent logs
 const getRecentLogs = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 50;
+        const limit = Number.parseInt(req.query.limit, 10) || 50;
 
         const logsResult = await query(`
             SELECT id, action, description, status, created_at, user_name, user_role, module, severity
