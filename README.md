@@ -1,13 +1,33 @@
 # 🏪 K-Wise Admin & Kiosk System
 
-**Version:** 5.0 Production - BRUTAL STRESS TEST VERIFIED ⭐⭐⭐⭐⭐  
-**Last Updated:** November 20, 2025  
-**Status:** ✅ Fully Operational - Perfect 5.0/5.0 Rating  
+**Version:** 6.1 Production - Architecture Hardened + Full-System Audit  
+**Last Updated:** April 6, 2026  
+**Status:** ✅ Fully Operational - Security Hardened (9.0/10)  
 **License:** Proprietary  
 **Author:** Gabriel Ludwig Rivera  
-**Compatibility System:** AI-Enhanced with 3,200+ Rules + DeepSeek R1 Model
+**Compatibility System:** 4-Signal Hybrid Engine (Deterministic + AI + ML + Tier) with 3,200+ Rules, RAG Pipeline, and DeepSeek R1
 
 ---
+
+### 🔧 v6.1 Full-System Audit (April 6, 2026)
+
+Principal-level audit scanned 2,250-line `server.js`, 63 backend services, 107 kiosk components, 55 route files, 877-line Ollama AI service, 151 PostgreSQL tables (320 MB), and all configuration files. Identified and fixed **12 root-cause issues**; deleted **50+ dead files**; all changes validated by two rounds of Opus-level automated code review and the full Jest test suite.
+
+| # | Fix | Root Cause | Impact |
+|---|---|---|---|
+| 5 | Kiosk pagination uses `COUNT(*)` query + input clamping | `totalPages` computed from paginated slice, not DB total | Correct multi-page product browsing |
+| 6 | `unhandledRejection` graceful shutdown with re-entrancy guard | `process.exit(1)` on ANY stray promise crashed production | PM2-safe restart; no infinite recursion |
+| 7 | `trust proxy` moved before rate limiter/CORS | Was set AFTER IP-dependent middleware | Correct client IP detection behind proxies |
+| 8 | CORS/static asset logging guarded behind `NODE_ENV` | Every request logged origin string in production | Eliminates production log pollution |
+| 9 | Duplicate search route loading removed | `require('./routes/search')` called twice at line 639 AND 1189 | Prevents double event listener mounting |
+| 10 | 4 orphaned stub services deleted | `dashboardService`, `orderService`, `productService`, `userService` each leaked a `new Pool()` | Eliminates PostgreSQL connection pool leak |
+| 11 | AI cache key uses `selectedModel` not `model` | `generateCacheKey()` used initial default, not GPU-selected model | Prevents cross-model cache pollution |
+| 12 | Health monitor `setInterval` handle stored + cleared on shutdown | Interval handle was never stored, leaked on `stopKeepAlive()` | Clean Node.js process exit |
+| — | `.env.example` real credentials replaced with placeholders | Hardcoded `DB_PASSWORD` and `JWT_SECRET` in template | No real passwords in version control |
+| — | 50+ dead/backup/empty files deleted across routes, migrations, scripts, SQL, kiosk | `*_OLD.js`, `*.broken`, empty `.sql`, deprecated redirect stubs | ~200KB code rot removed |
+
+**Database Health** — 151 tables, 320 MB total, 0 table bloat, 0 long-running queries, 25 unused indexes, 15 missing FK indexes identified, pgvector not installed (vector embedding search unavailable).
+
 
 ## 📋 Table of Contents
 
@@ -38,22 +58,24 @@ K-Wise is a **comprehensive computer store management ecosystem** combining:
 - **Customer Kiosk**: Self-service browsing, PC building, and ordering system
 - **AI-Powered Features**: DeepSeek R1 Ollama integration for compatibility analysis, upgrade recommendations, and build optimization
 - **Real-Time Queue Management**: Live order tracking with Server-Sent Events (SSE)
-- **Advanced Compatibility Engine**: 2,513+ deterministic rules + AI contextual analysis
+- **Advanced Compatibility Engine**: 3,200+ deterministic rules + AI + ML pattern scoring + RAG pipeline
+- **Hybrid RAG Pipeline**: BM25 lexical search + vector embeddings with Reciprocal Rank Fusion (RRF)
 
 ### 🏆 Key Statistics
 
-- **306+ Active Products** across 12+ categories
+- **429 Active Products** across 33 categories
 - **3,200+ Compatibility Rules** in database-backed engine (VERIFIED ✅)
-- **6-Layer Compatibility Analysis** with AI enhancement
-- **28 Component Pairs** validated for pairwise compatibility
-- **13 Database Tables** with optimized indexes
+- **4-Signal Compatibility Scoring**: Deterministic (45%) + AI (20%) + ML Patterns (20%) + Tier Matching (15%)
+- **128 ML Patterns** across 33 category pairs for pattern-based analysis
+- **132 Database Tables** with optimized indexes and connection pooling
 - **150+ API Endpoints** with full REST compliance
 - **99-Queue System** with automatic daily reset
-- **Real-Time Updates** via SSE and WebSocket
+- **Real-Time Updates** via SSE and WebSocket (Socket.IO with rate limiting)
 - **AI Response Time**: <2 seconds average (optimized, 60s timeout)
-- **Cache Hit Rate**: 85%+ on product queries
+- **Cache Hit Rate**: 85%+ on product queries (3-tier: Memory → Redis → Database)
 - **Compatibility Accuracy**: 100% (Zero false positives - BRUTAL TESTED ✅)
 - **Performance**: Sub-second response times for all compatibility checks
+- **Security Score**: 9.0/10 (JWT HS256, RBAC, input sanitization, socket rate limiting)
 - **Zero-Tolerance Policy**: No incompatible parts shown as compatible
 
 ---
@@ -64,9 +86,9 @@ K-Wise is a **comprehensive computer store management ecosystem** combining:
 
 | Requirement     | Version | Purpose                     |
 | --------------- | ------- | --------------------------- |
-| **Node.js**     | 16+     | Backend runtime             |
-| **npm**         | 8+      | Package manager             |
-| **PostgreSQL**  | 12+     | Primary database (KWiseDB)  |
+| **Node.js**     | 22+     | Backend runtime             |
+| **npm**         | 10+     | Package manager             |
+| **PostgreSQL**  | 17+     | Primary database (KWiseDB)  |
 | **Ollama**      | Latest  | AI model runtime (optional) |
 | **DeepSeek R1** | 1.5B/7B | AI model (optional)         |
 | **Windows**     | 10/11   | Development OS              |
@@ -138,7 +160,7 @@ npm install
 
 ```bash
 # Start PostgreSQL service
-net start postgresql-x64-14
+net start postgresql-x64-17
 
 # Create database and run migrations
 cd KWise-Backend
@@ -195,9 +217,9 @@ npm start
 
 | Technology             | Version | Purpose                 |
 | ---------------------- | ------- | ----------------------- |
-| **Node.js**            | 16+     | Server runtime          |
+| **Node.js**            | 22+     | Server runtime          |
 | **Express**            | 4.18.2  | Web framework           |
-| **PostgreSQL**         | 14+     | Relational database     |
+| **PostgreSQL**         | 17+     | Relational database     |
 | **pg**                 | 8.14.1  | PostgreSQL client       |
 | **bcrypt**             | 5.1.1   | Password hashing        |
 | **jsonwebtoken**       | 9.0.2   | JWT authentication      |
@@ -215,12 +237,15 @@ npm start
 
 ### AI & Machine Learning
 
-| Technology      | Version | Purpose                    |
-| --------------- | ------- | -------------------------- |
-| **Ollama**      | Latest  | AI model runtime           |
-| **DeepSeek R1** | 1.5B/7B | LLM for analysis           |
-| **LRU Cache**   | 11.2.2  | AI response caching        |
-| **Node-Fetch**  | 2.7.0   | HTTP client for Ollama API |
+| Technology       | Version | Purpose                     |
+| ---------------- | ------- | --------------------------- |
+| **Ollama**       | Latest  | AI model runtime            |
+| **DeepSeek R1**  | 1.5B/7B | LLM for analysis            |
+| **LRU Cache**    | 11.2.2  | AI response caching         |
+| **Node-Fetch**   | 2.7.0   | HTTP client for Ollama API  |
+| **BM25 Service** | Custom  | Okapi BM25 lexical search   |
+| **RAG Pipeline** | Custom  | Hybrid retrieval with RRF   |
+| **ML Scorer**    | Custom  | 3,200-rule pattern analysis |
 
 ### Development & Testing
 
@@ -258,7 +283,6 @@ npm run dev  # Handles Ollama automatically
 **📥 Manual Installation (First Time Only):**
 
 1. **Download Ollama:**
-
    - Visit: https://ollama.com/download/windows
    - Install the application
 
@@ -300,6 +324,7 @@ See [`KWise-Backend/OLLAMA_SETUP.md`](KWise-Backend/OLLAMA_SETUP.md) for complet
 ### 🎯 **System Overview**
 
 K-Wise implements a **triple-layer hybrid compatibility system** combining:
+
 1. **3,200+ Database-Driven Rules** (Deterministic, <50ms response)
 2. **Advanced 6-Layer Analysis** (PCPartPicker-level checking)
 3. **AI-Enhanced Reasoning** (DeepSeek R1 contextual validation)
@@ -317,17 +342,18 @@ K-Wise implements a **triple-layer hybrid compatibility system** combining:
 #### **8 Core Rule Categories:**
 
 1. **CPU ↔ Motherboard Compatibility** (Lines 37-119)
+
    ```javascript
    // Socket Matching (ZERO TOLERANCE)
    - LGA1700 ↔ LGA1700 only ✅
-   - AM5 ↔ AM5 only ✅  
+   - AM5 ↔ AM5 only ✅
    - AM4 ↔ AM4 only ✅
    - NO mixing Intel/AMD sockets ❌
-   
+
    // TDP Validation
    - CPU TDP ≤ Motherboard max TDP
    - VRM phase count adequate
-   
+
    // Memory Support
    - CPU supports DDR5 → MB must support DDR5
    - CPU supports DDR4 → MB can support DDR4
@@ -335,57 +361,61 @@ K-Wise implements a **triple-layer hybrid compatibility system** combining:
    ```
 
 2. **CPU ↔ RAM Compatibility** (Lines 121-210)
+
    ```javascript
    // Memory Type Matching (CATASTROPHIC IF WRONG)
    - DDR5 motherboard → DDR5 RAM only ✅
    - DDR4 motherboard → DDR4 RAM only ✅
    - NO DDR3 RAM for modern platforms ❌
-   
+
    // Speed Validation
    - RAM speed ≤ Motherboard max speed
    - CPU memory controller supports speed
-   
+
    // Capacity Limits
    - Total RAM ≤ Motherboard max capacity
    - Module count ≤ DIMM slots
    ```
 
 3. **GPU ↔ PSU Compatibility** (Lines 212-305)
+
    ```javascript
    // Power Budget Calculation
    Total Wattage = CPU TDP + GPU TDP + System Overhead
    System Overhead = 100W (base) + (10W per drive) + (20W per RGB fan)
-   
+
    Required PSU = Total Wattage × 1.25 (25% headroom)
-   
+
    // Connector Validation
    - GPU requires 3×8-pin → PSU must have 3×8-pin PCIe
    - GPU requires 12VHPWR → PSU must have native or adapter
-   
+
    // Efficiency Rating
    - 80+ Bronze minimum (70% efficiency)
    - 80+ Gold recommended (87% efficiency)
    ```
 
 4. **Cooling ↔ Case Compatibility** (Lines 307-398)
+
    ```javascript
    // CPU Cooler Clearance
    - Cooler height ≤ Case max cooler height
    - Air cooler: Check RAM clearance
    - AIO radiator: Check mounting points
-   
+
    // Radiator Support
    - 120mm AIO → Case supports 120mm rad
    - 240mm AIO → Case supports 240mm rad (top/front)
    - 280mm AIO → Case supports 280mm rad
    - 360mm AIO → Case supports 360mm rad
-   
+
    // TDP Adequacy
    - Cooler TDP rating ≥ CPU TDP × 1.2 (optimal)
    - Cooler TDP rating ≥ CPU TDP (minimum)
    ```
 
 5. **Motherboard ↔ Case Compatibility** (Lines 400-485)
+
    ```javascript
    // Form Factor Matching
    - ATX motherboard → ATX/Full Tower case ✅
@@ -395,35 +425,38 @@ K-Wise implements a **triple-layer hybrid compatibility system** combining:
    ```
 
 6. **Storage ↔ Motherboard Compatibility** (Lines 487-575)
+
    ```javascript
    // M.2 Slot Validation
    - NVMe drives ≤ M.2 slot count
    - PCIe Gen4 drive → Gen4 slot (optimal)
    - PCIe Gen4 drive → Gen3 slot (compatible, slower)
-   
+
    // SATA Validation
    - SATA drives ≤ SATA port count
    ```
 
 7. **GPU ↔ Case Compatibility** (Lines 577-670)
+
    ```javascript
    // Physical Clearance (CRITICAL)
    - GPU length ≤ Case max GPU length
    - GPU width (slots) ≤ Case expansion slots
    - GPU height ≤ Case internal height
-   
+
    // Example: RTX 4090 (336mm)
    - NZXT H510 (285mm max) → ❌ INCOMPATIBLE
    - Fractal Meshify 2 (360mm max) → ✅ COMPATIBLE
    ```
 
 8. **PSU ↔ Case Compatibility** (Lines 672-750)
+
    ```javascript
    // PSU Size Matching
    - ATX PSU → ATX case ✅
    - SFX PSU → SFX/ATX case ✅
    - ATX PSU → SFX case ❌
-   
+
    // Length Validation
    - PSU length ≤ Case max PSU length
    ```
@@ -439,16 +472,18 @@ K-Wise implements a **triple-layer hybrid compatibility system** combining:
 #### **6 Layers of Analysis:**
 
 **Layer 1: Interface Matching** (Lines 50-150)
+
 ```javascript
 // Socket/Connector Validation
 ✓ CPU socket matches motherboard socket
-✓ RAM type matches motherboard memory type  
+✓ RAM type matches motherboard memory type
 ✓ GPU PCIe generation compatible with slot
 ✓ Storage interface matches available ports
 ✓ All cables/connectors present
 ```
 
 **Layer 2: Power Delivery Validation** (Lines 150-250)
+
 ```javascript
 // Comprehensive Power Budget
 calculateTotalPower() {
@@ -459,12 +494,12 @@ calculateTotalPower() {
   motherboardPower = 40W;
   coolingPower = (AIO ? 15W : 10W) + (fans.count × 3W);
   rgbPower = RGB.devices × 5W;
-  
-  totalPower = cpuPower + gpuPower + ramPower + storagePower + 
+
+  totalPower = cpuPower + gpuPower + ramPower + storagePower +
                motherboardPower + coolingPower + rgbPower;
-  
+
   requiredPSU = totalPower × 1.25; // 25% headroom
-  
+
   return {
     totalDraw: totalPower,
     recommended: requiredPSU,
@@ -475,31 +510,32 @@ calculateTotalPower() {
 ```
 
 **Layer 3: Physical Dimensions Check** (Lines 250-400)
+
 ```javascript
 // 3D Space Validation
 analyzePhysicalClearances(components) {
   // GPU Clearance
   gpuFits = GPU.length + 20mm <= Case.maxGPULength;
   gpuSlots = GPU.slotWidth <= Case.expansionSlots;
-  
-  // CPU Cooler Clearance  
+
+  // CPU Cooler Clearance
   coolerFits = Cooler.height <= Case.maxCoolerHeight;
-  
+
   // RAM Clearance (if air cooler)
   if (!Cooler.waterCooled) {
     ramClearance = Cooler.overhang + RAM.height <= Case.ramClearance;
   }
-  
+
   // PSU Clearance
   psuFits = PSU.length <= Case.maxPSULength;
-  
+
   // Radiator Clearance
   if (Cooler.radiatorSize) {
     radiatorFits = checkRadiatorMounting(Case, Cooler, GPU);
     // Check: Does front rad conflict with GPU length?
     // Check: Does top rad conflict with RAM height?
   }
-  
+
   return {
     allFit: gpuFits && coolerFits && psuFits && radiatorFits,
     issues: [...clearanceIssues],
@@ -509,6 +545,7 @@ analyzePhysicalClearances(components) {
 ```
 
 **Layer 4: Thermal Design** (Lines 400-550)
+
 ```javascript
 // Cooling Adequacy Analysis
 analyzeThermalPerformance(build) {
@@ -520,7 +557,7 @@ analyzeThermalPerformance(build) {
     expectedTemp: estimateTemperature(CPU, Cooler, Case),
     recommendation: Cooler.tdpRating >= CPU.tdp × 1.2 ? "Optimal" : "Marginal"
   };
-  
+
   // Case Airflow
   caseAirflow = {
     intakeFans: Case.frontFans + Case.bottomFans,
@@ -528,7 +565,7 @@ analyzeThermalPerformance(build) {
     balance: intakeFans >= exhaustFans ? "Positive" : "Negative",
     adequacy: (intakeFans + exhaustFans) >= 3 ? "Good" : "Improve"
   };
-  
+
   // GPU Thermals
   gpuThermals = {
     tdp: GPU.tdp,
@@ -540,6 +577,7 @@ analyzeThermalPerformance(build) {
 ```
 
 **Layer 5: Feature Compatibility** (Lines 550-700)
+
 ```javascript
 // Advanced Feature Validation
 checkFeatureCompatibility(build) {
@@ -551,7 +589,7 @@ checkFeatureCompatibility(build) {
     compatible: true, // Backward compatible
     performance: calculatePCIeLoss(gpuRequirement, motherboardSlot)
   };
-  
+
   // RGB Sync
   rgb = {
     motherboardEcosystem: Motherboard.rgbHeader, // e.g., "Aura Sync"
@@ -559,14 +597,14 @@ checkFeatureCompatibility(build) {
     coolerCompatible: Cooler.rgb && Cooler.rgbType === Motherboard.rgbHeader,
     unified: allComponentsShareRGBEcosystem()
   };
-  
+
   // Wi-Fi/Bluetooth
   wireless = {
     motherboardHasWifi: Motherboard.wireless,
     wifiCard: build.includes("Wi-Fi Card"),
     bluetoothAvailable: Motherboard.bluetooth || build.includes("BT Adapter")
   };
-  
+
   // BIOS Update Required
   bios = {
     motherboardBIOS: Motherboard.biosVersion,
@@ -578,6 +616,7 @@ checkFeatureCompatibility(build) {
 ```
 
 **Layer 6: Known Issues Database** (Lines 700-900)
+
 ```javascript
 // Real-World Compatibility Data
 checkKnownIssues(build) {
@@ -588,12 +627,12 @@ checkKnownIssues(build) {
     WHERE (component_a_id = $1 AND component_b_id = $2)
        OR (component_a_id = $2 AND component_b_id = $1)
   `, [build.component1.id, build.component2.id]);
-  
+
   // Examples of known issues:
   // - "NZXT H510 + RTX 3080: Front intake restricted, temps +10°C"
   // - "Corsair iCUE RAM + ASUS Aura Sync: Requires separate software"
   // - "MSI B550 Tomahawk + Ryzen 5000: BIOS 7C91v15+ required"
-  
+
   return {
     criticalIssues: issues.filter(i => i.severity === 'critical'),
     warnings: issues.filter(i => i.severity === 'warning'),
@@ -618,7 +657,7 @@ checkKnownIssues(build) {
 async analyzeWithAI(components, deterministicScore) {
   // Step 1: Build detailed prompt
   const prompt = createCompatibilityPrompt(components);
-  
+
   // Step 2: Call DeepSeek R1
   const aiAnalysis = await ollamaService.generate({
     model: "deepseek-r1:1.5b",
@@ -627,13 +666,13 @@ async analyzeWithAI(components, deterministicScore) {
     max_tokens: 4000, // Allow detailed reasoning
     system: "You are an expert PC hardware compatibility analyzer..."
   });
-  
+
   // Step 3: Parse AI response
   const reasoning = parseAIReasoning(aiAnalysis);
-  
+
   // Step 4: Calculate final score
   finalScore = (deterministicScore × 0.70) + (reasoning.score × 0.30);
-  
+
   return {
     score: finalScore,
     reasoning: reasoning.text,
@@ -731,38 +770,47 @@ const COMPONENT_PAIRS = [
   { pair: "CPU ↔ GPU", rules: ["bottleneck", "pcie_lanes", "tier_matching"] },
   { pair: "CPU ↔ PSU", rules: ["power_budget"] },
   { pair: "CPU ↔ Case", rules: ["cooler_clearance"] },
-  
+
   // Motherboard-Related (6 pairs)
-  { pair: "Motherboard ↔ RAM", rules: ["memory_type", "speed", "capacity", "slots"] },
-  { pair: "Motherboard ↔ Storage", rules: ["m2_slots", "sata_ports", "pcie_gen"] },
+  {
+    pair: "Motherboard ↔ RAM",
+    rules: ["memory_type", "speed", "capacity", "slots"],
+  },
+  {
+    pair: "Motherboard ↔ Storage",
+    rules: ["m2_slots", "sata_ports", "pcie_gen"],
+  },
   { pair: "Motherboard ↔ GPU", rules: ["pcie_slot", "physical_slot"] },
   { pair: "Motherboard ↔ Case", rules: ["form_factor", "mounting_holes"] },
   { pair: "Motherboard ↔ PSU", rules: ["atx_connector", "eps_connector"] },
   { pair: "Motherboard ↔ Cooler", rules: ["headers", "mounting"] },
-  
+
   // GPU-Related (5 pairs)
   { pair: "GPU ↔ Case", rules: ["length", "slot_width", "height"] },
   { pair: "GPU ↔ PSU", rules: ["wattage", "pcie_connectors", "efficiency"] },
   { pair: "GPU ↔ Cooler", rules: ["airflow", "thermal_interaction"] },
   { pair: "GPU ↔ Motherboard", rules: ["pcie_lanes", "power_delivery"] },
   { pair: "GPU ↔ CPU", rules: ["bottleneck", "tier_matching"] },
-  
+
   // Case-Related (4 pairs)
-  { pair: "Case ↔ Cooler", rules: ["radiator_support", "fan_mounting", "height"] },
+  {
+    pair: "Case ↔ Cooler",
+    rules: ["radiator_support", "fan_mounting", "height"],
+  },
   { pair: "Case ↔ PSU", rules: ["form_factor", "length", "mounting"] },
   { pair: "Case ↔ Storage", rules: ["drive_bays", "mounting_points"] },
   { pair: "Case ↔ Motherboard", rules: ["form_factor", "io_shield"] },
-  
+
   // PSU-Related (3 pairs)
   { pair: "PSU ↔ All Components", rules: ["total_wattage", "efficiency"] },
   { pair: "PSU ↔ Cooler", rules: ["power_delivery"] },
   { pair: "PSU ↔ Case", rules: ["mounting", "cable_routing"] },
-  
+
   // Other (4 pairs)
   { pair: "RAM ↔ Cooler", rules: ["clearance", "height"] },
   { pair: "RAM ↔ Storage", rules: ["no_conflict"] },
   { pair: "Cooler ↔ Storage", rules: ["no_conflict"] },
-  { pair: "Case ↔ RAM", rules: ["dimm_clearance"] }
+  { pair: "Case ↔ RAM", rules: ["dimm_clearance"] },
 ];
 ```
 
@@ -800,70 +848,80 @@ Step 6: Complete build → Navigate to Order Summary
 const PCParts = () => {
   const [selectedComponents, setSelectedComponents] = useState([]);
   const [compatibleProducts, setCompatibleProducts] = useState({});
-  
+
   // When user selects a component
   const handleAddToCart = async (product, category) => {
     // Step 1: Add to cart
     const updatedCart = [...selectedComponents, { ...product, category }];
     setSelectedComponents(updatedCart);
-    
+
     // Step 2: Trigger compatibility analysis for ALL other categories
     await updateCompatibilityForAllCategories(updatedCart);
   };
-  
+
   // Update compatibility highlighting for all categories
   const updateCompatibilityForAllCategories = async (currentCart) => {
-    const categories = ['CPU', 'Motherboard', 'RAM', 'GPU', 'Storage', 'PSU', 'Cooling', 'Case'];
-    
+    const categories = [
+      "CPU",
+      "Motherboard",
+      "RAM",
+      "GPU",
+      "Storage",
+      "PSU",
+      "Cooling",
+      "Case",
+    ];
+
     // Build selectedParts object from cart
     const selectedParts = {};
-    currentCart.forEach(component => {
+    currentCart.forEach((component) => {
       selectedParts[component.category] = extractSpecs(component);
     });
-    
+
     // For each category NOT in cart, fetch compatible products
     const compatibilityPromises = categories
-      .filter(cat => !currentCart.some(c => c.category === cat))
-      .map(async category => {
+      .filter((cat) => !currentCart.some((c) => c.category === cat))
+      .map(async (category) => {
         // Call Builder API with current selections
         const response = await api.get(`/builder/available/${category}`, {
-          params: { selectedParts: JSON.stringify(selectedParts) }
+          params: { selectedParts: JSON.stringify(selectedParts) },
         });
-        
+
         return { category, compatible: response.data.data };
       });
-    
+
     const results = await Promise.all(compatibilityPromises);
-    
+
     // Update compatible products state
     const newCompatibility = {};
     results.forEach(({ category, compatible }) => {
-      newCompatibility[category] = compatible.map(p => p.id);
+      newCompatibility[category] = compatible.map((p) => p.id);
     });
-    
+
     setCompatibleProducts(newCompatibility);
   };
-  
+
   // Render products with compatibility highlighting
   const renderProduct = (product, category) => {
     const isCompatible = compatibleProducts[category]?.includes(product.id);
     const hasSelections = selectedComponents.length > 0;
-    
+
     return (
-      <div 
+      <div
         className={`product-card ${
-          hasSelections && isCompatible ? 'compatible-highlight' : ''
+          hasSelections && isCompatible ? "compatible-highlight" : ""
         }`}
         style={{
-          boxShadow: hasSelections && isCompatible 
-            ? '0 0 20px rgba(255, 255, 255, 0.8)' // WHITE BOX-SHADOW
-            : 'none'
+          boxShadow:
+            hasSelections && isCompatible
+              ? "0 0 20px rgba(255, 255, 255, 0.8)" // WHITE BOX-SHADOW
+              : "none",
         }}
       >
         {/* Product details */}
         <h3>{product.name}</h3>
         <p>₱{product.price.toLocaleString()}</p>
-        
+
         {hasSelections && (
           <div className="compatibility-badge">
             {isCompatible ? (
@@ -873,7 +931,7 @@ const PCParts = () => {
             )}
           </div>
         )}
-        
+
         <button onClick={() => handleAddToCart(product, category)}>
           Add to Cart
         </button>
@@ -929,19 +987,20 @@ RESULT: User can only easily select compatible parts (white box-shadow)
 
 ```javascript
 // KWise-Backend/routes/builder.js Lines 55-200
-router.get('/available/:category', async (req, res) => {
+router.get("/available/:category", async (req, res) => {
   try {
     const { category } = req.params;
-    const selectedParts = JSON.parse(req.query.selectedParts || '{}');
-    
+    const selectedParts = JSON.parse(req.query.selectedParts || "{}");
+
     let products = [];
-    
+
     // Category-specific filtering
     switch (category) {
-      case 'Motherboard':
+      case "Motherboard":
         if (selectedParts.CPU?.socket) {
           // Filter by CPU socket
-          products = await query(`
+          products = await query(
+            `
             SELECT p.*, mb.socket, mb.chipset, mb.memory_type
             FROM pc_parts p
             JOIN motherboard mb ON p.id = mb.id
@@ -949,14 +1008,17 @@ router.get('/available/:category', async (req, res) => {
               AND mb.socket = $1  -- 🔥 EXACT SOCKET MATCH
               AND p.is_active = true
             ORDER BY p.price ASC
-          `, [selectedParts.CPU.socket]);
+          `,
+            [selectedParts.CPU.socket],
+          );
         }
         break;
-        
-      case 'RAM':
+
+      case "RAM":
         if (selectedParts.Motherboard?.memory_type) {
           // Filter by motherboard memory type
-          products = await query(`
+          products = await query(
+            `
             SELECT p.*, r.memory_type, r.speed, r.total_capacity
             FROM pc_parts p
             JOIN ram r ON p.id = r.id
@@ -964,18 +1026,21 @@ router.get('/available/:category', async (req, res) => {
               AND r.memory_type = $1  -- 🔥 EXACT MEMORY TYPE MATCH
               AND p.is_active = true
             ORDER BY p.price ASC
-          `, [selectedParts.Motherboard.memory_type]);
+          `,
+            [selectedParts.Motherboard.memory_type],
+          );
         }
         break;
-        
-      case 'PSU':
+
+      case "PSU":
         // Calculate required wattage
         const cpuTDP = selectedParts.CPU?.tdp || 0;
         const gpuTDP = selectedParts.GPU?.tdp || 0;
         const systemOverhead = 100;
         const totalWattage = (cpuTDP + gpuTDP + systemOverhead) * 1.25;
-        
-        products = await query(`
+
+        products = await query(
+          `
           SELECT p.*, psu.wattage, psu.efficiency_rating
           FROM pc_parts p
           JOIN psu ON p.id = psu.id
@@ -983,15 +1048,18 @@ router.get('/available/:category', async (req, res) => {
             AND psu.wattage >= $1  -- 🔥 ADEQUATE WATTAGE
             AND p.is_active = true
           ORDER BY psu.wattage ASC
-        `, [Math.ceil(totalWattage)]);
+        `,
+          [Math.ceil(totalWattage)],
+        );
         break;
-        
-      case 'Case':
+
+      case "Case":
         // Filter by form factor + GPU length
-        const formFactor = selectedParts.Motherboard?.form_factor || 'ATX';
+        const formFactor = selectedParts.Motherboard?.form_factor || "ATX";
         const gpuLength = selectedParts.GPU?.length || 0;
-        
-        products = await query(`
+
+        products = await query(
+          `
           SELECT p.*, c.form_factor, c.max_gpu_length, c.max_cpu_cooler_height
           FROM pc_parts p
           JOIN case_table c ON p.id = c.id
@@ -1000,31 +1068,35 @@ router.get('/available/:category', async (req, res) => {
             AND c.max_gpu_length >= $1  -- 🔥 GPU CLEARANCE CHECK
             AND p.is_active = true
           ORDER BY p.price ASC
-        `, [gpuLength + 20]); // 20mm buffer
+        `,
+          [gpuLength + 20],
+        ); // 20mm buffer
         break;
-        
+
       default:
         // No filtering for first selection or unknown category
-        products = await query(`
+        products = await query(
+          `
           SELECT * FROM pc_parts
           WHERE category = $1 AND is_active = true
           ORDER BY price ASC
-        `, [category]);
+        `,
+          [category],
+        );
     }
-    
+
     // Apply Advanced Compatibility scoring
     const scoredProducts = await applyCompatibilityScores(
       products.rows,
       selectedParts,
-      category
+      category,
     );
-    
+
     res.json({
       success: true,
       data: scoredProducts,
-      filters_applied: Object.keys(selectedParts)
+      filters_applied: Object.keys(selectedParts),
     });
-    
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1042,7 +1114,8 @@ router.get('/available/:category', async (req, res) => {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
   }
   50% {
@@ -1098,22 +1171,22 @@ const ProductPage = () => {
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
   const [compatibleProducts, setCompatibleProducts] = useState({});
-  
+
   // Fetch product and compatible items
   useEffect(() => {
     const fetchProductAndCompatible = async () => {
       // Get product details
       const productRes = await api.get(`/products/${productId}`);
       setProduct(productRes.data);
-      
+
       // Get compatible products from all categories
       const compatRes = await api.get(`/kiosk/product/${productId}/compatible`);
       setCompatibleProducts(compatRes.data.data);
     };
-    
+
     fetchProductAndCompatible();
   }, [productId]);
-  
+
   return (
     <div className="product-page">
       {/* Product Details Section */}
@@ -1121,39 +1194,42 @@ const ProductPage = () => {
         <img src={product.imageUrl} alt={product.name} />
         <h1>{product.name}</h1>
         <p className="price">₱{product.price.toLocaleString()}</p>
-        
+
         {/* Specifications */}
         <div className="specifications">
           <h3>Specifications</h3>
-          {product.category === 'CPU' && (
+          {product.category === "CPU" && (
             <>
               <p>Socket: {product.socket}</p>
-              <p>Cores/Threads: {product.cores}/{product.threads}</p>
+              <p>
+                Cores/Threads: {product.cores}/{product.threads}
+              </p>
               <p>Base Clock: {product.base_clock} GHz</p>
               <p>TDP: {product.tdp}W</p>
             </>
           )}
           {/* More category-specific specs */}
         </div>
-        
-        <button onClick={() => addToCart(product)}>
-          Add to Cart
-        </button>
+
+        <button onClick={() => addToCart(product)}>Add to Cart</button>
       </div>
-      
+
       {/* 🔥 Compatible With Section */}
       <div className="compatible-with-section">
         <h2>Compatible With</h2>
         <p className="subtitle">
           Components verified compatible with {product.name}
         </p>
-        
+
         {/* Compatible Motherboards */}
         {compatibleProducts.motherboards?.length > 0 && (
           <div className="compatible-category">
-            <h3>🖥️ Compatible Motherboards ({compatibleProducts.motherboards.length})</h3>
+            <h3>
+              🖥️ Compatible Motherboards (
+              {compatibleProducts.motherboards.length})
+            </h3>
             <div className="compatible-grid">
-              {compatibleProducts.motherboards.map(mb => (
+              {compatibleProducts.motherboards.map((mb) => (
                 <CompatibleProductCard
                   key={mb.id}
                   product={mb}
@@ -1163,13 +1239,15 @@ const ProductPage = () => {
             </div>
           </div>
         )}
-        
+
         {/* Compatible Coolers */}
         {compatibleProducts.coolers?.length > 0 && (
           <div className="compatible-category">
-            <h3>❄️ Compatible CPU Coolers ({compatibleProducts.coolers.length})</h3>
+            <h3>
+              ❄️ Compatible CPU Coolers ({compatibleProducts.coolers.length})
+            </h3>
             <div className="compatible-grid">
-              {compatibleProducts.coolers.map(cooler => (
+              {compatibleProducts.coolers.map((cooler) => (
                 <CompatibleProductCard
                   key={cooler.id}
                   product={cooler}
@@ -1179,13 +1257,13 @@ const ProductPage = () => {
             </div>
           </div>
         )}
-        
+
         {/* Compatible RAM */}
         {compatibleProducts.ram?.length > 0 && (
           <div className="compatible-category">
             <h3>🧠 Compatible RAM ({compatibleProducts.ram.length})</h3>
             <div className="compatible-grid">
-              {compatibleProducts.ram.map(ramModule => (
+              {compatibleProducts.ram.map((ramModule) => (
                 <CompatibleProductCard
                   key={ramModule.id}
                   product={ramModule}
@@ -1205,10 +1283,10 @@ const CompatibleProductCard = ({ product, baseProduct }) => {
   return (
     <div className="compatible-product-card">
       <img src={product.imageUrl} alt={product.name} />
-      
+
       {/* Compatibility Score */}
       <div className="compatibility-score">
-        <div 
+        <div
           className={`score-badge score-${getScoreClass(product.compatibility_score)}`}
         >
           {product.compatibility_score}%
@@ -1217,38 +1295,34 @@ const CompatibleProductCard = ({ product, baseProduct }) => {
           {getCompatibilityLabel(product.compatibility_score)}
         </span>
       </div>
-      
+
       <h4>{product.name}</h4>
       <p className="price">₱{product.price.toLocaleString()}</p>
-      
+
       {/* Why Compatible */}
       <div className="compatibility-reason">
         <p>{product.compatibility_reason}</p>
       </div>
-      
-      <button onClick={() => viewProduct(product.id)}>
-        View Details
-      </button>
-      <button onClick={() => addToCart(product)}>
-        Add to Cart
-      </button>
+
+      <button onClick={() => viewProduct(product.id)}>View Details</button>
+      <button onClick={() => addToCart(product)}>Add to Cart</button>
     </div>
   );
 };
 
 // Compatibility scoring helpers
 const getScoreClass = (score) => {
-  if (score >= 95) return 'excellent';
-  if (score >= 90) return 'great';
-  if (score >= 85) return 'good';
-  return 'fair';
+  if (score >= 95) return "excellent";
+  if (score >= 90) return "great";
+  if (score >= 85) return "good";
+  return "fair";
 };
 
 const getCompatibilityLabel = (score) => {
-  if (score >= 95) return '✅ Perfect Match';
-  if (score >= 90) return '✅ Excellent';
-  if (score >= 85) return '✓ Good';
-  return '⚠ Check Details';
+  if (score >= 95) return "✅ Perfect Match";
+  if (score >= 90) return "✅ Excellent";
+  if (score >= 85) return "✓ Good";
+  return "⚠ Check Details";
 };
 ```
 
@@ -1256,12 +1330,13 @@ const getCompatibilityLabel = (score) => {
 
 ```javascript
 // KWise-Backend/routes/enhanced-kiosk.js Lines 80-220
-router.get('/product/:productId/compatible', async (req, res) => {
+router.get("/product/:productId/compatible", async (req, res) => {
   try {
     const { productId } = req.params;
-    
+
     // Get base product with full specs
-    const baseProduct = await query(`
+    const baseProduct = await query(
+      `
       SELECT p.*, 
              cpu.socket as cpu_socket, cpu.tdp as cpu_tdp,
              mb.socket as mb_socket, mb.chipset, mb.memory_type
@@ -1269,20 +1344,30 @@ router.get('/product/:productId/compatible', async (req, res) => {
       LEFT JOIN cpu ON p.id = cpu.id
       LEFT JOIN motherboard mb ON p.id = mb.id
       WHERE p.id = $1
-    `, [productId]);
-    
+    `,
+      [productId],
+    );
+
     if (baseProduct.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
     }
-    
+
     const product = baseProduct.rows[0];
-    let compatible = { motherboards: [], coolers: [], ram: [], gpus: [], psus: [] };
-    
+    let compatible = {
+      motherboards: [],
+      coolers: [],
+      ram: [],
+      gpus: [],
+      psus: [],
+    };
+
     // For CPU: Get compatible motherboards, coolers, RAM
-    if (product.category === 'CPU') {
+    if (product.category === "CPU") {
       const socket = product.cpu_socket;
       const tdp = product.cpu_tdp;
-      
+
       // Compatible Motherboards (matching socket, NO AM5 for Intel)
       const mbQuery = `
         SELECT p.*, mb.socket, mb.chipset, mb.memory_type,
@@ -1303,7 +1388,7 @@ router.get('/product/:productId/compatible', async (req, res) => {
         LIMIT 50
       `;
       compatible.motherboards = (await query(mbQuery, [socket])).rows;
-      
+
       // Compatible Coolers (adequate TDP rating)
       const coolerQuery = `
         SELECT p.*, c.tdp_rating, c.water_cooled,
@@ -1326,7 +1411,7 @@ router.get('/product/:productId/compatible', async (req, res) => {
         LIMIT 50
       `;
       compatible.coolers = (await query(coolerQuery, [tdp])).rows;
-      
+
       // Compatible RAM (NO DDR3 for modern CPUs!)
       const ramQuery = `
         SELECT p.*, r.memory_type, r.speed,
@@ -1349,13 +1434,12 @@ router.get('/product/:productId/compatible', async (req, res) => {
       `;
       compatible.ram = (await query(ramQuery)).rows;
     }
-    
+
     res.json({
       success: true,
       data: compatible,
-      baseProduct: product
+      baseProduct: product,
     });
-    
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1391,29 +1475,29 @@ const OrderSummary = () => {
   const [cart, setCart] = useState([]);
   const [compatibilityAnalysis, setCompatibilityAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     const analyzeOrder = async () => {
       setLoading(true);
-      
+
       // Get cart from localStorage or context
-      const currentCart = JSON.parse(localStorage.getItem('cart') || '[]');
+      const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
       setCart(currentCart);
-      
+
       // Call comprehensive compatibility analysis
-      const response = await api.post('/compatibility/analyze-build', {
+      const response = await api.post("/compatibility/analyze-build", {
         components: currentCart,
-        analysisType: 'comprehensive',
-        includeAI: true
+        analysisType: "comprehensive",
+        includeAI: true,
       });
-      
+
       setCompatibilityAnalysis(response.data);
       setLoading(false);
     };
-    
+
     analyzeOrder();
   }, []);
-  
+
   return (
     <div className="order-summary">
       {/* Order Details */}
@@ -1421,7 +1505,7 @@ const OrderSummary = () => {
         <h1>Order Summary</h1>
         <p>Review your build and compatibility analysis</p>
       </div>
-      
+
       {/* Cart Items */}
       <div className="cart-items">
         {cart.map((item, idx) => (
@@ -1434,21 +1518,25 @@ const OrderSummary = () => {
             </div>
           </div>
         ))}
-        
+
         <div className="cart-total">
           <h3>Total: ₱{calculateTotal(cart).toLocaleString()}</h3>
         </div>
       </div>
-      
+
       {/* 🔥 Compatibility Analysis Section */}
       {!loading && compatibilityAnalysis && (
         <div className="compatibility-analysis">
           <h2>Compatibility Analysis</h2>
-          
+
           {/* Overall Score */}
           <div className="overall-score">
-            <div className={`score-circle score-${getScoreLevel(compatibilityAnalysis.score)}`}>
-              <span className="score-number">{compatibilityAnalysis.score}</span>
+            <div
+              className={`score-circle score-${getScoreLevel(compatibilityAnalysis.score)}`}
+            >
+              <span className="score-number">
+                {compatibilityAnalysis.score}
+              </span>
               <span className="score-label">/100</span>
             </div>
             <div className="score-description">
@@ -1456,7 +1544,7 @@ const OrderSummary = () => {
               <p>{compatibilityAnalysis.summary}</p>
             </div>
           </div>
-          
+
           {/* 🔴 PROBLEMS (Critical Issues) */}
           {compatibilityAnalysis.problems?.length > 0 && (
             <div className="compatibility-section problems">
@@ -1464,7 +1552,7 @@ const OrderSummary = () => {
               <p className="section-subtitle">
                 These issues must be resolved before ordering
               </p>
-              
+
               {compatibilityAnalysis.problems.map((problem, idx) => (
                 <div key={idx} className="issue-item problem-item">
                   <div className="issue-header">
@@ -1475,19 +1563,23 @@ const OrderSummary = () => {
                   </div>
                   <p className="issue-description">{problem.description}</p>
                   <div className="issue-details">
-                    <p><strong>Affected Components:</strong></p>
+                    <p>
+                      <strong>Affected Components:</strong>
+                    </p>
                     <ul>
                       {problem.affectedComponents.map((comp, i) => (
                         <li key={i}>{comp}</li>
                       ))}
                     </ul>
-                    <p><strong>Solution:</strong> {problem.solution}</p>
+                    <p>
+                      <strong>Solution:</strong> {problem.solution}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
           )}
-          
+
           {/* 🟡 WARNINGS (Suboptimal but Functional) */}
           {compatibilityAnalysis.warnings?.length > 0 && (
             <div className="compatibility-section warnings">
@@ -1495,11 +1587,12 @@ const OrderSummary = () => {
               <p className="section-subtitle">
                 These issues are not critical but should be considered
               </p>
-              
+
               {compatibilityAnalysis.warnings.map((warning, idx) => {
                 // Continue lettering from where problems left off
-                const letterIndex = (compatibilityAnalysis.problems?.length || 0) + idx;
-                
+                const letterIndex =
+                  (compatibilityAnalysis.problems?.length || 0) + idx;
+
                 return (
                   <div key={idx} className="issue-item warning-item">
                     <div className="issue-header">
@@ -1510,25 +1603,31 @@ const OrderSummary = () => {
                     </div>
                     <p className="issue-description">{warning.description}</p>
                     <div className="issue-details">
-                      <p><strong>Impact:</strong> {warning.impact}</p>
-                      <p><strong>Recommendation:</strong> {warning.recommendation}</p>
+                      <p>
+                        <strong>Impact:</strong> {warning.impact}
+                      </p>
+                      <p>
+                        <strong>Recommendation:</strong>{" "}
+                        {warning.recommendation}
+                      </p>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-          
+
           {/* 🔵 NOTES (Informational) */}
           {compatibilityAnalysis.notes?.length > 0 && (
             <div className="compatibility-section notes">
               <h3>🔵 Notes (Important Information)</h3>
-              
+
               {compatibilityAnalysis.notes.map((note, idx) => {
-                const letterIndex = 
+                const letterIndex =
                   (compatibilityAnalysis.problems?.length || 0) +
-                  (compatibilityAnalysis.warnings?.length || 0) + idx;
-                
+                  (compatibilityAnalysis.warnings?.length || 0) +
+                  idx;
+
                 return (
                   <div key={idx} className="issue-item note-item">
                     <div className="issue-header">
@@ -1543,18 +1642,19 @@ const OrderSummary = () => {
               })}
             </div>
           )}
-          
+
           {/* 🔵 DISCLAIMERS (Legal/Warranty Info) */}
           {compatibilityAnalysis.disclaimers?.length > 0 && (
             <div className="compatibility-section disclaimers">
               <h3>🔵 Disclaimers</h3>
-              
+
               {compatibilityAnalysis.disclaimers.map((disclaimer, idx) => {
-                const letterIndex = 
+                const letterIndex =
                   (compatibilityAnalysis.problems?.length || 0) +
                   (compatibilityAnalysis.warnings?.length || 0) +
-                  (compatibilityAnalysis.notes?.length || 0) + idx;
-                
+                  (compatibilityAnalysis.notes?.length || 0) +
+                  idx;
+
                 return (
                   <div key={idx} className="issue-item disclaimer-item">
                     <div className="issue-header">
@@ -1563,13 +1663,15 @@ const OrderSummary = () => {
                       </span>
                       <h4>Disclaimer: {disclaimer.title}</h4>
                     </div>
-                    <p className="issue-description">{disclaimer.description}</p>
+                    <p className="issue-description">
+                      {disclaimer.description}
+                    </p>
                   </div>
                 );
               })}
             </div>
           )}
-          
+
           {/* AI Reasoning */}
           {compatibilityAnalysis.aiReasoning && (
             <div className="ai-reasoning">
@@ -1579,7 +1681,7 @@ const OrderSummary = () => {
           )}
         </div>
       )}
-      
+
       {/* Action Buttons */}
       <div className="action-buttons">
         {compatibilityAnalysis?.problems?.length > 0 ? (
@@ -1591,7 +1693,7 @@ const OrderSummary = () => {
             Proceed to Checkout
           </button>
         )}
-        
+
         <button className="btn-edit" onClick={() => goBack()}>
           Edit Build
         </button>
@@ -1616,43 +1718,43 @@ A. Critical Power Deficiency
    - System overhead: 120W (RAM, storage, fans, RGB)
    - Total peak draw: 693W
    - Your PSU: 650W (107% load - CRITICAL)
-   
+
    Affected Components:
    • Corsair CV650 650W 80+ Bronze PSU
    • Intel Core i9-14900K (253W)
    • NVIDIA RTX 4080 (320W)
-   
-   Solution: Select PSU rated 850W or higher. Recommended: 
+
+   Solution: Select PSU rated 850W or higher. Recommended:
    Corsair RM850x 850W 80+ Gold (75% load, optimal efficiency)
 
 🟡 WARNINGS (2)
 B. CPU Cooler Marginal Performance
    Arctic Liquid Freezer II 240mm rated 250W vs i9-14900K 253W TDP.
    Thermal performance will be at the limit under sustained workloads.
-   
+
    Impact: CPU may reach 85-90°C under heavy load (gaming + streaming)
    Recommendation: Consider 280mm or 360mm AIO for better thermal headroom
 
 C. Tight GPU Clearance
    RTX 4080 (304mm) in NZXT H510 (315mm max) leaves only 11mm clearance.
    Front intake fans may need to be removed or repositioned.
-   
+
    Impact: Potential installation difficulty, reduced front airflow
-   Recommendation: Select case with 350mm+ GPU clearance or verify 
+   Recommendation: Select case with 350mm+ GPU clearance or verify
    physical installation before purchase
 
 🔵 NOTES (2)
 D. BIOS Update Recommended
    ASUS ROG Z790-E motherboard may require BIOS update (version 1658+)
    for optimal Intel 14th Gen CPU support.
-   
+
    Update method: USB BIOS Flashback (no CPU required)
    Estimated time: 10 minutes
 
 E. Memory Speed Optimization
    DDR5-6000 RAM requires manual XMP/EXPO activation in BIOS.
    System will boot at JEDEC DDR5-4800 by default until profile enabled.
-   
+
    Performance impact: +10-15% gaming FPS with XMP enabled
 
 🔵 DISCLAIMERS (1)
@@ -1663,17 +1765,17 @@ F. Component Warranty
    • Motherboard: 3 years (ASUS)
    • PSU: 10 years (Corsair)
    • RAM: Lifetime (G.Skill)
-   
-   Warranty does not cover physical damage, liquid damage, or 
+
+   Warranty does not cover physical damage, liquid damage, or
    overclocking-related failures. Keep original packaging and receipts.
 
 🤖 AI ANALYSIS:
-This is a high-performance gaming build with one critical power supply 
-issue that must be addressed. The i9-14900K + RTX 4080 combination is 
-excellent for 4K gaming and content creation, with minimal CPU bottleneck 
-(<5% at 4K resolution). The 240mm AIO will work but runs at its thermal 
-limit - consider upgrading to 280mm/360mm for quieter operation and 
-longer component lifespan. Once PSU is upgraded to 850W+, this build 
+This is a high-performance gaming build with one critical power supply
+issue that must be addressed. The i9-14900K + RTX 4080 combination is
+excellent for 4K gaming and content creation, with minimal CPU bottleneck
+(<5% at 4K resolution). The 240mm AIO will work but runs at its thermal
+limit - consider upgrading to 280mm/360mm for quieter operation and
+longer component lifespan. Once PSU is upgraded to 850W+, this build
 will provide exceptional performance for its price tier.
 ```
 
@@ -1712,28 +1814,64 @@ const PCCustomized = () => {
   const [selectedParts, setSelectedParts] = useState({});
   const [availableOptions, setAvailableOptions] = useState([]);
   const [loading, setLoading] = useState(false);
-  
+
   const BUILD_STEPS = [
-    { step: 1, category: 'CPU', label: 'Processor', icon: '🔥', filtered: false },
-    { step: 2, category: 'Cooling', label: 'CPU Cooler', icon: '❄️', filtered: true },
-    { step: 3, category: 'Motherboard', label: 'Motherboard', icon: '🖥️', filtered: true },
-    { step: 4, category: 'RAM', label: 'Memory (RAM)', icon: '🧠', filtered: true },
-    { step: 5, category: 'Storage', label: 'Storage', icon: '💾', filtered: true },
-    { step: 6, category: 'GPU', label: 'Graphics Card (Optional)', icon: '🎮', filtered: false },
-    { step: 7, category: 'Case', label: 'PC Case', icon: '📦', filtered: true },
+    {
+      step: 1,
+      category: "CPU",
+      label: "Processor",
+      icon: "🔥",
+      filtered: false,
+    },
+    {
+      step: 2,
+      category: "Cooling",
+      label: "CPU Cooler",
+      icon: "❄️",
+      filtered: true,
+    },
+    {
+      step: 3,
+      category: "Motherboard",
+      label: "Motherboard",
+      icon: "🖥️",
+      filtered: true,
+    },
+    {
+      step: 4,
+      category: "RAM",
+      label: "Memory (RAM)",
+      icon: "🧠",
+      filtered: true,
+    },
+    {
+      step: 5,
+      category: "Storage",
+      label: "Storage",
+      icon: "💾",
+      filtered: true,
+    },
+    {
+      step: 6,
+      category: "GPU",
+      label: "Graphics Card (Optional)",
+      icon: "🎮",
+      filtered: false,
+    },
+    { step: 7, category: "Case", label: "PC Case", icon: "📦", filtered: true },
   ];
-  
+
   // Load options for current step
   useEffect(() => {
     loadStepOptions();
   }, [currentStep, selectedParts]);
-  
+
   const loadStepOptions = async () => {
     setLoading(true);
-    
+
     const currentCategory = BUILD_STEPS[currentStep - 1].category;
     const isFiltered = BUILD_STEPS[currentStep - 1].filtered;
-    
+
     if (!isFiltered) {
       // Unfiltered step - show all products
       const response = await api.get(`/products/category/${currentCategory}`);
@@ -1741,25 +1879,25 @@ const PCCustomized = () => {
     } else {
       // Filtered step - apply compatibility rules
       const response = await api.get(`/builder/available/${currentCategory}`, {
-        params: { selectedParts: JSON.stringify(selectedParts) }
+        params: { selectedParts: JSON.stringify(selectedParts) },
       });
       setAvailableOptions(response.data.data);
     }
-    
+
     setLoading(false);
   };
-  
+
   // Handle component selection
   const handleSelectComponent = async (component) => {
     const category = BUILD_STEPS[currentStep - 1].category;
-    
+
     // Save selection
     const newSelectedParts = {
       ...selectedParts,
-      [category]: component
+      [category]: component,
     };
     setSelectedParts(newSelectedParts);
-    
+
     // Move to next step
     if (currentStep < BUILD_STEPS.length) {
       setCurrentStep(currentStep + 1);
@@ -1768,27 +1906,27 @@ const PCCustomized = () => {
       await calculatePSURequirement(newSelectedParts);
     }
   };
-  
+
   // Calculate PSU requirement after all components selected
   const calculatePSURequirement = async (parts) => {
     const cpuTDP = parts.CPU?.tdp || 0;
     const gpuTDP = parts.GPU?.tdp || 0;
     const systemOverhead = 100;
-    
+
     const totalWattage = (cpuTDP + gpuTDP + systemOverhead) * 1.25;
-    
+
     // Fetch compatible PSUs
-    const response = await api.get('/builder/available/PSU', {
+    const response = await api.get("/builder/available/PSU", {
       params: {
         selectedParts: JSON.stringify(parts),
-        minWattage: Math.ceil(totalWattage)
-      }
+        minWattage: Math.ceil(totalWattage),
+      },
     });
-    
+
     // Show PSU selection modal or automatically select appropriate PSU
     showPSUSelectionModal(response.data.data, totalWattage);
   };
-  
+
   return (
     <div className="pc-customized-builder">
       {/* Progress Bar */}
@@ -1796,29 +1934,32 @@ const PCCustomized = () => {
         {BUILD_STEPS.map((step) => (
           <div
             key={step.step}
-            className={`progress-step ${currentStep >= step.step ? 'active' : ''} ${
-              selectedParts[step.category] ? 'completed' : ''
+            className={`progress-step ${currentStep >= step.step ? "active" : ""} ${
+              selectedParts[step.category] ? "completed" : ""
             }`}
           >
             <div className="step-number">{step.step}</div>
             <div className="step-label">{step.label}</div>
-            {selectedParts[step.category] && <span className="checkmark">✓</span>}
+            {selectedParts[step.category] && (
+              <span className="checkmark">✓</span>
+            )}
           </div>
         ))}
       </div>
-      
+
       {/* Current Step Content */}
       <div className="step-content">
         <h2>
-          {BUILD_STEPS[currentStep - 1].icon} {BUILD_STEPS[currentStep - 1].label}
+          {BUILD_STEPS[currentStep - 1].icon}{" "}
+          {BUILD_STEPS[currentStep - 1].label}
         </h2>
-        
+
         {BUILD_STEPS[currentStep - 1].filtered && (
           <p className="filtering-notice">
             🔥 Showing compatible products based on your selections
           </p>
         )}
-        
+
         {loading ? (
           <div className="loading-spinner">Loading compatible products...</div>
         ) : (
@@ -1834,7 +1975,7 @@ const PCCustomized = () => {
             ))}
           </div>
         )}
-        
+
         {/* Navigation Buttons */}
         <div className="step-navigation">
           {currentStep > 1 && (
@@ -1842,15 +1983,21 @@ const PCCustomized = () => {
               ← Previous Step
             </button>
           )}
-          
+
           {selectedParts[BUILD_STEPS[currentStep - 1].category] && (
-            <button onClick={() => handleSelectComponent(selectedParts[BUILD_STEPS[currentStep - 1].category])}>
+            <button
+              onClick={() =>
+                handleSelectComponent(
+                  selectedParts[BUILD_STEPS[currentStep - 1].category],
+                )
+              }
+            >
               Next Step →
             </button>
           )}
         </div>
       </div>
-      
+
       {/* Selected Parts Summary */}
       <div className="selected-parts-summary">
         <h3>Your Build So Far</h3>
@@ -1863,7 +2010,9 @@ const PCCustomized = () => {
           </div>
         ))}
         <div className="summary-total">
-          <strong>Total: ₱{calculateTotal(selectedParts).toLocaleString()}</strong>
+          <strong>
+            Total: ₱{calculateTotal(selectedParts).toLocaleString()}
+          </strong>
         </div>
       </div>
     </div>
@@ -1877,12 +2026,13 @@ const PCCustomized = () => {
 // Example 1: CPU Cooler Filtering (Step 2)
 // User selected: Intel i9-14900K (LGA1700, 253W TDP)
 
-router.get('/available/Cooling', async (req, res) => {
+router.get("/available/Cooling", async (req, res) => {
   const selectedParts = JSON.parse(req.query.selectedParts);
   const cpuSocket = selectedParts.CPU?.socket;
   const cpuTDP = selectedParts.CPU?.tdp;
-  
-  const coolers = await query(`
+
+  const coolers = await query(
+    `
     SELECT p.*, c.tdp_rating, c.water_cooled, c.height,
            CASE 
              WHEN c.socket_support LIKE '%' || $1 || '%' THEN 100
@@ -1899,20 +2049,23 @@ router.get('/available/Cooling', async (req, res) => {
       AND c.socket_support LIKE '%' || $1 || '%'  -- 🔥 Socket match
       AND p.is_active = true
     ORDER BY tdp_compatibility DESC, p.price ASC
-  `, [cpuSocket, cpuTDP]);
-  
+  `,
+    [cpuSocket, cpuTDP],
+  );
+
   res.json({ success: true, data: coolers.rows });
 });
 
 // Example 2: RAM Filtering (Step 4)
 // User selected: ASUS ROG Z790-E (DDR5, 128GB max)
 
-router.get('/available/RAM', async (req, res) => {
+router.get("/available/RAM", async (req, res) => {
   const selectedParts = JSON.parse(req.query.selectedParts);
   const memoryType = selectedParts.Motherboard?.memory_type;
   const maxCapacity = selectedParts.Motherboard?.max_ram;
-  
-  const ram = await query(`
+
+  const ram = await query(
+    `
     SELECT p.*, r.memory_type, r.speed, r.total_capacity, r.module_configuration
     FROM pc_parts p
     JOIN ram r ON p.id = r.id
@@ -1921,24 +2074,27 @@ router.get('/available/RAM', async (req, res) => {
       AND r.total_capacity <= $2  -- 🔥 Within motherboard capacity
       AND p.is_active = true
     ORDER BY r.speed DESC, p.price ASC
-  `, [memoryType, maxCapacity]);
-  
+  `,
+    [memoryType, maxCapacity],
+  );
+
   // If DDR5, 100% ensure NO DDR4 slips through
-  const filtered = ram.rows.filter(r => r.memory_type === memoryType);
-  
+  const filtered = ram.rows.filter((r) => r.memory_type === memoryType);
+
   res.json({ success: true, data: filtered });
 });
 
 // Example 3: Case Filtering (Step 7)
 // User selected: ATX motherboard, RTX 4090 (336mm), 280mm AIO
 
-router.get('/available/Case', async (req, res) => {
+router.get("/available/Case", async (req, res) => {
   const selectedParts = JSON.parse(req.query.selectedParts);
   const mbFormFactor = selectedParts.Motherboard?.form_factor;
   const gpuLength = selectedParts.GPU?.length || 0;
   const radiatorSize = selectedParts.Cooling?.radiator_size || 0;
-  
-  const cases = await query(`
+
+  const cases = await query(
+    `
     SELECT p.*, c.form_factor, c.max_gpu_length, c.max_cpu_cooler_height,
            c.radiator_support,
            CASE 
@@ -1954,8 +2110,10 @@ router.get('/available/Case', async (req, res) => {
       AND c.radiator_support LIKE '%' || $3 || '%'  -- 🔥 Radiator support
       AND p.is_active = true
     ORDER BY gpu_clearance_score DESC, p.price ASC
-  `, [mbFormFactor, gpuLength, radiatorSize + 'mm']);
-  
+  `,
+    [mbFormFactor, gpuLength, radiatorSize + "mm"],
+  );
+
   res.json({ success: true, data: cases.rows });
 });
 ```
@@ -1977,17 +2135,17 @@ USER FLOW:
 Phase 1: Parameter Selection
   Step 1: "How will you use your PC?"
     → Gaming, Work, Content Creation, General Use, Programming, Video Editing
-  
+
   Step 2: "What is your budget?"
-    → Bronze (₱10k-25k), Silver (₱26k-50k), Gold (₱51k-75k), 
+    → Bronze (₱10k-25k), Silver (₱26k-50k), Gold (₱51k-75k),
       Platinum (₱76k-100k), Diamond (₱100k+)
-  
+
   Step 3: "Performance Preference?"
     → Budget (maximize value), Balanced, Performance (maximize power)
-  
+
   Step 4: IF Gaming selected - "Gaming Preference?"
     → Competitive FPS, AAA Games, Casual Gaming, Streaming & Gaming
-  
+
   Step 5: Click "Generate Build with AI"
 
 Phase 2: AI Build Generation
@@ -2011,48 +2169,47 @@ Phase 3: Manual Editing (Optional)
 // PCCustomizedAI.js Lines 450-850
 const PCCustomizedAI = () => {
   const [parameters, setParameters] = useState({
-    usage: '',
-    budgetTier: '',
-    preference: '',
-    gamingPreference: ''
+    usage: "",
+    budgetTier: "",
+    preference: "",
+    gamingPreference: "",
   });
   const [generatedBuild, setGeneratedBuild] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  
+
   // Budget tiers
   const BUDGET_TIERS = [
-    { name: 'Bronze', range: '₱10,000 - ₱25,000', min: 10000, max: 25000 },
-    { name: 'Silver', range: '₱26,000 - ₱50,000', min: 26000, max: 50000 },
-    { name: 'Gold', range: '₱51,000 - ₱75,000', min: 51000, max: 75000 },
-    { name: 'Platinum', range: '₱76,000 - ₱100,000', min: 76000, max: 100000 },
-    { name: 'Diamond', range: '₱100,000+', min: 100000, max: 999999 }
+    { name: "Bronze", range: "₱10,000 - ₱25,000", min: 10000, max: 25000 },
+    { name: "Silver", range: "₱26,000 - ₱50,000", min: 26000, max: 50000 },
+    { name: "Gold", range: "₱51,000 - ₱75,000", min: 51000, max: 75000 },
+    { name: "Platinum", range: "₱76,000 - ₱100,000", min: 76000, max: 100000 },
+    { name: "Diamond", range: "₱100,000+", min: 100000, max: 999999 },
   ];
-  
+
   // Generate AI build
   const handleGenerateBuild = async () => {
     setIsGenerating(true);
-    
+
     try {
       // Call AI build generation endpoint
-      const response = await api.post('/ai/generate-build', {
+      const response = await api.post("/ai/generate-build", {
         usage: parameters.usage,
         budgetTier: parameters.budgetTier,
         preference: parameters.preference,
         gamingPreference: parameters.gamingPreference,
-        region: 'Philippines'
+        region: "Philippines",
       });
-      
+
       setGeneratedBuild(response.data.build);
       setIsGenerating(false);
-      
     } catch (error) {
-      console.error('Failed to generate build:', error);
+      console.error("Failed to generate build:", error);
       setIsGenerating(false);
-      alert('AI generation failed. Please try again.');
+      alert("AI generation failed. Please try again.");
     }
   };
-  
+
   return (
     <div className="pc-customized-ai">
       {!generatedBuild ? (
@@ -2062,32 +2219,41 @@ const PCCustomizedAI = () => {
           <p className="subtitle">
             Answer a few questions and let AI generate the perfect build for you
           </p>
-          
+
           {/* Question 1: Usage */}
           <div className="parameter-group">
             <h3>1. How will you use your PC?</h3>
             <div className="option-grid">
-              {['Gaming', 'Work', 'Content Creation', 'General Use', 'Programming', 'Video Editing'].map(use => (
+              {[
+                "Gaming",
+                "Work",
+                "Content Creation",
+                "General Use",
+                "Programming",
+                "Video Editing",
+              ].map((use) => (
                 <button
                   key={use}
-                  className={`option-btn ${parameters.usage === use ? 'selected' : ''}`}
-                  onClick={() => setParameters({...parameters, usage: use})}
+                  className={`option-btn ${parameters.usage === use ? "selected" : ""}`}
+                  onClick={() => setParameters({ ...parameters, usage: use })}
                 >
                   {use}
                 </button>
               ))}
             </div>
           </div>
-          
+
           {/* Question 2: Budget */}
           <div className="parameter-group">
             <h3>2. What is your budget?</h3>
             <div className="option-grid">
-              {BUDGET_TIERS.map(tier => (
+              {BUDGET_TIERS.map((tier) => (
                 <button
                   key={tier.name}
-                  className={`option-btn ${parameters.budgetTier === tier.name ? 'selected' : ''}`}
-                  onClick={() => setParameters({...parameters, budgetTier: tier.name})}
+                  className={`option-btn ${parameters.budgetTier === tier.name ? "selected" : ""}`}
+                  onClick={() =>
+                    setParameters({ ...parameters, budgetTier: tier.name })
+                  }
                 >
                   <div className="tier-name">{tier.name}</div>
                   <div className="tier-range">{tier.range}</div>
@@ -2095,20 +2261,28 @@ const PCCustomizedAI = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Question 3: Preference */}
           <div className="parameter-group">
             <h3>3. Performance Preference?</h3>
             <div className="option-grid">
               {[
-                { value: 'Budget', desc: 'Maximize value for money' },
-                { value: 'Balanced', desc: 'Balance between price and performance' },
-                { value: 'Performance', desc: 'Maximum performance, price flexible' }
-              ].map(pref => (
+                { value: "Budget", desc: "Maximize value for money" },
+                {
+                  value: "Balanced",
+                  desc: "Balance between price and performance",
+                },
+                {
+                  value: "Performance",
+                  desc: "Maximum performance, price flexible",
+                },
+              ].map((pref) => (
                 <button
                   key={pref.value}
-                  className={`option-btn ${parameters.preference === pref.value ? 'selected' : ''}`}
-                  onClick={() => setParameters({...parameters, preference: pref.value})}
+                  className={`option-btn ${parameters.preference === pref.value ? "selected" : ""}`}
+                  onClick={() =>
+                    setParameters({ ...parameters, preference: pref.value })
+                  }
                 >
                   <div className="pref-name">{pref.value}</div>
                   <div className="pref-desc">{pref.desc}</div>
@@ -2116,17 +2290,24 @@ const PCCustomizedAI = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Question 4: Gaming Preference (conditional) */}
-          {parameters.usage === 'Gaming' && (
+          {parameters.usage === "Gaming" && (
             <div className="parameter-group">
               <h3>4. Gaming Preference?</h3>
               <div className="option-grid">
-                {['Competitive FPS', 'AAA Games', 'Casual Gaming', 'Streaming & Gaming'].map(gaming => (
+                {[
+                  "Competitive FPS",
+                  "AAA Games",
+                  "Casual Gaming",
+                  "Streaming & Gaming",
+                ].map((gaming) => (
                   <button
                     key={gaming}
-                    className={`option-btn ${parameters.gamingPreference === gaming ? 'selected' : ''}`}
-                    onClick={() => setParameters({...parameters, gamingPreference: gaming})}
+                    className={`option-btn ${parameters.gamingPreference === gaming ? "selected" : ""}`}
+                    onClick={() =>
+                      setParameters({ ...parameters, gamingPreference: gaming })
+                    }
                   >
                     {gaming}
                   </button>
@@ -2134,14 +2315,21 @@ const PCCustomizedAI = () => {
               </div>
             </div>
           )}
-          
+
           {/* Generate Button */}
           <button
             className="generate-btn"
-            disabled={!parameters.usage || !parameters.budgetTier || !parameters.preference || isGenerating}
+            disabled={
+              !parameters.usage ||
+              !parameters.budgetTier ||
+              !parameters.preference ||
+              isGenerating
+            }
             onClick={handleGenerateBuild}
           >
-            {isGenerating ? '🤖 Generating Your Perfect Build...' : '🤖 Generate Build with AI'}
+            {isGenerating
+              ? "🤖 Generating Your Perfect Build..."
+              : "🤖 Generate Build with AI"}
           </button>
         </div>
       ) : (
@@ -2149,9 +2337,10 @@ const PCCustomizedAI = () => {
         <div className="generated-build-display">
           <h1>🤖 Your Reference PC Build</h1>
           <p className="ai-note">
-            AI-generated based on your preferences. You can use this as-is or customize any component.
+            AI-generated based on your preferences. You can use this as-is or
+            customize any component.
           </p>
-          
+
           {/* Build Summary */}
           <div className="build-summary">
             <div className="summary-header">
@@ -2160,37 +2349,41 @@ const PCCustomizedAI = () => {
                 ₱{generatedBuild.totalPrice.toLocaleString()}
               </div>
             </div>
-            
+
             <div className="ai-reasoning">
               <h3>🤖 AI Build Rationale</h3>
               <p>{generatedBuild.aiReasoning}</p>
             </div>
-            
+
             {/* Component List */}
             <div className="component-list">
-              {Object.entries(generatedBuild.components).map(([category, component]) => (
-                <div key={category} className="component-item">
-                  <div className="component-header">
-                    <span className="category-label">{category}</span>
-                    <button onClick={() => editComponent(category)}>
-                      ✏️ Edit
-                    </button>
-                  </div>
-                  <div className="component-details">
-                    <img src={component.imageUrl} alt={component.name} />
-                    <div className="component-info">
-                      <h4>{component.name}</h4>
-                      <p className="component-specs">{component.keySpecs}</p>
-                      <p className="component-price">₱{component.price.toLocaleString()}</p>
+              {Object.entries(generatedBuild.components).map(
+                ([category, component]) => (
+                  <div key={category} className="component-item">
+                    <div className="component-header">
+                      <span className="category-label">{category}</span>
+                      <button onClick={() => editComponent(category)}>
+                        ✏️ Edit
+                      </button>
+                    </div>
+                    <div className="component-details">
+                      <img src={component.imageUrl} alt={component.name} />
+                      <div className="component-info">
+                        <h4>{component.name}</h4>
+                        <p className="component-specs">{component.keySpecs}</p>
+                        <p className="component-price">
+                          ₱{component.price.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="component-reasoning">
+                      <strong>Why selected:</strong> {component.selectionReason}
                     </div>
                   </div>
-                  <div className="component-reasoning">
-                    <strong>Why selected:</strong> {component.selectionReason}
-                  </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
-            
+
             {/* Compatibility Analysis */}
             <div className="compatibility-summary">
               <h3>✓ Compatibility Verified</h3>
@@ -2207,13 +2400,19 @@ const PCCustomizedAI = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Action Buttons */}
             <div className="action-buttons">
-              <button className="btn-primary" onClick={() => proceedToCheckout(generatedBuild)}>
+              <button
+                className="btn-primary"
+                onClick={() => proceedToCheckout(generatedBuild)}
+              >
                 ✓ Use This Build - Proceed to Checkout
               </button>
-              <button className="btn-secondary" onClick={() => handleGenerateBuild()}>
+              <button
+                className="btn-secondary"
+                onClick={() => handleGenerateBuild()}
+              >
                 🔄 Generate New Build
               </button>
             </div>
@@ -2229,22 +2428,24 @@ const PCCustomizedAI = () => {
 
 ```javascript
 // KWise-Backend/routes/ai.js Lines 450-750
-router.post('/generate-build', async (req, res) => {
+router.post("/generate-build", async (req, res) => {
   try {
-    const { usage, budgetTier, preference, gamingPreference, region } = req.body;
-    
+    const { usage, budgetTier, preference, gamingPreference, region } =
+      req.body;
+
     // Step 1: Get budget range
     const budgetRanges = {
-      'Bronze': { min: 10000, max: 25000 },
-      'Silver': { min: 26000, max: 50000 },
-      'Gold': { min: 51000, max: 75000 },
-      'Platinum': { min: 76000, max: 100000 },
-      'Diamond': { min: 100000, max: 999999 }
+      Bronze: { min: 10000, max: 25000 },
+      Silver: { min: 26000, max: 50000 },
+      Gold: { min: 51000, max: 75000 },
+      Platinum: { min: 76000, max: 100000 },
+      Diamond: { min: 100000, max: 999999 },
     };
     const budget = budgetRanges[budgetTier];
-    
+
     // Step 2: Query reference builds from admin database
-    const referenceBuilds = await query(`
+    const referenceBuilds = await query(
+      `
       SELECT * FROM reference_builds
       WHERE use_case = $1
         AND budget_tier = $2
@@ -2252,36 +2453,40 @@ router.post('/generate-build', async (req, res) => {
         AND is_active = true
       ORDER BY compatibility_score DESC, created_at DESC
       LIMIT 5
-    `, [usage, budgetTier, preference]);
-    
+    `,
+      [usage, budgetTier, preference],
+    );
+
     if (referenceBuilds.rows.length === 0) {
       // No reference build - use AI to generate from scratch
       return await generateBuildFromScratch(usage, budget, preference, res);
     }
-    
+
     // Step 3: Adapt reference build to current stock/pricing
     const baseBuild = referenceBuilds.rows[0];
     const adaptedBuild = await adaptReferenceBuild(baseBuild, budget);
-    
+
     // Step 4: Apply compatibility validation
-    const validationResult = await validateBuildCompatibility(adaptedBuild.components);
-    
+    const validationResult = await validateBuildCompatibility(
+      adaptedBuild.components,
+    );
+
     if (!validationResult.compatible) {
       // Build has compatibility issues - fix automatically
       adaptedBuild.components = await fixCompatibilityIssues(
         adaptedBuild.components,
-        validationResult.issues
+        validationResult.issues,
       );
     }
-    
+
     // Step 5: Generate AI reasoning
     const aiReasoning = await generateBuildReasoning(
       adaptedBuild.components,
       usage,
       budget,
-      preference
+      preference,
     );
-    
+
     res.json({
       success: true,
       build: {
@@ -2290,10 +2495,12 @@ router.post('/generate-build', async (req, res) => {
         totalPrice: calculateTotalPrice(adaptedBuild.components),
         compatibilityScore: validationResult.score,
         aiReasoning: aiReasoning,
-        budgetUtilization: calculateBudgetUtilization(adaptedBuild.components, budget)
-      }
+        budgetUtilization: calculateBudgetUtilization(
+          adaptedBuild.components,
+          budget,
+        ),
+      },
     });
-    
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2302,15 +2509,20 @@ router.post('/generate-build', async (req, res) => {
 // Adapt reference build to current stock/pricing
 async function adaptReferenceBuild(referenceBuild, budget) {
   const components = {};
-  
-  for (const [category, refComponent] of Object.entries(referenceBuild.components)) {
+
+  for (const [category, refComponent] of Object.entries(
+    referenceBuild.components,
+  )) {
     // Try to find exact component
     let component = await query(
       `SELECT * FROM pc_parts WHERE id = $1 AND is_active = true`,
-      [refComponent.id]
+      [refComponent.id],
     );
-    
-    if (component.rows.length > 0 && component.rows[0].price <= budget.max * 0.15) {
+
+    if (
+      component.rows.length > 0 &&
+      component.rows[0].price <= budget.max * 0.15
+    ) {
       // Component available and within budget allocation
       components[category] = component.rows[0];
     } else {
@@ -2318,18 +2530,19 @@ async function adaptReferenceBuild(referenceBuild, budget) {
       components[category] = await findAlternativeComponent(
         category,
         refComponent,
-        budget.max * 0.15  // Max 15% of budget per component
+        budget.max * 0.15, // Max 15% of budget per component
       );
     }
   }
-  
+
   return { components };
 }
 
 // Find alternative component with similar specs
 async function findAlternativeComponent(category, refSpecs, maxPrice) {
   // Query similar components
-  const alternatives = await query(`
+  const alternatives = await query(
+    `
     SELECT p.*, 
            ABS(p.price - $2) as price_diff,
            p.performance_index
@@ -2339,8 +2552,10 @@ async function findAlternativeComponent(category, refSpecs, maxPrice) {
       AND p.price <= $3
     ORDER BY p.performance_index DESC, price_diff ASC
     LIMIT 5
-  `, [category, refSpecs.price, maxPrice]);
-  
+  `,
+    [category, refSpecs.price, maxPrice],
+  );
+
   return alternatives.rows[0];
 }
 
@@ -2350,15 +2565,14 @@ async function validateBuildCompatibility(components) {
   const deterministic = await runDeterministicRules(components);
   const advanced = await runAdvancedAnalysis(components);
   const ai = await runAIValidation(components);
-  
-  const overallScore = (deterministic.score * 0.4) + 
-                       (advanced.score * 0.4) + 
-                       (ai.score * 0.2);
-  
+
+  const overallScore =
+    deterministic.score * 0.4 + advanced.score * 0.4 + ai.score * 0.2;
+
   return {
     compatible: deterministic.compatible && advanced.compatible,
     score: overallScore,
-    issues: [...deterministic.issues, ...advanced.issues]
+    issues: [...deterministic.issues, ...advanced.issues],
   };
 }
 ```
@@ -2379,13 +2593,13 @@ USER FLOW:
 Phase 1: Build Estimation
   Step 1: "How do you use your PC?"
     → Gaming, Work, Content Creation, General Use, Programming, Video Editing
-  
+
   Step 2: "When did you buy this PC?"
     → 2021-2025 (Recent), 2016-2020 (Mid-Age), 2010-2015 (Old)
-  
+
   Step 3: "Budget when purchased?"
     → ₱10k-25k, ₱26k-50k, ₱51k-75k, ₱76k-100k, ₱100k+
-  
+
   Step 4: Click "Estimate My Build with AI"
 
 Phase 2: AI Build Estimation
@@ -2412,54 +2626,53 @@ Phase 4: Checkout
 // PCUpgrade.js Lines 350-650
 const PCUpgrade = () => {
   const [estimateParams, setEstimateParams] = useState({
-    usage: '',
-    purchaseYear: '',
-    budgetTier: ''
+    usage: "",
+    purchaseYear: "",
+    budgetTier: "",
   });
   const [estimatedBuild, setEstimatedBuild] = useState(null);
   const [selectedUpgrades, setSelectedUpgrades] = useState([]);
   const [isEstimating, setIsEstimating] = useState(false);
-  
+
   // Estimate build with AI
   const handleEstimateBuild = async () => {
     setIsEstimating(true);
-    
+
     try {
-      const response = await api.post('/ai/estimate-build', {
+      const response = await api.post("/ai/estimate-build", {
         usage: estimateParams.usage,
         purchaseYear: estimateParams.purchaseYear,
         budgetWhenPurchased: estimateParams.budgetTier,
-        region: 'Philippines'
+        region: "Philippines",
       });
-      
+
       setEstimatedBuild(response.data.estimatedBuild);
       setIsEstimating(false);
-      
     } catch (error) {
-      console.error('Failed to estimate build:', error);
+      console.error("Failed to estimate build:", error);
       setIsEstimating(false);
     }
   };
-  
+
   // Select category for upgrade
   const handleSelectCategory = async (category) => {
     // Fetch compatible upgrades for this category
-    const response = await api.get('/builder/available/' + category, {
+    const response = await api.get("/builder/available/" + category, {
       params: {
         selectedParts: JSON.stringify({
-          ...estimatedBuild,  // Pass estimated build as constraints
+          ...estimatedBuild, // Pass estimated build as constraints
           ...selectedUpgrades.reduce((acc, item) => {
             acc[item.category] = item;
             return acc;
-          }, {})
-        })
-      }
+          }, {}),
+        }),
+      },
     });
-    
+
     // Show upgrade options with compatibility filtering
     showUpgradeOptions(category, response.data.data);
   };
-  
+
   return (
     <div className="pc-upgrade">
       {!estimatedBuild ? (
@@ -2469,36 +2682,50 @@ const PCUpgrade = () => {
           <p className="subtitle">
             Let AI estimate your current build and recommend upgrades
           </p>
-          
+
           {/* Usage Question */}
           <div className="param-group">
             <h3>How do you use your PC?</h3>
             <div className="option-grid">
-              {['Gaming', 'Work', 'Content Creation', 'General Use', 'Programming', 'Video Editing'].map(use => (
+              {[
+                "Gaming",
+                "Work",
+                "Content Creation",
+                "General Use",
+                "Programming",
+                "Video Editing",
+              ].map((use) => (
                 <button
                   key={use}
-                  className={`option-btn ${estimateParams.usage === use ? 'selected' : ''}`}
-                  onClick={() => setEstimateParams({...estimateParams, usage: use})}
+                  className={`option-btn ${estimateParams.usage === use ? "selected" : ""}`}
+                  onClick={() =>
+                    setEstimateParams({ ...estimateParams, usage: use })
+                  }
                 >
                   {use}
                 </button>
               ))}
             </div>
           </div>
-          
+
           {/* Purchase Year Question */}
           <div className="param-group">
             <h3>When did you buy this PC?</h3>
             <div className="option-grid">
               {[
-                { label: '2021-2025', value: 'Recent', icon: '🆕' },
-                { label: '2016-2020', value: 'Mid-Age', icon: '📅' },
-                { label: '2010-2015', value: 'Old', icon: '🕰️' }
-              ].map(option => (
+                { label: "2021-2025", value: "Recent", icon: "🆕" },
+                { label: "2016-2020", value: "Mid-Age", icon: "📅" },
+                { label: "2010-2015", value: "Old", icon: "🕰️" },
+              ].map((option) => (
                 <button
                   key={option.value}
-                  className={`option-btn ${estimateParams.purchaseYear === option.value ? 'selected' : ''}`}
-                  onClick={() => setEstimateParams({...estimateParams, purchaseYear: option.value})}
+                  className={`option-btn ${estimateParams.purchaseYear === option.value ? "selected" : ""}`}
+                  onClick={() =>
+                    setEstimateParams({
+                      ...estimateParams,
+                      purchaseYear: option.value,
+                    })
+                  }
                 >
                   <span className="icon">{option.icon}</span>
                   <span className="label">{option.label}</span>
@@ -2506,30 +2733,44 @@ const PCUpgrade = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Budget When Purchased */}
           <div className="param-group">
             <h3>Budget when purchased?</h3>
             <div className="option-grid">
-              {['₱10k-25k', '₱26k-50k', '₱51k-75k', '₱76k-100k', '₱100k+'].map(budget => (
-                <button
-                  key={budget}
-                  className={`option-btn ${estimateParams.budgetTier === budget ? 'selected' : ''}`}
-                  onClick={() => setEstimateParams({...estimateParams, budgetTier: budget})}
-                >
-                  {budget}
-                </button>
-              ))}
+              {["₱10k-25k", "₱26k-50k", "₱51k-75k", "₱76k-100k", "₱100k+"].map(
+                (budget) => (
+                  <button
+                    key={budget}
+                    className={`option-btn ${estimateParams.budgetTier === budget ? "selected" : ""}`}
+                    onClick={() =>
+                      setEstimateParams({
+                        ...estimateParams,
+                        budgetTier: budget,
+                      })
+                    }
+                  >
+                    {budget}
+                  </button>
+                ),
+              )}
             </div>
           </div>
-          
+
           {/* Estimate Button */}
           <button
             className="estimate-btn"
-            disabled={!estimateParams.usage || !estimateParams.purchaseYear || !estimateParams.budgetTier || isEstimating}
+            disabled={
+              !estimateParams.usage ||
+              !estimateParams.purchaseYear ||
+              !estimateParams.budgetTier ||
+              isEstimating
+            }
             onClick={handleEstimateBuild}
           >
-            {isEstimating ? '🤖 Estimating Your Build...' : '🤖 Estimate My Build with AI'}
+            {isEstimating
+              ? "🤖 Estimating Your Build..."
+              : "🤖 Estimate My Build with AI"}
           </button>
         </div>
       ) : (
@@ -2539,41 +2780,47 @@ const PCUpgrade = () => {
           <div className="ai-confidence">
             🤖 AI Confidence: {estimatedBuild.confidence}%
           </div>
-          
+
           {/* Estimated Components */}
           <div className="estimated-components">
-            {Object.entries(estimatedBuild.components).map(([category, component]) => (
-              <div key={category} className="estimated-component">
-                <div className="component-header">
-                  <h3>{category}</h3>
-                  <span className={`upgrade-priority priority-${component.upgradePriority}`}>
-                    {component.upgradePriority === 'high' && '🔴 High Priority'}
-                    {component.upgradePriority === 'medium' && '🟡 Medium Priority'}
-                    {component.upgradePriority === 'low' && '🟢 Low Priority'}
-                  </span>
+            {Object.entries(estimatedBuild.components).map(
+              ([category, component]) => (
+                <div key={category} className="estimated-component">
+                  <div className="component-header">
+                    <h3>{category}</h3>
+                    <span
+                      className={`upgrade-priority priority-${component.upgradePriority}`}
+                    >
+                      {component.upgradePriority === "high" &&
+                        "🔴 High Priority"}
+                      {component.upgradePriority === "medium" &&
+                        "🟡 Medium Priority"}
+                      {component.upgradePriority === "low" && "🟢 Low Priority"}
+                    </span>
+                  </div>
+
+                  <div className="component-details">
+                    <h4>{component.estimatedName}</h4>
+                    <p className="specs">{component.estimatedSpecs}</p>
+                    <p className="age">~{component.ageYears} years old</p>
+                  </div>
+
+                  <div className="upgrade-reasoning">
+                    <strong>Upgrade Priority Reason:</strong>
+                    <p>{component.upgradeReason}</p>
+                  </div>
+
+                  <button
+                    className="btn-upgrade"
+                    onClick={() => handleSelectCategory(category)}
+                  >
+                    ⬆️ Upgrade {category}
+                  </button>
                 </div>
-                
-                <div className="component-details">
-                  <h4>{component.estimatedName}</h4>
-                  <p className="specs">{component.estimatedSpecs}</p>
-                  <p className="age">~{component.ageYears} years old</p>
-                </div>
-                
-                <div className="upgrade-reasoning">
-                  <strong>Upgrade Priority Reason:</strong>
-                  <p>{component.upgradeReason}</p>
-                </div>
-                
-                <button
-                  className="btn-upgrade"
-                  onClick={() => handleSelectCategory(category)}
-                >
-                  ⬆️ Upgrade {category}
-                </button>
-              </div>
-            ))}
+              ),
+            )}
           </div>
-          
+
           {/* Selected Upgrades Cart */}
           {selectedUpgrades.length > 0 && (
             <div className="upgrade-cart">
@@ -2582,16 +2829,22 @@ const PCUpgrade = () => {
                 <div key={idx} className="cart-item">
                   <span className="category">{upgrade.category}:</span>
                   <span className="name">{upgrade.name}</span>
-                  <span className="price">₱{upgrade.price.toLocaleString()}</span>
+                  <span className="price">
+                    ₱{upgrade.price.toLocaleString()}
+                  </span>
                   <button onClick={() => removeUpgrade(idx)}>✕</button>
                 </div>
               ))}
-              
+
               <div className="cart-total">
-                Total: ₱{calculateUpgradeTotal(selectedUpgrades).toLocaleString()}
+                Total: ₱
+                {calculateUpgradeTotal(selectedUpgrades).toLocaleString()}
               </div>
-              
-              <button className="btn-checkout" onClick={() => proceedToCheckout()}>
+
+              <button
+                className="btn-checkout"
+                onClick={() => proceedToCheckout()}
+              >
                 Proceed to Checkout
               </button>
             </div>
@@ -2607,40 +2860,49 @@ const PCUpgrade = () => {
 
 ```javascript
 // KWise-Backend/routes/ai.js Lines 850-1100
-router.post('/estimate-build', async (req, res) => {
+router.post("/estimate-build", async (req, res) => {
   try {
     const { usage, purchaseYear, budgetWhenPurchased, region } = req.body;
-    
+
     // Map purchase year to age bracket
     const ageMapping = {
-      'Recent': { minYear: 2021, maxYear: 2025, ageYears: 2 },
-      'Mid-Age': { minYear: 2016, maxYear: 2020, ageYears: 6 },
-      'Old': { minYear: 2010, maxYear: 2015, ageYears: 12 }
+      Recent: { minYear: 2021, maxYear: 2025, ageYears: 2 },
+      "Mid-Age": { minYear: 2016, maxYear: 2020, ageYears: 6 },
+      Old: { minYear: 2010, maxYear: 2015, ageYears: 12 },
     };
     const ageData = ageMapping[purchaseYear];
-    
+
     // Map budget to price range
     const budgetMapping = {
-      '₱10k-25k': { min: 10000, max: 25000 },
-      '₱26k-50k': { min: 26000, max: 50000 },
-      '₱51k-75k': { min: 51000, max: 75000 },
-      '₱76k-100k': { min: 76000, max: 100000 },
-      '₱100k+': { min: 100000, max: 200000 }
+      "₱10k-25k": { min: 10000, max: 25000 },
+      "₱26k-50k": { min: 26000, max: 50000 },
+      "₱51k-75k": { min: 51000, max: 75000 },
+      "₱76k-100k": { min: 76000, max: 100000 },
+      "₱100k+": { min: 100000, max: 200000 },
     };
     const budgetRange = budgetMapping[budgetWhenPurchased];
-    
+
     // Query reference builds from historical data
-    const historicalBuilds = await query(`
+    const historicalBuilds = await query(
+      `
       SELECT * FROM reference_builds
       WHERE use_case = $1
         AND build_year BETWEEN $2 AND $3
         AND total_price BETWEEN $4 AND $5
       ORDER BY build_year DESC, popularity DESC
       LIMIT 10
-    `, [usage, ageData.minYear, ageData.maxYear, budgetRange.min, budgetRange.max]);
-    
+    `,
+      [
+        usage,
+        ageData.minYear,
+        ageData.maxYear,
+        budgetRange.min,
+        budgetRange.max,
+      ],
+    );
+
     let estimatedComponents = {};
-    
+
     if (historicalBuilds.rows.length > 0) {
       // Use historical data
       const baseBuild = historicalBuilds.rows[0];
@@ -2650,28 +2912,27 @@ router.post('/estimate-build', async (req, res) => {
       const aiEstimate = await callDeepSeekForEstimation(
         usage,
         ageData.ageYears,
-        budgetRange
+        budgetRange,
       );
       estimatedComponents = aiEstimate.components;
     }
-    
+
     // Calculate upgrade priorities
     const componentsWithPriority = await calculateUpgradePriorities(
       estimatedComponents,
       usage,
-      ageData.ageYears
+      ageData.ageYears,
     );
-    
+
     res.json({
       success: true,
       estimatedBuild: {
         components: componentsWithPriority,
-        estimationBasis: historicalBuilds.rows.length > 0 ? 'historical' : 'ai',
+        estimationBasis: historicalBuilds.rows.length > 0 ? "historical" : "ai",
         confidence: historicalBuilds.rows.length > 0 ? 85 : 70,
-        totalEstimatedValue: calculateEstimatedValue(componentsWithPriority)
-      }
+        totalEstimatedValue: calculateEstimatedValue(componentsWithPriority),
+      },
     });
-    
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2680,42 +2941,42 @@ router.post('/estimate-build', async (req, res) => {
 // Calculate upgrade priorities
 async function calculateUpgradePriorities(components, usage, ageYears) {
   const priorities = {};
-  
+
   for (const [category, component] of Object.entries(components)) {
-    let priority = 'low';
-    let reason = '';
-    
+    let priority = "low";
+    let reason = "";
+
     // Age-based priority
     if (ageYears >= 5) {
-      if (category === 'GPU') {
-        priority = 'high';
+      if (category === "GPU") {
+        priority = "high";
         reason = `GPU is ${ageYears} years old - significant performance gain available`;
-      } else if (category === 'CPU') {
-        priority = 'medium';
+      } else if (category === "CPU") {
+        priority = "medium";
         reason = `CPU is ${ageYears} years old - moderate performance improvement possible`;
-      } else if (category === 'Storage') {
-        priority = 'medium';
+      } else if (category === "Storage") {
+        priority = "medium";
         reason = `Old storage technology - NVMe SSDs offer 5-10× faster speeds`;
       }
     }
-    
+
     // Usage-specific priority
-    if (usage === 'Gaming') {
-      if (category === 'GPU') priority = 'high';
-      if (category === 'RAM' && component.capacity < 16) {
-        priority = 'high';
-        reason = 'Insufficient RAM for modern gaming (recommend 16GB minimum)';
+    if (usage === "Gaming") {
+      if (category === "GPU") priority = "high";
+      if (category === "RAM" && component.capacity < 16) {
+        priority = "high";
+        reason = "Insufficient RAM for modern gaming (recommend 16GB minimum)";
       }
     }
-    
+
     priorities[category] = {
       ...component,
       upgradePriority: priority,
       upgradeReason: reason,
-      ageYears: ageYears
+      ageYears: ageYears,
     };
   }
-  
+
   return priorities;
 }
 ```
@@ -2823,29 +3084,29 @@ const FutureUpgrade = () => {
   const [currentBuild, setCurrentBuild] = useState([]);
   const [upgradeRecommendations, setUpgradeRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     loadUpgradeRecommendations();
   }, []);
-  
+
   const loadUpgradeRecommendations = async () => {
     // Get current build from cart/localStorage
-    const build = JSON.parse(localStorage.getItem('current-build') || '[]');
+    const build = JSON.parse(localStorage.getItem("current-build") || "[]");
     setCurrentBuild(build);
-    
+
     // Fetch upgrade recommendations
-    const response = await api.post('/ai/future-upgrade-recommendations', {
-      currentBuild: build
+    const response = await api.post("/ai/future-upgrade-recommendations", {
+      currentBuild: build,
     });
-    
+
     setUpgradeRecommendations(response.data.recommendations);
     setLoading(false);
   };
-  
+
   return (
     <div className="future-upgrade">
       <h1>🔮 Future Upgrade Recommendations</h1>
-      
+
       {/* Current Build Summary */}
       <div className="current-build-summary">
         <h2>Your Current Build</h2>
@@ -2857,77 +3118,100 @@ const FutureUpgrade = () => {
           </div>
         ))}
       </div>
-      
+
       {/* Upgrade Recommendations */}
       <div className="upgrade-recommendations">
         {upgradeRecommendations.map((recommendation, idx) => (
           <div key={idx} className="upgrade-card">
             <h2>{recommendation.category} Upgrade Path</h2>
-            
+
             <div className="upgrade-layout">
               {/* LEFT SIDE: In-Stock Upgrade */}
               <div className="in-stock-upgrade">
                 <h3>⬆️ In-Stock Upgrade</h3>
                 <div className="upgrade-product">
-                  <img src={recommendation.inStock.imageUrl} alt={recommendation.inStock.name} />
+                  <img
+                    src={recommendation.inStock.imageUrl}
+                    alt={recommendation.inStock.name}
+                  />
                   <h4>{recommendation.inStock.name}</h4>
-                  <p className="price">₱{recommendation.inStock.price.toLocaleString()}</p>
-                  
+                  <p className="price">
+                    ₱{recommendation.inStock.price.toLocaleString()}
+                  </p>
+
                   <div className="upgrade-benefits">
-                    <p>✓ {recommendation.inStock.performanceGain} performance gain</p>
+                    <p>
+                      ✓ {recommendation.inStock.performanceGain} performance
+                      gain
+                    </p>
                     <p>✓ {recommendation.inStock.compatibilityNote}</p>
                     <p>✓ {recommendation.inStock.keyBenefit}</p>
                   </div>
-                  
+
                   <button onClick={() => addToCart(recommendation.inStock)}>
                     Add to Cart
                   </button>
                 </div>
               </div>
-              
+
               {/* RIGHT SIDE: Full Compatible Build */}
               <div className="full-build-suggestion">
                 <h3>🖥️ Complete Build with This Upgrade</h3>
                 <div className="full-build-card">
-                  {Object.entries(recommendation.fullBuild.components).map(([cat, comp]) => (
-                    <div key={cat} className="build-component">
-                      <div className="component-header">
-                        <span className="category-label">{cat}</span>
-                        {comp.isExisting && (
-                          <span className="existing-badge">✓ Your Existing</span>
-                        )}
-                        {comp.isUpgrade && (
-                          <span className="upgrade-badge">⬆️ Upgraded</span>
+                  {Object.entries(recommendation.fullBuild.components).map(
+                    ([cat, comp]) => (
+                      <div key={cat} className="build-component">
+                        <div className="component-header">
+                          <span className="category-label">{cat}</span>
+                          {comp.isExisting && (
+                            <span className="existing-badge">
+                              ✓ Your Existing
+                            </span>
+                          )}
+                          {comp.isUpgrade && (
+                            <span className="upgrade-badge">⬆️ Upgraded</span>
+                          )}
+                        </div>
+
+                        <div className="component-detail">
+                          <p className="name">{comp.name}</p>
+                          <p className="price">
+                            ₱{comp.price.toLocaleString()}
+                          </p>
+                        </div>
+
+                        {comp.upgradeReason && (
+                          <p className="upgrade-reason">{comp.upgradeReason}</p>
                         )}
                       </div>
-                      
-                      <div className="component-detail">
-                        <p className="name">{comp.name}</p>
-                        <p className="price">₱{comp.price.toLocaleString()}</p>
-                      </div>
-                      
-                      {comp.upgradeReason && (
-                        <p className="upgrade-reason">{comp.upgradeReason}</p>
-                      )}
-                    </div>
-                  ))}
-                  
+                    ),
+                  )}
+
                   <div className="build-summary">
                     <div className="total-price">
-                      <strong>Total:</strong> ₱{recommendation.fullBuild.totalPrice.toLocaleString()}
+                      <strong>Total:</strong> ₱
+                      {recommendation.fullBuild.totalPrice.toLocaleString()}
                     </div>
-                    
+
                     <div className="compatibility-badge">
-                      <span className="score">{recommendation.fullBuild.compatibilityScore}/100</span>
+                      <span className="score">
+                        {recommendation.fullBuild.compatibilityScore}/100
+                      </span>
                       <span className="label">✅ Verified Compatible</span>
                     </div>
                   </div>
-                  
+
                   <div className="build-actions">
-                    <button onClick={() => viewFullSpecs(recommendation.fullBuild)}>
+                    <button
+                      onClick={() => viewFullSpecs(recommendation.fullBuild)}
+                    >
                       View Full Specs
                     </button>
-                    <button onClick={() => addFullBuildToCart(recommendation.fullBuild)}>
+                    <button
+                      onClick={() =>
+                        addFullBuildToCart(recommendation.fullBuild)
+                      }
+                    >
                       Add Full Build
                     </button>
                   </div>
@@ -2965,6 +3249,7 @@ SECTION 7-13: Advanced (82 traps) - ✅ 79/82 PASSING
 ### **Critical Findings & Improvements:**
 
 #### **Finding #1: DDR4/DDR5 Mixing Prevention**
+
 **Status**: ✅ RESOLVED  
 **Issue**: DDR4 RAM occasionally appeared for DDR5 motherboards  
 **Root Cause**: SQL query using `LIKE` instead of exact match  
@@ -2982,6 +3267,7 @@ AND p.id NOT IN (
 ```
 
 #### **Finding #2: Socket Compatibility Edge Cases**
+
 **Status**: ✅ RESOLVED  
 **Issue**: AM4 coolers showed for AM5 CPUs (physically compatible but not validated)  
 **Root Cause**: Physical mounting compatibility vs. official support distinction  
@@ -2991,16 +3277,20 @@ AND p.id NOT IN (
 // New validation layer
 const validateCoolerSocket = async (cooler, cpu) => {
   // Check official manufacturer support
-  const supported = await query(`
+  const supported = await query(
+    `
     SELECT 1 FROM cooler_socket_support
     WHERE cooler_id = $1 AND socket = $2 AND official_support = true
-  `, [cooler.id, cpu.socket]);
-  
+  `,
+    [cooler.id, cpu.socket],
+  );
+
   return supported.rows.length > 0;
 };
 ```
 
 #### **Finding #3: Power Budget Calculation Consistency**
+
 **Status**: ✅ RESOLVED  
 **Issue**: Different PSU wattage calculations across endpoints  
 **Root Cause**: Hardcoded overhead values vs. dynamic calculation  
@@ -3012,20 +3302,20 @@ class PowerBudgetCalculator {
   calculate(components) {
     const cpuPower = components.CPU?.tdp || 0;
     const gpuPower = components.GPU?.tdp || 0;
-    
+
     // Dynamic system overhead
     const baseOverhead = 80W;
     const ramOverhead = (components.RAM?.modules || 2) × 5W;
     const storageOverhead = this.calculateStorageOverhead(components.Storage);
     const coolingOverhead = components.Cooling?.water_cooled ? 15W : 8W;
     const rgbOverhead = this.calculateRGBOverhead(components);
-    
-    const systemOverhead = baseOverhead + ramOverhead + storageOverhead + 
+
+    const systemOverhead = baseOverhead + ramOverhead + storageOverhead +
                            coolingOverhead + rgbOverhead;
-    
+
     const totalDraw = cpuPower + gpuPower + systemOverhead;
     const recommended = Math.ceil(totalDraw × 1.25 / 50) × 50; // Round to nearest 50W
-    
+
     return {
       cpuDraw: cpuPower,
       gpuDraw: gpuPower,
@@ -3041,25 +3331,27 @@ class PowerBudgetCalculator {
 ### **Recommended Improvements:**
 
 #### **Improvement #1: Real-Time Compatibility Caching**
+
 ```javascript
 // Implement Redis caching for frequently checked compatibility pairs
 const compatibilityCache = new Map();
 
 async function checkCompatibilityWithCache(component1, component2) {
   const cacheKey = `${component1.id}-${component2.id}`;
-  
+
   if (compatibilityCache.has(cacheKey)) {
     return compatibilityCache.get(cacheKey);
   }
-  
+
   const result = await runFullCompatibilityCheck(component1, component2);
   compatibilityCache.set(cacheKey, result);
-  
+
   return result;
 }
 ```
 
 #### **Improvement #2: Progressive Compatibility Scoring**
+
 ```javascript
 // Show real-time compatibility scores as user builds
 const [compatibilityScore, setCompatibilityScore] = useState(0);
@@ -3068,18 +3360,19 @@ useEffect(() => {
   const updateScore = async () => {
     const score = await calculateLiveCompatibility(selectedParts);
     setCompatibilityScore(score);
-    
+
     // Show visual feedback
-    if (score >= 95) setStatusColor('green');
-    else if (score >= 85) setStatusColor('yellow');
-    else setStatusColor('red');
+    if (score >= 95) setStatusColor("green");
+    else if (score >= 85) setStatusColor("yellow");
+    else setStatusColor("red");
   };
-  
+
   updateScore();
 }, [selectedParts]);
 ```
 
 #### **Improvement #3: AI Confidence Indicators**
+
 ```javascript
 // Show AI reasoning confidence levels
 <div className="ai-reasoning">
@@ -3090,7 +3383,7 @@ useEffect(() => {
     </div>
   </div>
   <p>{aiReasoning}</p>
-  
+
   {aiConfidence < 80 && (
     <div className="low-confidence-notice">
       ⚠️ AI confidence below 80% - consider manual verification
@@ -3116,6 +3409,7 @@ AFTER OPTIMIZATION:
 ### **Final Rating: 5.0/5.0 ⭐⭐⭐⭐⭐**
 
 **Criteria Met:**
+
 - ✅ 100% socket compatibility accuracy
 - ✅ 100% memory type compatibility accuracy
 - ✅ Zero false positives (no incompatible shown as compatible)
@@ -3411,47 +3705,40 @@ KWise-Backend/
 #### 8 Core Compatibility Rules (compatibilityRules.js - 1183 lines):
 
 1. **checkCpuMotherboardCompatibility()** (Lines 37-119)
-
    - Socket matching (AM4, AM5, LGA1700, etc.)
    - TDP adequacy
    - Chipset compatibility
    - PCIe generation support
 
 2. **checkCpuRamCompatibility()** (Lines 121-210)
-
    - Memory type (DDR4, DDR5)
    - Speed support
    - Capacity limits
    - Channel configuration
 
 3. **checkGpuPsuCompatibility()** (Lines 212-305)
-
    - Total wattage calculation
    - PCIe connector availability
    - Efficiency rating (80+ Bronze/Gold)
    - Power headroom (20% recommended)
 
 4. **checkCoolingCaseCompatibility()** (Lines 307-398)
-
    - CPU cooler height clearance
    - Radiator mounting (120mm/240mm/360mm)
    - Fan configuration
    - Thermal design adequacy
 
 5. **checkMotherboardCaseCompatibility()** (Lines 400-485)
-
    - Form factor (ATX, mATX, Mini-ITX)
    - Mounting hole alignment
    - I/O shield clearance
 
 6. **checkStorageMotherboardCompatibility()** (Lines 487-575)
-
    - M.2 slot availability
    - NVMe gen support (Gen3/Gen4/Gen5)
    - SATA port availability
 
 7. **checkGpuCaseCompatibility()** (Lines 577-670)
-
    - GPU length clearance
    - Slot width (2-slot, 3-slot, 4-slot)
    - Vertical mounting support
@@ -3680,7 +3967,7 @@ const handleEstimatePC = async () => {
         estimatedBuild: response.estimatedBuild,
         currentParts: {},
         step: "select-upgrades",
-      })
+      }),
     );
 
     // Proceed to category selection
@@ -3730,7 +4017,7 @@ const getCompatibleProducts = async (
   products,
   selectedComponents,
   categoryName,
-  estimatedBuild = null
+  estimatedBuild = null,
 ) => {
   const selectedParts = {};
 
@@ -3755,7 +4042,7 @@ const getCompatibleProducts = async (
   // Call Builder API with combined constraints
   const compatibleProducts = await api.builder.getAvailableOptions(
     builderCategory,
-    selectedParts
+    selectedParts,
   );
 
   return compatibleProducts;
@@ -3887,7 +4174,7 @@ async function getStockUpgrade(component, category) {
     ORDER BY p.performance_index DESC, p.value_score DESC
     LIMIT 3
   `,
-    [category, currentPrice, currentPerformance]
+    [category, currentPrice, currentPerformance],
   );
 
   if (result.rows.length === 0) return null;
@@ -4057,7 +4344,7 @@ class QueueManager {
             assigned_at = NOW()
         WHERE id = $3
       `,
-        [queueNumber, queuePosition, orderId]
+        [queueNumber, queuePosition, orderId],
       );
 
       // Emit SSE event
@@ -4092,7 +4379,7 @@ class QueueManager {
           updated_at = NOW()
       WHERE id = $2
     `,
-      [newStatus, orderId]
+      [newStatus, orderId],
     );
 
     // Emit SSE event
@@ -4127,7 +4414,7 @@ class QueueManager {
         SET queue_position = $1
         WHERE id = $2
       `,
-        [i + 1, result.rows[i].id]
+        [i + 1, result.rows[i].id],
       );
     }
 
@@ -4152,7 +4439,7 @@ router.get("/stream", authenticateToken, (req, res) => {
   res.write(
     'data: {"event":"connected","timestamp":"' +
       new Date().toISOString() +
-      '"}\n\n'
+      '"}\n\n',
   );
 
   // Register client for queue updates
@@ -4382,14 +4669,12 @@ GET /api/orders/history?
 **Role-Based Access Control (RBAC):**
 
 - **Superadmin**: Full system access
-
   - Create/delete admin accounts
   - System configuration
   - Database management
   - View all logs
 
 - **Admin**: Standard operations
-
   - Order management
   - Stock management
   - Customer service
@@ -4449,27 +4734,23 @@ GET /api/users/activity-logs/:id
 **System Configuration:**
 
 - **General Settings**
-
   - Store name, address, contact
   - Operating hours
   - Tax rates
   - Currency format
 
 - **Email Settings**
-
   - SMTP configuration
   - Email templates
   - Notification preferences
 
 - **AI Configuration**
-
   - Ollama model selection
   - Timeout settings
   - Cache configuration
   - Feature toggles (enable/disable AI features)
 
 - **Queue Settings**
-
   - Auto-assignment rules
   - Queue reset time
   - Display preferences
@@ -4616,14 +4897,12 @@ class OllamaService {
 **Main Methods:**
 
 1. **optimizeBuild(buildConfig, requirements, availableComponents)**
-
    - Analyzes complete build configuration
    - Identifies bottlenecks
    - Suggests optimizations
    - Considers Philippine market factors
 
 2. **analyzeBott leneckRisks(build)**
-
    - CPU-GPU balance check
    - RAM capacity vs usage check
    - Storage speed bottlenecks
@@ -4667,14 +4946,12 @@ Response in JSON format with optimized components and reasoning.
 **Main Methods:**
 
 1. **performPCCheckup(systemSpecs, performanceData)**
-
    - Component health assessment
    - Performance bottleneck identification
    - Thermal analysis
    - Recommended services/upgrades
 
 2. **analyzeUpgradePath(currentBuild, budget, goals)**
-
    - Prioritize upgrade categories
    - Cost-benefit analysis
    - Incremental upgrade roadmap
@@ -4719,7 +4996,132 @@ Response in JSON with diagnostic summary and actionable recommendations.
 
 ---
 
-## 📡 API ENDPOINTS REFERENCE
+## � HYBRID RAG PIPELINE (Phase 4 Enhancement)
+
+### Architecture Overview
+
+The Hybrid RAG (Retrieval-Augmented Generation) Pipeline combines lexical and semantic search via **Reciprocal Rank Fusion (RRF)** for superior context retrieval in AI compatibility analysis.
+
+```
+Query Input
+    ↓
+┌──────────────────────────────────────────┐
+│  RAG Pipeline (ragPipeline.js)            │
+├──────────────────────────────────────────┤
+│  ┌─────────────┐  ┌──────────────────┐  │
+│  │ BM25 Search │  │  Vector Search    │  │
+│  │ (Lexical)   │  │  (Semantic)       │  │
+│  │ bm25Service │  │  embeddingService │  │
+│  └──────┬──────┘  └────────┬─────────┘  │
+│         └────────┬──────────┘            │
+│              ┌───▼────┐                  │
+│              │  RRF   │ k=60             │
+│              │ Fusion │                  │
+│              └───┬────┘                  │
+│         ┌────────▼──────────┐            │
+│         │  Context Window   │            │
+│         │  Builder          │            │
+│         └───────────────────┘            │
+└──────────────────────────────────────────┘
+    ↓
+AI Prompt with Enriched Context
+```
+
+### RRF Formula
+
+$$\text{RRF\_score}(d) = \sum_{i} \frac{1}{k + \text{rank}_i(d)}, \quad k = 60$$
+
+Each result is ranked in both BM25 and vector results, then combined by the reciprocal rank formula. Items appearing high in both rankings receive the highest fusion scores.
+
+### Components
+
+| Service             | File                            | Purpose                                          |
+| ------------------- | ------------------------------- | ------------------------------------------------ |
+| BM25 Service        | `services/bm25Service.js`       | Okapi BM25 lexical search (term frequency + IDF) |
+| RAG Pipeline        | `services/ragPipeline.js`       | Orchestrates BM25 + vector + RRF fusion          |
+| Embedding Service   | `services/embeddingService.js`  | Vector embeddings via Ollama nomic-embed-text    |
+| Enhanced AI Service | `services/enhancedAIService.js` | Injects RAG context into AI prompts              |
+
+### Database Tables
+
+| Table                | Purpose                                |
+| -------------------- | -------------------------------------- |
+| `rag_embeddings`     | Pre-computed product vector embeddings |
+| `rag_pipeline_stats` | Performance tracking for retrieval     |
+
+---
+
+## 🤖 ML COMPATIBILITY SCORER (Phase 5 Enhancement)
+
+### Overview
+
+A rule-based ML engine using **statistical pattern analysis** of the 3,200+ compatibility rules database. No external ML libraries required — pure JavaScript.
+
+### Technical Specs
+
+- **3,200 rules** loaded from `compatibility_rules` table
+- **128 patterns** identified across component category pairs
+- **33 categories** for contextual weighting
+- **Cache**: In-memory (1,000 prediction pairs)
+
+### 4-Signal Scoring Formula
+
+```
+┌─────────────────────────────────────────────────────┐
+│  When AI is available:                              │
+│  finalScore = det×0.45 + AI×0.20 + ML×0.20 + tier×0.15 │
+│                                                     │
+│  When AI is unavailable (fallback):                 │
+│  finalScore = det×0.65 + ML×0.20 + tier×0.15       │
+│                                                     │
+│  When ML fails (graceful degradation):              │
+│  finalScore = det×0.60 + AI×0.25 + tier×0.15       │
+└─────────────────────────────────────────────────────┘
+```
+
+### Endpoint
+
+```
+POST /api/ml/predict
+{
+  "componentA": { "id": 1, "category": "CPU", "brand": "Intel" },
+  "componentB": { "id": 2, "category": "Motherboard", "brand": "ASUS" }
+}
+```
+
+---
+
+## 🔒 SECURITY HARDENING (Phase 6)
+
+### Security Stack
+
+| Layer                  | Implementation                                          | Scope                 |
+| ---------------------- | ------------------------------------------------------- | --------------------- |
+| HTTP Headers           | Helmet 8.1.0                                            | All responses         |
+| CORS                   | Trusted origins only                                    | Cross-origin requests |
+| Rate Limiting (HTTP)   | 4-tier (global/realtime/polling/kiosk)                  | All routes            |
+| Rate Limiting (Socket) | 10 msg/sec per user                                     | WebSocket events      |
+| Authentication         | JWT HS256, `algorithms: ['HS256']` enforced             | Protected routes      |
+| Authorization          | RBAC (superadmin/admin/developer)                       | Restricted routes     |
+| Input Sanitization     | HTML strip + entity escape + 5000 char max              | Socket messages       |
+| Input Validation       | Type checking on all socket event payloads              | Socket events         |
+| SQL Injection          | 100% parameterized queries (`$1, $2...` syntax)         | All DB queries        |
+| Password Storage       | bcrypt                                                  | User passwords        |
+| Graceful Shutdown      | SIGTERM/SIGINT + uncaughtException + unhandledRejection | Process errors        |
+| Test Auth Bypass       | Requires `NODE_ENV = 'test'` AND env var                | Auth middleware       |
+
+### Resolved Vulnerabilities (Phase 6)
+
+1. **XSS via Socket messages** — Sanitized with HTML stripped + entity-encoded
+2. **DoS via Socket events** — Per-user 10 msg/sec token bucket
+3. **JWT algorithm confusion** — `algorithms: ['HS256']` enforced at verification
+4. **Zombie processes** — Fatal error handlers now trigger graceful shutdown + exit(1)
+5. **Auth bypass in production** — `restrictTo()` now gates on `NODE_ENV === 'test'`
+6. **Socket event injection** — Type validation on all event payloads
+
+---
+
+## �📡 API ENDPOINTS REFERENCE
 
 ### Authentication Endpoints
 
@@ -5090,14 +5492,12 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
 ### Authentication & Authorization
 
 1. **JWT Token System**
-
    - Access tokens (1 hour expiration)
    - Refresh tokens (7 days)
    - HttpOnly cookies for tokens
    - CSRF protection
 
 2. **Password Security**
-
    - bcrypt hashing (10 rounds)
    - Password complexity requirements
    - Reset token expiration (1 hour)
@@ -5149,7 +5549,7 @@ const aiLimiter = rateLimit({
 // Always use parameterized queries
 const result = await query(
   "SELECT * FROM pc_parts WHERE category = $1 AND price < $2",
-  [category, maxPrice] // Never concatenate user input
+  [category, maxPrice], // Never concatenate user input
 );
 ```
 
@@ -5321,3 +5721,59 @@ Proprietary - K-Wise Computer Store © 2025
 ---
 
 **Note:** This system requires PostgreSQL database `KWiseDB` with complete schema, Ollama with DeepSeek R1 model installed, and proper environment configuration. All AI features are optional and gracefully degrade if Ollama is unavailable.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+### Running Tests
+
+**Backend tests:**
+```bash
+cd KWise-Backend
+npm test                    # Run all tests with coverage
+npx jest --verbose          # Run with detailed output
+npx jest --no-coverage      # Run without coverage (faster)
+```
+
+**Frontend tests:**
+```bash
+cd K-Wise
+npm test                    # Run Jest in watch mode
+```
+
+### Test Infrastructure (April 7, 2026)
+
+The Jest test suite was overhauled to fix 8 critical infrastructure issues: coverage collection was re-enabled with phased 5% thresholds, 19 non-test scripts were excluded via regex patterns in `testPathIgnorePatterns`, the global auth bypass was replaced with a proper `generateTestToken()` helper for real JWT verification, server initialization was consolidated into `globalSetup` only, and placeholder tests were rewritten with real assertions. All fixes validated by adversarial peer review.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+### Running Tests
+
+**Backend tests:**
+```bash
+cd KWise-Backend
+npm test                    # Run all tests with coverage
+npx jest --verbose          # Run with detailed output
+npx jest --no-coverage      # Run without coverage (faster)
+```
+
+**Frontend tests:**
+```bash
+cd K-Wise
+npm test                    # Run Jest in watch mode
+```
+
+### Test Infrastructure (April 7, 2026)
+
+The Jest test suite was overhauled to fix 8 critical infrastructure issues: coverage collection was re-enabled with phased 5% thresholds, 19 non-test scripts were excluded via regex patterns in `testPathIgnorePatterns`, the global auth bypass was replaced with a proper `generateTestToken()` helper for real JWT verification, server initialization was consolidated into `globalSetup` only, and placeholder tests were rewritten with real assertions. All fixes validated by adversarial peer review.
+
+### Performance Optimization (April 7, 2026)
+
+Comprehensive performance audit identified and fixed critical bottlenecks: Redis `KEYS` command (blocking O(N)) replaced with non-blocking `SCAN` for pattern deletion, `FLUSHDB` and `disconnect()` wrapped in try/catch for graceful degradation, the `/api/kiosk/build-components` endpoint reduced from 8 sequential database queries to 1 batched query using `ANY()` (8 round-trips → 1), `ORDER BY RANDOM()` on featured products replaced with `TABLESAMPLE SYSTEM(10)` to avoid full table scans, and a migration file (`013-performance-indexes-phase6.sql`) created with 25+ `CREATE INDEX CONCURRENTLY` statements for unindexed columns (`settings.key`, `session_locks.session_id`, `queue_management.queue_number`, `order_locks.order_id`, etc.) plus `VACUUM ANALYZE` on all bloated tables. Zero data was modified or deleted — all changes are read-only or additive.
+
+### API 404 Fix & Request Storm Elimination (April 7, 2026)
+
+Fixed a double URL prefix bug where `builderAPI.js` and `adminAPI.js` were constructing URLs like `/api/api/compatibility/ram-slots` because the Axios `baseURL` (from `getApiBaseUrl()`) already contained `/api` and each individual call also prepended `/api/` — resulting in all compatibility slot checks returning 404. Fixed by removing the redundant `/api` prefix from both files. Additionally eliminated a request storm in `PCCustomized.js` where the `useEffect` for slot-checking was firing 4-8 times per component selection because it depended on full state objects (`multiSlotCart`) that got new references every render — replaced with stable primitive dependencies (`motherboardId`, `multiSlotCartKeyCount`) and added a global Axios request deduplication interceptor in `services/api.js` to cancel identical concurrent requests. Also silenced the repeated `⚠️ Skipping unknown category: mouse` warning for known peripheral categories. No database records were modified.
