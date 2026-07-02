@@ -8,8 +8,8 @@ const logger = require('../utils/logger');
 exports.getAllUsers = async (req, res, next) => {
 try {
     // Parse query parameters
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const page = parseInt(req.query.page, 10) || 1;
+    const limit = Number.parseInt(req.query.limit, 10) || 10;
+    const page = Number.parseInt(req.query.page, 10) || 1;
     const offset = (page - 1) * limit;
     const orderBy = req.query.orderBy || 'id';
     const order = req.query.order || 'ASC';
@@ -41,7 +41,7 @@ try {
  */
 exports.getUser = async (req, res, next) => {
 try {
-    const user = await User.findById(parseInt(req.params.id, 10));
+    const user = await User.findById(Number.parseInt(req.params.id, 10));
     
     if (!user) {
         return res.status(404).json({
@@ -135,7 +135,7 @@ try {
  */
 exports.updateUser = async (req, res, next) => {
 try {
-    const userId = parseInt(req.params.id, 10);
+    const userId = Number.parseInt(req.params.id, 10);
     const { name, email, password, role } = req.body;
     
     // Check if user exists
@@ -221,7 +221,7 @@ try {
  */
 exports.deleteUser = async (req, res, next) => {
     try {
-    const userId = parseInt(req.params.id, 10);
+    const userId = Number.parseInt(req.params.id, 10);
     
     // Check if user exists
     const existingUser = await User.findById(userId);
