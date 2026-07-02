@@ -130,7 +130,7 @@ async function autoAdvanceNowServing(completedQueueNumber, completedStation = nu
               AND queue_number != $1
         `, [completedQueueNumber]);
         
-        const otherServingCount = parseInt(otherServingResult.rows[0].serving_count);
+        const otherServingCount = Number.parseInt(otherServingResult.rows[0].serving_count, 10);
         
         if (otherServingCount > 0) {
             logger.info(`ℹ️ Station ${completedStation === 1 ? 2 : 1} is still serving, not auto-advancing to avoid interference`);
@@ -241,9 +241,9 @@ router.get('/', authenticateToken, async (req, res) => {
         if (status && status !== 'all') {
             whereClause = 'WHERE qm.status = $1';
             params.push(status);
-            params.push(parseInt(limit));
+            params.push(Number.parseInt(limit, 10));
         } else {
-            params.push(parseInt(limit));
+            params.push(Number.parseInt(limit, 10));
         }
         
         const result = await query(`
@@ -337,13 +337,13 @@ router.post('/assign/:orderId', authenticateToken, restrictTo('admin', 'superadm
             });
         }
 
-        const queueNumber = await queueManager.assignQueueToOrder(parseInt(orderId));
+        const queueNumber = await queueManager.assignQueueToOrder(Number.parseInt(orderId, 10));
         
         res.json({
             success: true,
             message: `Queue number ${queueNumber} assigned to order`,
             data: {
-                orderId: parseInt(orderId),
+                orderId: Number.parseInt(orderId, 10),
                 queueNumber,
                 customerName: order.customer_name
             }
@@ -435,7 +435,7 @@ router.patch('/:queueNumber/customer', authenticateToken, restrictTo('admin', 's
                 success: true,
                 message: `Customer name updated for Queue ${queueNumber}`,
                 data: {
-                    queueNumber: parseInt(queueNumber),
+                    queueNumber: Number.parseInt(queueNumber, 10),
                     customerName: updatedOrder?.customer_name || customerName.trim(),
                     orderId: queueInfo.order_id,
                     orderIdFormatted: queueInfo.order_id_formatted,
@@ -652,7 +652,7 @@ router.put('/:queueNumber/status', authenticateToken, restrictTo('admin', 'super
                 
                 logger.info(`✅ Queue ${queueNumber} cancelled and released (used_in_cycle preserved)`, {
                     service: 'pc-wise-admin',
-                    queueNumber: parseInt(queueNumber),
+                    queueNumber: Number.parseInt(queueNumber, 10),
                     orderId: queueInfo.order_id,
                     wasNowServing
                 });
@@ -690,7 +690,7 @@ router.put('/:queueNumber/status', authenticateToken, restrictTo('admin', 'super
             success: true,
             message: `Queue ${queueNumber} status updated to ${status}`,
             data: {
-                queueNumber: parseInt(queueNumber),
+                queueNumber: Number.parseInt(queueNumber, 10),
                 status,
                 orderId: queueInfo.order_id,
                 customerName: customerName || queueInfo.customer_name,
@@ -751,7 +751,7 @@ router.post('/complete/:orderId', authenticateToken, restrictTo('admin', 'supera
         const servingStation = servingCheck.rows[0]?.now_serving_station || null;
 
         // Complete the order (this will clear all station fields)
-        await queueManager.completeOrder(parseInt(orderId));
+        await queueManager.completeOrder(Number.parseInt(orderId, 10));
         
         // ✅ CRITICAL FIX: Pass saved station info to auto-advance
         if (wasNowServing && order.queue_number && servingStation) {
@@ -763,11 +763,11 @@ router.post('/complete/:orderId', authenticateToken, restrictTo('admin', 'supera
             success: true,
             message: 'Order completed successfully',
             data: {
-                orderId: parseInt(orderId),
+                orderId: Number.parseInt(orderId, 10),
                 orderIdFormatted: order.order_id_formatted,
                 queueNumber: order.queue_number,
                 customerName: customerName || order.customer_name,
-                totalAmount: parseFloat(order.total_amount)
+                totalAmount: Number.parseFloat(order.total_amount)
             }
         });
     } catch (error) {
@@ -947,13 +947,13 @@ router.get('/unified', authenticateToken, async (req, res) => {
         // Queue number filter
         if (queueNumber) {
             whereClause += ` AND o.queue_number = $${paramCount++}`;
-            params.push(parseInt(queueNumber));
+            params.push(Number.parseInt(queueNumber, 10));
         }
         
         // Assigned admin filter
         if (assignedTo) {
             whereClause += ` AND o.assisted_by = $${paramCount++}`;
-            params.push(parseInt(assignedTo));
+            params.push(Number.parseInt(assignedTo, 10));
         }
         
         // Date range filters
@@ -1033,7 +1033,7 @@ router.get('/unified', authenticateToken, async (req, res) => {
                 o.queue_number ASC,
                 o.created_at DESC
             LIMIT $${paramCount++}
-        `, [...params, parseInt(limit)]);
+        `, [...params, Number.parseInt(limit, 10)]);
         
         // Get statistics for the filtered results
         const statsResult = await query(`
@@ -1145,7 +1145,7 @@ router.put('/:queueNumber/now-serving', authenticateToken, restrictTo('admin', '
             success: true,
             message: `Queue #${queueNumber} is now being served`,
             data: {
-                queueNumber: parseInt(queueNumber),
+                queueNumber: Number.parseInt(queueNumber, 10),
                 orderId: queueInfo.order_id,
                 customerName: queueInfo.customer_name,
                 setBy: userId,

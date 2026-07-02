@@ -7,13 +7,20 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const logger = require('../utils/logger');
+const { protect, restrictTo } = require('../middleware/auth');
+
+const requirePriceAdmin = [protect, restrictTo('admin', 'superadmin')];
+const clampLimit = (value, fallback = 30, max = 100) => {
+    const parsed = Number.parseInt(value, 10);
+    return Math.min(Math.max(Number.isFinite(parsed) ? parsed : fallback, 1), max);
+};
 
 /**
  * @route   POST /api/price-history
  * @desc    Record a new price point
- * @access  Public (will add auth later)
+ * @access  Admin
  */
-router.post('/', async (req, res) => {
+router.post('/', requirePriceAdmin, async (req, res) => {
     try {
         const { product_id, price, source = 'manual', currency = 'PHP', notes } = req.body;
 
@@ -71,6 +78,8 @@ router.get('/:productId', async (req, res) => {
     try {
         const { productId } = req.params;
         const { limit = 30, days = 30 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 30;
+        const safeLimit = clampLimit(limit, 30, 100);
 
         const result = await pool.query(`
             SELECT 
@@ -80,10 +89,10 @@ router.get('/:productId', async (req, res) => {
             FROM price_history ph
             JOIN pc_parts p ON ph.product_id = p.id
             WHERE ph.product_id = $1
-            AND ph.recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+            AND ph.recorded_at >= NOW() - $2 * INTERVAL '1 day'
             ORDER BY ph.recorded_at DESC
-            LIMIT $2
-        `, [productId, parseInt(limit)]);
+            LIMIT $3
+        `, [productId, safeDays, safeLimit]);
 
         // Calculate price statistics
         const stats = await pool.query(`
@@ -94,15 +103,15 @@ router.get('/:productId', async (req, res) => {
                 COUNT(*) as total_records
             FROM price_history
             WHERE product_id = $1
-            AND recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
-        `, [productId]);
+            AND recorded_at >= NOW() - $2 * INTERVAL '1 day'
+        `, [productId, safeDays]);
 
         res.json({
             success: true,
             data: {
                 history: result.rows,
                 statistics: stats.rows[0],
-                period_days: parseInt(days)
+                period_days: Number.parseInt(days, 10)
             }
         });
 
@@ -123,6 +132,8 @@ router.get('/:productId', async (req, res) => {
 router.get('/alerts/drops', async (req, res) => {
     try {
         const { threshold = 5, days = 7, limit = 20 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 7;
+        const safeLimit = clampLimit(limit, 20, 100);
 
         const result = await pool.query(`
             WITH latest_prices AS (
@@ -138,7 +149,7 @@ router.get('/alerts/drops', async (req, res) => {
                     product_id,
                     price as previous_price
                 FROM price_history
-                WHERE recorded_at < NOW() - INTERVAL '${parseInt(days)} days'
+                WHERE recorded_at < NOW() - $1 * INTERVAL '1 day'
                 ORDER BY product_id, recorded_at DESC
             )
             SELECT 
@@ -153,17 +164,17 @@ router.get('/alerts/drops', async (req, res) => {
             FROM pc_parts p
             JOIN latest_prices lp ON p.id = lp.product_id
             JOIN previous_prices pp ON p.id = pp.product_id
-            WHERE ((pp.previous_price - lp.current_price) / pp.previous_price * 100) >= $1
+            WHERE ((pp.previous_price - lp.current_price) / pp.previous_price * 100) >= $2
             ORDER BY drop_percentage DESC
-            LIMIT $2
-        `, [parseFloat(threshold), parseInt(limit)]);
+            LIMIT $3
+        `, [safeDays, Number.parseFloat(threshold), safeLimit]);
 
         res.json({
             success: true,
             data: {
                 alerts: result.rows,
-                threshold_percentage: parseFloat(threshold),
-                period_days: parseInt(days)
+                threshold_percentage: Number.parseFloat(threshold),
+                period_days: Number.parseInt(days, 10)
             }
         });
 
@@ -184,7 +195,9 @@ router.get('/alerts/drops', async (req, res) => {
 router.get('/trends/market', async (req, res) => {
     try {
         const { category, days = 30 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 30;
 
+        let paramIndex = 2;
         let query = `
             WITH daily_averages AS (
                 SELECT 
@@ -194,12 +207,12 @@ router.get('/trends/market', async (req, res) => {
                     COUNT(*) as product_count
                 FROM price_history ph
                 JOIN pc_parts p ON ph.product_id = p.id
-                WHERE ph.recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+                WHERE ph.recorded_at >= NOW() - $1 * INTERVAL '1 day'
         `;
 
-        const params = [];
+        const params = [safeDays];
         if (category) {
-            query += ` AND p.category = $1`;
+            query += ` AND p.category = $${paramIndex}`;
             params.push(category);
         }
 
@@ -216,7 +229,7 @@ router.get('/trends/market', async (req, res) => {
             success: true,
             data: {
                 trends: result.rows,
-                period_days: parseInt(days),
+                period_days: Number.parseInt(days, 10),
                 category: category || 'all'
             }
         });
@@ -238,6 +251,7 @@ router.get('/trends/market', async (req, res) => {
 router.get('/view/latest', async (req, res) => {
     try {
         const { category, limit = 50 } = req.query;
+        const safeLimit = clampLimit(limit, 50, 100);
 
         let query = 'SELECT * FROM latest_product_prices';
         const params = [];
@@ -248,7 +262,7 @@ router.get('/view/latest', async (req, res) => {
         }
 
         query += ' ORDER BY price_change_percent DESC LIMIT $' + (params.length + 1);
-        params.push(parseInt(limit));
+        params.push(safeLimit);
 
         const result = await pool.query(query, params);
 
@@ -269,9 +283,9 @@ router.get('/view/latest', async (req, res) => {
 /**
  * @route   DELETE /api/price-history/:id
  * @desc    Delete a price history entry
- * @access  Admin (will add auth later)
+ * @access  Admin
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePriceAdmin, async (req, res) => {
     try {
         const { id } = req.params;
 

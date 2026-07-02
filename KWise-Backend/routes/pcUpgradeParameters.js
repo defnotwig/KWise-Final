@@ -8,63 +8,68 @@
 const express = require('express');
 const router = express.Router();
 const PCUpgradeParametersController = require('../controllers/pcUpgradeParametersController');
+const { protect, restrictTo } = require('../middleware/auth');
+
+router.use(protect);
+const requireParameterRead = restrictTo('admin', 'superadmin', 'developer');
+const requireParameterWrite = restrictTo('admin', 'superadmin');
 
 // ============================================================
 // USAGE TYPES ROUTES
 // ============================================================
 
 // Get all usage types
-router.get('/usage-types', PCUpgradeParametersController.getUsageTypes);
+router.get('/usage-types', requireParameterRead, PCUpgradeParametersController.getUsageTypes);
 
 // Create new usage type
-router.post('/usage-types', PCUpgradeParametersController.createUsageType);
+router.post('/usage-types', requireParameterWrite, PCUpgradeParametersController.createUsageType);
 
 // Update usage type
-router.put('/usage-types/:id', PCUpgradeParametersController.updateUsageType);
+router.put('/usage-types/:id', requireParameterWrite, PCUpgradeParametersController.updateUsageType);
 
 // Delete usage type
-router.delete('/usage-types/:id', PCUpgradeParametersController.deleteUsageType);
+router.delete('/usage-types/:id', requireParameterWrite, PCUpgradeParametersController.deleteUsageType);
 
 // ============================================================
 // YEAR RANGES ROUTES
 // ============================================================
 
 // Get all year ranges
-router.get('/year-ranges', PCUpgradeParametersController.getYearRanges);
+router.get('/year-ranges', requireParameterRead, PCUpgradeParametersController.getYearRanges);
 
 // Create new year range
-router.post('/year-ranges', PCUpgradeParametersController.createYearRange);
+router.post('/year-ranges', requireParameterWrite, PCUpgradeParametersController.createYearRange);
 
 // Update year range
-router.put('/year-ranges/:id', PCUpgradeParametersController.updateYearRange);
+router.put('/year-ranges/:id', requireParameterWrite, PCUpgradeParametersController.updateYearRange);
 
 // Delete year range
-router.delete('/year-ranges/:id', PCUpgradeParametersController.deleteYearRange);
+router.delete('/year-ranges/:id', requireParameterWrite, PCUpgradeParametersController.deleteYearRange);
 
 // ============================================================
 // BUDGET RANGES ROUTES
 // ============================================================
 
 // Get all budget ranges
-router.get('/budget-ranges', PCUpgradeParametersController.getBudgetRanges);
+router.get('/budget-ranges', requireParameterRead, PCUpgradeParametersController.getBudgetRanges);
 
 // Create new budget range
-router.post('/budget-ranges', PCUpgradeParametersController.createBudgetRange);
+router.post('/budget-ranges', requireParameterWrite, PCUpgradeParametersController.createBudgetRange);
 
 // Update budget range
-router.put('/budget-ranges/:id', PCUpgradeParametersController.updateBudgetRange);
+router.put('/budget-ranges/:id', requireParameterWrite, PCUpgradeParametersController.updateBudgetRange);
 
 // Delete budget range
-router.delete('/budget-ranges/:id', PCUpgradeParametersController.deleteBudgetRange);
+router.delete('/budget-ranges/:id', requireParameterWrite, PCUpgradeParametersController.deleteBudgetRange);
 
 // ============================================================
 // SUMMARY ROUTES
 // ============================================================
 
 // Get parameters summary
-router.get('/summary', PCUpgradeParametersController.getParametersSummary);
+router.get('/summary', requireParameterRead, PCUpgradeParametersController.getParametersSummary);
 
 // Get all parameters at once (for frontend)
-router.get('/all', PCUpgradeParametersController.getAllParameters);
+router.get('/all', requireParameterRead, PCUpgradeParametersController.getAllParameters);
 
 module.exports = router;

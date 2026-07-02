@@ -60,7 +60,7 @@ router.get('/search', async (req, res) => {
                 ORDER BY m.price ASC
                 LIMIT $${paramIndex++} OFFSET $${paramIndex}
             `;
-            params.push(parseInt(limit), parseInt(offset));
+            params.push(Number.parseInt(limit, 10), Number.parseInt(offset, 10));
 
             const result = await query(sqlQuery, params);
 
@@ -91,7 +91,7 @@ router.get('/search', async (req, res) => {
             ORDER BY p.price ASC
             LIMIT $${paramIndex++} OFFSET $${paramIndex}
         `;
-        params.push(parseInt(limit), parseInt(offset));
+        params.push(Number.parseInt(limit, 10), Number.parseInt(offset, 10));
 
         const result = await query(genericQuery, params);
 
@@ -143,7 +143,7 @@ router.get('/category/:category', async (req, res) => {
             LIMIT $2 OFFSET $3
         `;
 
-        const result = await query(sqlQuery, [category, parseInt(limit), parseInt(offset)]);
+        const result = await query(sqlQuery, [category, Number.parseInt(limit, 10), Number.parseInt(offset, 10)]);
 
         res.json({
             success: true,

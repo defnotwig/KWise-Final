@@ -64,9 +64,9 @@ router.get('/parameters', kioskGeneralLimit, async (req, res) => {
             categories: categoriesResult.rows.map(r => r.category),
             priceRanges: priceRangesResult.rows.reduce((acc, row) => {
                 acc[row.category] = {
-                    min: parseFloat(row.min_price),
-                    max: parseFloat(row.max_price),
-                    avg: parseFloat(row.avg_price)
+                    min: Number.parseFloat(row.min_price),
+                    max: Number.parseFloat(row.max_price),
+                    avg: Number.parseFloat(row.avg_price)
                 };
                 return acc;
             }, {}),
@@ -196,6 +196,19 @@ router.post('/external-suggestions', kioskGeneralLimit, async (req, res) => {
                 message: 'Missing required fields: currentComponent, category'
             });
         }
+
+        return res.status(410).json({
+            success: false,
+            code: 'OFFLINE_ONLY',
+            source: 'deterministic',
+            aiEnabled: false,
+            currentComponent,
+            category,
+            suggestions: [],
+            budget: budget || 0,
+            targetPerformance: targetPerformance || 'balanced',
+            message: 'External upgrade suggestions are disabled in local offline kiosk mode'
+        });
         
         // Mock component object for upgrade service
         const componentObj = {

@@ -18,6 +18,7 @@ router.get('/history/:productId', async (req, res) => {
     try {
         const { productId } = req.params;
         const { days = 30, limit = 100 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 30;
 
         const history = await query(`
             SELECT 
@@ -34,10 +35,10 @@ router.get('/history/:productId', async (req, res) => {
             FROM price_history ph
             JOIN pc_parts p ON p.id = ph.product_id
             WHERE ph.product_id = $1
-                AND ph.recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+                AND ph.recorded_at >= NOW() - $2 * INTERVAL '1 day'
             ORDER BY ph.recorded_at DESC
-            LIMIT $2
-        `, [productId, parseInt(limit)]);
+            LIMIT $3
+        `, [productId, safeDays, Number.parseInt(limit, 10)]);
 
         res.json({
             success: true,
@@ -64,7 +65,7 @@ router.get('/history/:productId', async (req, res) => {
 router.post('/update/:productId', protect, restrictTo('admin', 'superadmin'), async (req, res) => {
     try {
         const { productId } = req.params;
-        const { newPrice, notes } = req.body;
+        const { newPrice } = req.body;
 
         // Validate new price
         if (!newPrice || newPrice < 0) {
@@ -84,7 +85,7 @@ router.post('/update/:productId', protect, restrictTo('admin', 'superadmin'), as
             });
         }
 
-        const oldPrice = parseFloat(current.rows[0].price);
+        const oldPrice = Number.parseFloat(current.rows[0].price);
         const productName = current.rows[0].name;
         const priceChange = newPrice - oldPrice;
         const percentChange = oldPrice === 0 ? 100 : ((priceChange / oldPrice) * 100).toFixed(2);
@@ -118,7 +119,7 @@ router.post('/update/:productId', protect, restrictTo('admin', 'superadmin'), as
                 oldPrice,
                 newPrice,
                 priceChange,
-                percentChange: parseFloat(percentChange),
+                percentChange: Number.parseFloat(percentChange),
                 alertsTriggered: alerts.rowCount
             }
         });
@@ -141,6 +142,7 @@ router.post('/update/:productId', protect, restrictTo('admin', 'superadmin'), as
 router.get('/trends', async (req, res) => {
     try {
         const { days = 7, limit = 20 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 7;
 
         const trends = await query(`
             WITH latest_changes AS (
@@ -152,7 +154,7 @@ router.get('/trends', async (req, res) => {
                     price_change_percent,
                     recorded_at
                 FROM price_history
-                WHERE recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+                WHERE recorded_at >= NOW() - $1 * INTERVAL '1 day'
                     AND price_change IS NOT NULL
                 ORDER BY product_id, recorded_at DESC
             )
@@ -175,8 +177,8 @@ router.get('/trends', async (req, res) => {
             JOIN pc_parts p ON p.id = lc.product_id
             WHERE p.is_active = true
             ORDER BY ABS(lc.price_change_percent) DESC
-            LIMIT $1
-        `, [parseInt(limit)]);
+            LIMIT $2
+        `, [safeDays, Number.parseInt(limit, 10)]);
 
         // Separate into gainers and losers
         const gainers = trends.rows.filter(r => r.price_change > 0);
@@ -193,7 +195,7 @@ router.get('/trends', async (req, res) => {
                     gainersCount: gainers.length,
                     losersCount: losers.length,
                     averageChange: trends.rows.length > 0 
-                        ? (trends.rows.reduce((sum, r) => sum + parseFloat(r.price_change_percent), 0) / trends.rows.length).toFixed(2)
+                        ? (trends.rows.reduce((sum, r) => sum + Number.parseFloat(r.price_change_percent), 0) / trends.rows.length).toFixed(2)
                         : 0
                 }
             },
@@ -397,6 +399,7 @@ router.get('/category/:category', async (req, res) => {
     try {
         const { category } = req.params;
         const { days = 30 } = req.query;
+        const safeDays = Number.parseInt(days, 10) || 30;
 
         // Get category price summary
         const summary = await query(`
@@ -411,7 +414,7 @@ router.get('/category/:category', async (req, res) => {
                 FROM price_history ph
                 JOIN pc_parts p ON p.id = ph.product_id
                 WHERE p.category = $1
-                    AND ph.recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+                    AND ph.recorded_at >= NOW() - $2 * INTERVAL '1 day'
                 ORDER BY ph.product_id, ph.recorded_at DESC
             )
             SELECT 
@@ -427,7 +430,7 @@ router.get('/category/:category', async (req, res) => {
             FROM pc_parts p
             LEFT JOIN recent_prices rp ON rp.product_id = p.id
             WHERE p.category = $1 AND p.is_active = true
-        `, [category]);
+        `, [category, safeDays]);
 
         // Get trending products in category
         const trending = await query(`
@@ -445,7 +448,7 @@ router.get('/category/:category', async (req, res) => {
                 FROM price_history ph
                 JOIN pc_parts p ON p.id = ph.product_id
                 WHERE p.category = $1
-                    AND ph.recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+                    AND ph.recorded_at >= NOW() - $2 * INTERVAL '1 day'
                 ORDER BY ph.product_id, ph.recorded_at DESC
             )
             SELECT *
@@ -453,7 +456,7 @@ router.get('/category/:category', async (req, res) => {
             WHERE price_change IS NOT NULL
             ORDER BY ABS(price_change_percent) DESC
             LIMIT 5
-        `, [category]);
+        `, [category, safeDays]);
 
         res.json({
             success: true,
@@ -506,7 +509,7 @@ router.get('/statistics', async (req, res) => {
             success: true,
             data: {
                 priceHistory: stats.rows[0],
-                activeAlerts: parseInt(activeAlerts.rows[0].count),
+                activeAlerts: Number.parseInt(activeAlerts.rows[0].count, 10),
                 lastUpdated: new Date()
             }
         });

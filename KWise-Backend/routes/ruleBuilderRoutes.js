@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const logger = require('../utils/logger');
+const { protect, restrictTo } = require('../middleware/auth');
+
+router.use(protect);
+router.use(restrictTo('admin', 'superadmin', 'developer'));
+const requireRuleWrite = restrictTo('admin', 'superadmin');
 
 /**
  * Rule Builder API Routes
@@ -74,7 +79,7 @@ router.get('/', async (req, res) => {
 // ==========================================
 // POST /api/rules/create - Create new rule
 // ==========================================
-router.post('/create', async (req, res) => {
+router.post('/create', requireRuleWrite, async (req, res) => {
   try {
     const {
       name,
@@ -160,7 +165,7 @@ router.post('/create', async (req, res) => {
 // ==========================================
 // PUT /api/rules/:id/update - Update rule
 // ==========================================
-router.put('/:id/update', async (req, res) => {
+router.put('/:id/update', requireRuleWrite, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -247,7 +252,7 @@ router.put('/:id/update', async (req, res) => {
 // ==========================================
 // DELETE /api/rules/:id - Delete rule
 // ==========================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRuleWrite, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -323,19 +328,19 @@ router.post('/test', async (req, res) => {
           result = `${value} != ${condition.value}`;
           break;
         case '>':
-          passed = parseFloat(value) > parseFloat(condition.value);
+          passed = Number.parseFloat(value) > Number.parseFloat(condition.value);
           result = `${value} > ${condition.value}`;
           break;
         case '<':
-          passed = parseFloat(value) < parseFloat(condition.value);
+          passed = Number.parseFloat(value) < Number.parseFloat(condition.value);
           result = `${value} < ${condition.value}`;
           break;
         case '>=':
-          passed = parseFloat(value) >= parseFloat(condition.value);
+          passed = Number.parseFloat(value) >= Number.parseFloat(condition.value);
           result = `${value} >= ${condition.value}`;
           break;
         case '<=':
-          passed = parseFloat(value) <= parseFloat(condition.value);
+          passed = Number.parseFloat(value) <= Number.parseFloat(condition.value);
           result = `${value} <= ${condition.value}`;
           break;
         case 'contains':
@@ -563,7 +568,7 @@ router.get('/templates', async (req, res) => {
 // ==========================================
 // POST /api/rules/import - Import rules
 // ==========================================
-router.post('/import', async (req, res) => {
+router.post('/import', requireRuleWrite, async (req, res) => {
   try {
     const { rules } = req.body;
 

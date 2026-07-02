@@ -268,7 +268,7 @@ router.get('/check-stock/:id', async (req, res) => {
     `, [id]);
     
     const stockInfo = result.rows[0];
-    const allInStock = (parseInt(stockInfo.in_stock_count) + parseInt(stockInfo.unlinked_count)) === parseInt(stockInfo.total_components);
+    const allInStock = (Number.parseInt(stockInfo.in_stock_count, 10) + Number.parseInt(stockInfo.unlinked_count, 10)) === Number.parseInt(stockInfo.total_components, 10);
     
     res.json({
       success: true,

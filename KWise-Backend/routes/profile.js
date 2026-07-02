@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 const { query } = require('../config/db');
 const { protect } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const {
+    isAllowedImageMetadata,
+    randomImageFilename,
+    validateUploadedImageMagic
+} = require('../middleware/secureImageUpload');
 
 // Apply authentication to all profile routes
 router.use(protect);
@@ -21,9 +26,7 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const userId = req.user.id;
-        const timestamp = Date.now();
-        const ext = path.extname(file.originalname);
-        cb(null, `profile_${userId}_${timestamp}${ext}`);
+        cb(null, `profile_${userId}_${randomImageFilename(file.originalname)}`);
     }
 });
 
@@ -33,11 +36,10 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024 // 5MB limit
     },
     fileFilter: function (req, file, cb) {
-        // Check file type
-        if (file.mimetype.startsWith('image/')) {
+        if (isAllowedImageMetadata(file)) {
             cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed'));
+            cb(new Error('Only JPG, PNG, GIF, and WEBP image files are allowed'));
         }
     }
 });
@@ -167,7 +169,7 @@ router.put('/', async (req, res) => {
  * Upload profile picture
  * @route POST /api/profile/picture
  */
-router.post('/picture', upload.single('profilePicture'), async (req, res) => {
+router.post('/picture', upload.single('profilePicture'), validateUploadedImageMagic, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
