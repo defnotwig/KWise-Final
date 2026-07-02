@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { FiPlay, FiCheckCircle, FiXCircle, FiAlertTriangle } from 'react-icons/fi';
 
 /**
@@ -118,7 +119,7 @@ const RuleTester = ({ component1, component2, conditions, onTest, testResults })
               <h4>Condition Results:</h4>
               <ul>
                 {testResults.details.map((detail, index) => (
-                  <li key={index} className={detail.passed ? 'passed' : 'failed'}>
+                  <li key={`${detail.condition}-${index}`} className={detail.passed ? 'passed' : 'failed'}>
                     {getResultIcon(detail.passed)}
                     <code>{detail.condition}</code>
                     <span className="result-value">{detail.result}</span>
@@ -131,6 +132,33 @@ const RuleTester = ({ component1, component2, conditions, onTest, testResults })
       )}
     </div>
   );
+};
+
+RuleTester.propTypes = {
+  component1: PropTypes.shape({
+    name: PropTypes.string,
+  }),
+  component2: PropTypes.shape({
+    name: PropTypes.string,
+  }),
+  conditions: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      field: PropTypes.string,
+    })
+  ).isRequired,
+  onTest: PropTypes.func.isRequired,
+  testResults: PropTypes.shape({
+    passed: PropTypes.bool,
+    message: PropTypes.string,
+    details: PropTypes.arrayOf(
+      PropTypes.shape({
+        condition: PropTypes.string,
+        passed: PropTypes.bool,
+        result: PropTypes.string,
+      })
+    ),
+  }),
 };
 
 export default RuleTester;

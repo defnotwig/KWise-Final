@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import searchService from '../services/searchService';
 
@@ -27,7 +28,7 @@ export function SearchProvider({ children }) {
     const isAdminSection = location.pathname.startsWith('/admin');
 
     // Enhanced search handler with debouncing
-    const handleSearch = async (query) => {
+    const handleSearch = useCallback(async (query) => {
         setSearchQuery(query);
         
         if (!query || query.length < 2) {
@@ -42,12 +43,12 @@ export function SearchProvider({ children }) {
         setShowResults(true);
 
         // Clear previous timeout
-        if (window.searchTimeout) {
-            clearTimeout(window.searchTimeout);
+        if (globalThis.searchTimeout) {
+            clearTimeout(globalThis.searchTimeout);
         }
 
         // Debounce search by 300ms
-        window.searchTimeout = setTimeout(async () => {
+        globalThis.searchTimeout = setTimeout(async () => {
             try {
                 const result = await searchService.search(query, {
                     includeProducts: isAdminSection,
@@ -74,16 +75,16 @@ export function SearchProvider({ children }) {
                 setIsSearching(false);
             }
         }, 300);
-    };
+    }, [isAdminSection]);
 
     // Handle result click
-    const handleResultClick = (result) => {
+    const handleResultClick = useCallback((result) => {
         setShowResults(false);
         setSearchQuery('');
         if (result?.path) {
             navigate(result.path);
         }
-    };
+    }, [navigate]);
 
     // Clear search
     const clearSearch = () => {
@@ -94,12 +95,12 @@ export function SearchProvider({ children }) {
         setSearchStats(null);
         
         // Clear any pending search timeout
-        if (window.searchTimeout) {
-            clearTimeout(window.searchTimeout);
+        if (globalThis.searchTimeout) {
+            clearTimeout(globalThis.searchTimeout);
         }
     };
 
-    const value = {
+    const value = useMemo(() => ({
         searchQuery,
         searchResults,
         isSearching,
@@ -112,7 +113,8 @@ export function SearchProvider({ children }) {
         isAdminSection,
         setSearchQuery,
         setShowResults
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [searchQuery, searchResults, isSearching, showResults, searchStats, isAdminSection, handleSearch, handleResultClick]);
 
     return (
         <SearchContext.Provider value={value}>
@@ -120,5 +122,9 @@ export function SearchProvider({ children }) {
         </SearchContext.Provider>
     );
 }
+
+SearchProvider.propTypes = {
+    children: PropTypes.node.isRequired,
+};
 
 export default SearchContext;

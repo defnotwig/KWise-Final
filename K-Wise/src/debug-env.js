@@ -18,8 +18,8 @@ const testAPI = async () => {
 };
 
 // Run test after page loads
-if (typeof window !== 'undefined') {
-    window.addEventListener('load', () => {
+if (globalThis.window !== undefined) {
+    globalThis.addEventListener('load', () => {
         console.log('Page loaded, running tests...');
         testAPI();
     });

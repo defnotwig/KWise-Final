@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { getServerBaseUrl } from '../../utils/networkConfig';
 import {
   LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -33,7 +34,7 @@ const SystemPerformanceMetrics = () => {
   const fetchMetrics = useCallback(async () => {
     try {
       setRefreshing(true);
-      const response = await fetch('http://localhost:5000/api/system/metrics');
+      const response = await fetch(`${getServerBaseUrl()}/api/system/metrics`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -109,10 +110,10 @@ const SystemPerformanceMetrics = () => {
   // Format numbers with type safety
   const formatNumber = (num) => {
     // Convert to number and validate
-    const n = parseFloat(num);
+    const n = Number.parseFloat(num);
     
     // Check if conversion failed or value is null/undefined
-    if (isNaN(n) || num === null || num === undefined) return 'N/A';
+    if (Number.isNaN(n) || num === null || num === undefined) return 'N/A';
     
     // Format based on magnitude
     if (n >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
@@ -127,7 +128,7 @@ const SystemPerformanceMetrics = () => {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+    return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
   if (loading) {

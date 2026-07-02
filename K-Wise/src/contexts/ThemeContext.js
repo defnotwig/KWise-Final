@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 
 // Enhanced theme system with data attributes
 const ThemeContext = createContext();
@@ -23,17 +24,17 @@ export const ThemeProvider = ({ children }) => {
 
     // Apply theme to document root (but not for kiosk pages)
     useEffect(() => {
-        const isKioskRoute = window.location.pathname.includes('/pc-parts') ||
-            window.location.pathname.includes('/kiosk') ||
-            window.location.pathname.includes('/product') ||
-            window.location.pathname.includes('/order-summary') ||
-            window.location.pathname === '/';
+        const isKioskRoute = globalThis.location.pathname.includes('/pc-parts') ||
+            globalThis.location.pathname.includes('/kiosk') ||
+            globalThis.location.pathname.includes('/product') ||
+            globalThis.location.pathname.includes('/order-summary') ||
+            globalThis.location.pathname === '/';
 
-        if (!isKioskRoute) {
-            document.documentElement.setAttribute('data-theme', currentTheme);
-        } else {
+        if (isKioskRoute) {
             // Remove any theme attribute for kiosk pages
-            document.documentElement.removeAttribute('data-theme');
+            delete document.documentElement.dataset.theme;
+        } else {
+            document.documentElement.dataset.theme = currentTheme;
         }
         localStorage.setItem('kwise-theme', currentTheme);
     }, [currentTheme]);
@@ -54,7 +55,7 @@ export const ThemeProvider = ({ children }) => {
     };
 
     // Simple translation function (can be expanded)
-    const t = (key) => {
+    const t = useCallback((key) => {
         const translations = {
             en: {
                 dashboard: 'Dashboard',
@@ -76,21 +77,25 @@ export const ThemeProvider = ({ children }) => {
         };
 
         return translations[currentLanguage]?.[key] || key;
-    };
+    }, [currentLanguage]);
 
-    const value = {
+    const value = useMemo(() => ({
         currentTheme,
         currentLanguage,
         changeTheme,
         changeLanguage,
         t
-    };
+    }), [currentTheme, currentLanguage, t]);
 
     return (
         <ThemeContext.Provider value={value}>
             {children}
         </ThemeContext.Provider>
     );
+};
+
+ThemeProvider.propTypes = {
+    children: PropTypes.node.isRequired,
 };
 
 export default ThemeContext;

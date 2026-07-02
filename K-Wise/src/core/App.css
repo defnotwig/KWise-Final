@@ -59,6 +59,7 @@ button {
 /* FRONTEND KIOSK STYLES ONLY */
 
 .App {
+  display: block;
   text-align: center;
   height: 100vh;
   background: #040F0F;
@@ -66,6 +67,8 @@ button {
   min-height: 100vh;
   box-sizing: border-box;
   overflow: hidden;
+  color: inherit;
+  text-decoration: none;
 }
 
 .App-logo {
@@ -117,6 +120,7 @@ button {
   font-weight: 800;
   line-height: normal;
   margin-bottom: 1rem;
+  color: #00E083 !important;
 }
 
 .Store-name p {
@@ -129,10 +133,11 @@ button {
   margin-bottom: 2rem;
 }
 
-.start-up button {
+.start-up .button-like {
+  display: inline-block;
   background: linear-gradient(135deg, #00E083 0%, #00a67d 100%);
   border: none;
-  color: white;
+  color: #0a2a1a;
   padding: 20px 40px;
   font-size: 25px;
   font-weight: 600;
@@ -143,7 +148,7 @@ button {
   letter-spacing: 1px;
 }
 
-.start-up button:hover {
+.App:hover .start-up .button-like {
   transform: translateY(-3px);
   box-shadow: 0 10px 25px rgba(0, 224, 131, 0.3);
   background: linear-gradient(135deg, #00a67d 0%, #006f51 100%);
@@ -275,7 +280,7 @@ line-height: normal;
 }
 
 
-.App .Store-name .start-up button {
+.App .Store-name .start-up .button-like {
   font-size: 40px;
   font-style: normal;
   font-weight: 800;
@@ -292,15 +297,10 @@ line-height: normal;
   will-change: transform;
 }
 
-.App .Store-name .start-up button:active {
+.App:active .Store-name .start-up .button-like {
   color: #00E083 !important;
   animation: none;
   transform: scale(0.9);
-}
-
-/* Ensure splash headline and tagline use same color */
-.Store-name h1 {
-  color: #00E083 !important;
 }
 
 /* Zoom in/out animation for the start button */
@@ -411,7 +411,7 @@ line-height: normal;
     margin-bottom: 15px;
   }
 
-  .App .Store-name .start-up button {
+  .App .Store-name .start-up .button-like {
     font-size: clamp(20px, 6vw, 30px);
     padding: 15px 30px;
     margin-top: 40px;
@@ -467,7 +467,7 @@ line-height: normal;
     margin-bottom: 20px;
   }
 
-  .App .Store-name .start-up button {
+  .App .Store-name .start-up .button-like {
     font-size: clamp(28px, 5vw, 35px);
     padding: 18px 35px;
     margin-top: 60px;
@@ -522,7 +522,7 @@ line-height: normal;
     margin-bottom: 22px;
   }
 
-  .App .Store-name .start-up button {
+  .App .Store-name .start-up .button-like {
     font-size: clamp(32px, 4vw, 38px);
     padding: 18px 38px;
     margin-top: 80px;
@@ -577,7 +577,7 @@ line-height: normal;
     margin-bottom: 25px;
   }
 
-  .App .Store-name .start-up button {
+  .App .Store-name .start-up .button-like {
     font-size: 40px;
     padding: 20px 40px;
     margin-top: 100px;

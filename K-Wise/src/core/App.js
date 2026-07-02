@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, Link, useLocation } from "react-router-dom";
 import "./App.css";
 // Import theme system for all components
 import "../styles/theme.css";
@@ -16,91 +16,63 @@ import "../admin/styles/admin-layout.css";
 import "../admin/styles/admin-dashboard.css";
 import pcwiselogo from "../assets/App/pcwiselogo.svg";
 import pcwisename from "../assets/App/pcwisename.svg";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import PropTypes from 'prop-types';
 
 // Kiosk Components
-import Order from "../kiosk/Order";
-import Transaction from "../kiosk/Transac-components";
-import PCParts from "../kiosk/PC-Parts";
-import PCServices from "../kiosk/PC-Services";
-import AssistedService from "../kiosk/AssistedService";
-import ProductPage from "../kiosk/ProductPage";
-import OrderSummary from "../kiosk/OrderSummary";
-import PaymentWindow from "../kiosk/PaymentWindow";
-import QueuingDisplay from "../kiosk/QueuingDisplay";
-import OnlineBanking from "../kiosk/OnlineBanking";
-import CreditCard from "../kiosk/CreditCard";
-// NEW: Payment Method Detail Pages (Pasted Images 3-8)
-import OnlineBankPayment from "../kiosk/OnlineBankPayment";
-import CreditCardPayment from "../kiosk/CreditCardPayment";
-import InstallmentPayment from "../kiosk/InstallmentPayment";
-import PentagonStats from "../kiosk/PentagonStats";
-import PurposeOfUse from "../kiosk/PurposeOfUse";
-import PCBuildCategory from "../kiosk/PCBuildCategory";
-import PriceRange from "../kiosk/PriceRange";
-import ProductList from "../kiosk/ProductList";
-import PCCustomized from "../kiosk/PCCustomized";
-import PrebuiltOptions from "../kiosk/PrebuiltOptions"; // NEW - Preset vs Community selection
-import TierSelection from "../kiosk/TierSelection"; // NEW - Tier selection for preset/community
-import PCCustomizedAIAssessment from "../kiosk/PCCustomizedAIAssessment"; // NEW - Feature 6: AI Customization Assessment
-import PCCustomizedAISuggestions from "../kiosk/PCCustomizedAISuggestions"; // NEW - Feature 6: AI Build Suggestions
-import CustomizeAI from "../components/CustomizeAI/CustomizeAI"; // NEW - Unified CustomizeAI wizard
-import EditBuild from "../components/CustomizeAI/EditBuild"; // NEW - Edit AI-generated build
-import PeripheralsPrompt from "../components/CustomizeAI/PeripheralsPrompt"; // NEW - Ask if user wants peripherals
-import Peripherals from "../kiosk/Peripherals"; // NEW - Peripherals selection page
-import ProductPageCustom from "../kiosk/ProductPageCustom";
-import CustomizedProducts from "../kiosk/CustomizedProducts";
-import PCBuilder from "../kiosk/PCBuilder"; // ✅ NEW: Guided step-by-step PC Builder
-import BuildSummary from "../kiosk/BuildSummary"; // ✅ NEW: Build completion summary
-import FutureUpgrade from "../kiosk/FutureUpgrade";
-import CustomizedDisplay from "../kiosk/CustomizedDisplay";
-import PreBuiltDisplay from "../kiosk/PreBuiltDisplay";
-import OrderSumCustom from "../kiosk/OrderSumCustom";
-import PCCleaning from "../kiosk/PCCleaning";
-import PCCleaningAssessment from "../kiosk/PCCleaningAssessment"; // ✅ NEW: PC Cleaning Assessment
-import PCReCase from "../kiosk/PCReCase"; // ✅ NEW: PC Re-Case optional page
-import OrderSumClean from "../kiosk/OrderSumClean";
-import PCCheckup from "../kiosk/PCCheckup";
-import ReviewIssues from "../kiosk/ReviewIssues";
-import OrderSumBuild from "../kiosk/OrderSumBuild";
-import PCUpgrade from "../kiosk/PCUpgrade";
-import PCUpgradePreview from "../kiosk/PCUpgradePreview"; // NEW - Phase 11: Preview Existing Build
-import OrderSumUpgrade from "../kiosk/OrderSumUpgrade";
-// NEW - Phase 3: Product Browsing Components
-import PCUpgradeDisplay from "../kiosk/PCUpgradeDisplay";
-import PCUpgradeProduct from "../kiosk/PCUpgradeProduct";
-
-// NEW - Phase 4: Admin AI Metrics
-import AIMetrics from "../admin/pages/AIMetrics";
-
-// NEW - Task 7: Admin Auto-Generate Orders
-import AutoGenerateOrders from "../admin/AutoGenerateOrders";
-
-// NEW - Task 11: Analytics Dashboard
-import AnalyticsDashboard from "../admin/AnalyticsDashboard";
-
-// NEW - Task 14 Phase 4: AI Analytics Dashboard
-import AIAnalyticsDashboard from "../admin/AIAnalyticsDashboard";
-
-// NEW - Phase 4: Cache Performance Dashboard
-import CachePerformanceDashboard from "../components/admin/CachePerformanceDashboard";
-
-// NEW - Phase 4: System Performance Metrics
-import SystemPerformanceMetrics from "../components/admin/SystemPerformanceMetrics";
-
-// NEW - Phase 4: Visual Rule Builder
-import RuleBuilder from "../components/admin/RuleBuilder/RuleBuilder";
-
-// NEW - IP Access Control System
-import IPAccessControl from "../admin/pages/IPAccessControl";
-
-// NEW - PRIORITY 3: Real-World Data Admin Components
-import AdminFeedbackReview from "../admin/components/AdminFeedbackReview";
-import AdminKnownIssues from "../admin/components/AdminKnownIssues";
-
-// Debug components
-import CategoriesDebugTest from "../components/CategoriesDebugTest";
-import SimpleCategoriesTest from "../components/SimpleCategoriesTest";
+const Order = lazy(() => import("../kiosk/Order"));
+const Transaction = lazy(() => import("../kiosk/Transac-components"));
+const PCParts = lazy(() => import("../kiosk/PC-Parts"));
+const PCServices = lazy(() => import("../kiosk/PC-Services"));
+const AssistedService = lazy(() => import("../kiosk/AssistedService"));
+const ProductPage = lazy(() => import("../kiosk/ProductPage"));
+const OrderSummary = lazy(() => import("../kiosk/OrderSummary"));
+const PaymentWindow = lazy(() => import("../kiosk/PaymentWindow"));
+const QueuingDisplay = lazy(() => import("../kiosk/QueuingDisplay"));
+const OnlineBanking = lazy(() => import("../kiosk/OnlineBanking"));
+const CreditCard = lazy(() => import("../kiosk/CreditCard"));
+const OnlineBankPayment = lazy(() => import("../kiosk/OnlineBankPayment"));
+const CreditCardPayment = lazy(() => import("../kiosk/CreditCardPayment"));
+const InstallmentPayment = lazy(() => import("../kiosk/InstallmentPayment"));
+const PentagonStats = lazy(() => import("../kiosk/PentagonStats"));
+const PurposeOfUse = lazy(() => import("../kiosk/PurposeOfUse"));
+const PCBuildCategory = lazy(() => import("../kiosk/PCBuildCategory"));
+const PriceRange = lazy(() => import("../kiosk/PriceRange"));
+const ProductList = lazy(() => import("../kiosk/ProductList"));
+const PCCustomized = lazy(() => import("../kiosk/PCCustomized"));
+const PrebuiltOptions = lazy(() => import("../kiosk/PrebuiltOptions"));
+const TierSelection = lazy(() => import("../kiosk/TierSelection"));
+// Offline kiosk mode: AI customizer source is retained on disk, but routes below redirect away from it.
+const PeripheralsPrompt = lazy(() => import("../components/CustomizeAI/PeripheralsPrompt"));
+const Peripherals = lazy(() => import("../kiosk/Peripherals"));
+const ProductPageCustom = lazy(() => import("../kiosk/ProductPageCustom"));
+const CustomizedProducts = lazy(() => import("../kiosk/CustomizedProducts"));
+const PCBuilder = lazy(() => import("../kiosk/PCBuilder"));
+const BuildSummary = lazy(() => import("../kiosk/BuildSummary"));
+const FutureUpgrade = lazy(() => import("../kiosk/FutureUpgrade"));
+const CustomizedDisplay = lazy(() => import("../kiosk/CustomizedDisplay"));
+const PreBuiltDisplay = lazy(() => import("../kiosk/PreBuiltDisplay"));
+const OrderSumCustom = lazy(() => import("../kiosk/OrderSumCustom"));
+const PCCleaning = lazy(() => import("../kiosk/PCCleaning"));
+const PCCleaningAssessment = lazy(() => import("../kiosk/PCCleaningAssessment"));
+const PCReCase = lazy(() => import("../kiosk/PCReCase"));
+const OrderSumClean = lazy(() => import("../kiosk/OrderSumClean"));
+const PCCheckup = lazy(() => import("../kiosk/PCCheckup"));
+const ReviewIssues = lazy(() => import("../kiosk/ReviewIssues"));
+const OrderSumBuild = lazy(() => import("../kiosk/OrderSumBuild"));
+const PCUpgrade = lazy(() => import("../kiosk/PCUpgrade"));
+const PCUpgradePreview = lazy(() => import("../kiosk/PCUpgradePreview"));
+const OrderSumUpgrade = lazy(() => import("../kiosk/OrderSumUpgrade"));
+const PCUpgradeDisplay = lazy(() => import("../kiosk/PCUpgradeDisplay"));
+const PCUpgradeProduct = lazy(() => import("../kiosk/PCUpgradeProduct"));
+const AutoGenerateOrders = lazy(() => import("../admin/AutoGenerateOrders"));
+const AnalyticsDashboard = lazy(() => import("../admin/AnalyticsDashboard"));
+const CachePerformanceDashboard = lazy(() => import("../components/admin/CachePerformanceDashboard"));
+const SystemPerformanceMetrics = lazy(() => import("../components/admin/SystemPerformanceMetrics"));
+const RuleBuilder = lazy(() => import("../components/admin/RuleBuilder/RuleBuilder"));
+const IPAccessControl = lazy(() => import("../admin/pages/IPAccessControl"));
+const AdminFeedbackReview = lazy(() => import("../admin/components/AdminFeedbackReview"));
+const AdminKnownIssues = lazy(() => import("../admin/components/AdminKnownIssues"));
 
 // Assistance Notification Component
 import AssistanceNotification from "../components/AssistanceNotification";
@@ -110,20 +82,20 @@ import useSocket from "../hooks/useSocket";
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { SearchProvider } from '../contexts/SearchContext-simple';
-import Dashboard from '../pages/Dashboard/Dashboard';
-import Login from '../pages/Login/Login';
-import ResetPassword from '../pages/Login/ResetPassword';
-import Stock from '../pages/Orders/Stock';
-import StockDetail from '../pages/Orders/StockDetail';
-import History from '../pages/Orders/History';
-import OrderQueue from '../pages/Orders/OrderQueue';
-import QueueMonitorDisplay from '../pages/Orders/QueueMonitorDisplay'; // NEW - Issue #6: Vertical monitor display
-import LogHistory from '../pages/Orders/LogHistory';
-import Accounts from '../pages/Accounts/Accounts';
-import Settings from '../pages/Settings/Settings';
-import DeveloperTools from '../pages/DeveloperTools/DeveloperTools';
-import OrderQueueDisplay from '../components/Widgets/OrderQueueDisplay';
-import Layout from '../components/Layout/Layout';
+const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'));
+const Login = lazy(() => import('../pages/Login/Login'));
+const ResetPassword = lazy(() => import('../pages/Login/ResetPassword'));
+const Stock = lazy(() => import('../pages/Orders/Stock'));
+const StockDetail = lazy(() => import('../pages/Orders/StockDetail'));
+const History = lazy(() => import('../pages/Orders/History'));
+const OrderQueue = lazy(() => import('../pages/Orders/OrderQueue'));
+const QueueMonitorDisplay = lazy(() => import('../pages/Orders/QueueMonitorDisplay'));
+const LogHistory = lazy(() => import('../pages/Orders/LogHistory'));
+const Accounts = lazy(() => import('../pages/Accounts/Accounts'));
+const Settings = lazy(() => import('../pages/Settings/Settings'));
+const DeveloperTools = lazy(() => import('../pages/DeveloperTools/DeveloperTools'));
+const OrderQueueDisplay = lazy(() => import('../components/Widgets/OrderQueueDisplay'));
+const Layout = lazy(() => import('../components/Layout/Layout'));
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -140,23 +112,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     });
   }, [currentUser, isLoading, allowedRoles, location.pathname]);
 
-  // Check if we have a user in localStorage when currentUser is not available yet
-  const getUserFromStorage = () => {
-    try {
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        return JSON.parse(storedUser);
-      }
-    } catch (e) {
-      console.error('Error parsing user from localStorage in ProtectedRoute:', e);
-    }
-    return null;
-  };
+  const user = currentUser;
 
-  // Use either currentUser from context or from localStorage
-  const user = currentUser || getUserFromStorage();
-
-  // Show loading state only if truly loading and no stored user
+  // Show loading state while /api/auth/me verifies the cookie-backed session
   if (isLoading && !user) {
     console.log("ProtectedRoute - Still loading auth, showing loading...");
     return <div className="loading">Loading...</div>;
@@ -180,108 +138,10 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   return children;
 };
 
-// Create a more robust protected component for direct page access
-// Commented out since it's not currently used - can be uncommented when needed
-/*
-const ProtectedDirectRoute = ({ component: Component, requiredRole }) => {
-  const { currentUser, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
-
-  console.log(`ProtectedDirectRoute (${location.pathname}) - Initial render, required role:`, requiredRole);
-
-  useEffect(() => {
-    const checkAccess = async () => {
-      console.log(`ProtectedDirectRoute (${location.pathname}) - Checking authorization for role:`, requiredRole);
-
-      setIsChecking(true);
-      let user = null;
-      let role = null;
-
-      // First try to get user from context
-      if (currentUser && currentUser.role) {
-        user = currentUser;
-        role = currentUser.role;
-        console.log(`ProtectedDirectRoute (${location.pathname}) - Found user in context:`, user.name, role);
-      }
-      // Then try from localStorage
-      else {
-        try {
-          const storedUser = localStorage.getItem('currentUser');
-          if (storedUser) {
-            user = JSON.parse(storedUser);
-            role = user.role;
-            console.log(`ProtectedDirectRoute (${location.pathname}) - Found user in localStorage:`, user.name, role);
-          }
-        } catch (e) {
-          console.error(`ProtectedDirectRoute (${location.pathname}) - Error checking stored user:`, e);
-        }
-      }
-
-      // Check authorization
-      let authorized = false;
-
-      if (!user) {
-        console.log(`ProtectedDirectRoute (${location.pathname}) - No user found, redirecting to login`);
-        navigate('/login', { replace: true });
-        setIsChecking(false);
-        return;
-      }
-
-      // For superadmin role check
-      if (requiredRole === 'superadmin' && role === 'superadmin') {
-        authorized = true;
-      }
-      // For admin or superadmin role check
-      else if (requiredRole === 'adminOrSuperadmin' && (role === 'admin' || role === 'superadmin')) {
-        authorized = true;
-      }
-
-      console.log(`ProtectedDirectRoute (${location.pathname}) - Authorization result:`, authorized);
-
-      if (!authorized) {
-        console.log(`ProtectedDirectRoute (${location.pathname}) - Access denied, redirecting to dashboard`);
-        navigate('/admin/dashboard', { replace: true });
-      }
-
-      setIsAuthorized(authorized);
-      setIsChecking(false);
-    };
-
-    // Only check access if:
-    // 1. Not loading from auth context
-    // 2. We haven't finished checking yet OR we need to recheck because user/loading state changed
-    if (!isLoading || isChecking) {
-      checkAccess();
-    }
-  }, [currentUser, isLoading, requiredRole, navigate, location.pathname, isChecking]);
-
-  // Show loading while checking authorization
-  if (isLoading || isChecking) {
-    return (
-      <div className="loading">
-        Verifying access...
-      </div>
-    );
-  }
-
-  // Only render component if authorized
-  if (!isAuthorized) {
-    return null; // Will be redirected by useEffect
-  }
-
-  // Render the protected component
-  return (
-    <SearchProvider>
-      <Layout>
-        <Component />
-      </Layout>
-    </SearchProvider>
-  );
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+  allowedRoles: PropTypes.arrayOf(PropTypes.string)
 };
-*/
 
 // AdminLayout component to wrap authenticated routes with SearchProvider
 const AdminLayout = () => {
@@ -294,26 +154,11 @@ const AdminLayout = () => {
 
 //Here is the Starting point of a Kiosk System, where we can see the route in every page.
 function Home() {
-  const navigate = useNavigate();
-  // Make the entire page clickable and accessible
-  const handleClick = (e) => {
-    // Prevent double navigation if a link or button is clicked
-    if (e.target.closest("a,button")) return;
-    navigate("/order");
-  };
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      navigate("/order");
-    }
-  };
   return (
-    <div
+    <Link
+      to="/order"
       className="App"
-      tabIndex={0}
-      role="button"
       aria-label="Tap anywhere to start"
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
       style={{ outline: "none" }}
     >
       <div className="bg-vectors">
@@ -358,10 +203,10 @@ function Home() {
           <p>YOUR WISE CHOICE</p>
         </div>
         <div className="start-up">
-          <button tabIndex={-1} style={{ pointerEvents: "none" }}>TAP ANYWHERE TO START</button>
+          <span className="button-like" aria-hidden="true">TAP ANYWHERE TO START</span>
         </div>
       </header>
-    </div>
+    </Link>
   );
 }
 
@@ -378,6 +223,10 @@ function AdminWrapper({ children }) {
   );
 }
 
+AdminWrapper.propTypes = {
+  children: PropTypes.node.isRequired
+};
+
 // Route wrapper to determine if admin styles should be applied
 function RouteWrapper({ children }) {
   const location = useLocation();
@@ -389,6 +238,10 @@ function RouteWrapper({ children }) {
   
   return children;
 }
+
+RouteWrapper.propTypes = {
+  children: PropTypes.node.isRequired
+};
 
 // App Component
 function App() {
@@ -409,8 +262,6 @@ function App() {
         }
       };
 
-      // Only test connection once on mount
-      testBackendConnection();
     }
   }, []); // Empty dependency array ensures this only runs once
 
@@ -420,19 +271,18 @@ function App() {
         <Router>
           <div className="app-container">
             <RouteWrapper>
+              <Suspense fallback={<div className="loading">Loading...</div>}>
               <Routes>
                 {/* Login route */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
 
                 {/* Client-facing routes */}
-                <Route path="/" element={<Home />} />
-                <Route path="/app" element={<Home />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/app" element={<Home />} />
               <Route path="/order" element={<Order />} />
               <Route path="/transaction" element={<Transaction />} />
               <Route path="/pc-parts" element={<PCParts />} />
-              <Route path="/debug-categories" element={<CategoriesDebugTest />} />
-              <Route path="/simple-test" element={<SimpleCategoriesTest />} />
               <Route path="/pc-services" element={<PCServices />} />
               <Route path="/assisted-service" element={<AssistedService />} />
               <Route path="/product/:productId" element={<ProductPage />} />
@@ -455,10 +305,11 @@ function App() {
               <Route path="/priceRange" element={<PriceRange />} />
               <Route path="/product-list" element={<ProductList />} />
               <Route path="/pc-customized" element={<PCCustomized />} />
-              <Route path="/pc-customized-ai-assessment" element={<PCCustomizedAIAssessment />} /> {/* NEW - Feature 6: AI Assessment */}
-              <Route path="/pc-customized-ai-suggestions" element={<PCCustomizedAISuggestions />} /> {/* NEW - Feature 6: AI Suggestions */}
-              <Route path="/customize-ai" element={<CustomizeAI />} /> {/* NEW - Unified CustomizeAI wizard */}
-              <Route path="/customize-ai/edit-build" element={<EditBuild />} /> {/* NEW - Edit AI build */}
+              <Route path="/pc-customized-ai-assessment" element={<Navigate to="/pc-customized" replace />} />
+              <Route path="/pc-customized-ai-suggestions" element={<Navigate to="/pc-customized" replace />} />
+              <Route path="/pc-customized-ai/*" element={<Navigate to="/pc-customized" replace />} />
+              <Route path="/customize-ai" element={<Navigate to="/pc-customized" replace />} />
+              <Route path="/customize-ai/*" element={<Navigate to="/pc-customized" replace />} />
               <Route path="/peripherals-prompt" element={<PeripheralsPrompt />} /> {/* NEW - Ask about peripherals */}
               <Route path="/peripherals" element={<Peripherals />} /> {/* NEW - Peripherals selection */}
               <Route path="/productpage-custom/:productId" element={<ProductPageCustom />} />
@@ -507,12 +358,7 @@ function App() {
                     <AnalyticsDashboard />
                   </ProtectedRoute>
                 } />
-                {/* NEW - Task 14 Phase 4: AI Analytics Dashboard */}
-                <Route path="ai-analytics" element={
-                  <ProtectedRoute allowedRoles={["superadmin", "admin", "developer"]}>
-                    <AIAnalyticsDashboard />
-                  </ProtectedRoute>
-                } />
+                <Route path="ai-analytics" element={<Navigate to="/admin/analytics" replace />} />
                 <Route path="log-history" element={
                   <ProtectedRoute allowedRoles={["superadmin"]}>
                     <LogHistory />
@@ -526,12 +372,7 @@ function App() {
                     <IPAccessControl />
                   </ProtectedRoute>
                 } />
-                {/* NEW - Phase 4: AI Metrics Dashboard */}
-                <Route path="ai-metrics" element={
-                  <ProtectedRoute allowedRoles={["superadmin", "admin"]}>
-                    <AIMetrics />
-                  </ProtectedRoute>
-                } />
+                <Route path="ai-metrics" element={<Navigate to="/admin/system-metrics" replace />} />
                 {/* NEW - Phase 4: Cache Performance Dashboard */}
                 <Route path="cache-performance" element={
                   <ProtectedRoute allowedRoles={["superadmin", "admin", "developer"]}>
@@ -577,6 +418,7 @@ function App() {
               {/* Fallback redirect to home */}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
+              </Suspense>
             </RouteWrapper>
           </div>
         </Router>

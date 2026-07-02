@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { stockAPI, ordersAPI, usersAPI } from '../services/api';
 
@@ -71,10 +72,8 @@ export function SearchProvider({ children }) {
             const allResults = [];
 
             // Use Promise.allSettled for parallel requests to improve speed
-            const searchPromises = [];
-
-            // Search in stock items across all categories
-            searchPromises.push(
+            const searchPromises = [
+                // Search in stock items across all categories
                 stockAPI.search({ q: query, limit: 10 }).then(stockResponse => {
                     if (stockResponse?.data?.data && Array.isArray(stockResponse.data.data)) {
                         const stockResults = stockResponse.data.data.map(item => ({
@@ -94,10 +93,8 @@ export function SearchProvider({ children }) {
                     console.log('Stock search failed:', error);
                     return { type: 'stock', results: [] };
                 })
-            );
-
-            // Search in orders (if available)
-            searchPromises.push(
+                ,
+                // Search in orders (if available)
                 ordersAPI.search({ q: query, limit: 5 }).then(ordersResponse => {
                     if (ordersResponse?.data?.orders && Array.isArray(ordersResponse.data.orders)) {
                         const orderResults = ordersResponse.data.orders.map(order => ({
@@ -117,10 +114,8 @@ export function SearchProvider({ children }) {
                     console.log('Orders search failed:', error);
                     return { type: 'orders', results: [] };
                 })
-            );
-
-            // Search in users (if available)
-            searchPromises.push(
+                ,
+                // Search in users (if available)
                 usersAPI.search({ q: query, limit: 5 }).then(usersResponse => {
                     if (usersResponse?.data?.users && Array.isArray(usersResponse.data.users)) {
                         const userResults = usersResponse.data.users.map(user => ({
@@ -152,9 +147,8 @@ export function SearchProvider({ children }) {
             });
 
             // Sort by relevance and limit results
-            const sortedResults = allResults
-                .sort((a, b) => (b.relevance || 0) - (a.relevance || 0))
-                .slice(0, 20); // Limit to top 20 results
+            allResults.sort((a, b) => (b.relevance || 0) - (a.relevance || 0));
+            const sortedResults = allResults.slice(0, 20); // Limit to top 20 results
 
             setSearchResults(sortedResults);
 
@@ -171,12 +165,12 @@ export function SearchProvider({ children }) {
         setSearchQuery(query);
         
         // Clear previous timeout
-        if (window.searchTimeout) {
-            clearTimeout(window.searchTimeout);
+        if (globalThis.searchTimeout) {
+            clearTimeout(globalThis.searchTimeout);
         }
         
         // Debounce search by 300ms for better performance
-        window.searchTimeout = setTimeout(() => {
+        globalThis.searchTimeout = setTimeout(() => {
             performSearch(query);
         }, 300);
     };
@@ -196,7 +190,7 @@ export function SearchProvider({ children }) {
         setIsSearching(false);
     };
 
-    const value = {
+    const value = useMemo(() => ({
         searchQuery,
         searchResults,
         isSearching,
@@ -206,7 +200,7 @@ export function SearchProvider({ children }) {
         handleSelectResult: handleResultClick, // Alias for compatibility
         clearSearch,
         isAdminSection
-    };
+    }), [searchQuery, searchResults, isSearching, showResults]);
 
     return (
         <SearchContext.Provider value={value}>
@@ -214,5 +208,9 @@ export function SearchProvider({ children }) {
         </SearchContext.Provider>
     );
 }
+
+SearchProvider.propTypes = {
+    children: PropTypes.node.isRequired,
+};
 
 export default SearchContext;
