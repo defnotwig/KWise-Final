@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getServerBaseUrl } from "../utils/networkConfig";
 import "./AssistedService.css";
 import Group6 from '../assets/Group 6.webp'; // Assisted Service Icon
 
 function AssistedService() {
   const navigate = useNavigate();
   // eslint-disable-next-line no-unused-vars
-  const [assistanceRequestId, setAssistanceRequestId] = useState(null);
+  const [assistanceRequestId, setAssistanceRequestId] = useState(null); // NOSONAR - setter used in async callback
   const [staffOnWay, setStaffOnWay] = useState(false);
   const [staffName, setStaffName] = useState('');
   const requestSentRef = React.useRef(false); // Prevent double submissions
@@ -24,7 +25,7 @@ function AssistedService() {
       }
       requestSentRef.current = true;
       try {
-        const response = await fetch('http://localhost:5000/api/assistance/request', {
+        const response = await fetch(`${getServerBaseUrl()}/api/assistance/request`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -47,7 +48,7 @@ function AssistedService() {
           // Start polling for status AFTER getting the request ID
           statusCheckInterval = setInterval(async () => {
             try {
-              const statusResponse = await fetch(`http://localhost:5000/api/assistance/${requestId}/status`);
+              const statusResponse = await fetch(`${getServerBaseUrl()}/api/assistance/${requestId}/status`);
               if (statusResponse.ok) {
                 const statusData = await statusResponse.json();
                 if (statusData.data.status === 'acknowledged') {
@@ -92,11 +93,12 @@ function AssistedService() {
     <div className="assisted-service-container">
       
       {/* 🔼 Transparent clickable box */}
-      <div
+      <button
+        type="button"
         className="top-navigation-box"
         onClick={() => navigate("/transaction")}
         aria-label="Go to transaction page"
-      ></div>
+      />
   
       <div className="content">
         <img src={Group6} alt="Assisted Service" className="logo" />

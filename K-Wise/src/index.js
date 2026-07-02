@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './vite-env-shim';
 import './core/index.css';
 // KIOSK RESPONSIVE: Import global responsive system for all kiosk pages
 import './styles/kiosk-responsive.css';

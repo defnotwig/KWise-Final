@@ -1,13 +1,13 @@
 /**
  * Product Comparison Component
- * TASK 5: 2-Product Vertical Split Screen Comparison with AI Analysis
+ * TASK 5: 2-Product Vertical Split Screen Comparison
  * For PC-Parts.js kiosk page only
  */
 
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faTrophy, faDollarSign } from '@fortawesome/free-solid-svg-icons';
-import aiService from '../api/aiService';
 import api from '../api/api';
 import './CompareProducts.css';
 
@@ -16,54 +16,94 @@ import pricediff from "../assets/CompareProducts/pricediff.svg";
 import tiercomparison from "../assets/CompareProducts/tiercomparison.svg";
 import recommend from "../assets/CompareProducts/recommend.svg";
 
+const normalizeSpecs = (specs) => {
+  if (!specs) return {};
+  if (typeof specs === 'string') {
+    if (specs === 'No specifications provided' || specs === '') return {};
+    try {
+      return JSON.parse(specs);
+    } catch {
+      return {};
+    }
+  }
+  return typeof specs === 'object' && !Array.isArray(specs) ? specs : {};
+};
+
 const CompareProducts = ({ products, onClose, onAddToCart }) => {
-  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Ensure we have exactly 2 products
   const [product1, product2] = products || [];
 
-  /**
-   * Get AI-powered comparison analysis
-   */
+  const getPrice = (product) => {
+    if (!product?.price) return 0;
+    const priceStr = product.price.toString();
+    return Number.parseFloat(priceStr.replaceAll(/[^\d.]/g, '') || 0);
+  };
+
+  const formatSpecValue = (value) => {
+    if (value === null || value === undefined) return '-';
+    if (value === 'N/A' || value === '') return '-';
+
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const entries = Object.entries(value);
+      if (entries.length === 0) return '-';
+
+      return entries
+        .map(([k, v]) => `${k.replaceAll('_', ' ')}: ${v}`)
+        .join(', ');
+    }
+
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+
+    return String(value);
+  };
+
+  const getSpecifications = (product) => {
+    const specs = normalizeSpecs(product?.specifications);
+    const specArray = [];
+
+    Object.keys(specs).forEach(key => {
+      const value = specs[key];
+      if (value !== null && value !== undefined && value !== 'N/A' && value !== '') {
+        specArray.push({
+          label: key.replaceAll('_', ' ').toUpperCase(),
+          value: formatSpecValue(value)
+        });
+      }
+    });
+
+    return specArray;
+  };
+
   const analyzeComparison = React.useCallback(async () => {
     setLoading(true);
 
     try {
-      console.log('🤖 Requesting AI comparison analysis...');
+      const price1 = getPrice(product1);
+      const price2 = getPrice(product2);
+      const specs1 = getSpecifications(product1);
+      const specs2 = getSpecifications(product2);
+      const score1 = specs1.length * 5 - (price1 / 10000);
+      const score2 = specs2.length * 5 - (price2 / 10000);
+      const winner = Math.abs(score1 - score2) < 1
+        ? (price1 <= price2 ? 'product1' : 'product2')
+        : (score1 >= score2 ? 'product1' : 'product2');
+      const winnerName = winner === 'product1' ? product1.name : product2.name;
 
-      // Call AI comparison API
-      const response = await aiService.compareProducts({
-        product1Id: product1.id,
-        product2Id: product2.id,
-        sessionId: sessionStorage.getItem('sessionId') || null
+      setAnalysis({
+        summary: 'Local comparison complete',
+        winner,
+        valueAnalysis: `${winnerName} is the better value based on available specifications and price.`,
+        recommendation: `Based on available specifications and value, ${winnerName} is recommended.`
       });
-
-      if (response.success && response.data) {
-        // Extract the comparison data
-        const comparisonData = response.data;
-
-        // Format for component state
-        setAiAnalysis({
-          summary: comparisonData.aiSummary || 'Comparison complete',
-          winner: comparisonData.winner === comparisonData.product1.id ? 'product1' : 'product2',
-          valueAnalysis: comparisonData.comparisonDetails?.valueAnalysis || '',
-          recommendation: `Based on specifications and value, ${comparisonData.winner === comparisonData.product1.id ? product1.name : product2.name
-            } is recommended.`,
-          priceComparison: comparisonData.comparisonDetails?.priceComparison,
-          tierComparison: comparisonData.comparisonDetails?.tierComparison
-        });
-
-        console.log('✅ AI comparison analysis received:', comparisonData);
-      } else {
-        throw new Error('Failed to get AI analysis');
-      }
     } catch (err) {
-      console.error('❌ Error getting AI comparison:', err);
-      // Provide basic fallback comparison
-      setAiAnalysis({
-        winner: product1.price < product2.price ? 'product1' : 'product2',
-        summary: 'AI analysis unavailable. Compare specifications manually.',
+      console.error('Error getting local comparison:', err);
+      setAnalysis({
+        winner: getPrice(product1) <= getPrice(product2) ? 'product1' : 'product2',
+        summary: 'Local comparison unavailable. Compare specifications manually.',
         valueAnalysis: 'Unable to generate value analysis.',
         recommendation: 'Choose based on your budget and requirements.'
       });
@@ -78,103 +118,9 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
     }
   }, [product1, product2, analyzeComparison]);
 
-  /**
-   * Parse price to number
-   */
-  const getPrice = (product) => {
-    if (!product || !product.price) return 0;
-    const priceStr = product.price.toString();
-    return parseFloat(priceStr.replace(/[^\d.]/g, '') || 0);
-  };
-
-  /**
-   * Helper function to format specification values for display
-   * Converts objects to readable strings
-   */
-  const formatSpecValue = (value) => {
-    if (value === null || value === undefined) return '-';
-    if (value === 'N/A' || value === '') return '-';
-    
-    // Handle objects - convert to readable string
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      // Format common nested object patterns
-      const entries = Object.entries(value);
-      if (entries.length === 0) return '-';
-      
-      // Format as "key1: value1, key2: value2"
-      return entries
-        .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
-        .join(', ');
-    }
-    
-    // Handle arrays
-    if (Array.isArray(value)) {
-      return value.join(', ');
-    }
-    
-    return String(value);
-  };
-
-  /**
-   * Format specifications for display
-   */
-  const getSpecifications = (product) => {
-    if (!product) {
-      console.log('❌ getSpecifications: No product provided');
-      return [];
-    }
-
-    console.log('🔍 getSpecifications called for:', product.name);
-    console.log('🔍 Raw specifications:', product.specifications);
-    console.log('🔍 Specifications type:', typeof product.specifications);
-
-    // Handle specifications as string or object
-    let specs = product.specifications || {};
-    
-    // If specifications is a string, try to parse it
-    if (typeof specs === 'string') {
-      if (specs === 'No specifications provided' || specs === '') {
-        console.log('⚠️ Empty or placeholder specifications string');
-        return [];
-      }
-      try {
-        specs = JSON.parse(specs);
-        console.log('✅ Parsed JSON specifications:', specs);
-      } catch (e) {
-        console.warn('❌ Failed to parse specifications:', specs, e);
-        return [];
-      }
-    }
-
-    // Ensure specs is an object
-    if (typeof specs !== 'object' || Array.isArray(specs)) {
-      console.log('❌ Specifications is not a valid object:', specs);
-      return [];
-    }
-
-    const specArray = [];
-
-    // Extract specifications
-    Object.keys(specs).forEach(key => {
-      const value = specs[key];
-      if (value !== null && value !== undefined && value !== 'N/A' && value !== '') {
-        specArray.push({
-          label: key.replace(/_/g, ' ').toUpperCase(),
-          value: formatSpecValue(value)
-        });
-      }
-    });
-
-    console.log('✅ Extracted specifications array:', specArray);
-    return specArray;
-  };
-
-  /**
-   * Get all unique spec keys from both products
-   */
   const getAllSpecKeys = () => {
-    const specs1 = product1.specifications || {};
-    const specs2 = product2.specifications || {};
+    const specs1 = normalizeSpecs(product1?.specifications);
+    const specs2 = normalizeSpecs(product2?.specifications);
     const allKeys = new Set([...Object.keys(specs1), ...Object.keys(specs2)]);
     return Array.from(allKeys).filter(key => {
       const val1 = specs1[key];
@@ -183,9 +129,6 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
     });
   };
 
-  /**
-   * Calculate price difference
-   */
   const getPriceDifference = () => {
     const price1 = getPrice(product1);
     const price2 = getPrice(product2);
@@ -202,7 +145,7 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
     return (
       <div className="compare-modal-overlay">
         <div className="compare-error">
-          <h2>⚠️ Comparison Error</h2>
+          <h2>Comparison Error</h2>
           <p>Please select exactly 2 products to compare</p>
           <button onClick={onClose} className="compare-close-btn">Close</button>
         </div>
@@ -214,11 +157,12 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
   const specs1 = getSpecifications(product1);
   const specs2 = getSpecifications(product2);
   const allSpecKeys = getAllSpecKeys();
+  const normalizedSpecs1 = normalizeSpecs(product1.specifications);
+  const normalizedSpecs2 = normalizeSpecs(product2.specifications);
 
   return (
     <div className="compare-modal-overlay">
       <div className="compare-modal">
-        {/* Header */}
         <div className="compare-header">
           <h1 className="compare-title">Comparison</h1>
           <button className="compare-close-btn-icon" onClick={onClose}>
@@ -226,22 +170,20 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
           </button>
         </div>
 
-        {/* AI Analysis Header */}
         {loading ? (
           <div className="compare-ai-loading">
             <div className="loading-spinner"></div>
-            <p>AI analyzing products...</p>
+            <p>Comparing products...</p>
           </div>
-        ) : aiAnalysis && (
+        ) : analysis && (
           <div className="compare-ai-analysis">
             <div className="ai-analysis-header">
-              <img src={comparison} alt="AI Analysis" className="comparison-icon" />
-              <h2>AI Value Analysis</h2>
+              <img src={comparison} alt="Value Analysis" className="comparison-icon" />
+              <h2>Value Analysis</h2>
             </div>
           </div>
         )}
 
-        {/* Price Difference Banner */}
         <div className="compare-price-banner">
           <FontAwesomeIcon icon={faDollarSign} />
           <span>
@@ -250,11 +192,9 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
           </span>
         </div>
 
-        {/* Comparison Grid - Vertical Split */}
         <div className="compare-grid">
-          {/* Left Product */}
-          <div className={`compare-product-card ${aiAnalysis?.winner === 'product1' ? 'winner' : ''}`}>
-            {aiAnalysis?.winner === 'product1' && (
+          <div className={`compare-product-card ${analysis?.winner === 'product1' ? 'winner' : ''}`}>
+            {analysis?.winner === 'product1' && (
               <div className="winner-badge">
                 <FontAwesomeIcon icon={faTrophy} /> Best Value
               </div>
@@ -280,8 +220,8 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
               <h4>Specifications</h4>
               {specs1.length > 0 ? (
                 <ul>
-                  {specs1.map((spec, idx) => (
-                    <li key={idx}>
+                  {specs1.map((spec) => (
+                    <li key={`spec1-${spec.label}`}>
                       <span className="spec-label">{spec.label}:</span>
                       <span className="spec-value">{spec.value}</span>
                     </li>
@@ -302,14 +242,12 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
             </button>
           </div>
 
-          {/* Divider */}
           <div className="compare-divider">
             <span>VS</span>
           </div>
 
-          {/* Right Product */}
-          <div className={`compare-product-card ${aiAnalysis?.winner === 'product2' ? 'winner' : ''}`}>
-            {aiAnalysis?.winner === 'product2' && (
+          <div className={`compare-product-card ${analysis?.winner === 'product2' ? 'winner' : ''}`}>
+            {analysis?.winner === 'product2' && (
               <div className="winner-badge">
                 <FontAwesomeIcon icon={faTrophy} /> Best Value
               </div>
@@ -335,8 +273,8 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
               <h4>Specifications</h4>
               {specs2.length > 0 ? (
                 <ul>
-                  {specs2.map((spec, idx) => (
-                    <li key={idx}>
+                  {specs2.map((spec) => (
+                    <li key={`spec2-${spec.label}`}>
                       <span className="spec-label">{spec.label}:</span>
                       <span className="spec-value">{spec.value}</span>
                     </li>
@@ -358,19 +296,16 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
           </div>
         </div>
 
-        {/* Comparison Table */}
         {allSpecKeys.length > 0 && (
           <div className="compare-table-section">
             <div className="compare-table-wrapper">
               <div className="compare-table">
-                {allSpecKeys.map((key, idx) => {
-                  const rawSpec1 = product1.specifications?.[key];
-                  const rawSpec2 = product2.specifications?.[key];
-                  const spec1 = formatSpecValue(rawSpec1);
-                  const spec2 = formatSpecValue(rawSpec2);
+                {allSpecKeys.map((key) => {
+                  const spec1 = formatSpecValue(normalizedSpecs1[key]);
+                  const spec2 = formatSpecValue(normalizedSpecs2[key]);
                   return (
-                    <div key={idx} className="compare-table-row">
-                      <div className="spec-label">{key.replace(/_/g, ' ')}</div>
+                    <div key={`compare-${key}`} className="compare-table-row">
+                      <div className="spec-label">{key.replaceAll('_', ' ')}</div>
                       <div className="spec-values">
                         <div className="spec-value-item">{spec1}</div>
                         <div className="spec-value-item">{spec2}</div>
@@ -383,49 +318,47 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
           </div>
         )}
 
-        {/* AI Analysis Content */}
-        {!loading && aiAnalysis && (
+        {!loading && analysis && (
           <div className="compare-ai-analysis-content-section">
             <div className="ai-analysis-content">
               <div className="ai-value">
-                {aiAnalysis.priceComparison && typeof aiAnalysis.priceComparison === 'object' ? (
+                {analysis.priceComparison && typeof analysis.priceComparison === 'object' ? (
                   <>
                     <strong className="ai-title">
-                      <img src={pricediff} alt="Price Difference" className="ai-price-icon"/> Price Difference: </strong>
-                    ₱{aiAnalysis.priceComparison.difference?.toLocaleString() || 0}
+                      <img src={pricediff} alt="Price Difference" className="ai-price-icon" /> Price Difference: </strong>
+                    ₱{analysis.priceComparison.difference?.toLocaleString() || 0}
                     <br />
                   </>
-                ) : aiAnalysis.priceComparison && typeof aiAnalysis.priceComparison === 'string' ? (
+                ) : analysis.priceComparison && typeof analysis.priceComparison === 'string' ? (
                   <>
                     <strong>Price Difference:</strong>
                     <br />
-                    {aiAnalysis.priceComparison}
+                    {analysis.priceComparison}
                     <br /><br />
                   </>
                 ) : null}
-                {aiAnalysis.tierComparison && typeof aiAnalysis.tierComparison === 'object' ? (
+                {analysis.tierComparison && typeof analysis.tierComparison === 'object' ? (
                   <>
                     <strong className="ai-title">
-                    <img src={tiercomparison} alt="Tier Comparison" className="ai-tier-icon"/> Tier Comparison: </strong>
-                    
-                    {aiAnalysis.tierComparison.product1Tier || 'N/A'} vs {aiAnalysis.tierComparison.product2Tier || 'N/A'}
+                      <img src={tiercomparison} alt="Tier Comparison" className="ai-tier-icon" /> Tier Comparison: </strong>
+                    {analysis.tierComparison.product1Tier || 'N/A'} vs {analysis.tierComparison.product2Tier || 'N/A'}
                   </>
-                ) : aiAnalysis.tierComparison && typeof aiAnalysis.tierComparison === 'string' ? (
+                ) : analysis.tierComparison && typeof analysis.tierComparison === 'string' ? (
                   <>
                     <strong>Tier Comparison:</strong>
                     <br />
-                    {aiAnalysis.tierComparison}
+                    {analysis.tierComparison}
                   </>
                 ) : null}
-                {!aiAnalysis.priceComparison && !aiAnalysis.tierComparison && aiAnalysis.valueAnalysis && (
-                  aiAnalysis.valueAnalysis
+                {!analysis.priceComparison && !analysis.tierComparison && analysis.valueAnalysis && (
+                  analysis.valueAnalysis
                 )}
               </div>
               <div className="ai-recommendation">
                 <strong>
-                <img src={recommend} alt="recommendation" /> Recommendation:</strong>
+                  <img src={recommend} alt="recommendation" /> Recommendation:</strong>
                 <br />
-                {aiAnalysis.recommendation || 'Choose based on your specific needs and budget.'}
+                {analysis.recommendation || 'Choose based on your specific needs and budget.'}
               </div>
             </div>
           </div>
@@ -433,6 +366,12 @@ const CompareProducts = ({ products, onClose, onAddToCart }) => {
       </div>
     </div>
   );
+};
+
+CompareProducts.propTypes = {
+  products: PropTypes.arrayOf(PropTypes.object).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onAddToCart: PropTypes.func.isRequired
 };
 
 export default CompareProducts;

@@ -6,9 +6,8 @@ import Customized from "../assets/Customized.webp";
 import dropdown from "../assets/PCParts/dropdown.svg";
 import filterspecs from "../assets/CustomProducts/filterspecs.svg";
 import api from "../api/api"; // Import centralized API
-import aiService from "../api/aiService"; // Re-enabled for compatibility analysis
 import { extractBrandsFromProducts, countProductsByBrand, detectProductBrand } from "../utils/brandDetection"; // 🔥 FIX: Import brand detection utility
-import { filterCompatibleProducts } from "../utils/compatibilityFilter"; // 🔥 CRITICAL: Client-side pre-filtering
+import KioskProductImage from "../components/KioskProductImage";
 
 // Import default category images
 import CPU1 from "../assets/CPU1.webp";
@@ -19,6 +18,96 @@ import Storage1 from "../assets/Storage1.webp";
 import GPU1 from "../assets/GPU1.webp";
 import SystemUnit1 from "../assets/SystemUnit1.webp";
 import PSU1 from "../assets/PSU1.webp";
+
+/** Detect the normalized category key from a raw category string */
+function detectCategoryKey(rawCategory) {
+  const catLower = (rawCategory || '').toLowerCase();
+  let key = catLower
+    .trim()
+    .replaceAll(/\s+/g, '_')
+    .replaceAll(/central_processing_unit/ig, 'cpu')
+    .replaceAll(/graphics_processing_unit/ig, 'gpu')
+    .replaceAll(/memory_\(ram\)/ig, 'ram')
+    .replaceAll(/memory/ig, 'ram')
+    .replaceAll(/cpu_cooler/ig, 'cooling')
+    .replaceAll(/power_supply_unit/ig, 'psu')
+    .replaceAll(/pc_case/ig, 'case');
+
+  if (catLower.includes('cpu') || catLower.includes('processor') || catLower.includes('central processing')) return 'cpu';
+  if (catLower.includes('cool') || catLower.includes('fan')) return 'cooling';
+  if (catLower.includes('mother')) return 'motherboard';
+  if (catLower.includes('ram') || catLower.includes('memory')) return 'ram';
+  if (catLower.includes('storage') || catLower.includes('ssd') || catLower.includes('hdd')) return 'storage';
+  if (catLower.includes('gpu') || catLower.includes('graphics')) return 'gpu';
+  if (catLower.includes('case') || catLower.includes('chassis')) return 'case';
+  if (catLower.includes('psu') || catLower.includes('power')) return 'psu';
+  return key;
+}
+
+/** Build a full component object with all compatibility-relevant fields */
+function buildComponentObject(comp) {
+  const specs = comp.specifications || comp.normalized_specs || {};
+  return {
+    id: comp.id,
+    name: comp.name,
+    category: comp.category || comp.categoryName || '',
+    brand: comp.brand || null,
+    price: comp.price || 0,
+    specifications: specs,
+    dimensions: comp.dimensions || {},
+    image_url: comp.image_url || comp.imageUrl || comp.file_path || comp.image || null,
+    imageVariants: comp.imageVariants || comp.image_variants || null,
+    socket: comp.socket || specs.socket,
+    memory_type: comp.memory_type || specs.memory_type || specs.type,
+    form_factor: comp.form_factor || specs.form_factor,
+    tdp: comp.tdp || specs.tdp,
+    wattage: comp.wattage || specs.wattage,
+    length: comp.length || specs.length,
+    max_gpu_length: comp.max_gpu_length || specs.max_gpu_length,
+    max_gpu_length_mm: comp.max_gpu_length_mm || specs.max_gpu_length_mm,
+    height: comp.height || specs.height,
+    pcie_6pin_connectors: comp.pcie_6pin_connectors || specs.pcie_6pin_connectors || 0,
+    pcie_8pin_connectors: comp.pcie_8pin_connectors || specs.pcie_8pin_connectors || 0,
+    sata_ports: comp.sata_ports || specs.sata_ports,
+    m2_slots: comp.m2_slots || specs.m2_slots,
+    pcie_slots: comp.pcie_slots || specs.pcie_slots,
+    storage_type: comp.storage_type || specs.storage_type || comp.type,
+    speed: comp.speed || specs.speed,
+  };
+}
+
+/** Build the components map from selected components for compatibility checking */
+function buildComponentsMap(selectedComponents) {
+  const components = {};
+  const ramSticks = [];
+  for (const comp of selectedComponents) {
+    if (!comp) continue;
+    const categoryKey = detectCategoryKey(comp.category || comp.categoryName || '');
+    if (categoryKey === 'ram') ramSticks.push(comp);
+    // For RAM and Storage, only use the first item as reference
+    if ((categoryKey === 'ram' || categoryKey === 'storage') && components[categoryKey]) continue;
+    components[categoryKey] = buildComponentObject(comp);
+  }
+  return { components, ramSticks };
+}
+
+/** Merge multiSlotCart items into selectedComponents array, avoiding duplicates */
+function mergeMultiSlotItems(cartItems, multiSlotCartObj) {
+  const selected = cartItems.filter(item => item !== null);
+  if (!multiSlotCartObj || Object.keys(multiSlotCartObj).length === 0) return selected;
+  for (const item of Object.values(multiSlotCartObj)) {
+    if (item?.id && !selected.some(comp => comp?.id === item.id)) {
+      selected.push(item);
+    }
+  }
+  return selected;
+}
+
+/** Parse a numeric price from a product's price field */
+function parseProductPrice(price) {
+  if (typeof price === 'number') return price;
+  return Number.parseFloat(String(price || '').replaceAll(/[^0-9.]/g, '')) || 0;
+}
 
 const CustomizedProducts = () => {
   const location = useLocation();
@@ -43,14 +132,8 @@ const CustomizedProducts = () => {
     if (Array.isArray(products)) {
       // 🔥 CRITICAL: Log dimensions from products received via navigation
       if (products.length > 0) {
-        console.log('📦 CustomizedProducts received products:', products.length);
-        console.log('🔍 First product dimensions check:', {
-          name: products[0].name,
-          hasSpecs: !!products[0].specifications,
-          hasDims: !!products[0].dimensions,
-          specsKeys: Object.keys(products[0].specifications || {}),
-          dimsKeys: Object.keys(products[0].dimensions || {})
-        });
+        console.log(`📦 CustomizedProducts received ${products.length} products`);
+        console.log(`🔍 First product: hasSpecs=${!!products[0].specifications}, hasDims=${!!products[0].dimensions}`);
       }
       return products;
     }
@@ -133,9 +216,9 @@ const CustomizedProducts = () => {
       product.product_brand || 
       product.manufacturer || 
       product.maker ||
-      (product.specifications && product.specifications.brand) ||
-      (product.specifications && product.specifications.manufacturer) ||
-      (product.info && product.info.brand) ||
+      product.specifications?.brand ||
+      product.specifications?.manufacturer ||
+      product.info?.brand ||
       '';
 
     if (brandField && typeof brandField === 'string' && brandField.trim()) {
@@ -161,7 +244,7 @@ const CustomizedProducts = () => {
 
     // 🔥 Use utility functions for brand detection
     // Normalize category name for brandDetection (remove spaces, use canonical names)
-    let normalizedCategory = (categoryName || '').toLowerCase().replace(/\s+/g, '');
+    let normalizedCategory = (categoryName || '').toLowerCase().replaceAll(/\s+/g, '');
     if (normalizedCategory.includes('cooler') || normalizedCategory.includes('cooling')) normalizedCategory = 'cooling';
     else if (normalizedCategory.includes('processor')) normalizedCategory = 'cpu';
     else if (normalizedCategory.includes('memory')) normalizedCategory = 'ram';
@@ -188,11 +271,7 @@ const CustomizedProducts = () => {
     
     // Debug: Log first 3 products to verify brand field
     if (enhancedProducts.length > 0) {
-      console.log('🔍 Sample products with brands:', enhancedProducts.slice(0, 3).map(p => ({
-        name: p.name,
-        brand: p.brand,
-        hasBrandField: !!p.brand
-      })));
+      console.log(`🔍 Brand detection: ${enhancedProducts.slice(0, 3).map(p => p.brand || 'unknown').join(', ')}...`);
     }
   }, [enhancedProducts, categoryName]);
 
@@ -235,9 +314,9 @@ const CustomizedProducts = () => {
     Object.entries(specValues).forEach(([key, valueSet]) => {
       filters[key] = Array.from(valueSet).sort((a, b) => {
         // Try numeric sort first
-        const numA = parseFloat(a);
-        const numB = parseFloat(b);
-        if (!isNaN(numA) && !isNaN(numB)) {
+        const numA = Number.parseFloat(a);
+        const numB = Number.parseFloat(b);
+        if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
           return numA - numB;
         }
         // Fallback to string sort
@@ -255,72 +334,32 @@ const CustomizedProducts = () => {
    */
   useEffect(() => {
     const loadAIEnhancements = async () => {
+      const fallbackProducts = Array.isArray(products) ? products : [];
       if (!products?.length || !currentCart) {
-        setEnhancedProducts(Array.isArray(products) ? products : []);
+        setEnhancedProducts(fallbackProducts);
         return;
       }
 
       try {
-        console.log('🤖 Loading compatibility validation for category:', categoryName);
-
-        // 🔥 CRITICAL FIX: Merge currentCart with multiSlotCart to get ALL selected components
-        // This ensures RAM slots and Storage slots are included in compatibility checks
-        const selectedComponents = currentCart.filter(item => item !== null);
-        
-        // Add multi-slot items (RAM, Storage) to selected components
-        if (multiSlotCart && Object.keys(multiSlotCart).length > 0) {
-          console.log('📦 Including multi-slot items in compatibility check:', Object.keys(multiSlotCart));
-          Object.values(multiSlotCart).forEach(item => {
-            if (item && item.id) {
-              // Check if this item is already in selectedComponents (avoid duplicates)
-              const exists = selectedComponents.some(comp => comp && comp.id === item.id);
-              if (!exists) {
-                selectedComponents.push(item);
-              }
-            }
-          });
-        }
-        
-        // 🔥 FIXED: Run compatibility filtering when there is 1+ component
-        // User requirement: "when CPU selected the compatibility filtering should run automatically"
-        if (selectedComponents.length >= 1) {
-          console.log('🔍 Running compatibility validation with', selectedComponents.length, 'existing components');
-          console.log('📦 Products to validate:', products?.length || 0);
-          
-          // 🔥 CRITICAL FIX: Use ONLY backend validation (remove double-filtering)
-          // Backend validation is authoritative - it uses the same rules as Order Summary
-          const compatibleProducts = await getCompatibleProducts(products, selectedComponents, categoryName);
-          
-          if (compatibleProducts && compatibleProducts.length >= 0) {
-            console.log('✅ Backend validated:', compatibleProducts.length, 'compatible products');
-            
-            // 🔥 CRITICAL FIX: Trust backend validation completely - NO additional filtering
-            // Show exactly what backend says is compatible (same as Order Summary validation)
-            console.log(`📊 Showing ${compatibleProducts.length} compatible products (${products.length - compatibleProducts.length} incompatible items hidden)`);
-            
-            setEnhancedProducts(Array.isArray(compatibleProducts) ? compatibleProducts : []);
-            setAiEnabled(true);
-          } else {
-            // If backend validation fails, show all products as fallback
-            console.warn('⚠️ Backend validation failed - showing all products');
-            setEnhancedProducts(Array.isArray(products) ? products : []);
-            setAiEnabled(false);
-          }
-          
-          console.log('✅ Compatibility validation completed');
-        } else {
-          // No existing components - show all products without filtering
-          setEnhancedProducts(Array.isArray(products) ? products : []);
+        const selectedComponents = mergeMultiSlotItems(currentCart, multiSlotCart);
+        if (selectedComponents.length < 1) {
+          setEnhancedProducts(fallbackProducts);
           setAiEnabled(false);
-          console.log('💡 No existing components - showing all products');
+          return;
         }
 
+        const compatible = await getCompatibleProducts(products, selectedComponents, categoryName);
+        if (compatible?.length > 0) {
+          setEnhancedProducts(compatible);
+          setAiEnabled(true);
+        } else {
+          setEnhancedProducts(fallbackProducts);
+          setAiEnabled(false);
+        }
       } catch (error) {
-        console.warn('⚠️ Compatibility validation failed, using standard product list:', error);
+        console.warn('⚠️ Compatibility validation failed:', error);
         setEnhancedProducts(Array.isArray(products) ? products : []);
         setAiEnabled(false);
-      } finally {
-        // Always re-enable UI after processing
       }
     };
 
@@ -333,448 +372,60 @@ const CustomizedProducts = () => {
    * This ensures step-by-step filtering uses THE SAME validation logic as the final check
    * Prevents false compatibility errors at Order Summary
    */
-  const getCompatibleProducts = async (products, selectedComponents, categoryName) => {
+  const getCompatibleProducts = async (allProducts, selectedComponents, catName) => {
     try {
-      console.log('🔍 Advanced compatibility filtering for:', categoryName);
-      console.log('📦 Total products:', products.length);
-      console.log('🔧 Selected components:', selectedComponents.length);
+      const { ramSticks } = buildComponentsMap(selectedComponents);
 
-      // Build components object in the format expected by Advanced Compatibility API
-      const components = {};
-      const ramSticks = []; // 🔥 CRITICAL FIX: Collect ALL RAM sticks for DDR type validation
-      const storageDevices = []; // Collect all storage devices
-      
-      selectedComponents.forEach(comp => {
-        if (!comp) return;
-        
-        // Determine component type based on category or name
-        // 🔥 CRITICAL FIX: Use comp.category (normalized lowercase) BEFORE comp.categoryName (display name)
-        // This fixes filtering failure where "Processor" vs "cpu" key mismatch causes filter to skip
-        const category = comp.category || comp.categoryName || '';
-        const catLower = category.toLowerCase();
-        
-        console.log(`🔍 Analyzing component: ${comp.name} (${category})`);
-        
-        // Use same normalization as CompatibilityValidationModal
-        let categoryKey = catLower
-          .trim()
-          .replace(/\s+/g, '_')
-          .replace(/central_processing_unit/gi, 'cpu')
-          .replace(/graphics_processing_unit/gi, 'gpu')
-          .replace(/memory_\(ram\)/gi, 'ram')
-          .replace(/memory/gi, 'ram')
-          .replace(/cpu_cooler/gi, 'cooling')
-          .replace(/power_supply_unit/gi, 'psu')
-          .replace(/pc_case/gi, 'case');
-        
-        // Detect component type and build complete component object
-        if (catLower.includes('cpu') || catLower.includes('processor') || catLower.includes('central processing')) {
-          categoryKey = 'cpu';
-        } 
-        else if (catLower.includes('cool') || catLower.includes('fan')) {
-          categoryKey = 'cooling';
+      // Validate RAM DDR type consistency
+      if (ramSticks.length > 1) {
+        const firstDDR = ramSticks[0].specifications?.type || ramSticks[0].specifications?.memory_type;
+        const allSameDDR = ramSticks.every(stick =>
+          (stick.specifications?.type || stick.specifications?.memory_type) === firstDDR
+        );
+        if (!allSameDDR) {
+          console.warn('⚠️ MIXED DDR TYPES DETECTED in RAM sticks');
         }
-        else if (catLower.includes('mother')) {
-          categoryKey = 'motherboard';
-        }
-        else if (catLower.includes('ram') || catLower.includes('memory')) {
-          categoryKey = 'ram';
-          // 🔥 CRITICAL FIX: Collect RAM sticks separately to check DDR type consistency
-          ramSticks.push(comp);
-        }
-        else if (catLower.includes('storage') || catLower.includes('ssd') || catLower.includes('hdd')) {
-          categoryKey = 'storage';
-          storageDevices.push(comp);
-        }
-        else if (catLower.includes('gpu') || catLower.includes('graphics')) {
-          categoryKey = 'gpu';
-        }
-        else if (catLower.includes('case') || catLower.includes('chassis')) {
-          categoryKey = 'case';
-        }
-        else if (catLower.includes('psu') || catLower.includes('power')) {
-          categoryKey = 'psu';
-        }
-        
-        // Build full component object with ALL fields (same as validation modal)
-        // 🔥 CRITICAL FIX: For RAM and Storage, use the FIRST item as reference for validation
-        if (categoryKey === 'ram' && !components['ram']) {
-          components[categoryKey] = {
-            id: comp.id,
-            name: comp.name,
-            category: category,
-            brand: comp.brand || null,
-            price: comp.price || 0,
-            specifications: comp.specifications || comp.normalized_specs || {},
-            dimensions: comp.dimensions || {}, // 🔥 CRITICAL FIX: Pass dimensions for validation
-            image_url: comp.image_url || null,
-            // Include direct fields for compatibility checks
-            socket: comp.socket || comp.specifications?.socket,
-            memory_type: comp.memory_type || comp.specifications?.memory_type || comp.specifications?.type,
-            form_factor: comp.form_factor || comp.specifications?.form_factor,
-            tdp: comp.tdp || comp.specifications?.tdp,
-            wattage: comp.wattage || comp.specifications?.wattage,
-            length: comp.length || comp.specifications?.length,
-            max_gpu_length: comp.max_gpu_length || comp.specifications?.max_gpu_length,
-            height: comp.height || comp.specifications?.height,
-            pcie_6pin_connectors: comp.pcie_6pin_connectors || comp.specifications?.pcie_6pin_connectors || 0,
-            pcie_8pin_connectors: comp.pcie_8pin_connectors || comp.specifications?.pcie_8pin_connectors || 0,
-            sata_ports: comp.sata_ports || comp.specifications?.sata_ports,
-            m2_slots: comp.m2_slots || comp.specifications?.m2_slots,
-            pcie_slots: comp.pcie_slots || comp.specifications?.pcie_slots
-          };
-        } else if (categoryKey === 'storage' && !components['storage']) {
-          components[categoryKey] = {
-            id: comp.id,
-            name: comp.name,
-            category: category,
-            brand: comp.brand || null,
-            price: comp.price || 0,
-            specifications: comp.specifications || comp.normalized_specs || {},
-            dimensions: comp.dimensions || {}, // 🔥 CRITICAL FIX: Pass dimensions for validation
-            image_url: comp.image_url || null,
-            socket: comp.socket || comp.specifications?.socket,
-            memory_type: comp.memory_type || comp.specifications?.memory_type,
-            form_factor: comp.form_factor || comp.specifications?.form_factor,
-            tdp: comp.tdp || comp.specifications?.tdp,
-            wattage: comp.wattage || comp.specifications?.wattage,
-            length: comp.length || comp.specifications?.length,
-            max_gpu_length: comp.max_gpu_length || comp.specifications?.max_gpu_length,
-            height: comp.height || comp.specifications?.height,
-            pcie_6pin_connectors: comp.pcie_6pin_connectors || comp.specifications?.pcie_6pin_connectors || 0,
-            pcie_8pin_connectors: comp.pcie_8pin_connectors || comp.specifications?.pcie_8pin_connectors || 0,
-            sata_ports: comp.sata_ports || comp.specifications?.sata_ports,
-            m2_slots: comp.m2_slots || comp.specifications?.m2_slots,
-            pcie_slots: comp.pcie_slots || comp.specifications?.pcie_slots,
-            storage_type: comp.storage_type || comp.specifications?.storage_type || comp.type,
-            speed: comp.speed || comp.specifications?.speed
-          };
-        } else if (categoryKey !== 'ram' && categoryKey !== 'storage') {
-          // For non-multi-slot components, just add normally
-          components[categoryKey] = {
-            id: comp.id,
-            name: comp.name,
-            category: category,
-            brand: comp.brand || null,
-            price: comp.price || 0,
-            specifications: comp.specifications || comp.normalized_specs || {},
-            dimensions: comp.dimensions || {}, // 🔥 CRITICAL FIX: Pass dimensions for validation
-            image_url: comp.image_url || null,
-            // Include direct fields for compatibility checks
-            socket: comp.socket || comp.specifications?.socket,
-            memory_type: comp.memory_type || comp.specifications?.memory_type,
-            form_factor: comp.form_factor || comp.specifications?.form_factor,
-            tdp: comp.tdp || comp.specifications?.tdp,
-            wattage: comp.wattage || comp.specifications?.wattage,
-            length: comp.length || comp.specifications?.length,
-            max_gpu_length: comp.max_gpu_length || comp.specifications?.max_gpu_length,
-            height: comp.height || comp.specifications?.height,
-            pcie_6pin_connectors: comp.pcie_6pin_connectors || comp.specifications?.pcie_6pin_connectors || 0,
-            pcie_8pin_connectors: comp.pcie_8pin_connectors || comp.specifications?.pcie_8pin_connectors || 0,
-            sata_ports: comp.sata_ports || comp.specifications?.sata_ports,
-            m2_slots: comp.m2_slots || comp.specifications?.m2_slots,
-            pcie_slots: comp.pcie_slots || comp.specifications?.pcie_slots
-          };
-        }
-        
-        console.log(`✅ ${categoryKey} added to compatibility check`);
+      }
+
+      const selectingCategory = detectCategoryKey(catName);
+      if (!selectingCategory) return allProducts;
+
+      const batchResponse = await api.kiosk.checkCompatibilityCandidates({
+        contextParts: selectedComponents.map(buildComponentObject),
+        candidates: allProducts.map(product => buildComponentObject({ ...product, category: catName })),
+        targetCategory: selectingCategory,
+        mode: 'candidate_filter'
       });
 
-      // 🔥 CRITICAL FIX: Validate RAM DDR type consistency
-      if (ramSticks.length > 1) {
-        console.log(`🎰 Multiple RAM sticks detected (${ramSticks.length}), checking DDR type consistency...`);
-        const firstDDR = ramSticks[0].specifications?.type || ramSticks[0].specifications?.memory_type;
-        const allSameDDR = ramSticks.every(stick => {
-          const stickDDR = stick.specifications?.type || stick.specifications?.memory_type;
-          return stickDDR === firstDDR;
+      if (!batchResponse.success) return allProducts;
+
+      return (batchResponse.data || [])
+        .map(product => {
+          const compatibilityBadgeType = product.compatible === false
+            ? 'incompatible'
+            : (product.verdict === 'warning' || product.verdict === 'manual_check' ? 'warning' : 'compatible');
+          const compatibilityScore = product.compatibility_score || 0;
+
+          return {
+            ...product,
+            badge: compatibilityBadgeType,
+            compatibilityBadgeType,
+            compatibilityScore,
+            aiScore: compatibilityScore,
+            aiAnalyzed: true,
+            aiRecommended: compatibilityBadgeType === 'compatible' && compatibilityScore >= 90,
+            recommended: product.compatible !== false,
+            isCompatible: product.compatible !== false,
+            compatible: product.compatible !== false,
+            warnings: product.warnings?.length > 0 ? product.warnings : undefined,
+            issues: product.deterministic_issues || product.compatibility_issues || [],
+            manualChecks: product.manualChecks || []
+          };
         });
-        
-        if (!allSameDDR) {
-          console.warn('⚠️ MIXED DDR TYPES DETECTED! RAM sticks have different DDR types:', 
-            ramSticks.map(s => ({name: s.name, ddr: s.specifications?.type || s.specifications?.memory_type}))
-          );
-        } else {
-          console.log(`✅ All RAM sticks are ${firstDDR}`);
-        }
-      }
-
-      console.log('📊 Components for advanced validation:', Object.keys(components));
-
-      // Determine which category we're selecting for
-      let selectingCategory = null;
-      const catLower = categoryName.toLowerCase();
-      
-      if (catLower.includes('cooler') || catLower.includes('cool') || catLower.includes('fan')) selectingCategory = 'cooling';
-      else if (catLower.includes('cpu') || catLower.includes('processor')) selectingCategory = 'cpu';
-      else if (catLower.includes('mother')) selectingCategory = 'motherboard';
-      else if (catLower.includes('ram') || catLower.includes('memory')) selectingCategory = 'ram';
-      else if (catLower.includes('storage') || catLower.includes('ssd') || catLower.includes('hdd')) selectingCategory = 'storage';
-      else if (catLower.includes('gpu') || catLower.includes('graphics')) selectingCategory = 'gpu';
-      else if (catLower.includes('case') || catLower.includes('chassis')) selectingCategory = 'case';
-      else if (catLower.includes('psu') || catLower.includes('power')) selectingCategory = 'psu';
-
-      if (!selectingCategory) {
-        console.warn('⚠️ Could not determine category for:', categoryName);
-        return products; // Return all products if category unknown
-      }
-
-      console.log(`🎯 Testing compatibility for each ${selectingCategory}...`);
-
-      // 🔥 PERFORMANCE OPTIMIZATION: Use client-side filter FIRST
-      // This eliminates obviously incompatible products (socket mismatch, DDR mismatch, etc.)
-      // Reduces API calls by 70-90%, preventing rate limiting
-      console.log('📊 Step 1: Client-side pre-filtering...');
-      const clientFilteredProducts = filterCompatibleProducts(products, components, selectingCategory);
-      console.log(`✅ Client-side filter: ${products.length} → ${clientFilteredProducts.length} products (removed ${products.length - clientFilteredProducts.length} obvious incompatibilities)`);
-
-      // 🔥 CRITICAL FIX: If client-side filter removes ALL products, return empty array
-      // This prevents showing incompatible products that passed no validation
-      if (clientFilteredProducts.length === 0) {
-        console.log('⚠️ Client-side filter eliminated all products - no compatible options available');
-        return [];
-      }
-
-      // Test each remaining product with Advanced Compatibility API for comprehensive validation
-      const compatibleProducts = [];
-      const incompatibleProducts = [];
-      
-      console.log('📊 Step 2: API validation of client-filtered products...');
-      
-      // 🔥 RATE LIMITING PROTECTION: Process in small batches with delays
-      const BATCH_SIZE = 5; // Only 5 products at a time
-      const DELAY_BETWEEN_BATCHES = 500; // 500ms delay between batches
-      
-      for (let i = 0; i < clientFilteredProducts.length; i += BATCH_SIZE) {
-        const batch = clientFilteredProducts.slice(i, i + BATCH_SIZE);
-        console.log(`📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(clientFilteredProducts.length / BATCH_SIZE)}`);
-        
-        for (const product of batch) {
-          try {
-            // Create test components object with this product added
-            const rawTestComponents = {
-              ...components,
-              [selectingCategory]: {
-                id: product.id,
-                name: product.name,
-                category: categoryName,
-                brand: product.brand || null,
-                price: product.price || 0,
-                specifications: product.specifications || {},
-                dimensions: product.dimensions || {}, // 🔥 CRITICAL FIX: Pass dimensions for validation
-                // Include all compatibility-relevant fields
-                socket: product.socket || product.specifications?.socket,
-                memory_type: product.memory_type || product.specifications?.memory_type,
-                form_factor: product.form_factor || product.specifications?.form_factor,
-                tdp: product.tdp || product.specifications?.tdp,
-                wattage: product.wattage || product.specifications?.wattage,
-                length: product.length || product.specifications?.length,
-                max_gpu_length: product.max_gpu_length || product.specifications?.max_gpu_length,
-                max_gpu_length_mm: product.max_gpu_length_mm || product.specifications?.max_gpu_length_mm,
-                height: product.height || product.specifications?.height,
-                pcie_6pin_connectors: product.pcie_6pin_connectors || product.specifications?.pcie_6pin_connectors || 0,
-                pcie_8pin_connectors: product.pcie_8pin_connectors || product.specifications?.pcie_8pin_connectors || 0,
-                sata_ports: product.sata_ports || product.specifications?.sata_ports,
-                m2_slots: product.m2_slots || product.specifications?.m2_slots,
-                pcie_slots: product.pcie_slots || product.specifications?.pcie_slots,
-                storage_type: product.storage_type || product.specifications?.storage_type || product.type,
-                speed: product.speed || product.specifications?.speed
-              }
-            };
-            
-            // 🔥 FIX: Filter out null/undefined components to prevent backend errors
-            const testComponents = Object.keys(rawTestComponents).reduce((acc, key) => {
-              if (rawTestComponents[key] !== null && rawTestComponents[key] !== undefined) {
-                acc[key] = rawTestComponents[key];
-              }
-              return acc;
-            }, {});
-            
-            // Call Advanced Compatibility API (same as Order Summary)
-            const apiBaseUrl = api.config.baseUrl;
-            const response = await fetch(`${apiBaseUrl}/compatibility/advanced/full-build`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                components: testComponents,
-                comprehensive: true 
-              })
-            });
-            
-            if (response.ok) {
-              const validation = await response.json();
-              
-              if (validation.success && validation.data) {
-                const { criticalIssues = [], warnings = [], score = 0 } = validation.data;
-                
-                // 🔥 CRITICAL FIX: Only include products with NO critical issues
-                // This ensures step-by-step filtering matches Order Summary validation
-                if (criticalIssues.length === 0) {
-                  compatibleProducts.push({
-                    ...product,
-                    badge: '✅ Compatible',
-                    compatibilityScore: score,
-                    aiAnalyzed: true,
-                    recommended: true,
-                    isCompatible: true,
-                    compatible: true,
-                    warnings: warnings.length > 0 ? warnings : undefined
-                  });
-                } else {
-                  // 🔥 CRITICAL FIX: Mark as incompatible (do NOT include in compatibleProducts)
-                  incompatibleProducts.push({
-                    ...product,
-                    badge: '❌ Incompatible',
-                    compatibilityScore: score,
-                    compatible: false,
-                    issues: criticalIssues
-                  });
-                }
-              } else {
-                // 🔥 CRITICAL FIX: If validation response is malformed, treat as incompatible
-                console.warn(`⚠️ Malformed validation response for ${product.name} - marking incompatible`);
-                incompatibleProducts.push({
-                  ...product,
-                  badge: '❌ Incompatible',
-                  compatibilityScore: 0,
-                  compatible: false,
-                  issues: [{ message: 'Validation error: malformed response' }]
-                });
-              }
-            } else if (response.status === 429) {
-              // 🔥 RATE LIMIT FIX: On 429, STOP processing and return what we have
-              // This prevents cascading failures
-              console.warn(`⚠️ Rate limited - stopping validation at product: ${product.name}`);
-              console.warn(`📊 Returning ${compatibleProducts.length} validated compatible products`);
-              return compatibleProducts;
-            } else {
-              // 🔥 CRITICAL FIX: If validation fails (4xx/5xx), treat as INCOMPATIBLE
-              // This prevents showing incompatible products that fail validation
-              const errorData = await response.json().catch(() => ({}));
-              console.warn(`❌ Validation failed for ${product.name} (${response.status}):`, errorData.message || errorData.error);
-              incompatibleProducts.push({
-                ...product,
-                badge: '❌ Incompatible',
-                compatibilityScore: 0,
-                compatible: false,
-                issues: [{ message: errorData.message || errorData.error || `Validation error: ${response.statusText}` }]
-              });
-            }
-          } catch (error) {
-            // 🔥 CRITICAL FIX: On error, mark as INCOMPATIBLE instead of assuming compatible
-            // This prevents showing products that couldn't be validated
-            console.error(`❌ Error validating ${product.name}:`, error.message);
-            incompatibleProducts.push({
-              ...product,
-              badge: '❌ Error',
-              compatibilityScore: 0,
-              compatible: false,
-              issues: [{ message: `Validation error: ${error.message}` }]
-            });
-          }
-        }
-        
-        // Add delay between batches to prevent rate limiting
-        if (i + BATCH_SIZE < clientFilteredProducts.length) {
-          console.log(`⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
-        }
-      }
-      
-      console.log(`✅ Advanced validation complete: ${compatibleProducts.length} compatible, ${incompatibleProducts.length} incompatible`);
-      
-      // Return ONLY compatible products (same as user requirement)
-      return compatibleProducts;
-      
     } catch (error) {
       console.error('❌ Advanced compatibility check failed:', error);
-      // 🔥 CRITICAL FIX: On failure, return empty array to prevent showing unvalidated products
-      console.warn('⚠️ Returning empty array due to validation failure');
-      return [];
+      return allProducts;
     }
-  };
-
-  /**
-   * Analyze products with AGGRESSIVE throttling to prevent rate limiting
-   * Only used as fallback when database filtering can't determine compatibility
-   */
-  // eslint-disable-next-line no-unused-vars
-  const _analyzeProductsWithBatching = async (products, selectedComponents) => {
-    const BATCH_SIZE = 2; // Only 2 products at a time (very conservative)
-    const BATCH_DELAY = 1000; // 1 second delay between batches
-    const REQUEST_DELAY = 500; // 500ms delay between individual requests in batch
-    
-    console.log(`🤖 Starting AI analysis for ${products.length} products with aggressive throttling...`);
-    
-    const results = [];
-    
-    for (let i = 0; i < products.length; i += BATCH_SIZE) {
-      const batch = products.slice(i, i + BATCH_SIZE);
-      console.log(`📊 Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(products.length / BATCH_SIZE)}`);
-      
-      try {
-        // Process batch sequentially (NOT in parallel) to prevent rate limiting
-        for (const product of batch) {
-          try {
-            await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
-            
-            const compatibilityResult = await aiService.checkCompatibility(selectedComponents, product);
-            
-            // 🔥 FIX ISSUE #1: Preserve image URLs when adding AI analysis results
-            results.push({
-              ...product,
-              // Ensure image field is preserved or reconstructed
-              image: product.image || api.utils.getFullImageUrl(product.imageUrl || product.image_url) || getFallbackImage(product.category || categoryName),
-              imageUrl: product.imageUrl || product.image_url || product.image,
-              aiRecommended: compatibilityResult.recommended || false,
-              aiScore: compatibilityResult.compatibility_score || 75,
-              compatibilityScore: compatibilityResult.compatibility_score || 75,
-              compatibilityInfo: compatibilityResult.message || 'Compatible',
-              aiCompatibilityWarning: compatibilityResult.warnings || null,
-              aiAnalyzed: true
-            });
-            
-            console.log(`✅ AI analysis successful for: ${product.name}`);
-            
-          } catch (error) {
-            console.warn(`⚠️ AI analysis failed for ${product.name}:`, error.message);
-            // 🔥 FIX ISSUE #1: Preserve image URLs when adding AI analysis results
-            results.push({
-              ...product,
-              // Ensure image field is preserved or reconstructed
-              image: product.image || api.utils.getFullImageUrl(product.imageUrl || product.image_url) || getFallbackImage(product.category || categoryName),
-              imageUrl: product.imageUrl || product.image_url || product.image,
-              aiScore: 60,
-              compatibilityScore: 60,
-              compatibilityInfo: 'Manual verification recommended',
-              aiAnalyzed: false
-            });
-          }
-        }
-        
-        // Add delay between batches to prevent rate limiting
-        if (i + BATCH_SIZE < products.length) {
-          console.log(`⏳ Waiting ${BATCH_DELAY}ms before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
-        }
-        
-      } catch (error) {
-        console.warn('❌ Batch processing failed:', error);
-        // 🔥 FIX ISSUE #1: Preserve image URLs when batch fails
-        results.push(...batch.map(product => ({
-          ...product,
-          // Ensure image field is preserved or reconstructed
-          image: product.image || api.utils.getFullImageUrl(product.imageUrl || product.image_url) || getFallbackImage(product.category || categoryName),
-          imageUrl: product.imageUrl || product.image_url || product.image,
-          aiScore: 60,
-          compatibilityScore: 60,
-          compatibilityInfo: 'Manual verification recommended',
-          aiAnalyzed: false
-        })));
-      }
-    }
-    
-    console.log(`✅ AI analysis completed for ${results.length} products`);
-    return results;
   };
 
   const handleBackClick = () => {
@@ -820,14 +471,24 @@ const CustomizedProducts = () => {
   const handleProductClick = (product) => {
     // FIX ISSUE #3: Ensure full product data including image URLs, specifications AND dimensions
     console.log('🖱️ Product clicked:', product?.name, 'category:', product?.category);
+
+    if (product?.compatible === false) {
+      const shouldContinue = globalThis.confirm?.(
+        `${product.name} is marked incompatible with the current build. Continue anyway?`
+      );
+      if (!shouldContinue) return;
+    }
     
     navigate("/customized-display", {
       state: {
         product: {
           ...product,
           // Ensure image URL is properly constructed
-          image: api.utils.getFullImageUrl(product.imageUrl || product.image) || getFallbackImage(product.category || categoryName),
-          imageUrl: product.imageUrl || product.image,
+          image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.file_path || product.image) || getFallbackImage(product.category || categoryName),
+          imageUrl: product.imageUrl || product.image_url || product.file_path || product.image,
+          image_url: product.image_url || product.imageUrl || product.file_path || product.image,
+          imageVariants: product.imageVariants || product.image_variants || {},
+          image_variants: product.imageVariants || product.image_variants || {},
           // 🔥 CRITICAL: Ensure specifications AND dimensions are included for compatibility validation
           specifications: product.specifications || product.spec || {},
           dimensions: product.dimensions || {},
@@ -865,13 +526,20 @@ const CustomizedProducts = () => {
    * Render compatibility badge (PCPartPicker-style)
    */
   const renderAIBadge = (product) => {
-    if (!aiEnabled && !product.badge) return null;
+    const badge = String(product.badge || '');
+    const compatibilityBadgeType = product.compatibilityBadgeType
+      || (product.compatible === false ? 'incompatible' : '')
+      || (product.verdict === 'warning' || product.verdict === 'manual_check' ? 'warning' : '')
+      || (product.verdict === 'pass' ? 'compatible' : '')
+      || (badge.includes('Incompatible') ? 'incompatible' : '')
+      || (badge.includes('May Work') ? 'warning' : '')
+      || (badge.includes('Compatible') ? 'compatible' : '');
 
-    // Phase 2 compatibility badges
-    const badge = product.badge || '';
+    if (!aiEnabled && !badge && !compatibilityBadgeType) return null;
+
     const compatibilityScore = product.compatibilityScore || product.aiScore || 0;
 
-    if (badge === '✅ Compatible') {
+    if (compatibilityBadgeType === 'compatible') {
       return (
         <div className="compatibility-badge compatible" title={`Compatible (Score: ${compatibilityScore}/100)`}>
           <CheckCircle size={16} />
@@ -880,7 +548,7 @@ const CustomizedProducts = () => {
       );
     }
 
-    if (badge === '⚠️ May Work') {
+    if (compatibilityBadgeType === 'warning') {
       return (
         <div className="compatibility-badge warning" title={`May work with issues (Score: ${compatibilityScore}/100)`}>
           <AlertTriangle size={16} />
@@ -889,7 +557,7 @@ const CustomizedProducts = () => {
       );
     }
 
-    if (badge === '❌ Incompatible') {
+    if (compatibilityBadgeType === 'incompatible') {
       return (
         <div className="compatibility-badge incompatible" title={`Incompatible (Score: ${compatibilityScore}/100)`}>
           <AlertCircle size={16} />
@@ -898,9 +566,9 @@ const CustomizedProducts = () => {
       );
     }
 
-    // Fallback to old AI badges
+    // Legacy field fallback populated by deterministic compatibility responses.
     if (product.aiRecommended) {
-      return <div className="ai-badge ai-recommended" title="AI Recommended for your build">🤖 AI Pick</div>;
+      return <div className="ai-badge ai-recommended" title="Recommended for your build">Recommended</div>;
     }
     
     if (product.aiCompatibilityWarning) {
@@ -974,9 +642,9 @@ const CustomizedProducts = () => {
     // Price filter
     if (priceRange.min || priceRange.max) {
       filtered = filtered.filter(p => {
-        const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price || '').replace(/[^0-9.]/g, '')) || 0;
-        const min = priceRange.min ? parseFloat(priceRange.min) : 0;
-        const max = priceRange.max ? parseFloat(priceRange.max) : Infinity;
+        const price = typeof p.price === 'number' ? p.price : Number.parseFloat(String(p.price || '').replaceAll(/[^0-9.]/g, '')) || 0;
+        const min = priceRange.min ? Number.parseFloat(priceRange.min) : 0;
+        const max = priceRange.max ? Number.parseFloat(priceRange.max) : Infinity;
         return price >= min && price <= max;
       });
     }
@@ -995,29 +663,31 @@ const CustomizedProducts = () => {
 
     // Sort
     filtered.sort((a, b) => {
-      // AI recommended products first
+      const compatibilityRank = (product) => {
+        if (product.compatible === false || product.compatibilityBadgeType === 'incompatible') return 3;
+        if (product.verdict === 'warning' || product.verdict === 'manual_check' || product.compatibilityBadgeType === 'warning') return 2;
+        return 1;
+      };
+      const rankDiff = compatibilityRank(a) - compatibilityRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      const scoreDiff = (b.compatibilityScore || b.compatibility_score || 0) - (a.compatibilityScore || a.compatibility_score || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+
       if (aiEnabled) {
         if (a.aiRecommended && !b.aiRecommended) return -1;
         if (!a.aiRecommended && b.aiRecommended) return 1;
         if (a.aiScore !== b.aiScore) return (b.aiScore || 0) - (a.aiScore || 0);
       }
 
-      // Then apply selected sort order
       switch (sortOrder) {
         case 'name-asc':
           return (a.name || '').localeCompare(b.name || '');
         case 'name-desc':
           return (b.name || '').localeCompare(a.name || '');
-        case 'price-asc': {
-          const priceA = typeof a.price === 'number' ? a.price : parseFloat(String(a.price || '').replace(/[^0-9.]/g, '')) || 0;
-          const priceB = typeof b.price === 'number' ? b.price : parseFloat(String(b.price || '').replace(/[^0-9.]/g, '')) || 0;
-          return priceA - priceB;
-        }
-        case 'price-desc': {
-          const priceA = typeof a.price === 'number' ? a.price : parseFloat(String(a.price || '').replace(/[^0-9.]/g, '')) || 0;
-          const priceB = typeof b.price === 'number' ? b.price : parseFloat(String(b.price || '').replace(/[^0-9.]/g, '')) || 0;
-          return priceB - priceA;
-        }
+        case 'price-asc':
+          return parseProductPrice(a.price) - parseProductPrice(b.price);
+        case 'price-desc':
+          return parseProductPrice(b.price) - parseProductPrice(a.price);
         default:
           return (a.name || '').localeCompare(b.name || '');
       }
@@ -1101,7 +771,7 @@ const CustomizedProducts = () => {
           {/* Filter Button */}
           <div className="filter-button-container">
             <button className="filter-button" onClick={toggleFilterModal}>
-              <img src={filterspecs} alt="Filter Icon" className="filter-icon"/>
+              <img src={filterspecs} alt="Filter Icon" className="filter-icon" />{' '}
               FILTER SPECS
             </button>
           </div>
@@ -1109,12 +779,19 @@ const CustomizedProducts = () => {
       </div>
       <div className="customized-products-grid">
         {sortedProducts?.map((product, index) => {
-          const isIncompatible = product.compatible === false || product.badge === '❌ Incompatible';
-          const hasWarning = product.badge === '⚠️ May Work';
+          const badge = String(product.badge || '');
+          const compatibilityBadgeType = product.compatibilityBadgeType
+            || (product.compatible === false ? 'incompatible' : '')
+            || (product.verdict === 'warning' || product.verdict === 'manual_check' ? 'warning' : '')
+            || (badge.includes('Incompatible') ? 'incompatible' : '')
+            || (badge.includes('May Work') ? 'warning' : '');
+          const isIncompatible = product.compatible === false || compatibilityBadgeType === 'incompatible';
+          const hasWarning = compatibilityBadgeType === 'warning';
           const hasBiosWarning = product.biosWarning;
 
           return (
-            <div
+            <button
+              type="button"
               key={product.id || index}
               className={`customized-products-card ${
                 product.aiRecommended ? 'ai-recommended-card' : ''
@@ -1125,10 +802,12 @@ const CustomizedProducts = () => {
               } ${
                 hasWarning ? 'warning-card' : ''
               }`}
-              onClick={() => !isIncompatible && handleProductClick(product)}
+              tabIndex={0}
+              onClick={() => handleProductClick(product)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleProductClick(product); } }}
               style={{ 
                 opacity: isIncompatible ? 0.5 : 1,
-                cursor: isIncompatible ? 'not-allowed' : 'pointer'
+                cursor: 'pointer'
               }}
             >
               <div className="product-card-header">
@@ -1148,22 +827,15 @@ const CustomizedProducts = () => {
                 </div>
               )}
 
-              <img
-              src={(() => {
-                // FIX ISSUE #3: Properly construct image URLs for display
-                const imageUrl = product.imageUrl || product.image;
-                if (imageUrl) {
-                  return api.utils.getFullImageUrl(imageUrl);
-                }
-                return getFallbackImage(product.category || categoryName);
-              })()}
-              alt={product.name}
-              className="customized-products-image"
-              onError={(e) => {
-                // Fallback if image fails to load
-                e.target.src = getFallbackImage(product.category || categoryName);
-              }}
-            />
+              <KioskProductImage
+                product={product}
+                alt={product.name}
+                className="customized-products-image"
+                fallbackSrc={getFallbackImage(product.category || categoryName)}
+                sizes="(max-width: 768px) 45vw, 220px"
+                width="220"
+                height="220"
+              />
             <div className="customized-products-details"> 
             <div className="customized-products-name">{product.name}</div>
             
@@ -1204,7 +876,7 @@ const CustomizedProducts = () => {
             
             <div className="customized-products-price">
               {product.price
-                ? `₱${parseFloat(product.price.toString().replace(/[^0-9.,]/g, "").replace(/,/g, ""))
+                ? `₱${Number.parseFloat(product.price.toString().replaceAll(/[^0-9.,]/g, "").replaceAll(',', ""))
                   .toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
@@ -1222,15 +894,16 @@ const CustomizedProducts = () => {
                 <span>Why {isIncompatible ? 'Incompatible' : 'Warning'}?</span>
               </button>
             )}
-          </div>
+          </button>
         );
         })}
       </div>
 
       {/* Compatibility Modal */}
       {showCompatibilityModal && selectedProductForModal && (
-        <div className="incompatibility-modal-overlay" onClick={closeCompatibilityModal}>
-          <div className="incompatibility-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="incompatibility-modal-overlay" role="none" onClick={closeCompatibilityModal} onKeyDown={(e) => { if (e.key === 'Escape') closeCompatibilityModal(); }}>
+          <dialog open className="incompatibility-modal-content" aria-label="Compatibility Analysis">
+            <div role="none" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Escape') closeCompatibilityModal(); }}>
             <div className="modal-header">
               <h3>
                 <AlertCircle size={24} />
@@ -1246,17 +919,23 @@ const CustomizedProducts = () => {
               <div className="modal-score-section">
                 <h4>Compatibility Score</h4>
                 <div className="score-display">
-                  <div 
-                    className="score-bar" 
-                    style={{ 
-                      width: `${selectedProductForModal.compatibilityScore || 0}%`,
-                      backgroundColor: 
-                        selectedProductForModal.compatibilityScore >= 85 ? '#22c55e' :
-                        selectedProductForModal.compatibilityScore >= 60 ? '#f59e0b' : '#ef4444'
-                    }}
-                  >
-                    {selectedProductForModal.compatibilityScore || 0}%
-                  </div>
+                  {(() => {
+                    const score = selectedProductForModal.compatibilityScore || 0;
+                    let barColor = '#ef4444';
+                    if (score >= 85) barColor = '#22c55e';
+                    else if (score >= 60) barColor = '#f59e0b';
+                    return (
+                      <div
+                        className="score-bar"
+                        style={{
+                          width: `${score}%`,
+                          backgroundColor: barColor
+                        }}
+                      >
+                        {score}%
+                      </div>
+                    );
+                  })()}
                 </div>
                 <p className="score-description">{selectedProductForModal.badge}</p>
               </div>
@@ -1267,7 +946,7 @@ const CustomizedProducts = () => {
                   <h4>Issues Detected</h4>
                   <ul className="issues-list">
                     {selectedProductForModal.issues.map((issue, idx) => (
-                      <li key={idx} className={`issue-item ${issue.severity || 'warning'}`}>
+                      <li key={`issue-${issue.severity || 'warn'}-${idx}`} className={`issue-item ${issue.severity || 'warning'}`}>
                         <div className="issue-icon">
                           {issue.severity === 'critical' ? <AlertCircle size={20} /> : <AlertTriangle size={20} />}
                         </div>
@@ -1284,7 +963,7 @@ const CustomizedProducts = () => {
                   <h4>Recommendations</h4>
                   <ul className="recommendations-list">
                     {selectedProductForModal.recommendations.map((rec, idx) => (
-                      <li key={idx} className="recommendation-item">
+                      <li key={`rec-${idx}-${typeof rec === 'string' ? rec.slice(0, 20) : idx}`} className="recommendation-item">
                         <CheckCircle size={16} />
                         <span>{rec}</span>
                       </li>
@@ -1309,7 +988,7 @@ const CustomizedProducts = () => {
                     <summary>View Compatibility Rules</summary>
                     <ul className="rules-list">
                       {selectedProductForModal.ruleResults.map((rule, idx) => (
-                        <li key={idx} className="rule-item">
+                        <li key={`rule-${rule.rule || idx}`} className="rule-item">
                           <strong>{rule.rule}:</strong> Score {rule.score}/100
                         </li>
                       ))}
@@ -1324,14 +1003,15 @@ const CustomizedProducts = () => {
                 Close
               </button>
             </div>
-          </div>
+            </div>
+          </dialog>
         </div>
       )}
 
       {/* Filter & Sort Popup - PC-Parts Style */}
       {showFilterModal && (
-        <div className="popup-overlay" onClick={toggleFilterModal}>
-          <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <div className="popup-overlay" role="none" onClick={toggleFilterModal} onKeyDown={(e) => { if (e.key === 'Escape') toggleFilterModal(); }}>
+          <div className="popup" role="none" onClick={(e) => e.stopPropagation()}>
             <h2 className="popup-title">FILTER & SORT</h2>
             <button className="popup-close-btn" onClick={toggleFilterModal}>
               <X size={24} />
@@ -1406,7 +1086,7 @@ const CustomizedProducts = () => {
                     {isOpen && (
                       <div className="filter-options">
                         <button
-                          className={`filter-btn ${!currentValue ? 'active' : ''}`}
+                          className={['filter-btn', !currentValue && 'active'].filter(Boolean).join(' ')}
                           onClick={() => {
                             const newFilters = { ...specificationFilters };
                             delete newFilters[specKey];

@@ -10,7 +10,7 @@ const BuildSummary = () => {
 
   const getTotalPrice = () => {
     return Object.values(selectedParts).reduce((sum, part) => {
-      return sum + (parseFloat(part.price) || 0);
+      return sum + (Number.parseFloat(part.price) || 0);
     }, 0);
   };
 
@@ -136,7 +136,7 @@ const BuildSummary = () => {
             <div key={category} className="parts-table-row">
               <div className="part-category">{category}</div>
               <div className="part-name">{part.name}</div>
-              <div className="part-price">₱{parseFloat(part.price).toFixed(2)}</div>
+              <div className="part-price">₱{Number.parseFloat(part.price).toFixed(2)}</div>
             </div>
           ))}
           <div className="parts-table-footer">

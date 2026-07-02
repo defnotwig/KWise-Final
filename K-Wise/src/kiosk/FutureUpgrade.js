@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./FutureUpgrade.css";
 import { useNavigate, useLocation } from "react-router-dom";
-import aiService from "../api/aiService";
 import { stockAPI } from "../services/api";
 import api from "../api/api";
 import builderAPI from "../api/builderAPI";
@@ -15,129 +14,150 @@ import currentIcon from "../assets/FutureUpgrade/currentIcon.webp";
 import upgradeIcon from "../assets/FutureUpgrade/upgradeIcon.webp";
 import whyUpgradeIcon from "../assets/FutureUpgrade/whyUpgradeIcon.webp";
 
+// Data-driven spec formatting rules (eliminates if-chains in formatSpecifications)
+const SPEC_FORMAT_RULES = [
+  { key: 'vram', guard: null, fmt: v => `${v}GB VRAM` },
+  { key: 'clockSpeed', guard: s => !s.cores, fmt: v => `${v} MHz` },
+  { key: 'busWidth', guard: null, fmt: v => `${v}-bit` },
+  { key: 'cores', guard: null, fmt: v => `${v} Cores` },
+  { key: 'threads', guard: null, fmt: v => `${v} Threads` },
+  { key: 'clockSpeed', guard: s => !!s.cores, fmt: v => `${v} GHz` },
+  { key: 'baseSpeed', guard: null, fmt: v => `${v} GHz Base` },
+  { key: 'boostSpeed', guard: null, fmt: v => `${v} GHz Boost` },
+  { key: 'capacity', guard: s => !s.readSpeed, fmt: v => `${v}GB` },
+  { key: 'speed', guard: null, fmt: v => `${v} MHz` },
+  { key: 'type', guard: (_, v) => v?.includes?.('DDR') || v === 'NVMe' || v === 'SATA', fmt: v => v },
+  { key: 'capacity', guard: s => !!s.readSpeed, fmt: v => `${v}` },
+  { key: 'readSpeed', guard: null, fmt: v => `${v} MB/s Read` },
+  { key: 'writeSpeed', guard: null, fmt: v => `${v} MB/s Write` },
+  { key: 'wattage', guard: null, fmt: v => `${v}W` },
+  { key: 'efficiency', guard: null, fmt: v => v },
+  { key: 'modular', guard: null, fmt: v => v },
+  { key: 'fanSize', guard: null, fmt: v => `${v}mm Fan` },
+  { key: 'tdp', guard: null, fmt: v => `${v}W TDP` },
+  { key: 'coolingType', guard: null, fmt: v => v },
+];
+
+// Performance metric weights per category
+const PERF_METRICS = {
+  GPU: [{ cur: 'vram', upg: 'vram', w: 0.7 }, { cur: 'clockSpeed', upg: 'clockSpeed', w: 0.3 }],
+  CPU: [{ cur: 'cores', upg: 'cores', w: 0.5 }, { cur: 'clockSpeed', upg: 'clockSpeed', w: 0.5 }],
+  RAM: [{ cur: 'capacity', upg: 'capacity', w: 0.6 }, { cur: 'speed', upg: 'speed', w: 0.4 }],
+  Storage: [{ cur: 'readSpeed', upg: 'readSpeed', w: 1 }],
+  PSU: [{ cur: 'wattage', upg: 'wattage', w: 0.5 }]
+};
+
+// Spec difference message generators per category
+const SPEC_DIFF_GENERATORS = {
+  GPU: (cur, upg) => (upg.vram && cur.vram) ? `Upgrade from ${cur.vram}GB to ${upg.vram}GB VRAM for smoother gaming and rendering.` : null,
+  CPU: (cur, upg) => (upg.cores && cur.cores) ? `${upg.cores} cores vs ${cur.cores} cores means ${Math.round((upg.cores - cur.cores) / cur.cores * 100)}% more multitasking power.` : null,
+  RAM: (cur, upg) => (upg.capacity && cur.capacity) ? `Double your memory from ${cur.capacity}GB to ${upg.capacity}GB for seamless multitasking.` : null,
+  Storage: (cur, upg) => (upg.readSpeed && cur.readSpeed) ? `${Math.round(upg.readSpeed / cur.readSpeed)}x faster load times with ${upg.readSpeed}MB/s read speed.` : null,
+  PSU: (cur, upg) => upg.efficiency ? `${upg.efficiency} efficiency means lower power bills and cooler operation.` : null
+};
+
+// Compatibility matchers for generateCompatibleComponent
+const COMPATIBILITY_MATCHERS = [
+  {
+    category: 'Motherboard', dependsOn: 'CPU',
+    getSpec: build => build.CPU?.dbProduct?.socket || build.CPU?.dbProduct?.specifications?.socket,
+    match: (p, spec) => p.specifications?.socket === spec || p.socket === spec
+  },
+  {
+    category: 'RAM', dependsOn: 'Motherboard',
+    getSpec: build => build.Motherboard?.dbProduct?.specifications?.memory_type || build.Motherboard?.dbProduct?.memory_type,
+    match: (p, spec) => p.specifications?.memory_type === spec || p.memory_type === spec
+  },
+  {
+    category: 'CPU', dependsOn: 'Motherboard',
+    getSpec: build => build.Motherboard?.dbProduct?.socket || build.Motherboard?.dbProduct?.specifications?.socket,
+    match: (p, spec) => p.specifications?.socket === spec || p.socket === spec
+  },
+  {
+    category: 'Cooling', dependsOn: 'CPU',
+    getSpec: build => build.CPU?.dbProduct?.socket || build.CPU?.dbProduct?.specifications?.socket,
+    match: (p, spec) => (p.specifications?.compatible_sockets || p.compatible_sockets || '').includes(spec)
+  }
+];
+
+// Compute weighted spec gain from metrics array
+const computeSpecGain = (metrics, currentSpecs, upgradeSpecs) => {
+  let total = 0;
+  let hasData = false;
+  for (const m of metrics) {
+    if (currentSpecs[m.cur] && upgradeSpecs[m.upg]) {
+      const gain = ((upgradeSpecs[m.upg] - currentSpecs[m.cur]) / currentSpecs[m.cur]) * 100;
+      total += Math.round(gain * m.w);
+      hasData = true;
+    }
+  }
+  return hasData ? total : 30;
+};
+
+// Format a single entry value for generic spec display
+const formatEntryValue = (value) => {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return value.toLocaleString();
+  if (typeof value === 'object') return JSON.stringify(value).replaceAll(/[{}"[\]]|\\n/g, '');
+  return value;
+};
+
+// Format object specs using data-driven rules + generic fallback
+const formatObjectSpecs = (specs) => {
+  const entries = Object.entries(specs);
+  if (entries.length === 0) return 'N/A';
+
+  if (specs.raw && Array.isArray(specs.raw)) {
+    const rawFormatted = specs.raw.filter(item => item != null && item !== '').join(', ');
+    if (rawFormatted) return rawFormatted;
+  }
+
+  const formattedParts = [];
+  for (const rule of SPEC_FORMAT_RULES) {
+    const val = specs[rule.key];
+    if (!val) continue;
+    if (rule.guard && !rule.guard(specs, val)) continue;
+    formattedParts.push(rule.fmt(val));
+  }
+  if (formattedParts.length > 0) return formattedParts.join(', ');
+
+  const formatted = entries
+    .filter(([key, value]) => key !== 'raw' && key !== '_original' && value != null && value !== '')
+    .map(([key, value]) => {
+      const formattedKey = key.replaceAll('_', ' ').replaceAll(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase()).trim();
+      return `${formattedKey}: ${formatEntryValue(value)}`;
+    })
+    .join(', ');
+
+  return formatted || 'N/A';
+};
+
 /**
  * Format specifications object/string to clean readable format
- * Converts JSON objects to "key: value, key: value" format
- * @param {string|object} specs - The specifications to format
- * @returns {string} Formatted specifications string
  */
 const formatSpecifications = (specs) => {
   if (!specs) return 'N/A';
-  
-  // If already a formatted string, return it directly
+
   if (typeof specs === 'string') {
-    // Check if it's already a nicely formatted spec string (not JSON)
     if (!specs.startsWith('{') && !specs.startsWith('[')) {
-      // Clean up any raw formatting issues
-      const cleaned = specs.replace(/[{}"[\]]|\\n/g, '').trim();
-      return cleaned || 'N/A';
+      return specs.replaceAll(/[{}"[\]]|\\n/g, '').trim() || 'N/A';
     }
-    
-    // Try to parse JSON string
     try {
       specs = JSON.parse(specs);
-    } catch (e) {
-      // Not valid JSON, return cleaned string
-      return specs.replace(/[{}"[\]]|\\n/g, '').trim() || 'N/A';
+    } catch {
+      return specs.replaceAll(/[{}"[\]]|\\n/g, '').trim() || 'N/A';
     }
   }
-  
-  // If it's an array, join the elements
+
   if (Array.isArray(specs)) {
-    if (specs.length === 0) return 'N/A';
-    return specs
-      .filter(item => item !== null && item !== undefined && item !== '')
-      .join(', ') || 'N/A';
+    return specs.length === 0 ? 'N/A' : (specs.filter(item => item != null && item !== '').join(', ') || 'N/A');
   }
-  
-  // If it's an object, format it nicely based on known spec keys
+
   if (typeof specs === 'object' && specs !== null) {
-    const entries = Object.entries(specs);
-    if (entries.length === 0) return 'N/A';
-    
-    // Handle raw specs array from parseSpecifications
-    if (specs.raw && Array.isArray(specs.raw)) {
-      const rawFormatted = specs.raw
-        .filter(item => item !== null && item !== undefined && item !== '')
-        .join(', ');
-      if (rawFormatted) return rawFormatted;
-    }
-    
-    // Category-specific formatting for known spec structures
-    const formattedParts = [];
-    
-    // GPU specs
-    if (specs.vram) formattedParts.push(`${specs.vram}GB VRAM`);
-    if (specs.clockSpeed && !specs.cores) formattedParts.push(`${specs.clockSpeed} MHz`);
-    if (specs.busWidth) formattedParts.push(`${specs.busWidth}-bit`);
-    
-    // CPU specs
-    if (specs.cores) formattedParts.push(`${specs.cores} Cores`);
-    if (specs.threads) formattedParts.push(`${specs.threads} Threads`);
-    if (specs.clockSpeed && specs.cores) formattedParts.push(`${specs.clockSpeed} GHz`);
-    if (specs.baseSpeed) formattedParts.push(`${specs.baseSpeed} GHz Base`);
-    if (specs.boostSpeed) formattedParts.push(`${specs.boostSpeed} GHz Boost`);
-    
-    // RAM specs
-    if (specs.capacity && !specs.readSpeed) formattedParts.push(`${specs.capacity}GB`);
-    if (specs.speed) formattedParts.push(`${specs.speed} MHz`);
-    if (specs.type && (specs.type.includes('DDR') || specs.type === 'NVMe' || specs.type === 'SATA')) {
-      formattedParts.push(specs.type);
-    }
-    
-    // Storage specs
-    if (specs.capacity && specs.readSpeed) formattedParts.push(`${specs.capacity}`);
-    if (specs.readSpeed) formattedParts.push(`${specs.readSpeed} MB/s Read`);
-    if (specs.writeSpeed) formattedParts.push(`${specs.writeSpeed} MB/s Write`);
-    
-    // PSU specs
-    if (specs.wattage) formattedParts.push(`${specs.wattage}W`);
-    if (specs.efficiency) formattedParts.push(specs.efficiency);
-    if (specs.modular) formattedParts.push(specs.modular);
-    
-    // Cooling specs
-    if (specs.fanSize) formattedParts.push(`${specs.fanSize}mm Fan`);
-    if (specs.tdp) formattedParts.push(`${specs.tdp}W TDP`);
-    if (specs.coolingType) formattedParts.push(specs.coolingType);
-    
-    // If we found category-specific specs, return them
-    if (formattedParts.length > 0) {
-      return formattedParts.join(', ');
-    }
-    
-    // Fallback: format all key-value pairs generically
-    const formatted = entries
-      .filter(([key, value]) => {
-        // Skip internal/raw keys and empty values
-        if (key === 'raw' || key === '_original') return false;
-        return value !== null && value !== undefined && value !== '';
-      })
-      .map(([key, value]) => {
-        // Format the key: replace underscores with spaces, add spaces before capitals
-        const formattedKey = key
-          .replace(/_/g, ' ')
-          .replace(/([A-Z])/g, ' $1')
-          .replace(/^\w/, c => c.toUpperCase())
-          .trim();
-        
-        // Format the value
-        let formattedValue = value;
-        if (typeof value === 'boolean') {
-          formattedValue = value ? 'Yes' : 'No';
-        } else if (typeof value === 'number') {
-          formattedValue = value.toLocaleString();
-        } else if (typeof value === 'object') {
-          formattedValue = JSON.stringify(value).replace(/[{}"[\]]|\\n/g, '');
-        }
-        
-        return `${formattedKey}: ${formattedValue}`;
-      })
-      .join(', ');
-    
-    return formatted || 'N/A';
+    return formatObjectSpecs(specs);
   }
-  
-  return String(specs) || 'N/A';
+
+  return typeof specs === 'object' ? JSON.stringify(specs) : String(specs) || 'N/A';
 };
 
 function FutureUpgrade() {
@@ -155,10 +175,7 @@ function FutureUpgrade() {
     const storedCart = JSON.parse(localStorage.getItem("cart")) || [];
     const prebuiltCart = JSON.parse(localStorage.getItem("prebuiltCart")) || [];
 
-    console.log('🔍 FutureUpgrade - Raw data from localStorage:');
-    console.log('  customOrders:', customOrders);
-    console.log('  storedCart:', JSON.stringify(storedCart, null, 2));
-    console.log('  prebuiltCart:', JSON.stringify(prebuiltCart, null, 2));
+    console.log(`🔍 FutureUpgrade - localStorage: customOrders=${customOrders.length}, storedCart=${storedCart.length}, prebuiltCart=${prebuiltCart.length}`);
 
     let cartItems = [];
     
@@ -170,7 +187,7 @@ function FutureUpgrade() {
         id: item.id,
         name: item.name,
         category: item.category,
-        price: parseFloat((item.price || '0').toString().replace(/[^\d.]/g, '')) || 0,
+        price: Number.parseFloat((item.price || '0').toString().replaceAll(/[^\d.]/g, '')) || 0,
         specifications: item.specifications || item.details || '',
         quantity: item.quantity || 1,
         image: item.image,
@@ -189,14 +206,14 @@ function FutureUpgrade() {
       cartItems = prebuiltCart.flatMap((item, itemIdx) => {
         const items = [];
         
-        console.log(`  🔍 Processing prebuilt item ${itemIdx + 1}:`, item);
+        console.log(`  🔍 Processing prebuilt item ${itemIdx + 1}`);
         
         // Extract components from customized prebuilt
         if (item.components && Array.isArray(item.components)) {
           console.log(`    - Components array length: ${item.components.length}`);
           
           item.components.forEach((comp, idx) => {
-            console.log(`      [${idx}] Component:`, comp);
+            console.log(`      [${idx}] Component: ${comp?.name || comp?.value || 'unknown'}`);
             
             // PreBuilt components have structure: {cpu: {...}, gpu: {...}, etc.}
             // OR array structure: [{name: "CPU", value: "AMD..."}, ...]
@@ -228,7 +245,7 @@ function FutureUpgrade() {
               items.push(componentItem);
               console.log(`        ✅ Added component: ${componentCategory} = ${componentName}`);
             } else {
-              console.warn(`        ⚠️ Skipping invalid component at index ${idx}:`, comp);
+              console.warn(`        ⚠️ Skipping invalid component at index ${idx}`);
             }
           });
         }
@@ -260,17 +277,14 @@ function FutureUpgrade() {
         cartItems = storedCart.flatMap((order, orderIdx) => {
           const items = [];
 
-          console.log(`  🔍 Processing order ${orderIdx + 1}:`, order);
-          console.log(`    - Product:`, order.product);
-          console.log(`    - Product.components:`, order.product?.components);
-          console.log(`    - Addon:`, order.addon);
+          console.log(`  🔍 Processing order ${orderIdx + 1}: product=${order.product?.name || 'unknown'}, components=${order.product?.components?.length || 0}, addon=${!!order.addon}`);
 
           // Extract components from Pre-Built product
-          if (order.product && order.product.components && Array.isArray(order.product.components)) {
+          if (Array.isArray(order.product?.components)) {
             console.log(`    - Components array length: ${order.product.components.length}`);
 
             order.product.components.forEach((comp, idx) => {
-              console.log(`      [${idx}] Component raw:`, JSON.stringify(comp));
+              console.log(`      [${idx}] Component: ${comp?.name || comp?.componentType || 'unknown'}`);
 
               // More flexible validation - check various possible structures
               const hasName = comp && (comp.name || comp.componentType || comp.type);
@@ -287,7 +301,7 @@ function FutureUpgrade() {
                   componentValue = parts.slice(1).join(':').trim();
                 }
 
-                if (componentValue && componentValue.trim()) {
+                if (componentValue?.trim()) {
                   const componentItem = {
                     name: componentValue, // Use the actual component value (e.g., "AMD RYZEN 7 9700X")
                     category: componentName, // Use component type as category (e.g., "CPU", "Motherboard")
@@ -311,7 +325,7 @@ function FutureUpgrade() {
           }
 
           // Add addon if exists
-          if (order.addon && order.addon.name) {
+          if (order.addon?.name) {
             const addonItem = {
               name: order.addon.name,
               category: order.addon.category || 'Gaming Monitors',
@@ -348,188 +362,74 @@ function FutureUpgrade() {
   useEffect(() => {
     if (cartItems.length === 0) return;
 
-    const generateAIUpgradeSuggestions = async () => {
+    // Helper: Resolve category and price for a cart item from DB or detection
+    async function resolveCartItemCategory(cartItem) {
+      let itemPrice = Number.parseFloat((cartItem.price || '0').toString().replaceAll(/[^\d.]/g, '')) || 0;
+      let categoryName = cartItem.category || 'Component';
+      try {
+        const searchResult = await stockAPI.getAll({ search: cartItem.name, limit: 1, status: 'active' });
+        const products = searchResult.data?.data || searchResult.data || [];
+        if (products.length > 0 && products[0].name.toLowerCase() === cartItem.name.toLowerCase()) {
+          categoryName = products[0].category || categoryName;
+          if (itemPrice === 0) itemPrice = Number.parseFloat(products[0].price) || itemPrice;
+        } else {
+          const detected = detectCategoryFromName(cartItem.name, cartItem.category);
+          if (detected !== 'Component') categoryName = detected;
+        }
+      } catch {
+        const detected = detectCategoryFromName(cartItem.name, cartItem.category);
+        if (detected !== 'Component') categoryName = detected;
+      }
+      if (itemPrice === 0 && cartItem.isPreBuiltComponent) {
+        itemPrice = estimateComponentPrice(cartItem.name, categoryName);
+      }
+      return { itemPrice, categoryName };
+    }
+
+    // Helper: Build complete compatible build for an upgrade
+    async function generateUpgradeBuild(stockUpgrade, categoryName, componentOrder) {
+      const buildComponents = { [categoryName]: stockUpgrade };
+      for (const cat of componentOrder) {
+        if (cat !== categoryName && !buildComponents[cat]) {
+          const comp = await generateCompatibleComponent(cat, buildComponents, categoryName);
+          if (comp) buildComponents[cat] = comp;
+        }
+      }
+      return generateCompleteBuild(buildComponents, componentOrder);
+    }
+
+    const generateOfflineUpgradeSuggestions = async () => {
       setLoading(true);
       try {
-        console.log('🔮🤖 Generating enhanced dual upgrade suggestions...');
-
-        // Prepare current build components for AI analysis
-        const currentBuild = cartItems.map(item => ({
-          name: item.name || 'Unknown Component',
-          category: item.category || 'Unknown',
-          price: parseFloat((item.price || '0').toString().replace(/[^\d.]/g, '')) || 0,
-          specifications: item.specifications || '',
-          quantity: item.quantity || 1
-        }));
-
-        console.log('📦 Current build for dual upgrade analysis:', currentBuild.length, 'components');
-
-        // Try using enhanced kiosk hot picks endpoint (dual recommendations)
-        try {
-          const upgradeResponse = await aiService.getKioskHotPicks(
-            currentBuild,
-            100000, // ₱100k budget range for upgrades
-            {
-              analysisType: 'future_upgrade_dual',
-              timeframe: '1-2 years',
-              maxRecommendations: cartItems.length * 2, // 2 recommendations per item
-              enhanceWithAI: true,
-              marketTrends: '2024-2025 Philippines gaming and productivity trends',
-              dualUpgrade: true // Request dual options
-            }
-          );
-
-          if (upgradeResponse.success && upgradeResponse.data?.recommendations?.length > 0) {
-            // Group recommendations by component (2 per component)
-            const groupedSuggestions = [];
-            const recommendations = upgradeResponse.data.recommendations;
-
-            // 🔥 FIX: Store original cart length to prevent processing dynamically added items
-            const originalCartLength = cartItems.length;
-            for (let i = 0; i < originalCartLength; i++) {
-              const component = cartItems[i];
-              const stockUpgrade = recommendations.find(rec =>
-                rec.type === 'stock_upgrade' && rec.category === component.category
-              );
-              const externalUpgrade = recommendations.find(rec =>
-                rec.type === 'external_upgrade' && rec.category === component.category
-              );
-
-              if (stockUpgrade || externalUpgrade) {
-                groupedSuggestions.push({
-                  componentIndex: i,
-                  currentItem: component.name,
-                  category: component.category,
-                  upgrades: [stockUpgrade, externalUpgrade].filter(Boolean)
-                });
-              }
-            }
-
-            if (groupedSuggestions.length > 0) {
-              setAiUpgradeSuggestions(groupedSuggestions);
-              setAiDiagnosticEnabled(true);
-              console.log('🔮✅ Enhanced dual upgrade suggestions generated:', groupedSuggestions.length, 'components');
-              return;
-            } else {
-              console.log('ℹ️ AI service returned no matched suggestions, proceeding with RuleBuilder + Builder API compatibility system...');
-            }
-          }
-        } catch (aiError) {
-          console.log('ℹ️ AI service unavailable, using RuleBuilder + Builder API compatibility system:', aiError.message);
-        }
-
-        // 🔄 Generate In-Stock upgrades + Individual Complete Builds per cart item using RuleBuilder + Builder API
-        console.log('🔄 Generating In-Stock upgrade suggestions + Complete Builds using RuleBuilder + Builder API (3200+ compatibility rules)...');
-        console.log('📊 Cart items to process:', cartItems.length);
-        console.log('🔍 Cart item categories:', cartItems.map(i => i.category).join(', '));
-        const stockSuggestions = [];
-
-        // Define component order for complete build (8 components total)
+        // Generate stock upgrades + complete builds using local inventory and deterministic compatibility.
         const componentOrder = ['CPU', 'Cooling', 'Motherboard', 'RAM', 'Storage', 'GPU', 'Case', 'PSU'];
-        
-        // 🔥 CRITICAL FIX: Only process ACTUAL cart items (not expanded components)
+        const stockSuggestions = [];
         const originalCartLength = cartItems.length;
-        console.log('🎯 Generating', originalCartLength, 'FutureUpgrade suggestions (1 per cart item)');
 
-        // Use only actual cart items - no test components
         for (let index = 0; index < originalCartLength; index++) {
           const cartItem = cartItems[index];
-          
-          // 🔥 FIX: Skip if this item doesn't have a name (invalid)
-          if (!cartItem || !cartItem.name) {
-            console.warn(`⚠️ Skipping invalid cart item at index ${index}:`, cartItem);
-            continue;
-          }
-          let itemPrice = parseFloat((cartItem.price || '0').toString().replace(/[^\d.]/g, '')) || 0;
+          if (!cartItem?.name) continue;
 
-          // 🔥 FIX: Query database for actual product category
-          let categoryName = cartItem.category || 'Component';
-          let actualProduct = null;
-          
-          try {
-            // Try to find product in database by name to get proper category
-            const searchResult = await stockAPI.getAll({
-              search: cartItem.name,
-              limit: 1,
-              status: 'active'
-            });
-            
-            const products = searchResult.data?.data || searchResult.data || [];
-            if (products.length > 0 && products[0].name.toLowerCase() === cartItem.name.toLowerCase()) {
-              actualProduct = products[0];
-              categoryName = actualProduct.category || categoryName;
-              if (itemPrice === 0) {
-                itemPrice = parseFloat(actualProduct.price) || itemPrice;
-              }
-              console.log(`   ✅ Found product in DB: ${actualProduct.name} - Category: ${categoryName}`);
-            } else {
-              // Fallback to detection
-              const detectedCategory = detectCategoryFromName(cartItem.name, cartItem.category);
-              categoryName = detectedCategory !== 'Component' ? detectedCategory : categoryName;
-              console.log(`   ⚠️ Product not in DB, detected category: ${categoryName}`);
-            }
-          } catch (error) {
-            console.warn(`   ⚠️ Error querying DB for product, using detection:`, error.message);
-            const detectedCategory = detectCategoryFromName(cartItem.name, cartItem.category);
-            categoryName = detectedCategory !== 'Component' ? detectedCategory : categoryName;
-          }
-
-          // 🔥 FIX: Estimate price for PreBuilt components (price = 0)
-          if (itemPrice === 0 && cartItem.isPreBuiltComponent) {
-            itemPrice = estimateComponentPrice(cartItem.name, categoryName);
-            console.log(`   💰 Estimated price for PreBuilt component: ₱${itemPrice.toLocaleString()}`);
-          }
-
-          console.log(`🔍 Processing upgrade ${index + 1}/${cartItems.length}: ${cartItem.name}`);
-          console.log(`   💡 Original category: "${cartItem.category}" → Detected: "${categoryName}" - ₱${itemPrice.toLocaleString()}`);
-
-          // 🔥 ASYNC DATABASE QUERY - Generate In-Stock upgrade only
+          const { itemPrice, categoryName } = await resolveCartItemCategory(cartItem);
           const stockUpgrade = await generateStockUpgrade(cartItem, itemPrice, categoryName, index);
 
           if (stockUpgrade) {
-            console.log(`  ✅ Generated stock upgrade: ${stockUpgrade.upgradeItem} - ₱${stockUpgrade.price}`);
-            
-            // 🏗️ Generate complete build for this upgrade
-            const buildComponents = {};
-            
-            // Add upgraded component
-            buildComponents[categoryName] = stockUpgrade;
-            
-            // Generate compatible components for all other categories
-            for (const cat of componentOrder) {
-              if (cat !== categoryName && !buildComponents[cat]) {
-                const compatibleComponent = await generateCompatibleComponent(cat, buildComponents, categoryName);
-                if (compatibleComponent) {
-                  buildComponents[cat] = compatibleComponent;
-                }
-              }
-            }
-            
-            // Build complete compatible build
-            const completeBuild = await generateCompleteBuild(buildComponents, componentOrder);
-            
-            // 🔥 CRITICAL FIX: Only add if build is compatible (score >= 70)
-            if (completeBuild && completeBuild.isCompatible && completeBuild.compatibilityScore >= 70) {
+            const completeBuild = await generateUpgradeBuild(stockUpgrade, categoryName, componentOrder);
+            if (completeBuild?.isCompatible && completeBuild.compatibilityScore >= 70) {
               stockSuggestions.push({
                 componentIndex: index,
                 currentItem: cartItem.name,
                 category: categoryName,
                 upgrade: stockUpgrade,
-                suggestedBuild: completeBuild // Individual build per upgrade
+                suggestedBuild: completeBuild
               });
-              console.log(`  ✅ Added COMPATIBLE suggestion (Score: ${completeBuild.compatibilityScore})`);
-            } else {
-              console.warn(`  ⚠️ Skipping INCOMPATIBLE build (Score: ${completeBuild?.compatibilityScore || 0}) - warnings:`, completeBuild?.compatibilityWarnings);
             }
-          } else {
-            console.warn(`  ⚠️ No stock upgrade found for ${categoryName}`);
           }
         }
-        
-        console.log('📊 Final In-Stock suggestions count:', stockSuggestions.length);
+
         setAiUpgradeSuggestions(stockSuggestions);
         setAiDiagnosticEnabled(false);
-        console.log('✅ In-Stock upgrade suggestions + Complete Builds ready');
+
 
       } catch (error) {
         console.error('⚠️ Future upgrade generation failed:', error);
@@ -605,7 +505,7 @@ function FutureUpgrade() {
           // Build current parts object for compatibility check with FULL component details
           const selectedParts = {};
           for (const [cat, comp] of Object.entries(existingBuild)) {
-            if (comp && comp.dbProduct) {
+            if (comp?.dbProduct) {
               // 🔥 FIX: Pass full component details, not just ID
               selectedParts[cat] = {
                 id: comp.dbProduct.id,
@@ -639,48 +539,12 @@ function FutureUpgrade() {
           return null;
         }
         
-        // 🔥 ENHANCED: Try to find compatible product by checking socket/ram type compatibility
+        // 🔥 ENHANCED: Find compatible product using data-driven compatibility matchers
         let selectedProduct = null;
-        
-        if (category === 'Motherboard' && existingBuild.CPU) {
-          // Find motherboard with matching socket
-          const cpuSocket = existingBuild.CPU.dbProduct?.socket || existingBuild.CPU.dbProduct?.specifications?.socket;
-          selectedProduct = compatibleProducts.find(p => 
-            p.specifications?.socket === cpuSocket || p.socket === cpuSocket
-          );
-          if (selectedProduct) {
-            console.log(`   ✅ Found Motherboard with matching CPU socket: ${cpuSocket}`);
-          }
-        } else if (category === 'RAM' && existingBuild.Motherboard) {
-          // Find RAM with matching memory type
-          const moboRamType = existingBuild.Motherboard.dbProduct?.specifications?.memory_type || 
-                             existingBuild.Motherboard.dbProduct?.memory_type;
-          selectedProduct = compatibleProducts.find(p => 
-            p.specifications?.memory_type === moboRamType || p.memory_type === moboRamType
-          );
-          if (selectedProduct) {
-            console.log(`   ✅ Found RAM matching Motherboard memory type: ${moboRamType}`);
-          }
-        } else if (category === 'CPU' && existingBuild.Motherboard) {
-          // Find CPU with matching socket
-          const moboSocket = existingBuild.Motherboard.dbProduct?.socket || 
-                            existingBuild.Motherboard.dbProduct?.specifications?.socket;
-          selectedProduct = compatibleProducts.find(p => 
-            p.specifications?.socket === moboSocket || p.socket === moboSocket
-          );
-          if (selectedProduct) {
-            console.log(`   ✅ Found CPU matching Motherboard socket: ${moboSocket}`);
-          }
-        } else if (category === 'Cooling' && existingBuild.CPU) {
-          // Find cooling compatible with CPU socket
-          const cpuSocket = existingBuild.CPU.dbProduct?.socket || existingBuild.CPU.dbProduct?.specifications?.socket;
-          selectedProduct = compatibleProducts.find(p => {
-            const compatSockets = p.specifications?.compatible_sockets || p.compatible_sockets || '';
-            return compatSockets.includes(cpuSocket);
-          });
-          if (selectedProduct) {
-            console.log(`   ✅ Found Cooling compatible with CPU socket: ${cpuSocket}`);
-          }
+        const matcher = COMPATIBILITY_MATCHERS.find(m => m.category === category && existingBuild[m.dependsOn]);
+        const refSpec = matcher?.getSpec(existingBuild);
+        if (matcher && refSpec) {
+          selectedProduct = compatibleProducts.find(p => matcher.match(p, refSpec));
         }
         
         // Fallback to first product if no specific match found
@@ -689,17 +553,17 @@ function FutureUpgrade() {
           console.log(`   ℹ️ No specific compatibility match, using first available ${category}`);
         }
         
+        // Resolve product image URL from available fields
+        const rawImageUrl = selectedProduct.imageUrl || selectedProduct.image_url || selectedProduct.image;
+        const resolvedImage = rawImageUrl ? api.utils.getFullImageUrl(rawImageUrl) : null;
+
         return {
           id: selectedProduct.id,
           upgradeItem: selectedProduct.name,
           name: selectedProduct.name,
-          price: parseFloat(selectedProduct.price),
+          price: Number.parseFloat(selectedProduct.price),
           category: category,
-          // 🔥 CRITICAL FIX: Backend returns imageUrl (camelCase) not image_url
-          image: selectedProduct.imageUrl 
-            ? api.utils.getFullImageUrl(selectedProduct.imageUrl) 
-            : (selectedProduct.image_url ? api.utils.getFullImageUrl(selectedProduct.image_url) 
-            : (selectedProduct.image ? api.utils.getFullImageUrl(selectedProduct.image) : null)),
+          image: resolvedImage,
           dbProduct: selectedProduct,
           upgradeSpecs: selectedProduct.specifications || '',
           currentSpecs: ''
@@ -881,7 +745,7 @@ function FutureUpgrade() {
       const priceMultipliers = [
         { min: 0.8, max: 1.2, label: '±20%' },    // Attempt 1: Tight range
         { min: 0.6, max: 1.5, label: '±40-50%' }, // Attempt 2: Wider range
-        { min: 0.4, max: 2.0, label: '±60-100%' } // Attempt 3: Very wide range
+        { min: 0.4, max: 2, label: '±60-100%' } // Attempt 3: Very wide range
       ];
 
       const multiplier = priceMultipliers[Math.min(attempt - 1, maxAttempts - 1)];
@@ -939,7 +803,7 @@ function FutureUpgrade() {
         // Select product (rotate through available options)
         const selectedProduct = products[index % products.length];
 
-        console.log(`   ✅ Selected: ${selectedProduct.name} - ₱${parseFloat(selectedProduct.price).toLocaleString()}`);
+        console.log(`   ✅ Selected: ${selectedProduct.name} - ₱${Number.parseFloat(selectedProduct.price).toLocaleString()}`);
 
         // Parse specifications for comparison
         const currentSpecs = parseSpecifications(cartItem.specifications || '', category);
@@ -962,65 +826,22 @@ function FutureUpgrade() {
           id: selectedProduct.id, // Use actual database ID
           type: 'stock_upgrade',
           upgradeItem: selectedProduct.name,
-          price: parseFloat(selectedProduct.price) || upgradePrice,
-          priceDifference: `₱${(parseFloat(selectedProduct.price) - itemPrice).toLocaleString()}`,
+          price: Number.parseFloat(selectedProduct.price) || upgradePrice,
+          priceDifference: `₱${(Number.parseFloat(selectedProduct.price) - itemPrice).toLocaleString()}`,
           performanceGain: performanceGain,
           availability: selectedProduct.quantity > 0 ? `In Stock (${selectedProduct.quantity})` : 'In Stock',
-          futureProofing: calculateFutureProofingRating(parseFloat(selectedProduct.price), itemPrice, category),
+          futureProofing: calculateFutureProofingRating(Number.parseFloat(selectedProduct.price), itemPrice, category),
           reason: reason,
           priority: 'Stock Available',
           source: 'K-Wise Stock',
           currentSpecs: formatSpecsForDisplay(currentSpecs, category),
           upgradeSpecs: formatSpecsForDisplay(upgradeSpecs, category),
-          image: api.utils.getFullImageUrl(selectedProduct.image_url || selectedProduct.image), // ✅ Real product image
+          image: api.utils.getFullImageUrl(selectedProduct.imageUrl || selectedProduct.image_url || selectedProduct.image), // ✅ Real product image
           dbProduct: selectedProduct, // Store full product data for compatibility check
           category: category // Store category for build generation
         };
       } catch (error) {
         console.error(`   ❌ Error generating stock upgrade for ${category}:`, error);
-        return null;
-      }
-    }
-
-    // eslint-disable-next-line no-unused-vars
-    async function generateAIExternalSuggestion(cartItem, itemPrice, category, index) {
-      try {
-        console.log(`   🤖 Using AI to suggest external market ${category} upgrade...`);
-
-        // AI generates external market suggestions based on current trends
-        const aiSuggestion = await aiService.generateExternalProductSuggestion({
-          currentProduct: cartItem.name,
-          category: category,
-          currentPrice: itemPrice,
-          targetPriceRange: [itemPrice * 1.5, itemPrice * 2.5],
-          market: 'Philippines',
-          year: new Date().getFullYear()
-        });
-
-        if (aiSuggestion && aiSuggestion.recommendation) {
-          const recommendation = aiSuggestion.recommendation;
-          return {
-            id: `ai-external-${index}`,
-            type: 'external_upgrade',
-            upgradeItem: recommendation.productName || `Latest ${category}`,
-            price: recommendation.estimatedPrice || itemPrice * 1.9,
-            priceDifference: `₱${(recommendation.estimatedPrice - itemPrice).toLocaleString()}`,
-            performanceGain: recommendation.performanceImprovement || '+50%',
-            availability: '🌐 External Market (AI Suggested)',
-            futureProofing: 'Excellent (3-5 years)',
-            reason: recommendation.reason || `Latest ${category} technology available in external market`,
-            priority: '🤖 AI Recommended',
-            source: 'External Market - AI Suggestion',
-            currentSpecs: cartItem.specifications || '',
-            upgradeSpecs: recommendation.keyFeatures || 'Latest specifications',
-            image: null, // No image for AI suggestions
-            isAISuggestion: true
-          };
-        }
-
-        return null;
-      } catch (error) {
-        console.error(`   ❌ AI external suggestion failed for ${category}:`, error);
         return null;
       }
     }
@@ -1050,7 +871,7 @@ function FutureUpgrade() {
       const premiumCategories = ['GPU', 'CPU', 'Motherboard'];
       const isPremium = premiumCategories.includes(category);
 
-      if (ratio >= 2.0 && isPremium) return 'Excellent (4+ years)';
+      if (ratio >= 2 && isPremium) return 'Excellent (4+ years)';
       if (ratio >= 1.8) return 'Very Good (3-4 years)';
       if (ratio >= 1.5) return 'Good (2-3 years)';
       return 'Moderate (1-2 years)';
@@ -1076,8 +897,7 @@ function FutureUpgrade() {
         // Try to parse as JSON first
         try {
           return JSON.parse(specString);
-        } catch (e) {
-          // Not JSON, parse as text
+        } catch { // Not JSON, parse as text
         }
 
         // Parse text-based specifications
@@ -1140,85 +960,27 @@ function FutureUpgrade() {
      */
     function extractNumber(str, regex) {
       const match = str.match(regex);
-      return match ? parseFloat(match[1]) : null;
+      return match ? Number.parseFloat(match[1]) : null;
     }
 
     /**
      * Calculate performance gain based on actual specifications
      */
     function calculateSpecBasedPerformance(currentSpecs, upgradeSpecs, category, isPremium = false) {
-      let gainPercentage = 30; // Default
-
+      let gainPercentage = 30;
       try {
-        switch (category) {
-          case 'GPU':
-            if (currentSpecs.vram && upgradeSpecs.vram) {
-              const vramGain = ((upgradeSpecs.vram - currentSpecs.vram) / currentSpecs.vram) * 100;
-              gainPercentage = Math.round(vramGain * 0.7); // VRAM contributes 70% to perceived performance
-            }
-            if (currentSpecs.clockSpeed && upgradeSpecs.clockSpeed) {
-              const clockGain = ((upgradeSpecs.clockSpeed - currentSpecs.clockSpeed) / currentSpecs.clockSpeed) * 100;
-              gainPercentage += Math.round(clockGain * 0.3); // Clock contributes 30%
-            } 
-            break;
-
-          case 'CPU':
-            if (currentSpecs.cores && upgradeSpecs.cores) {
-              const coreGain = ((upgradeSpecs.cores - currentSpecs.cores) / currentSpecs.cores) * 100;
-              gainPercentage = Math.round(coreGain * 0.5);
-            }
-            if (currentSpecs.clockSpeed && upgradeSpecs.clockSpeed) {
-              const clockGain = ((upgradeSpecs.clockSpeed - currentSpecs.clockSpeed) / currentSpecs.clockSpeed) * 100;
-              gainPercentage += Math.round(clockGain * 0.5);
-            }
-            break;
-
-          case 'RAM':
-            if (currentSpecs.capacity && upgradeSpecs.capacity) {
-              const capacityGain = ((upgradeSpecs.capacity - currentSpecs.capacity) / currentSpecs.capacity) * 100;
-              gainPercentage = Math.round(capacityGain * 0.6);
-            }
-            if (currentSpecs.speed && upgradeSpecs.speed) {
-              const speedGain = ((upgradeSpecs.speed - currentSpecs.speed) / currentSpecs.speed) * 100;
-              gainPercentage += Math.round(speedGain * 0.4);
-            }
-            break;
-
-          case 'Storage':
-            if (currentSpecs.readSpeed && upgradeSpecs.readSpeed) {
-              const speedGain = ((upgradeSpecs.readSpeed - currentSpecs.readSpeed) / currentSpecs.readSpeed) * 100;
-              gainPercentage = Math.round(speedGain);
-            }
-            if (currentSpecs.type === 'SATA' && upgradeSpecs.type === 'NVMe') {
-              gainPercentage += 50; // NVMe bonus
-            }
-            break;
-
-          case 'PSU':
-            if (currentSpecs.wattage && upgradeSpecs.wattage) {
-              const wattageGain = ((upgradeSpecs.wattage - currentSpecs.wattage) / currentSpecs.wattage) * 100;
-              gainPercentage = Math.round(wattageGain * 0.5);
-            }
-            break;
-
-          default:
-            // Use default gain percentage for other categories
-            gainPercentage = 30;
-            break;
+        const metrics = PERF_METRICS[category];
+        if (metrics) {
+          gainPercentage = computeSpecGain(metrics, currentSpecs, upgradeSpecs);
+          if (category === 'Storage' && currentSpecs.type === 'SATA' && upgradeSpecs.type === 'NVMe') {
+            gainPercentage += 50;
+          }
         }
-
-        // Apply premium boost
-        if (isPremium) {
-          gainPercentage = Math.round(gainPercentage * 1.3);
-        }
-
-        // Clamp between 15% and 85%
+        if (isPremium) gainPercentage = Math.round(gainPercentage * 1.3);
         gainPercentage = Math.min(Math.max(gainPercentage, 15), 85);
-
       } catch (error) {
         console.error('Error calculating spec-based performance:', error);
       }
-
       return `+${gainPercentage}%`;
     }
 
@@ -1227,41 +989,14 @@ function FutureUpgrade() {
      */
     function getKeySpecDifference(currentSpecs, upgradeSpecs, category) {
       try {
-        switch (category) {
-          case 'GPU':
-            if (upgradeSpecs.vram && currentSpecs.vram) {
-              return `Upgrade from ${currentSpecs.vram}GB to ${upgradeSpecs.vram}GB VRAM for smoother gaming and rendering.`;
-            }
-            break;
-          case 'CPU':
-            if (upgradeSpecs.cores && currentSpecs.cores) {
-              return `${upgradeSpecs.cores} cores vs ${currentSpecs.cores} cores means ${Math.round((upgradeSpecs.cores - currentSpecs.cores) / currentSpecs.cores * 100)}% more multitasking power.`;
-            }
-            break;
-          case 'RAM':
-            if (upgradeSpecs.capacity && currentSpecs.capacity) {
-              return `Double your memory from ${currentSpecs.capacity}GB to ${upgradeSpecs.capacity}GB for seamless multitasking.`;
-            }
-            break;
-          case 'Storage':
-            if (upgradeSpecs.readSpeed && currentSpecs.readSpeed) {
-              return `${Math.round(upgradeSpecs.readSpeed / currentSpecs.readSpeed)}x faster load times with ${upgradeSpecs.readSpeed}MB/s read speed.`;
-            }
-            break;
-          case 'PSU':
-            if (upgradeSpecs.efficiency) {
-              return `${upgradeSpecs.efficiency} efficiency means lower power bills and cooler operation.`;
-            }
-            break;
-
-          default:
-            // Return generic message for other categories
-            return 'Enhanced specifications for better performance.';
+        const generator = SPEC_DIFF_GENERATORS[category];
+        if (generator) {
+          const msg = generator(currentSpecs, upgradeSpecs);
+          if (msg) return msg;
         }
       } catch (error) {
         console.error('Error generating spec difference:', error);
       }
-
       return 'Enhanced specifications for better performance.';
     }
 
@@ -1291,7 +1026,7 @@ function FutureUpgrade() {
             }
             return JSON.stringify(specs).substring(0, 100);
         }
-      } catch (error) {
+      } catch { // Spec parsing may fail for unusual formats
         return 'Standard specifications';
       }
     }
@@ -1313,7 +1048,7 @@ function FutureUpgrade() {
       return specs[category] || 'Standard specifications';
     }
 
-    generateAIUpgradeSuggestions();
+    generateOfflineUpgradeSuggestions();
   }, [cartItems]);
 
   return (
@@ -1321,23 +1056,27 @@ function FutureUpgrade() {
       <img src={futureupgrades} alt="Logo" className="upgrade-logo" />
       <h1 className="upgrade-title">
         Future Upgrades Predictions
-        {aiDiagnosticEnabled && <span className="ai-badge">🤖 AI</span>}
+        {aiDiagnosticEnabled && <span className="ai-badge">Local</span>}
       </h1>
-      <span className="AI-identifyer"> Powered by AI </span>
+      <span className="AI-identifyer"> Local compatibility rules </span>
 
 
-      {cartItems.length === 0 ? (
+      {cartItems.length === 0 && (
         <p className="upgrade-empty">Your cart is empty. Please add PC parts first.</p>
-      ) : loading ? (
-        <p className="loading-text">🔄 Analyzing your build with Enhanced AI...</p>
-      ) : (
+      )}
+
+      {cartItems.length > 0 && loading && (
+        <p className="loading-text">Analyzing your build with local compatibility rules...</p>
+      )}
+
+      {cartItems.length > 0 && !loading && (
         <div className="llama-suggestions">
 
 
           {aiUpgradeSuggestions.length > 0 ? (
             <>
               <h2>
-                {aiDiagnosticEnabled && <span className="ai-verification">✅ Verified by AI</span>}
+                {aiDiagnosticEnabled && <span className="ai-verification">Verified by local rules</span>}
               </h2>
               <div className="suggestion-grid-container">
                 <div className="vertical-scroll-container">
@@ -1458,7 +1197,7 @@ function FutureUpgrade() {
                           </div>
 
                           {/* Suggested Complete Build Section */}
-                          {component.suggestedBuild && component.suggestedBuild.components && (
+                          {component.suggestedBuild?.components && (
                             <div className="upgrade-right">
                               <div className="suggested-build-section">
                                 <div className="suggested-build-header">
@@ -1468,7 +1207,7 @@ function FutureUpgrade() {
                                 {component.suggestedBuild.compatibilityWarnings && component.suggestedBuild.compatibilityWarnings.length > 0 && (
                                   <div className="compatibility-warnings">
                                     {component.suggestedBuild.compatibilityWarnings.map((warning, idx) => (
-                                      <div key={idx} className={`warning-item ${warning.severity}`}>
+                                      <div key={`warn-${warning.severity}-${idx}`} className={`warning-item ${warning.severity}`}>
                                         {warning.message}
                                       </div>
                                     ))}
@@ -1477,7 +1216,7 @@ function FutureUpgrade() {
 
                                 <div className="future-build-components-list">
                                   {component.suggestedBuild.components.map((comp, idx) => (
-                                    <div key={idx} className="future-build-component-item">
+                                    <div key={`build-${comp.category || idx}-${idx}`} className="future-build-component-item">
                                       {comp.image && (
                                         <img 
                                           src={comp.image} 

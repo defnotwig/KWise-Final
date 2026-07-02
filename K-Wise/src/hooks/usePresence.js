@@ -64,17 +64,17 @@ export const usePresence = () => {
         };
 
         // Add event listeners
-        window.addEventListener('focus', handleFocus);
-        window.addEventListener('blur', handleBlur);
+        globalThis.addEventListener('focus', handleFocus);
+        globalThis.addEventListener('blur', handleBlur);
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('beforeunload', handleBeforeUnload);
+        globalThis.addEventListener('beforeunload', handleBeforeUnload);
 
         // Cleanup on unmount or socket change
         return () => {
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('blur', handleBlur);
+            globalThis.removeEventListener('focus', handleFocus);
+            globalThis.removeEventListener('blur', handleBlur);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('beforeunload', handleBeforeUnload);
+            globalThis.removeEventListener('beforeunload', handleBeforeUnload);
             
             // Set offline when component unmounts
             setOffline();

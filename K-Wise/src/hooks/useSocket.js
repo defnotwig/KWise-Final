@@ -11,22 +11,17 @@ const useSocket = () => {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // Get token from localStorage since currentUser doesn't include it
-    const token = localStorage.getItem('token');
     
-    if (currentUser && token && !socketRef.current) {
+    if (currentUser && !socketRef.current) {
       console.log('🔌 Initializing Socket.IO connection...');
       console.log('👤 User:', currentUser.name, '(', currentUser.role, ')');
-      console.log('🔑 Token exists:', !!token);
       
       const wsUrl = getWebSocketUrl();
       console.log('🔗 Connecting to WebSocket URL:', wsUrl);
       
       const newSocket = io(wsUrl, {
-        auth: {
-          token: token
-        },
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        withCredentials: true
       });
 
       newSocket.on('connect', () => {
@@ -82,14 +77,14 @@ const useSocket = () => {
         }
       };
 
-      window.addEventListener('focus', handleFocus);
-      window.addEventListener('blur', handleBlur);
-      window.addEventListener('beforeunload', handleBeforeUnload);
+      globalThis.addEventListener('focus', handleFocus);
+      globalThis.addEventListener('blur', handleBlur);
+      globalThis.addEventListener('beforeunload', handleBeforeUnload);
 
       return () => {
-        window.removeEventListener('focus', handleFocus);
-        window.removeEventListener('blur', handleBlur);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
+        globalThis.removeEventListener('focus', handleFocus);
+        globalThis.removeEventListener('blur', handleBlur);
+        globalThis.removeEventListener('beforeunload', handleBeforeUnload);
         
         if (newSocket) {
           newSocket.emit('user:offline');
@@ -108,7 +103,7 @@ const useSocket = () => {
         setConnected(false);
       }
     };
-  }, [currentUser]); // Removed token dependency since we read from localStorage
+  }, [currentUser]);
 
   return {
     socket,

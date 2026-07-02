@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./CustomizedDisplay.css";
 import Customized from "../assets/Customized.webp"; // Ensure the path is correct
+import KioskProductImage from "../components/KioskProductImage";
 
 // Import default category images
 import CPU1 from "../assets/CPU1.webp";
@@ -12,9 +13,6 @@ import Storage1 from "../assets/Storage1.webp";
 import GPU1 from "../assets/GPU1.webp";
 import SystemUnit1 from "../assets/SystemUnit1.webp";
 import PSU1 from "../assets/PSU1.webp";
-
-// 🔥 FIX ISSUE #1: Import API for proper image URL construction
-import api from "../api/api";
 
 const CustomizedDisplay = () => {
   const location = useLocation();
@@ -156,7 +154,7 @@ const CustomizedDisplay = () => {
     if (from === 'pc-upgrade') {
       const categoryKey = location.state?.categoryKey;
       if (categoryKey) {
-        const current = JSON.parse(localStorage.getItem('pc-upgrade-current')) || {};
+        const current = JSON.parse(localStorage.getItem('pc-upgrade-current') || '{}');
         current[categoryKey] = product; // save selected product as current part
         localStorage.setItem('pc-upgrade-current', JSON.stringify(current));
       }
@@ -232,7 +230,7 @@ const CustomizedDisplay = () => {
     }
       
     // 🔥 FIX ISSUE #1: Dispatch custom event to notify PCCustomized of cart change
-    window.dispatchEvent(new Event('cartUpdated'));
+    globalThis.dispatchEvent(new Event('cartUpdated'));
     console.log('📢 cartUpdated event dispatched');
 
     // 🔥 FIX ISSUE #2: Set flag to indicate returning from navigation
@@ -263,22 +261,15 @@ const CustomizedDisplay = () => {
 
       {/* Product Details */}
       <div className="customized-display-product">
-        <img 
-          src={(() => {
-            // 🔥 FIX ISSUE #1: Properly construct image URLs using api.utils.getFullImageUrl
-            const imageUrl = product?.imageUrl || product?.image_url || product?.image;
-            if (imageUrl) {
-              return api.utils.getFullImageUrl(imageUrl);
-            }
-            return getFallbackImage(product?.category || categoryName);
-          })()} 
-          alt={product?.name} 
-          className="customized-display-image" 
-          onError={(e) => {
-            // Fallback if image fails to load
-            console.warn('🖼️ Image failed to load, using fallback:', e.target.src);
-            e.target.src = getFallbackImage(product?.category || categoryName);
-          }} 
+        <KioskProductImage
+          product={product}
+          alt={product?.name}
+          className="customized-display-image"
+          variant="detail"
+          fallbackSrc={getFallbackImage(product?.category || categoryName)}
+          sizes="(max-width: 768px) 90vw, 420px"
+          width="420"
+          height="420"
         />
         <div className="customized-display-info">
           <p className="customized-display-price">
@@ -289,7 +280,7 @@ const CustomizedDisplay = () => {
                 return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               }
               // If string, extract number and format
-              const numericPrice = parseFloat(String(price || '').replace(/[^\d.]/g, '')) || 0;
+              const numericPrice = Number.parseFloat(String(price || '').replaceAll(/[^\d.]/g, '')) || 0;
               return numericPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             })()}
           </p>
@@ -333,14 +324,14 @@ const CustomizedDisplay = () => {
               <div className="specifications-content">
                 {/* 🔥 FIX ISSUE #3: Use vertical list instead of table */}
                 <div className="specifications-list">
-                  {specEntries.map(([key, value], index) => {
+                  {specEntries.map(([key, value]) => {
                     // Format the key for display
                     const formattedKey = key
-                      .replace(/_/g, ' ')
-                      .replace(/\b\w/g, l => l.toUpperCase());
+                      .replaceAll('_', ' ')
+                      .replaceAll(/\b\w/g, l => l.toUpperCase());
                     
                     // Format the value
-                    let formattedValue = value;
+                    let formattedValue;
                     if (Array.isArray(value)) {
                       formattedValue = value.join(', ');
                     } else if (typeof value === 'object' && value !== null) {
@@ -350,7 +341,7 @@ const CustomizedDisplay = () => {
                     }
                     
                     return (
-                      <div key={index} className="spec-item">
+                      <div key={`spec-${key}`} className="spec-item">
                         <span className="spec-label">{formattedKey}:</span>{' '}
                         <span className="spec-value">{formattedValue}</span>
                       </div>

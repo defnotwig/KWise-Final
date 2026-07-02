@@ -9,7 +9,7 @@ function CreditCard() {
 
   const handleCardSelection = (cardType) => {
     // Generate queue number
-    const lastQueueNumber = parseInt(localStorage.getItem("lastQueueNumber") || "0", 10);
+    const lastQueueNumber = Number.parseInt(localStorage.getItem("lastQueueNumber") || "0", 10);
     const newQueueNumber = lastQueueNumber + 1;
 
     localStorage.setItem("lastQueueNumber", newQueueNumber);
