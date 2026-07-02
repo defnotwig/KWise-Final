@@ -5,35 +5,35 @@
  * Graceful fallback to network printing for unsupported platforms
  */
 
+import { getServerBaseUrl } from '../utils/networkConfig';
+
 class ThermalPrinterService {
-    constructor() {
-        this.device = null;
-        this.bluetoothDevice = null;
-        this.bluetoothCharacteristic = null;
-        this.isConnected = false;
-        this.connectionType = null; // 'usb', 'bluetooth', or 'network'
-        this.printerName = 'GEZHI micro-printer';
-        
-        // USB Vendor/Product IDs for thermal printers (including Bisofice 58mm)
-        this.USB_FILTERS = [
-            { vendorId: 0x0DD4, productId: 0x0205 }, // Common thermal printer IDs
-            { vendorId: 0x0519, productId: 0x2013 },
-            { vendorId: 0x04B8, productId: 0x0E03 }, // Epson TM series
-            { vendorId: 0x067B, productId: 0x2305 }, // Generic POS printer
-            { vendorId: 0x4348, productId: 0x5584 }, // Y58BT specific
-            { vendorId: 0x0483, productId: 0x5743 }, // Bisofice/Generic STM32 based
-            { vendorId: 0x1FC9, productId: 0x2016 }, // Bisofice USB printer
-            { vendorId: 0x6868, productId: 0x0200 }, // Generic 58mm thermal
-            { vendorId: 0x0525, productId: 0xA4A7 }  // Linux USB Gadget (some thermal printers)
-        ];
-        
-        // Bluetooth Service/Characteristic UUIDs for Y58BT thermal printer
-        this.BLUETOOTH_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb'; // Printer service
-        this.BLUETOOTH_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';    // Print characteristic
-        
-        this.ENDPOINT_IN = 1;  // Bulk IN endpoint (USB)
-        this.ENDPOINT_OUT = 2; // Bulk OUT endpoint (USB)
-    }
+    device = null;
+    bluetoothDevice = null;
+    bluetoothCharacteristic = null;
+    isConnected = false;
+    connectionType = null; // 'usb', 'bluetooth', or 'network'
+    printerName = 'GEZHI micro-printer';
+    
+    // USB Vendor/Product IDs for thermal printers (including Bisofice 58mm)
+    USB_FILTERS = [
+        { vendorId: 0x0DD4, productId: 0x0205 }, // Common thermal printer IDs
+        { vendorId: 0x0519, productId: 0x2013 },
+        { vendorId: 0x04B8, productId: 0x0E03 }, // Epson TM series
+        { vendorId: 0x067B, productId: 0x2305 }, // Generic POS printer
+        { vendorId: 0x4348, productId: 0x5584 }, // Y58BT specific
+        { vendorId: 0x0483, productId: 0x5743 }, // Bisofice/Generic STM32 based
+        { vendorId: 0x1FC9, productId: 0x2016 }, // Bisofice USB printer
+        { vendorId: 0x6868, productId: 0x0200 }, // Generic 58mm thermal
+        { vendorId: 0x0525, productId: 0xA4A7 }  // Linux USB Gadget (some thermal printers)
+    ];
+    
+    // Bluetooth Service/Characteristic UUIDs for Y58BT thermal printer
+    BLUETOOTH_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb'; // Printer service
+    BLUETOOTH_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';    // Print characteristic
+    
+    ENDPOINT_IN = 1;  // Bulk IN endpoint (USB)
+    ENDPOINT_OUT = 2; // Bulk OUT endpoint (USB)
 
     /**
      * Check if WebUSB is supported
@@ -54,7 +54,7 @@ class ThermalPrinterService {
      */
     detectPlatform() {
         const userAgent = navigator.userAgent.toLowerCase();
-        const platform = navigator.platform.toLowerCase();
+        const platform = (navigator.userAgentData?.platform || navigator.userAgent).toLowerCase();
         
         // iOS detection
         if (/iphone|ipad|ipod/.test(userAgent) || (platform === 'macintel' && navigator.maxTouchPoints > 1)) {
@@ -103,6 +103,123 @@ class ThermalPrinterService {
             usbSupported: this.isUSBSupported(),
             bluetoothSupported: this.isBluetoothSupported()
         };
+    }
+
+    /**
+     * Reset connection state to defaults
+     */
+    _clearState() {
+        this.isConnected = false;
+        this.device = null;
+        this.bluetoothDevice = null;
+        this.bluetoothCharacteristic = null;
+        this.connectionType = null;
+    }
+
+    /**
+     * Safely release and close USB device
+     */
+    async _cleanupUSBDevice() {
+        if (!this.device?.opened) return;
+        try {
+            await this.device.releaseInterface(0);
+        } catch (error) {
+            console.debug('Cleanup: releaseInterface failed', error.message);
+        }
+        try {
+            await this.device.close();
+        } catch (error) {
+            console.debug('Cleanup: device close failed', error.message);
+        }
+    }
+
+    /**
+     * ✅ Shared USB device setup: open, configure, claim interface
+     */
+    async _setupUSBDevice() {
+        if (this.device.opened) {
+            console.log('ℹ️ Device already open, skipping open()');
+        } else {
+            try {
+                await this.device.open();
+                console.log('✅ Device opened');
+            } catch (openError) {
+                if (openError.name === 'SecurityError' && openError.message.includes('Access denied')) {
+                    console.error('❌ Windows has locked the printer. Providing user guidance...');
+                    const windowsError = new Error(
+                        'Windows is using this printer. Please:\n' +
+                        '1. Open Windows Settings → Printers & scanners\n' +
+                        '2. Click on "Bisofice 58mm"\n' +
+                        '3. Click "Remove device"\n' +
+                        '4. Unplug and replug the USB cable\n' +
+                        '5. Click Connect again in K-Wise\n\n' +
+                        'Alternative: Restart your computer to release the device.'
+                    );
+                    windowsError.name = 'SecurityError';
+                    throw windowsError;
+                }
+                throw openError;
+            }
+        }
+
+        if (this.device.configuration === null) {
+            await this.device.selectConfiguration(1);
+            console.log('⚙️ Configuration selected');
+        }
+
+        try {
+            await this.device.claimInterface(0);
+            console.log('🔗 Interface claimed');
+        } catch (error) {
+            if (error.name === 'InvalidStateError' && error.message.includes('already claimed')) {
+                console.log('ℹ️ Interface already claimed, continuing...');
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * ✅ Try connection with a specific method, return result or throw
+     */
+    async _tryMethodWithFallback(primaryMethod, fallbackMethod, platformInfo) {
+        try {
+            return primaryMethod === 'bluetooth'
+                ? await this.connectBluetooth()
+                : await this.connectUSB();
+        } catch (error) {
+            if (error.name === 'NotFoundError' && error.message.includes('cancelled')) {
+                throw new Error('Connection cancelled by user');
+            }
+            if (primaryMethod === 'usb' && (error.name === 'SecurityError' || error.name === 'InvalidStateError' || error.message.includes('Windows is using'))) {
+                throw error;
+            }
+            const fallbackSupported = primaryMethod === 'bluetooth' ? platformInfo.usbSupported : platformInfo.bluetoothSupported;
+            if (fallbackSupported) {
+                console.warn(`⚠️ ${primaryMethod} failed, trying ${fallbackMethod}...`, error.message);
+                return fallbackMethod === 'bluetooth'
+                    ? await this.connectBluetooth()
+                    : await this.connectUSB();
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * ✅ Force cleanup a specific device type
+     */
+    async _cleanupDevice(device, type) {
+        if (!device) return;
+        try {
+            if (type === 'usb' && device.opened) {
+                try { await device.releaseInterface(0); } catch (error) { console.debug('Cleanup: releaseInterface failed', error.message); }
+                try { await device.close(); } catch (error) { console.debug('Cleanup: device close failed', error.message); }
+            } else if (type === 'bluetooth' && device.gatt?.connected) {
+                await device.gatt.disconnect();
+            }
+        } catch (error) {
+            console.warn(`⚠️ ${type} cleanup warning:`, error.message);
+        }
     }
 
     /**
@@ -163,51 +280,8 @@ class ThermalPrinterService {
                     `VID=0x${newFilter.vendorId.toString(16).padStart(4, '0')}, PID=0x${newFilter.productId.toString(16).padStart(4, '0')}`);
             }
 
-            // ✅ CRITICAL FIX: Check if device is already open before trying to open
-            if (!this.device.opened) {
-                try {
-                    await this.device.open();
-                    console.log('✅ Device opened');
-                } catch (openError) {
-                    // ✅ CRITICAL: Handle Windows device lock
-                    if (openError.name === 'SecurityError' && openError.message.includes('Access denied')) {
-                        console.error('❌ Windows has locked the printer. Providing user guidance...');
-                        // Create custom error that preserves SecurityError type to prevent Bluetooth fallback
-                        const windowsError = new Error(
-                            'Windows is using this printer. Please:\n' +
-                            '1. Open Windows Settings → Printers & scanners\n' +
-                            '2. Click on "Bisofice 58mm"\n' +
-                            '3. Click "Remove device"\n' +
-                            '4. Unplug and replug the USB cable\n' +
-                            '5. Click Connect again in K-Wise\n\n' +
-                            'Alternative: Restart your computer to release the device.'
-                        );
-                        windowsError.name = 'SecurityError'; // ✅ Preserve error type
-                        throw windowsError;
-                    }
-                    throw openError;
-                }
-            } else {
-                console.log('ℹ️ Device already open, skipping open()');
-            }
-
-            // Select configuration
-            if (this.device.configuration === null) {
-                await this.device.selectConfiguration(1);
-                console.log('⚙️ Configuration selected');
-            }
-
-            // ✅ CRITICAL FIX: Check if interface is already claimed
-            try {
-                await this.device.claimInterface(0);
-                console.log('🔗 Interface claimed');
-            } catch (error) {
-                if (error.name === 'InvalidStateError' && error.message.includes('already claimed')) {
-                    console.log('ℹ️ Interface already claimed, continuing...');
-                } else {
-                    throw error;
-                }
-            }
+            // ✅ Setup device: open, configure, claim interface
+            await this._setupUSBDevice();
 
             this.isConnected = true;
             this.connectionType = 'usb';
@@ -264,12 +338,13 @@ class ThermalPrinterService {
             let service;
             try {
                 service = await server.getPrimaryService(this.BLUETOOTH_SERVICE_UUID);
-            } catch (e) {
-                console.log('⚠️ Default service not found, trying alternative...');
+            } catch (error) {
+                console.log('⚠️ Default service not found, trying alternative...', error.message);
                 // Try alternative service UUIDs
                 try {
                     service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                } catch (e2) {
+                } catch (error_) {
+                    console.log('⚠️ Alternative service also failed, trying last fallback...', error_.message);
                     service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
                 }
             }
@@ -279,8 +354,8 @@ class ThermalPrinterService {
             // Get characteristic for printing
             try {
                 this.bluetoothCharacteristic = await service.getCharacteristic(this.BLUETOOTH_CHAR_UUID);
-            } catch (e) {
-                console.log('⚠️ Default characteristic not found, trying alternative...');
+            } catch (error) {
+                console.log('⚠️ Default characteristic not found, trying alternative...', error.message);
                 // Try alternative characteristic UUIDs
                 const characteristics = await service.getCharacteristics();
                 if (characteristics.length > 0) {
@@ -315,7 +390,6 @@ class ThermalPrinterService {
         if (this.isConnected || this.device || this.bluetoothDevice) {
             console.log('⚠️ Device state exists, performing force reset...');
             await this.forceReset();
-            // Wait for cleanup
             await new Promise(resolve => setTimeout(resolve, 200));
         }
         
@@ -324,44 +398,13 @@ class ThermalPrinterService {
         console.log('🔍 Platform detected:', platformInfo);
         console.log('📋 Recommended method:', platformInfo.recommendedMethod);
         
-        // Try recommended method first
         if (platformInfo.recommendedMethod === 'bluetooth' && platformInfo.bluetoothSupported) {
-            try {
-                return await this.connectBluetooth();
-            } catch (error) {
-                // Don't show confusing "trying USB" if user cancelled
-                if (error.name === 'NotFoundError' && error.message.includes('cancelled')) {
-                    throw new Error('Connection cancelled by user');
-                }
-                console.warn('⚠️ Bluetooth failed, trying USB...', error.message);
-                if (platformInfo.usbSupported) {
-                    return await this.connectUSB();
-                }
-                throw error;
-            }
-        } else if (platformInfo.recommendedMethod === 'usb' && platformInfo.usbSupported) {
-            try {
-                return await this.connectUSB();
-            } catch (error) {
-                // ✅ CRITICAL FIX: Don't try Bluetooth for USB-specific errors
-                if (error.name === 'NotFoundError' && error.message.includes('cancelled')) {
-                    throw new Error('Connection cancelled by user');
-                }
-                // Don't fallback to Bluetooth for USB access/permission errors or Windows device lock
-                if (error.name === 'SecurityError' || error.name === 'InvalidStateError' || error.message.includes('Windows is using')) {
-                    console.error('❌ USB connection blocked - not trying Bluetooth:', error.message);
-                    throw error; // Preserve original error with Windows instructions
-                }
-                // Only try Bluetooth for other errors (like connection failures)
-                console.warn('⚠️ USB failed, trying Bluetooth...', error.message);
-                if (platformInfo.bluetoothSupported) {
-                    return await this.connectBluetooth();
-                }
-                throw error;
-            }
-        } else {
-            throw new Error(`No supported connection method available on ${platformInfo.os}. Please use Chrome/Edge or enable Bluetooth.`);
+            return this._tryMethodWithFallback('bluetooth', 'usb', platformInfo);
         }
+        if (platformInfo.recommendedMethod === 'usb' && platformInfo.usbSupported) {
+            return this._tryMethodWithFallback('usb', 'bluetooth', platformInfo);
+        }
+        throw new Error(`No supported connection method available on ${platformInfo.os}. Please use Chrome/Edge or enable Bluetooth.`);
     }
 
     /**
@@ -409,30 +452,8 @@ class ThermalPrinterService {
                 console.log(`📱 Device: ${printer.productName || 'Unknown'} (VID=0x${printer.vendorId.toString(16)}, PID=0x${printer.productId.toString(16)})`);                
                 this.device = printer;
 
-                // ✅ CRITICAL FIX: Check if device is already open to prevent InvalidStateError
-                if (!this.device.opened) {
-                    await this.device.open();
-                    console.log('✅ Device opened');
-                } else {
-                    console.log('ℹ️ Device already open');
-                }
-                
-                if (this.device.configuration === null) {
-                    await this.device.selectConfiguration(1);
-                    console.log('⚙️ Configuration selected');
-                }
-
-                // ✅ CRITICAL FIX: Try to claim interface, handle if already claimed
-                try {
-                    await this.device.claimInterface(0);
-                    console.log('🔗 Interface claimed');
-                } catch (error) {
-                    if (error.name === 'InvalidStateError' && error.message.includes('already claimed')) {
-                        console.log('ℹ️ Interface already claimed');
-                    } else {
-                        throw error;
-                    }
-                }
+                // ✅ Setup device: open, configure, claim interface
+                await this._setupUSBDevice();
 
                 this.isConnected = true;
                 this.connectionType = 'usb';
@@ -482,7 +503,7 @@ class ThermalPrinterService {
             } else if (Array.isArray(data)) {
                 dataArray = new Uint8Array(data);
             } else {
-                throw new Error('Invalid data format. Must be string, Uint8Array, or Array');
+                throw new TypeError('Invalid data format. Must be string, Uint8Array, or Array');
             }
 
             console.log(`📤 Sending ${dataArray.length} bytes to printer via ${this.connectionType}...`);
@@ -522,11 +543,8 @@ class ThermalPrinterService {
         try {
             console.log('🖨️ Generating receipt data from backend...');
             
-            // ✅ FIX: Use dynamic API URL instead of hardcoded localhost
-            // Import getApiBaseUrl at the top of the file if needed, or construct URL dynamically
-            const apiBaseUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:5000' 
-                : `http://${window.location.hostname}:5000`;
+            // ✅ FIX: Use centralized API URL configuration
+            const apiBaseUrl = getServerBaseUrl();
             
             // Get receipt data from backend
             const response = await fetch(`${apiBaseUrl}/api/receipts/thermal`, {
@@ -604,48 +622,21 @@ class ThermalPrinterService {
         try {
             if (this.connectionType === 'usb' && this.device) {
                 console.log('👋 Disconnecting USB printer...');
-                
-                // Release interface first
-                if (this.device.opened) {
-                    try {
-                        await this.device.releaseInterface(0);
-                        console.log('✅ Interface released');
-                    } catch (error) {
-                        console.warn('⚠️ Interface release failed:', error.message);
-                    }
-                }
-                
-                // Close device
-                if (this.device.opened) {
-                    try {
-                        await this.device.close();
-                        console.log('✅ Device closed');
-                    } catch (error) {
-                        console.warn('⚠️ Device close failed:', error.message);
-                    }
-                }
+                await this._cleanupUSBDevice();
+                console.log('✅ USB device closed');
             } else if (this.connectionType === 'bluetooth' && this.bluetoothDevice) {
                 console.log('👋 Disconnecting Bluetooth printer...');
-                if (this.bluetoothDevice.gatt.connected) {
+                if (this.bluetoothDevice.gatt?.connected) {
                     await this.bluetoothDevice.gatt.disconnect();
                     console.log('✅ Bluetooth disconnected');
                 }
             }
             
-            this.isConnected = false;
-            this.device = null;
-            this.bluetoothDevice = null;
-            this.bluetoothCharacteristic = null;
-            this.connectionType = null;
+            this._clearState();
             console.log('✅ Printer disconnected completely');
         } catch (error) {
             console.error('⚠️ Error disconnecting printer:', error);
-            // Force clear state even on error
-            this.isConnected = false;
-            this.device = null;
-            this.bluetoothDevice = null;
-            this.bluetoothCharacteristic = null;
-            this.connectionType = null;
+            this._clearState();
         }
     }
 
@@ -656,35 +647,13 @@ class ThermalPrinterService {
     async forceReset() {
         console.log('🔄 Force resetting printer connection...');
         
-        // Clear all state
-        this.isConnected = false;
-        this.connectionType = null;
-        this.bluetoothCharacteristic = null;
+        const usbDevice = this.device;
+        const btDevice = this.bluetoothDevice;
         
-        // Try to close USB device if exists
-        if (this.device) {
-            try {
-                if (this.device.opened) {
-                    try { await this.device.releaseInterface(0); } catch (e) { }
-                    try { await this.device.close(); } catch (e) { }
-                }
-            } catch (error) {
-                console.warn('⚠️ Force cleanup warning:', error.message);
-            }
-            this.device = null;
-        }
+        this._clearState();
         
-        // Try to disconnect Bluetooth if exists
-        if (this.bluetoothDevice) {
-            try {
-                if (this.bluetoothDevice.gatt && this.bluetoothDevice.gatt.connected) {
-                    await this.bluetoothDevice.gatt.disconnect();
-                }
-            } catch (error) {
-                console.warn('⚠️ Bluetooth cleanup warning:', error.message);
-            }
-            this.bluetoothDevice = null;
-        }
+        await this._cleanupDevice(usbDevice, 'usb');
+        await this._cleanupDevice(btDevice, 'bluetooth');
         
         console.log('✅ Force reset complete - all resources released');
     }

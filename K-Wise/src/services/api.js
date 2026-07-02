@@ -1,43 +1,83 @@
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/networkConfig';
+import { withCsrfHeader, clearLegacyAuthStorage, stripLegacyAuthHeader } from '../utils/authSecurity';
+import { installAxiosGetCache } from '../utils/httpClientCache';
 
 // Dynamic API configuration that adapts to network environment
 const API_BASE_URL = getApiBaseUrl();
+const VERBOSE_API_LOGS = process.env.VITE_KWISE_VERBOSE_LOGS === 'true'
+    || process.env.REACT_APP_KWISE_VERBOSE_LOGS === 'true';
+const baseConsole = globalThis.console || { log: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
+const console = {
+    ...baseConsole,
+    log: (...args) => {
+        if (VERBOSE_API_LOGS) {
+            baseConsole.log(...args);
+        }
+    },
+    debug: (...args) => {
+        if (VERBOSE_API_LOGS) {
+            baseConsole.debug(...args);
+        }
+    }
+};
+
+const createClientRequestKey = (prefix = 'kwise') => {
+    if (globalThis.crypto?.randomUUID) {
+        return `${prefix}-${globalThis.crypto.randomUUID()}`;
+    }
+
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
 
 console.log('🔧 API Service initialized with base URL:', API_BASE_URL);
 
 // Create axios instance with base configuration
 const api = axios.create({
     baseURL: API_BASE_URL,
+    withCredentials: true,
     timeout: 30000, // ✅ FIX: Set to 30s for standard operations (60s was excessive except for AI)
     headers: {
         'Content-Type': 'application/json'
     }
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
+// Request deduplication — prevents identical concurrent requests from flooding the backend
+api.interceptors.request.use((config) => {
+    config.withCredentials = true;
+    config.headers = withCsrfHeader(stripLegacyAuthHeader(config.headers || {}), config.method);
+    return config;
+});
+
+installAxiosGetCache(api, {
+    ttlMs: process.env.VITE_KWISE_CLIENT_CACHE_MS || 15000,
+    maxEntries: 300,
+    cacheablePath: (pathname) => (
+        pathname.startsWith('/api/kiosk/')
+        || pathname.startsWith('/kiosk/')
+        || pathname.startsWith('/api/stock')
+        || pathname.startsWith('/stock')
+        || pathname === '/api/health'
+        || pathname === '/health'
+    )
+});
+
+// Prevent multiple concurrent 401 responses from triggering duplicate redirects
+let isRedirecting = false;
 
 // Response interceptor to handle errors
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            // Token expired or invalid
-            localStorage.removeItem('token');
+        const requestUrl = error.config?.url || '';
+        const isAuthProbe = requestUrl.includes('/auth/me');
+        const isAdminPath = globalThis.location?.pathname?.startsWith('/admin');
+
+        if (error.response?.status === 401 && isAdminPath && !isAuthProbe && !isRedirecting) {
+            isRedirecting = true;
+            clearLegacyAuthStorage();
             localStorage.removeItem('currentUser');
-            window.location.href = '/login';
+            globalThis.location.href = '/login';
         }
         return Promise.reject(error);
     }
@@ -185,6 +225,10 @@ export const stockAPI = {
         // Otherwise treat as params object
         console.log('Calling /api/stock (stockAPI.getItems) with params:', categoryOrParams);
         return api.get('/stock', { params: categoryOrParams });
+    },
+    getCatalogBootstrap: (params = {}) => {
+        console.log('Calling /api/kiosk/catalog/bootstrap with params:', params);
+        return api.get('/kiosk/catalog/bootstrap', { params });
     },
     getById: (id) => {
         console.log('Calling /api/stock/:id with id:', id);
@@ -422,11 +466,12 @@ export const ordersAPI = {
             // Backend canonical shape: { success:true, data:{ transactions:[], pagination:{...} } }
             // Fallback legacy shapes handled gracefully
             const container = body.data || body;
-            const transactions = Array.isArray(container.transactions)
-                ? container.transactions
-                : Array.isArray(container.data)
-                    ? container.data
-                    : [];
+            let transactions = [];
+            if (Array.isArray(container.transactions)) {
+                transactions = container.transactions;
+            } else if (Array.isArray(container.data)) {
+                transactions = container.data;
+            }
             const paginationRaw = container.pagination || {};
             const pagination = {
                 currentPage: paginationRaw.currentPage || paginationRaw.page || 1,
@@ -449,7 +494,7 @@ export const ordersAPI = {
         console.log('Calling /api/orders/assistants');
         try {
             const res = await api.get('/orders/assistants');
-            const rows = (res.data && res.data.data) || [];
+            const rows = res.data?.data || [];
             return rows.map(r => ({ id: r.id, username: r.username, name: r.name || r.username }));
         } catch (e) {
             console.error('getAssistants error:', e.message);
@@ -828,13 +873,17 @@ export const testConnection = async () => {
             console.log('🔧 Testing API connection to:', API_BASE_URL);
         }
 
-        // Test the health endpoint with cache busting
-        const response = await api.get(`/health?t=${Date.now()}`);
+        const response = await api.get('/health');
         if (process.env.NODE_ENV === 'development') {
             console.log('✅ Health check response:', response.data);
         }
         return true;
     } catch (error) {
+        const isCanceled = error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.message === 'canceled';
+        if (isCanceled) {
+            return false;
+        }
+
         // Log errors to see what's happening
         if (process.env.NODE_ENV === 'development') {
             console.error('❌ Connection test failed:', error.message);
@@ -842,12 +891,11 @@ export const testConnection = async () => {
 
         // Try a direct fetch as fallback with cache busting
         try {
-            const directResponse = await fetch(`http://localhost:5000/api/health?t=${Date.now()}`, {
+            const directResponse = await fetch(`${API_BASE_URL}/health`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                },
-                cache: 'no-cache'
+                }
             });
             if (directResponse.ok) {
                 if (process.env.NODE_ENV === 'development') {
@@ -882,15 +930,27 @@ export const kioskAPI = {
     },
     // Kiosk order creation with queue management integration
     createOrder: (orderData) => {
+        const idempotencyKey = orderData.idempotencyKey
+            || orderData.clientRequestId
+            || createClientRequestKey('kiosk-order');
         console.log('📤 Calling /api/kiosk/orders (POST) with queue management:');
-        console.log('📦 Order data:', JSON.stringify(orderData, null, 2));
+        console.log('Order data summary:', {
+            itemCount: orderData.items?.length || 0,
+            selectedPartCount: orderData.selectedParts?.length || 0,
+            idempotencyKey
+        });
         console.log('📦 Order data keys:', Object.keys(orderData));
         console.log('📦 Items count:', orderData.items?.length);
         console.log('📦 Total amount:', orderData.totalAmount);
         console.log('📦 Service type:', orderData.serviceType);
         
         // Use the api instance which has proper config
-        return api.post('/kiosk/orders', orderData);
+        return api.post('/kiosk/orders', orderData, {
+            timeout: 5000,
+            headers: {
+                'X-KWise-Idempotency-Key': idempotencyKey
+            }
+        });
     }
 };
 

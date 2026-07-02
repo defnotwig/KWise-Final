@@ -1,4 +1,5 @@
 import { stockAPI, ordersAPI, usersAPI } from '../services/api';
+import { getServerBaseUrl } from '../utils/networkConfig';
 
 // Enhanced search functionality with parallel API calls and caching
 class SearchService {
@@ -270,12 +271,8 @@ class SearchService {
         }
 
         try {
-            // Call the global search API endpoint
-            const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:5000/api/search/global?q=${encodeURIComponent(query)}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+            // Call the global search API endpoint            const response = await fetch(`${getServerBaseUrl()}/api/search/global?q=${encodeURIComponent(query)}`, {
+                headers: {                    'Content-Type': 'application/json'
                 }
             });
 
@@ -400,7 +397,7 @@ class SearchService {
             }
 
             // Add admin pages search
-            searchPromises.push(this.searchAdminPages(query));
+            searchPromises.push(Promise.resolve(this.searchAdminPages(query)));
 
             const searchResults = await Promise.all(searchPromises);
 

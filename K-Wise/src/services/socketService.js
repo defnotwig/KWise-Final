@@ -9,6 +9,7 @@
  */
 
 import { io } from 'socket.io-client';
+import { getServerBaseUrl } from '../utils/networkConfig';
 
 let socketInstance = null;
 let connectionAttempts = 0;
@@ -16,24 +17,22 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 /**
  * Initialize Socket.IO connection
- * @param {string} token - JWT authentication token
- * @returns {Socket} Socket.IO client instance
+  * @returns {Socket} Socket.IO client instance
  */
-export const initializeSocket = (token) => {
+export const initializeSocket = () => {
     if (socketInstance) {
         console.log('♻️ Socket already initialized, returning existing instance');
         return socketInstance;
     }
 
-    const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const API_BASE = getServerBaseUrl();
     
     console.log('🔌 Initializing Socket.IO global connection...');
     console.log('🔗 Server URL:', API_BASE);
-    console.log('🔑 Token exists:', !!token);
 
     socketInstance = io(API_BASE, {
-        auth: { token },
         transports: ['websocket', 'polling'],
+        withCredentials: true,
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
@@ -47,9 +46,9 @@ export const initializeSocket = (token) => {
         connectionAttempts = 0;
         
         // Make socket globally available
-        if (typeof window !== 'undefined') {
-            window.io = socketInstance;
-            console.log('🌐 window.io globally available');
+        if (globalThis.window !== undefined) {
+            globalThis.io = socketInstance;
+            console.log('🌐 globalThis.io globally available');
         }
     });
 
@@ -88,17 +87,17 @@ export const initializeSocket = (token) => {
     socketInstance.on('newIPDetected', (data) => {
         console.log('🆕 New IP detected:', data);
         // Dispatch custom event for components to listen
-        window.dispatchEvent(new CustomEvent('ipAccessUpdate', { detail: { type: 'new', data } }));
+        globalThis.dispatchEvent(new CustomEvent('ipAccessUpdate', { detail: { type: 'new', data } }));
     });
 
     socketInstance.on('blockedIPAttempt', (data) => {
         console.log('🚫 Blocked IP attempt:', data);
-        window.dispatchEvent(new CustomEvent('ipAccessUpdate', { detail: { type: 'blocked', data } }));
+        globalThis.dispatchEvent(new CustomEvent('ipAccessUpdate', { detail: { type: 'blocked', data } }));
     });
 
     socketInstance.on('ipStatusChanged', (data) => {
         console.log('🔄 IP status changed:', data);
-        window.dispatchEvent(new CustomEvent('ipAccessUpdate', { detail: { type: 'statusChanged', data } }));
+        globalThis.dispatchEvent(new CustomEvent('ipAccessUpdate', { detail: { type: 'statusChanged', data } }));
     });
 
     return socketInstance;
@@ -121,8 +120,8 @@ export const disconnectSocket = () => {
         socketInstance.disconnect();
         socketInstance = null;
         
-        if (typeof window !== 'undefined') {
-            window.io = null;
+        if (globalThis.window !== undefined) {
+            globalThis.io = null;
         }
     }
 };

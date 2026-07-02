@@ -572,7 +572,7 @@
 }
 
 /* Ensure admin components never inherit kiosk green colors */
-.admin-layout *:not(.pc-parts-container *):not(.kiosk-*) {
+.admin-layout *:not(.pc-parts-container *):not([class^="kiosk-"]):not([class*=" kiosk-"]) {
   background-image: none !important;
 }
 
