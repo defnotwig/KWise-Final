@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLocation } from "react-router-dom";
-
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import PropTypes from "prop-types";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./PC-Parts.css";
 import "./PCCustomized.css";
 import "./PeripheralCategories.css"; // Import peripheral category styles
@@ -9,12 +8,9 @@ import PCWise from "../assets/PCWise.webp";
 import Vector from "../assets/Vector (3).webp"
 import Chest from "../assets/Chest.webp";
 import Frame from "../assets/Frame 138.webp";
-import { stockAPI, kioskAPI } from "../services/api";
+import { stockAPI } from "../services/api";
 import api from "../api/api";
-import aiService from "../api/aiService";
-import CompareProducts from "./CompareProducts"; // TASK 5: Product Comparison Component
-import CompatibilityValidationModal from "../components/CompatibilityValidationModal"; // ✅ CHECKOUT-LEVEL COMPATIBILITY MODAL
-import { filterCompatibleProducts } from "../utils/compatibilityFilter"; // ✅ STEP-BY-STEP COMPATIBILITY FILTERING
+import realtimeKioskAPI from "../api/kioskAPI";
 import { extractTopSpecFilters, formatSpecKey } from "../utils/topSpecifications"; // 🔥 TOP 5 SPECIFICATIONS
 import logoComponent from "../assets/PCParts/logoComponent.svg";
 import dropdown from "../assets/PCParts/dropdown.svg";
@@ -23,6 +19,8 @@ import compare from "../assets/PCParts/compare.svg";
 import deleteIcon from "../assets/PCParts/delete.svg";
 import minusIcon from "../assets/PCParts/minus.svg";
 import addIcon from "../assets/PCParts/add.svg";
+import { normalizeKioskProduct } from "../utils/kioskContracts";
+import KioskProductImage from "../components/KioskProductImage";
 
 import monitor from "../assets/PCParts/monitor.svg";
 import mouse from "../assets/PCParts/mouse.svg";
@@ -32,75 +30,93 @@ import speaker from "../assets/PCParts/speaker.svg";
 import webcam from "../assets/PCParts/webcam.svg";
 import cpucooler from "../assets/PCParts/cpucooler.svg";
 
+const CompareProducts = React.lazy(() => import("./CompareProducts"));
+const CompatibilityValidationModal = React.lazy(() => import("../components/CompatibilityValidationModal"));
+
 // Component Images
 import CPU1 from "../assets/CPU1.webp";
-import Ryzen from "../assets/Ryzen.webp";
-import IntelCorei5 from "../assets/IntelCorei5.webp";
-import IntelCorei7 from "../assets/IntelCorei7.webp";
 import COOLMANREYNA from "../assets/COOLMANREYNA.webp";
 import Motherboard1 from "../assets/Motherboard1.webp";
-import GigabyteMotherboard from "../assets/GigabyteMotherboard.webp";
-import B550MK from "../assets/B550M-K.webp";
-import ASrockMotherboard from "../assets/ASrockMotherboard.webp";
-import AsusMotherboard from "../assets/AsusMotherboard.webp";
 import GPU1 from "../assets/GPU1.webp";
-import RX550 from "../assets/RX550.webp";
-import RX580 from "../assets/RX580.webp";
-import RX6600 from "../assets/RX6600.webp";
-import RX7600XT from "../assets/RX7600XT.webp";
-import RX7700XT from "../assets/RX7700XT.webp";
-import RX7800XT from "../assets/RX7800XT.webp";
-import RTX4060 from "../assets/RTX4060.webp";
-import RTX4060Ti from "../assets/RTX4060Ti.webp";
-import RTX4060TiColorful from "../assets/RTX4060TiColorful.webp";
-import RTX4070 from "../assets/RTX4070.webp";
-import RTX4070Colorful from "../assets/RTX4070Colorful.webp";
 import Ram from "../assets/Ram.webp";
-import GB8Team from "../assets/8GBTeam.webp";
-import GB16Team from "../assets/16GBTeam.webp";
-import GB16Kingston from "../assets/16GBKingston.webp";
-import GB16TForceDarkZa from "../assets/16GBTForceDarkZa.webp";
-import GB16TFORCEBlack from "../assets/16GBTFORCEBlack.webp";
-import GB16TFORCEWhite from "../assets/16GBTFORCEWhite.webp";
-import GB32GSkillTridentZ from "../assets/32GBG.SKILLTridentZ.webp";
 import Storage1 from "../assets/Storage1.webp";
-import WDGREEN from "../assets/WDGREEN.webp";
-import TFORCEVULCAN from "../assets/TFORCEVULCAN.webp";
-import SAMSUNG870EVO from "../assets/SAMSUNG870EVO.webp";
-import WDBLUEGEN4 from "../assets/WDBLUEGEN4.webp";
-import WDGREENGEN3 from "../assets/WDGREENGEN3.webp";
-import TEAMGROUPMP33PRO from "../assets/TEAMGROUPMP33PRO.webp";
-import XPGSX8200PROGEN4 from "../assets/XPGSX8200PROGEN4.webp";
 import PSU1 from "../assets/PSU1.webp";
-import YGTKY750 from "../assets/YGTKY750.webp";
-import COUGARSTC500 from "../assets/COUGARSTC500.webp";
-import CORSAIRCX550 from "../assets/CORSAIRCX550.webp";
-import FSPVITAGM from "../assets/FSPVITAGM.webp";
-import GIGABYTEP550SS from "../assets/GIGABYTEP550SS.webp";
-import GIGABYTEP550SSSILVERWhite from "../assets/GIGABYTEP550SSSILVERWhite.webp";
 import SystemUnit1 from "../assets/SystemUnit1.webp";
-import YGTMARS8 from "../assets/YGTMARS8.webp";
-import KEYTECHROBINLITE from "../assets/KEYTECHROBINLITE.webp";
-import KEYTECHROBINVIEW from "../assets/KEYTECHROBINVIEW.webp";
-import INPLAYOPENVIEWV100 from "../assets/INPLAYOPENVIEWV100.webp";
-import PlayerMIKU2 from "../assets/PlayerMIKU2.webp";
-import DARKFLASHDB330M from "../assets/DARKFLASHDB330M.webp";
-import LIANLIO11DynamicMINI from "../assets/LIANLIO11DynamicMINI.webp";
 import Peripheral from "../assets/Peripheral.webp";
-import LogitechG502HERO from "../assets/LogitechG502HERO.webp";
-import RazerDeathAdderV2 from "../assets/RazerDeathAdderV2.webp";
-import SteelSeriesApex3KL from "../assets/SteelSeriesApex3KL.webp";
-import HyperXAlloyOriginsCore from "../assets/HyperXAlloyOriginsCore.webp";
-import RazerBlackSharkV2X from "../assets/RazerBlackSharkV2X.webp";
-import LogitechG435Wireless from "../assets/LogitechG435Wireless.webp";
-import SteelSeriesQcKHeavyMousePad from "../assets/SteelSeriesQcKHeavyMousePad.webp";
-import HyperXPulsefireHaste from "../assets/HyperXPulsefireHaste.webp";
+
+const Ryzen = CPU1;
+const IntelCorei5 = CPU1;
+const IntelCorei7 = CPU1;
+const GigabyteMotherboard = Motherboard1;
+const B550MK = Motherboard1;
+const ASrockMotherboard = Motherboard1;
+const AsusMotherboard = Motherboard1;
+const RX550 = GPU1;
+const RX580 = GPU1;
+const RX6600 = GPU1;
+const RX7600XT = GPU1;
+const RX7700XT = GPU1;
+const RX7800XT = GPU1;
+const RTX4060 = GPU1;
+const RTX4060Ti = GPU1;
+const RTX4060TiColorful = GPU1;
+const RTX4070 = GPU1;
+const RTX4070Colorful = GPU1;
+const GB8Team = Ram;
+const GB16Team = Ram;
+const GB16Kingston = Ram;
+const GB16TForceDarkZa = Ram;
+const GB16TFORCEBlack = Ram;
+const GB16TFORCEWhite = Ram;
+const GB32GSkillTridentZ = Ram;
+const WDGREEN = Storage1;
+const TFORCEVULCAN = Storage1;
+const SAMSUNG870EVO = Storage1;
+const WDBLUEGEN4 = Storage1;
+const WDGREENGEN3 = Storage1;
+const TEAMGROUPMP33PRO = Storage1;
+const XPGSX8200PROGEN4 = Storage1;
+const YGTKY750 = PSU1;
+const COUGARSTC500 = PSU1;
+const CORSAIRCX550 = PSU1;
+const FSPVITAGM = PSU1;
+const GIGABYTEP550SS = PSU1;
+const GIGABYTEP550SSSILVERWhite = PSU1;
+const YGTMARS8 = SystemUnit1;
+const KEYTECHROBINLITE = SystemUnit1;
+const KEYTECHROBINVIEW = SystemUnit1;
+const INPLAYOPENVIEWV100 = SystemUnit1;
+const PlayerMIKU2 = SystemUnit1;
+const DARKFLASHDB330M = SystemUnit1;
+const LIANLIO11DynamicMINI = SystemUnit1;
+const LogitechG502HERO = Peripheral;
+const RazerDeathAdderV2 = Peripheral;
+const SteelSeriesApex3KL = Peripheral;
+const HyperXAlloyOriginsCore = Peripheral;
+const RazerBlackSharkV2X = Peripheral;
+const LogitechG435Wireless = Peripheral;
+const SteelSeriesQcKHeavyMousePad = Peripheral;
+const HyperXPulsefireHaste = Peripheral;
+
+const VERBOSE_KIOSK_LOGS = process.env.VITE_KWISE_VERBOSE_LOGS === 'true'
+  || process.env.REACT_APP_KWISE_VERBOSE_LOGS === 'true';
+const browserConsole = globalThis.console || {};
+const console = VERBOSE_KIOSK_LOGS
+  ? browserConsole
+  : {
+      log: () => {},
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: (...args) => browserConsole.error?.(...args)
+    };
+let cachedHomepageProducts = null;
 
 
 // Sample Product Data (Replace with your database fetch logic)
 // Helper component for enumerated spec values
 // eslint-disable-next-line no-unused-vars
-const _SpecValueSelector = ({ category, field, value, onChange }) => {
+const SpecValueSelector = ({ category, field, value, onChange }) => {
   const [options, setOptions] = React.useState([]);
   React.useEffect(() => {
     if (!category || !field) return;
@@ -130,6 +146,12 @@ const _SpecValueSelector = ({ category, field, value, onChange }) => {
       {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
     </select>
   );
+};
+SpecValueSelector.propTypes = {
+  category: PropTypes.string,
+  field: PropTypes.string,
+  value: PropTypes.string,
+  onChange: PropTypes.func,
 };
 export const menuItems = [
   { name: "Home", image: Vector, category: "home" },
@@ -1392,7 +1414,7 @@ export const menuItems = [
     },
     {
       name: "HyperX Pulsefire Haste",
-      image: HyperXPulsefireHaste, 
+      image: HyperXPulsefireHaste,
       price: "PHP 2,195",
       details: "Ultra-light honeycomb gaming mouse with Pixart 3335 sensor.",
       specifications: "DPI: 16,000 | Buttons: 6 | Weight: 59g | RGB: Yes"
@@ -1407,9 +1429,9 @@ menuItems.forEach(category => {
     category.products.forEach(product => {
       if (product.price) {
         // Remove any non-numeric characters except dots
-        const numericPrice = product.price.toString().replace(/[^\d.]/g, "");
+        const numericPrice = product.price.toString().replaceAll(/[^\d.]/g, "");
         // Parse to float and format with 2 decimal places
-        const formattedPrice = parseFloat(numericPrice).toLocaleString(undefined, {
+        const formattedPrice = Number.parseFloat(numericPrice).toLocaleString(undefined, {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
         });
@@ -1436,9 +1458,195 @@ export const updateCartIcon = () => {
   const cartCount = cartItems
     .filter(item => item && typeof item === 'object')
     .reduce((acc, item) => acc + (item.quantity || 0), 0);
-  cartIcon.setAttribute("data-count", cartCount);
+  cartIcon.dataset.count = cartCount;
 };
 
+// Category inference patterns for legacy cart items without category
+const CATEGORY_PATTERNS = [
+  { pattern: /ryzen|intel|processor|core i/i, category: 'CPU' },
+  { pattern: /motherboard|mobo|b550|b650|b850|x670|z790/i, category: 'Motherboard' },
+  { pattern: /rtx|gtx|radeon|gpu|graphics/i, category: 'GPU' },
+  { pattern: /(?:ram|memory|ddr)(?!.*(?:storage|ssd))/i, category: 'RAM' },
+  { pattern: /ssd|hdd|nvme|storage|\btb\b|\bgb\b/i, category: 'Storage' },
+  { pattern: /psu|power supply|watt|80\+/i, category: 'PSU' },
+  { pattern: /\bcase\b|chassis|tower/i, category: 'Case' },
+  { pattern: /cooler|cooling|aio|\bfan\b/i, category: 'Cooling' },
+];
+
+function inferCategoryFromName(productName) {
+  const name = (productName || '').toLowerCase();
+  for (const { pattern, category } of CATEGORY_PATTERNS) {
+    if (pattern.test(name)) return category;
+  }
+  return null;
+}
+
+const PERIPHERAL_CATEGORIES = new Set(['Mouse', 'Keyboard', 'Headphones', 'Speakers', 'Webcam']);
+const isCanceledRequest = (error) => error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError';
+
+function toNumericPrice(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number.parseFloat(String(value || '').replaceAll(/[^\d.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function prepareCartForCompatibility(cartItems) {
+  let cartModified = false;
+  for (const item of cartItems) {
+    if (!item || item.category) continue;
+    const inferredCategory = inferCategoryFromName(item.name || item.product_name);
+    if (inferredCategory) {
+      item.category = inferredCategory;
+      cartModified = true;
+    }
+  }
+  if (cartModified) {
+    localStorage.setItem("cart", JSON.stringify(cartItems));
+  }
+  return cartItems
+    .filter(item => item?.category && !PERIPHERAL_CATEGORIES.has(item.category));
+}
+
+async function fetchCompatibilityFromAPI(nonPeripheralCart, productsList, currentViewingCategory) {
+  const scores = {};
+
+  const response = await realtimeKioskAPI.checkCompatibilityBatch({
+    contextParts: nonPeripheralCart.map(item => ({
+      id: item.id,
+      name: item.name || item.product_name,
+      category: item.category,
+      brand: item.brand,
+      price: item.price,
+      specifications: item.specifications || {},
+      tier: item.tier || 'unknown'
+    })),
+    candidates: productsList.map(product => ({
+      id: product.id,
+      name: product.name,
+      category: product.category || currentViewingCategory,
+      brand: product.brand,
+      price: product.price,
+      specifications: product.specifications || {},
+      dimensions: product.dimensions || {},
+      tier: product.tier || 'unknown'
+    })),
+    mode: 'candidate_filter',
+    targetCategory: currentViewingCategory
+  });
+
+  const results = response?.data || response?.results || [];
+  results.forEach(result => {
+    const score = result.score ?? result.compatibility_score ?? result.compatibilityScore ?? 0;
+    scores[result.id] = result.compatible === false ? 0 : Math.max(score, 75);
+  });
+
+  return scores;
+}
+
+function normalizeHomepagePick(pick, analysisField, defaultAnalysis) {
+  const numericPrice = toNumericPrice(pick.effectivePrice || pick.salePrice || pick.price);
+  return {
+    ...pick,
+    id: pick.id || pick.componentId,
+    image: api.utils.getFullImageUrl(pick.imageUrl || pick.image_url || pick.file_path || pick.image),
+    numericPrice,
+    price: typeof pick.price === 'string' ? pick.price : `₱${numericPrice.toLocaleString()}`,
+    localAnalysis: pick[analysisField] || pick.analysis || pick.reason || defaultAnalysis
+  };
+}
+
+function normalizeSalePick(product) {
+  const originalPrice = toNumericPrice(product.originalPrice || product.regularPrice || product.basePrice || product.price);
+  const salePrice = toNumericPrice(product.salePrice || product.sale_price || product.effectivePrice || product.discountedPrice || product.price);
+  const isDiscounted = originalPrice > 0 && salePrice > 0 && salePrice < originalPrice;
+
+  if (!isDiscounted && product.onSale !== true) {
+    return null;
+  }
+
+  const effectiveSalePrice = salePrice > 0 ? salePrice : originalPrice;
+  const discountPercent = isDiscounted
+    ? Math.round(((originalPrice - effectiveSalePrice) / originalPrice) * 100)
+    : 0;
+
+  return {
+    ...product,
+    image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.file_path || product.image),
+    originalPrice,
+    salePrice: effectiveSalePrice,
+    discountPercent,
+    price: `₱${effectiveSalePrice.toLocaleString()}`,
+    formattedOriginalPrice: `₱${originalPrice.toLocaleString()}`,
+    formattedSalePrice: `₱${effectiveSalePrice.toLocaleString()}`
+  };
+}
+
+async function fetchAllCategoryProducts(categories) {
+  const categoryResults = await Promise.all(categories.map(async (category) => {
+    try {
+      const response = await stockAPI.getCatalogBootstrap({
+        category, page: 1, limit: 20, sort: 'name', order: 'ASC', includeSpecRanges: false
+      });
+      const items = response.data?.data?.products || response.data?.data?.items || [];
+      if (Array.isArray(items)) {
+        return items.map(product => ({
+          ...product,
+          image: normalizeKioskProduct(product, { category }).image,
+          price: Number.parseFloat(product.price || 0),
+          category,
+          stock: product.stock || 0,
+          brand: product.brand || 'Unknown'
+        }));
+      }
+    } catch (error) {
+      if (!isCanceledRequest(error)) {
+        console.warn(`Failed to fetch ${category} products:`, error);
+      }
+    }
+    return [];
+  }));
+  return categoryResults.flat();
+}
+
+async function fetchFeaturedFallback() {
+  const products = await realtimeKioskAPI.getFeaturedProducts();
+  return products.map(product => ({
+    ...product,
+    image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.file_path || product.image),
+    price: `₱${toNumericPrice(product.effectivePrice || product.price).toLocaleString()}`
+  }));
+}
+
+function extractProductsFromResponse(response) {
+  if (response?.data) {
+    if (Array.isArray(response.data.data?.products)) return response.data.data.products;
+    if (Array.isArray(response.data.data?.items)) return response.data.data.items;
+    if (Array.isArray(response.data.data)) return response.data.data;
+    if (Array.isArray(response.data.products)) return response.data.products;
+    if (Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response.data.results)) return response.data.results;
+  }
+  if (Array.isArray(response)) return response;
+  return [];
+}
+
+function normalizeProduct(product) {
+  const normalizedProduct = normalizeKioskProduct(product);
+  const productDescription = product.details || product.description;
+  const productSpecs = product.specifications || product.specs;
+  let resolvedSpecs = productSpecs;
+  if (productSpecs == null || productSpecs === '' ||
+    (typeof productSpecs === 'object' && Object.keys(productSpecs).length === 0)) {
+    resolvedSpecs = "No specifications provided";
+  }
+
+  return {
+    ...normalizedProduct,
+    price: product.price ? Number(product.price.toString().replaceAll(/[^\d.]/g, "")) : null,
+    details: productDescription && productDescription !== '' ? productDescription : "No details available",
+    specifications: resolvedSpecs
+  };
+}
 
 
 function PCParts() {
@@ -1449,17 +1657,19 @@ function PCParts() {
   const [priceOpen, setPriceOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [specSectionOpen, setSpecSectionOpen] = useState({});
-  // eslint-disable-next-line no-unused-vars
-  const [_specRanges, setSpecRanges] = useState({}); // Store min/max values for numeric specs
+  const specRangesRef = useRef({}); // Store min/max values for numeric specs
   const [randomHotPicks, setRandomHotPicks] = useState([]);
   const [randomValueForMoney, setRandomValueForMoney] = useState([]);
   const [randomOnSale, setRandomOnSale] = useState([]);
+  const onSaleRequestRef = useRef(null);
+  const homepageProductsLoadedRef = useRef(false);
+  const homepageProductsScheduledRef = useRef(false);
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem("cart")) || []);
   const [showStartOverModal, setShowStartOverModal] = useState(false);
   const [showCancelOrderModal, setShowCancelOrderModal] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState({}); // Track which products show full controls
   const [expandTimers, setExpandTimers] = useState({}); // Track timers for auto-collapse
-  
+
   // ✅ NEW: Carousel rotation state (show 4 items at a time from pool of 8-20)
   const [carouselStartIndex, setCarouselStartIndex] = useState(0);
   const ITEMS_PER_PAGE = 4; // Show 4 items at a time on 1920x1080
@@ -1470,7 +1680,7 @@ function PCParts() {
   const [selectedComponents, setSelectedComponents] = useState({}); // Track selected components by category
   const [compatibilityScores, setCompatibilityScores] = useState({}); // Compatibility scores for products
   // eslint-disable-next-line no-unused-vars
-  const [hideIncompatible, setHideIncompatible] = useState(false); // Toggle to hide incompatible products
+  const [hideIncompatible] = useState(false); // Toggle to hide incompatible products
   const [compatibilityContext, setCompatibilityContext] = useState(null); // Compatibility context for sorting
   const [isLoadingCompatibility, setIsLoadingCompatibility] = useState(false); // Loading state for compatibility checks
   const [cartItemsCount, setCartItemsCount] = useState(0); // Track non-peripheral cart items count
@@ -1502,15 +1712,15 @@ function PCParts() {
     const handleStorageChange = () => {
       setCart(JSON.parse(localStorage.getItem("cart")) || []);
     };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
+
+    globalThis.addEventListener('storage', handleStorageChange);
+
     // Also listen for a custom event for same-window updates
-    window.addEventListener('cartUpdated', handleStorageChange);
-    
+    globalThis.addEventListener('cartUpdated', handleStorageChange);
+
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('cartUpdated', handleStorageChange);
+      globalThis.removeEventListener('storage', handleStorageChange);
+      globalThis.removeEventListener('cartUpdated', handleStorageChange);
     };
   }, []);
 
@@ -1528,36 +1738,36 @@ function PCParts() {
 
   //Function to compute the total price
   const getPrice = (item) => {
-    if (!item || !item.price) {
+    if (!item?.price) {
       console.log('💰 getPrice: No item or price found', item);
       return 0;
     }
-    
+
     let price = item.price;
     console.log('💰 getPrice: Input price:', price, 'Type:', typeof price);
-    
+
     // Handle different price formats
     if (typeof price === "number") {
       console.log('💰 getPrice: Numeric price:', price);
       return price;
     }
-    
+
     if (typeof price === "string") {
       // Remove currency symbols, commas, and other non-numeric characters
       // Keep only digits, decimal points, and minus signs
-      let numericString = price.replace(/[^\d.-]/g, "");
-      
+      let numericString = price.replaceAll(/[^\d.-]/g, "");
+
       // Handle cases like "PHP 1,234.56" or "₱1,234.56"
       if (numericString.includes(',')) {
-        numericString = numericString.replace(/,/g, '');
+        numericString = numericString.replaceAll(',', '');
       }
-      
-      const parsed = parseFloat(numericString);
-      const result = isNaN(parsed) ? 0 : parsed;
+
+      const parsed = Number.parseFloat(numericString);
+      const result = Number.isNaN(parsed) ? 0 : parsed;
       console.log('💰 getPrice: String price:', price, '→ numericString:', numericString, '→ parsed:', result);
       return result;
     }
-    
+
     console.log('💰 getPrice: Unknown price format, returning 0');
     return 0;
   };
@@ -1600,8 +1810,8 @@ function PCParts() {
   useEffect(() => {
     const calculateTotalPrice = () => {
       const cartItems = JSON.parse(localStorage.getItem("cart")) || [];
-      console.log('💰 Calculating total price for cart items:', cartItems);
-      
+      console.log(`💰 Calculating total price for ${cartItems.length} cart items`);
+
       // Filter out null/undefined items before reducing
       const total = cartItems
         .filter(item => item && typeof item === 'object')
@@ -1609,18 +1819,12 @@ function PCParts() {
           const itemPrice = getPrice(item);
           const quantity = item.quantity || 1;
           const itemTotal = itemPrice * quantity;
-          
-          console.log(`💰 Item ${index + 1}:`, {
-            name: item.name,
-            price: item.price,
-            parsedPrice: itemPrice,
-            quantity: quantity,
-            itemTotal: itemTotal
-          });
-          
+
+          console.log(`💰 Item ${index + 1}: ${item.name} ×${quantity} = ${itemTotal}`);
+
           return acc + itemTotal;
         }, 0);
-      
+
       console.log('💰 Total calculated price:', total);
       return total;
     };
@@ -1640,18 +1844,18 @@ function PCParts() {
       localStorage.setItem("cartTotal", "0");
     };
 
-    window.addEventListener("cartReset", handleCartReset);
-    return () => window.removeEventListener("cartReset", handleCartReset);
+    globalThis.addEventListener("cartReset", handleCartReset);
+    return () => globalThis.removeEventListener("cartReset", handleCartReset);
   }, []);
 
   // ✅ COMPATIBILITY: Sync cart items to selectedComponents for validation
   useEffect(() => {
     const cartItems = JSON.parse(localStorage.getItem("cart")) || [];
-    
+
     // Build selectedComponents object from cart
     const components = {};
     cartItems.forEach(item => {
-      if (item && item.category) {
+      if (item?.category) {
         components[item.category] = {
           id: item.id,
           name: item.name,
@@ -1660,7 +1864,7 @@ function PCParts() {
         };
       }
     });
-    
+
     setSelectedComponents(components);
     console.log('🔍 Synced cart to selectedComponents:', Object.keys(components));
   }, [cart]);
@@ -1694,7 +1898,7 @@ function PCParts() {
       'CPU': 'CPU',
       'CPU Cooler': 'Cooling', // Fix: Map CPU Cooler to Cooling
       'Cooling': 'Cooling',
-      'Motherboard': 'Motherboard', 
+      'Motherboard': 'Motherboard',
       'RAM': 'RAM',
       'Storage': 'Storage',
       'GPU': 'GPU',
@@ -1714,8 +1918,7 @@ function PCParts() {
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false); // Brand dropdown state
   const [priceRange, setPriceRange] = useState({ min: 0, max: 0 }); // ✅ FIXED: Typo in max property
   const [selectedPrice, setSelectedPrice] = useState({ min: '', max: '' });
-  // eslint-disable-next-line no-unused-vars
-  const [_specMeta, setSpecMeta] = useState([]); // fields definitions
+  const specMetaRef = useRef([]); // fields definitions
   const [specFilters, setSpecFilters] = useState({}); // key -> value or {min,max}
   const [availableSpecFilters, setAvailableSpecFilters] = useState({}); // 🔥 Top 5 spec values per category
   const [sortOrder, setSortOrder] = useState({ sort: 'name', order: 'ASC' });
@@ -1729,8 +1932,8 @@ function PCParts() {
   const buildQueryParams = useCallback((category) => {
     const params = { category, page: 1, limit: 60 };
     if (selectedBrand && selectedBrand !== '') params.brand = selectedBrand; // ✅ FIXED: Single brand filtering
-    if (selectedPrice.min !== '' && !isNaN(selectedPrice.min)) params.minPrice = selectedPrice.min;
-    if (selectedPrice.max !== '' && !isNaN(selectedPrice.max)) params.maxPrice = selectedPrice.max;
+    if (selectedPrice.min !== '' && !Number.isNaN(selectedPrice.min)) params.minPrice = selectedPrice.min;
+    if (selectedPrice.max !== '' && !Number.isNaN(selectedPrice.max)) params.maxPrice = selectedPrice.max;
     // spec filters
     Object.entries(specFilters).forEach(([field, value]) => {
       if (value === '' || value == null) return;
@@ -1747,6 +1950,270 @@ function PCParts() {
     return params;
   }, [selectedBrand, selectedPrice.min, selectedPrice.max, specFilters, sortOrder]); // ✅ FIXED: Updated dependencies
 
+  // Helper: Fetch brands with counts for a category
+  const fetchCategoryBrands = useCallback(async (category) => {
+    try {
+      const res = await stockAPI.getBrandsWithCounts(category);
+      const data = res.data?.data || {};
+      const brands = data.brands || [];
+      setAvailableBrands(brands.map(b => b.name));
+      const counts = {};
+      brands.forEach(brand => { counts[brand.name] = brand.count; });
+      setBrandCounts(counts);
+      setTotalCategoryItems(data.totalItems || 0);
+    } catch {
+      setAvailableBrands([]);
+      setBrandCounts({});
+      setTotalCategoryItems(0);
+    }
+  }, []);
+
+  // Helper: Fetch price range for a category
+  const fetchCategoryPriceRange = useCallback(async (category) => {
+    try {
+      const res = await stockAPI.getPriceRange(category);
+      const data = res.data?.data || res.data || {};
+      if (data.min != null && data.max != null) {
+        setPriceRange({ min: data.min, max: data.max });
+      }
+      } catch (error) {
+        if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+          console.warn(`Failed to fetch price range for ${category}:`, error.message);
+        }
+      }
+  }, []);
+
+  // Helper: Fetch spec metadata and ranges for a category
+  const fetchCategorySpecMeta = useCallback(async (category) => {
+    try {
+      const res = await stockAPI.getPartMeta(category);
+      const fields = res.data?.data?.fields || [];
+      specMetaRef.current = fields;
+
+      const ranges = {};
+      for (const field of fields) {
+        const fieldKey = field.field_name || field.name;
+        const fieldType = field.field_type || field.type || 'text';
+        if (fieldType === 'number') {
+          try {
+            const rangeRes = await stockAPI.getSpecRange(category, fieldKey);
+            const rangeData = rangeRes.data?.data ?? rangeRes.data;
+            if (rangeData?.min != null && rangeData?.max != null) {
+              ranges[fieldKey] = { min: rangeData.min, max: rangeData.max, totalItems: rangeData.totalItems || 0 };
+            }
+          } catch (err) {
+            if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+              console.warn(`Failed to fetch range for ${fieldKey}:`, err);
+            }
+          }
+        }
+      }
+      specRangesRef.current = ranges;
+    } catch {
+      specMetaRef.current = [];
+      specRangesRef.current = {};
+    }
+  }, []);
+
+  // Helper: Process raw peripheral product from API into display-ready format
+  const processPeripheralProduct = useCallback((product, subcat) => ({
+    ...product,
+    subcategory: subcat,
+    image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.file_path || product.image),
+    price: product.price ? Number(product.price.toString().replaceAll(/[^\d.]/g, "")) : null,
+    details: product.details || product.description || "No details available",
+    specifications: product.specifications || product.specs || "No specifications provided"
+  }), []);
+
+  // Helper: Collect brand counts from a product array
+  const collectBrandCounts = useCallback((productList) => {
+    const counts = {};
+    for (const p of productList) {
+      if (p.brand) {
+        counts[p.brand] = (counts[p.brand] || 0) + 1;
+      }
+    }
+    return counts;
+  }, []);
+
+  // Helper: Fetch and filter peripheral products across all subcategories
+  // Helper: Fetch all peripheral subcategory products
+  const fetchAllPeripheralSubcats = useCallback(async () => {
+    const allProducts = [];
+    const allBrands = new Set();
+    let minPrice = Infinity, maxPrice = -Infinity;
+
+    for (const subcat of peripheralSubcategories) {
+      try {
+        const params = { category: subcat, page: 1, limit: 100 };
+        const response = await stockAPI.getItems(params);
+        const products = response.data?.data || response.data || [];
+        if (!Array.isArray(products)) continue;
+
+        const processed = products.map(product => processPeripheralProduct(product, subcat));
+        allProducts.push(...processed);
+
+        for (const p of processed) {
+          if (p.brand) allBrands.add(p.brand);
+          if (p.price > 0) { minPrice = Math.min(minPrice, p.price); maxPrice = Math.max(maxPrice, p.price); }
+        }
+      } catch (error) {
+        if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+          console.warn(`Failed to fetch ${subcat}:`, error.message);
+        }
+      }
+    }
+    return { allProducts, allBrands, minPrice, maxPrice };
+  }, [peripheralSubcategories, processPeripheralProduct]);
+
+  // Helper: Apply brand/price/sort filters to peripheral products
+  const applyPeripheralFilters = useCallback((products, brand, price, sort) => {
+    let filtered = [...products];
+    if (brand && brand !== '') {
+      filtered = filtered.filter(p => p.brand === brand);
+    }
+    if (price.min !== '' && !Number.isNaN(price.min)) {
+      filtered = filtered.filter(p => p.price >= Number(price.min));
+    }
+    if (price.max !== '' && !Number.isNaN(price.max)) {
+      filtered = filtered.filter(p => p.price <= Number(price.max));
+    }
+    filtered.sort((a, b) => {
+      if (sort.sort === 'name') {
+        const comparison = a.name.localeCompare(b.name);
+        return sort.order === 'DESC' ? -comparison : comparison;
+      }
+      return 0;
+    });
+    return filtered;
+  }, []);
+
+  const fetchPeripheralProducts = useCallback(async () => {
+    try {
+      const { allProducts, allBrands, minPrice, maxPrice } = await fetchAllPeripheralSubcats();
+
+      // Filter by active peripheral if selected
+      let filteredProducts = allProducts;
+      if (activePeripheral) {
+        filteredProducts = allProducts.filter(p => p.subcategory === activePeripheral);
+        const subcatBrandSet = new Set(filteredProducts.map(p => p.brand).filter(Boolean));
+        setAvailableBrands(Array.from(subcatBrandSet).sort((a, b) => a.localeCompare(b)));
+        setBrandCounts(collectBrandCounts(filteredProducts));
+        setTotalCategoryItems(allProducts.filter(p => p.subcategory === activePeripheral).length);
+      } else {
+        setAvailableBrands(Array.from(allBrands).sort((a, b) => a.localeCompare(b)));
+        setBrandCounts(collectBrandCounts(allProducts));
+        setTotalCategoryItems(allProducts.length);
+      }
+
+      filteredProducts = applyPeripheralFilters(filteredProducts, selectedBrand, selectedPrice, sortOrder);
+      setProducts(filteredProducts);
+
+      if (minPrice !== Infinity && maxPrice !== -Infinity) {
+        setPriceRange({ min: minPrice, max: maxPrice });
+      }
+    } catch (error) {
+      console.error("Error fetching peripheral products:", error);
+      setProducts([]);
+    }
+  }, [activePeripheral, selectedBrand, selectedPrice, sortOrder, fetchAllPeripheralSubcats, collectBrandCounts, applyPeripheralFilters]);
+
+  // Helper: Fetch and process products for a non-peripheral category
+  const fetchCategoryProducts = useCallback(async (backendCategory, selectedCategory) => {
+    try {
+      setIsLoading(true);
+      const params = buildQueryParams(backendCategory);
+      const filterKeys = Object.keys(params).filter(key => !['category', 'page', 'limit', 'sort', 'order'].includes(key));
+      const canUseCatalogBootstrap = filterKeys.length === 0
+        && params.sort === 'name'
+        && params.order === 'ASC';
+
+      if (canUseCatalogBootstrap) {
+        try {
+          const bootstrapResponse = await stockAPI.getCatalogBootstrap({
+            ...params,
+            includeSpecRanges: true
+          });
+          const bootstrapData = bootstrapResponse.data?.data || {};
+          const brands = Array.isArray(bootstrapData.brands) ? bootstrapData.brands : [];
+          const brandCountsFromBootstrap = {};
+          brands.forEach(brand => {
+            if (brand?.name) {
+              brandCountsFromBootstrap[brand.name] = brand.count || 0;
+            }
+          });
+
+          setAvailableBrands(brands.map(brand => brand.name).filter(Boolean));
+          setBrandCounts(brandCountsFromBootstrap);
+          setTotalCategoryItems(bootstrapData.totalItems || bootstrapData.pagination?.totalItems || 0);
+
+          if (bootstrapData.priceRange?.min != null && bootstrapData.priceRange?.max != null) {
+            setPriceRange({
+              min: bootstrapData.priceRange.min,
+              max: bootstrapData.priceRange.max
+            });
+          }
+
+          specMetaRef.current = Array.isArray(bootstrapData.specFields) ? bootstrapData.specFields : [];
+          specRangesRef.current = bootstrapData.specRanges || {};
+
+          const fetchedProducts = Array.isArray(bootstrapData.products)
+            ? bootstrapData.products
+            : extractProductsFromResponse(bootstrapResponse);
+          const updatedProducts = fetchedProducts.map(normalizeProduct);
+          setProducts(updatedProducts);
+          return;
+        } catch (bootstrapError) {
+          if (bootstrapError?.code !== 'ERR_CANCELED' && bootstrapError?.name !== 'CanceledError') {
+            console.warn(`Catalog bootstrap failed for ${backendCategory}; using stock endpoints`, bootstrapError.message);
+          }
+        }
+      }
+
+      // Fire brands, price range, and spec meta in parallel
+      Promise.allSettled([
+        fetchCategoryBrands(backendCategory),
+        fetchCategoryPriceRange(backendCategory),
+        fetchCategorySpecMeta(backendCategory)
+      ]);
+
+      const response = await stockAPI.getItems(params);
+      const fetchedProducts = extractProductsFromResponse(response);
+
+      if (fetchedProducts.length > 0) {
+        const updatedProducts = fetchedProducts.map(normalizeProduct);
+
+        setProducts(updatedProducts);
+      } else {
+        // Check brand filter issue
+        if (selectedBrand && selectedBrand !== '') {
+          try {
+            const allCategoryParams = { category: backendCategory, page: 1, limit: 200 };
+            const allCategoryResponse = await stockAPI.getItems(allCategoryParams);
+            const allProducts = extractProductsFromResponse(allCategoryResponse);
+
+            const availableBrandsInCategory = new Set(allProducts.map(p => p.brand).filter(Boolean));
+            if (!availableBrandsInCategory.has(selectedBrand)) {
+              setSelectedBrand('');
+            }
+          } catch (error) {
+            if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+              console.error("Error checking brand availability:", error);
+            }
+          }
+        }
+        setProducts([]);
+      }
+    } catch (error) {
+      if (error?.code !== 'ERR_CANCELED' && error?.name !== 'CanceledError') {
+        console.error("Error fetching products:", error);
+      }
+      setProducts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [buildQueryParams, selectedBrand, selectedComponents, fetchCategoryBrands, fetchCategoryPriceRange, fetchCategorySpecMeta]);
+
   //Function to identify the fetch products listed above
   useEffect(() => {
     if (menuItems.length > 0 && selectedItem >= 0 && selectedItem < menuItems.length) {
@@ -1757,312 +2224,21 @@ function PCParts() {
       const debounceTimer = setTimeout(() => {
 
       if (selectedCategory === 'Peripherals') {
-        // Special handling for peripherals - fetch all peripheral categories
-        const fetchPeripheralProducts = async () => {
-          try {
-            const allPeripheralProducts = [];
-            const allBrands = new Set();
-            let minPrice = Infinity, maxPrice = -Infinity;
-            
-            for (const subcat of peripheralSubcategories) {
-              try {
-                const params = { category: subcat, page: 1, limit: 100 };
-                const response = await stockAPI.getItems(params);
-                const products = response.data?.data || response.data || [];
-                
-                if (Array.isArray(products)) {
-                  const processedProducts = products.map(product => ({
-                    ...product,
-                    subcategory: subcat, // Mark subcategory
-                    image: api.utils.getFullImageUrl(product.image_url || product.image), // ✅ Fix peripheral image URL
-                    price: product.price ? Number(product.price.toString().replace(/[^\d.]/g, "")) : null,
-                    details: product.details || product.description || "No details available",
-                    specifications: product.specifications || product.specs || "No specifications provided"
-                  }));
-                  
-                  allPeripheralProducts.push(...processedProducts);
-                  
-                  // Collect brands and price ranges
-                  for (const p of processedProducts) {
-                    if (p.brand) allBrands.add(p.brand);
-                    if (p.price && p.price > 0) {
-                      minPrice = Math.min(minPrice, p.price);
-                      maxPrice = Math.max(maxPrice, p.price);
-                    }
-                  }
-                }
-              } catch (error) {
-                console.warn(`Failed to fetch ${subcat}:`, error.message);
-              }
-            }
-            
-            // Filter by active peripheral if selected
-            let filteredProducts = allPeripheralProducts;
-            if (activePeripheral) {
-              filteredProducts = allPeripheralProducts.filter(p => p.subcategory === activePeripheral);
-              
-              // Update brands and counts for specific subcategory
-              const subcatBrands = new Set();
-              const subcatBrandCounts = {};
-              filteredProducts.forEach(p => { 
-                if (p.brand) {
-                  subcatBrands.add(p.brand);
-                  subcatBrandCounts[p.brand] = (subcatBrandCounts[p.brand] || 0) + 1;
-                }
-              });
-              setAvailableBrands(Array.from(subcatBrands).sort());
-              setBrandCounts(subcatBrandCounts);
-              setTotalCategoryItems(allPeripheralProducts.filter(p => p.subcategory === activePeripheral).length);
-            } else {
-              // Count all brands across all peripherals
-              const allBrandCounts = {};
-              allPeripheralProducts.forEach(p => {
-                if (p.brand) {
-                  allBrandCounts[p.brand] = (allBrandCounts[p.brand] || 0) + 1;
-                }
-              });
-              setAvailableBrands(Array.from(allBrands).sort());
-              setBrandCounts(allBrandCounts);
-              setTotalCategoryItems(allPeripheralProducts.length);
-            }
-            
-            // Apply other filters
-            if (selectedBrand && selectedBrand !== '') {
-              filteredProducts = filteredProducts.filter(p => p.brand === selectedBrand); // ✅ FIXED: Single brand filtering
-            }
-            
-            if (selectedPrice.min !== '' && !isNaN(selectedPrice.min)) {
-              filteredProducts = filteredProducts.filter(p => p.price >= Number(selectedPrice.min));
-            }
-            
-            if (selectedPrice.max !== '' && !isNaN(selectedPrice.max)) {
-              filteredProducts = filteredProducts.filter(p => p.price <= Number(selectedPrice.max));
-            }
-            
-            // Sort
-            filteredProducts.sort((a, b) => {
-              if (sortOrder.sort === 'name') {
-                const comparison = a.name.localeCompare(b.name);
-                return sortOrder.order === 'DESC' ? -comparison : comparison;
-              }
-              return 0;
-            });
-            
-            setProducts(filteredProducts);
-            
-            if (minPrice !== Infinity && maxPrice !== -Infinity) {
-              setPriceRange({ min: minPrice, max: maxPrice });
-              if (selectedPrice.min === '' && selectedPrice.max === '') {
-                setSelectedPrice({ min: minPrice, max: maxPrice });
-              }
-            }
-            
-          } catch (error) {
-            console.error("Error fetching peripheral products:", error);
-            setProducts([]);
-          }
-        };
-        
         fetchPeripheralProducts();
-        
+
       } else if (backendCategory) {
         console.log("Fetching products for category:", selectedCategory, "->", backendCategory);
-
-        // Use API call instead of static data
-        const fetchProducts = async () => {
-          try {
-            // Set loading state for UI feedback
-            setIsLoading(true);
-            // Fetch brands with counts for category
-            stockAPI.getBrandsWithCounts(backendCategory)
-              .then(res => {
-                const data = res.data?.data || {};
-                const brands = data.brands || [];
-                setAvailableBrands(brands.map(b => b.name));
-                
-                // Create brand counts object
-                const counts = {};
-                brands.forEach(brand => {
-                  counts[brand.name] = brand.count;
-                });
-                setBrandCounts(counts);
-                setTotalCategoryItems(data.totalItems || 0);
-              })
-              .catch(() => {
-                setAvailableBrands([]);
-                setBrandCounts({});
-                setTotalCategoryItems(0);
-              });
-
-            // Fetch price range for category
-            stockAPI.getPriceRange(backendCategory)
-              .then(res => {
-                const data = (res.data && res.data.data) || res.data || {};
-                if (data.min != null && data.max != null) {
-                  setPriceRange({ min: data.min, max: data.max });
-                  if (selectedPrice.min === '' && selectedPrice.max === '') {
-                    setSelectedPrice({ min: data.min, max: data.max });
-                  }
-                }
-              })
-              .catch((error) => {
-                console.warn(`Failed to fetch price range for ${backendCategory}:`, error.message);
-                // Use default price range on error
-                setPriceRange({ min: 0, max: 100000 });
-              });
-
-            // Fetch specification meta
-            stockAPI.getPartMeta(backendCategory)
-              .then(async (res) => {
-                const fields = (res.data && res.data.data && res.data.data.fields) || [];
-                setSpecMeta(fields);
-                
-                // Fetch ranges for numeric specification fields
-                const ranges = {};
-                for (const field of fields) {
-                  const fieldKey = field.field_name || field.name;
-                  const fieldType = field.field_type || field.type || 'text';
-                  
-                  if (fieldType === 'number') {
-                    try {
-                      const rangeRes = await stockAPI.getSpecRange(backendCategory, fieldKey);
-                      const rangeData = rangeRes.data && rangeRes.data.data ? rangeRes.data.data : rangeRes.data;
-                      if (rangeData && rangeData.min != null && rangeData.max != null) {
-                        ranges[fieldKey] = {
-                          min: rangeData.min,
-                          max: rangeData.max,
-                          totalItems: rangeData.totalItems || 0
-                        };
-                      }
-                    } catch (error) {
-                      console.warn(`Failed to fetch range for ${fieldKey}:`, error);
-                    }
-                  }
-                }
-                setSpecRanges(ranges);
-              })
-              .catch(() => {
-                setSpecMeta([]);
-                setSpecRanges({});
-              });
-
-            const params = buildQueryParams(backendCategory);
-            console.log("🔍 Fetching products with params:", params);
-            const response = await stockAPI.getItems(params);
-            console.log("API Response:", response);
-            
-            // ✅ Better handling of different response structures
-            let fetchedProducts = [];
-            
-            if (response && response.data) {
-              if (Array.isArray(response.data.data)) {
-                fetchedProducts = response.data.data;
-              } else if (Array.isArray(response.data.products)) {
-                fetchedProducts = response.data.products;
-              } else if (Array.isArray(response.data)) {
-                fetchedProducts = response.data;
-              } else if (response.data.results && Array.isArray(response.data.results)) {
-                fetchedProducts = response.data.results;
-              }
-            } else if (Array.isArray(response)) {
-              fetchedProducts = response;
-            }
-            
-            console.log("🔄 Processed fetchedProducts:", fetchedProducts.length, "items");
-            
-            // ✅ Ensure we have an array before mapping
-            if (Array.isArray(fetchedProducts) && fetchedProducts.length > 0) {
-              const updatedProducts = fetchedProducts.map(product => {
-                // 🔥 CRITICAL FIX: Handle NULL/empty descriptions and specifications
-                const productDescription = product.details || product.description;
-                const productSpecs = product.specifications || product.specs;
-                
-                return {
-                  ...product,
-                  image: api.utils.getFullImageUrl(product.image_url || product.image), // ✅ Fix image URL
-                  price: product.price
-                    ? Number(product.price.toString().replace(/[^\d.]/g, "")) // ✅ Extracts only numbers
-                    : null,  // ✅ Use null for unavailable prices
-                  details: productDescription && productDescription !== '' 
-                    ? productDescription 
-                    : "No details available",
-                  // 🔥 CRITICAL: Handle specifications - keep object if valid, fallback to string if null/empty
-                  specifications: productSpecs != null && productSpecs !== '' 
-                    ? (typeof productSpecs === 'object' && Object.keys(productSpecs).length === 0 
-                        ? "No specifications provided" 
-                        : productSpecs)
-                    : "No specifications provided"
-                };
-              });
-
-              // ✅ STEP-BY-STEP COMPATIBILITY FILTERING
-              // Apply compatibility filtering based on already-selected components
-              let filteredProducts = updatedProducts;
-              if (Object.keys(selectedComponents).length > 0) {
-                console.log(`🔧 Applying compatibility filtering for category "${selectedCategory}" with ${Object.keys(selectedComponents).length} selected components`);
-                filteredProducts = filterCompatibleProducts(updatedProducts, selectedComponents, selectedCategory);
-                
-                const filteredCount = filteredProducts.length;
-                const totalCount = updatedProducts.length;
-                if (filteredCount < totalCount) {
-                  console.log(`✅ Compatibility filter: ${filteredCount}/${totalCount} products are compatible`);
-                }
-              }
-
-              console.log("✅ Setting products:", filteredProducts.length, "items for category:", selectedCategory);
-              setProducts(filteredProducts);
-            } else {
-              console.warn("⚠️ No valid products found in API response for category:", selectedCategory);
-              // Check if this is a brand filter issue - IMPROVED HANDLING
-              if (selectedBrand && selectedBrand !== '') {
-                console.log("🔍 Brand filter applied but no results. Checking brand availability...");
-                // Try fetching all products for category to verify brand exists
-                try {
-                  const allCategoryParams = { category: backendCategory, page: 1, limit: 200 };
-                  const allCategoryResponse = await stockAPI.getItems(allCategoryParams);
-                  const allProducts = allCategoryResponse.data?.data || allCategoryResponse.data || [];
-                  
-                  if (Array.isArray(allProducts)) {
-                    const availableBrandsInCategory = new Set();
-                    allProducts.forEach(p => {
-                      if (p.brand) availableBrandsInCategory.add(p.brand);
-                    });
-                    
-                    if (!availableBrandsInCategory.has(selectedBrand)) {
-                      console.warn(`❌ Brand "${selectedBrand}" not available in category "${selectedCategory}". Available brands:`, Array.from(availableBrandsInCategory));
-                      // Auto-clear invalid brand selection
-                      setSelectedBrand('');
-                    } else {
-                      console.warn(`⚠️ Brand "${selectedBrand}" exists but no active/visible products found`);
-                    }
-                  }
-                } catch (error) {
-                  console.error("Error checking brand availability:", error);
-                }
-              }
-              setProducts([]);
-            }
-          } catch (error) {
-            console.error("Error fetching products:", error);
-            console.log("Using empty array instead of fallback for category:", selectedCategory);
-            // Don't fallback to static data, use empty array to force real data only
-            setProducts([]);
-          } finally {
-            // Clear loading state
-            setIsLoading(false);
-          }
-        };
-
-        fetchProducts();
+        fetchCategoryProducts(backendCategory, selectedCategory);
       } else {
         // For home category or unmapped categories, show empty
         setProducts([]);
       }
-      
+
       }, 150); // 150ms debounce for category switches (faster response)
-      
+
       return () => clearTimeout(debounceTimer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItem, selectedBrand, selectedPrice.min, selectedPrice.max, specFilters, sortOrder, activePeripheral, buildQueryParams, peripheralSubcategories, selectedComponents]); // ✅ Added selectedComponents for compatibility filtering
 
   // 🔥 NEW: Extract top 5 specification filters from current products
@@ -2082,7 +2258,7 @@ function PCParts() {
     // Extract top specs using utility
     const topSpecFilters = extractTopSpecFilters(products, selectedCategory);
     setAvailableSpecFilters(topSpecFilters);
-    
+
     console.log(`🔍 Top spec filters for ${selectedCategory}:`, topSpecFilters);
   }, [products, selectedItem]);
 
@@ -2090,14 +2266,14 @@ function PCParts() {
   useEffect(() => {
     // ✅ FIX: Always re-check cart on every render and category change
     const cartItems = JSON.parse(localStorage.getItem("cart")) || [];
-    
+
     // 🧹 CLEANUP: Remove null/undefined items from cart permanently
     const cleanedCart = cartItems.filter(item => item !== null && item !== undefined);
     if (cleanedCart.length !== cartItems.length) {
       console.log(`🧹 Cleaned cart: removed ${cartItems.length - cleanedCart.length} null items`);
       localStorage.setItem("cart", JSON.stringify(cleanedCart));
     }
-    
+
     const nonPeripheralItems = cleanedCart.filter(item => {
       if (!item) return false; // 🔥 FIX: Skip null/undefined items (redundant but safe)
       const cat = item.category || '';
@@ -2126,26 +2302,26 @@ function PCParts() {
         const contextTime = new Date(context.timestamp).getTime();
         const age = now - contextTime;
         const ageSeconds = Math.floor(age / 1000);
-        
+
         // 🔥 ROOT CAUSE FIX #2: Add debug logging for timestamp issues
         console.log('🕐 Context timestamp check:', {
           now,
           contextTime,
-          contextTimeValid: !isNaN(contextTime),
+          contextTimeValid: !Number.isNaN(contextTime),
           age,
           ageSeconds,
           timestamp: context.timestamp,
           expiresIn: Math.floor((10 * 60 * 1000 - age) / 1000) + 's'
         });
-        
+
         // 🔥 ROOT CAUSE FIX #3: Handle invalid timestamps gracefully
-        if (isNaN(contextTime)) {
+        if (Number.isNaN(contextTime)) {
           console.error('❌ Invalid timestamp in context, removing:', context.timestamp);
           localStorage.removeItem('selectedComponentContext');
           setCompatibilityContext(null);
           return;
         }
-        
+
         // 🔥 ROOT CAUSE FIX #4: Handle negative age (future timestamps)
         if (age < 0) {
           console.warn('⚠️ Context timestamp is in the future, treating as fresh:', context.timestamp);
@@ -2153,12 +2329,12 @@ function PCParts() {
           console.log('✅ Detected compatibility context (future timestamp):', context);
           return;
         }
-        
+
         // ✅ FIX: Context never expires - only clears when cart is emptied
         // This ensures compatibility badges persist indefinitely while shopping
         setCompatibilityContext(context);
         console.log('✅ Detected compatibility context:', context, `(age: ${ageSeconds}s, never expires)`);
-        
+
         // Note: Context will be cleared automatically when cart is emptied
         // See the cart change listener and "Cancel Order" / "Start Over" handlers
       } catch (error) {
@@ -2200,7 +2376,7 @@ function PCParts() {
     };
 
     // Listen for storage events from other tabs/windows
-    window.addEventListener('storage', handleStorageChange);
+    globalThis.addEventListener('storage', handleStorageChange);
 
     // ✅ FIX: Removed setInterval polling - causes infinite loop
     // Cart updates are handled via:
@@ -2209,7 +2385,7 @@ function PCParts() {
     // 3. cartUpdated custom event dispatched after cart modifications
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      globalThis.removeEventListener('storage', handleStorageChange);
     };
   }, [cartItemsCount]);
 
@@ -2224,7 +2400,7 @@ function PCParts() {
       }
       return;
     }
-    
+
     if (!products || products.length === 0) {
       // Don't clear existing scores, just skip fetching
       console.log('⚠️ No products to analyze - keeping existing scores');
@@ -2234,67 +2410,11 @@ function PCParts() {
     const fetchCompatibilityScores = async () => {
       setIsLoadingCompatibility(true);
       try {
-        console.log('🔍 Fetching AI compatibility scores for', products.length, 'products...');
-        
+        console.log('Fetching deterministic compatibility scores for', products.length, 'products...');
+
         // Get all cart items for comprehensive compatibility analysis
         const cartItems = JSON.parse(localStorage.getItem("cart")) || [];
-        
-        // ✅ CRITICAL FIX: Infer category from product name for legacy cart items
-        let cartModified = false;
-        cartItems.forEach((item, index) => {
-          if (!item) return; // 🔥 FIX: Skip null/undefined items
-          if (!item.category) {
-            const name = (item.name || item.product_name || '').toLowerCase();
-            let inferredCategory = null;
-            
-            // Infer category from product name patterns
-            if (name.includes('ryzen') || name.includes('intel') || name.includes('processor') || name.includes('core i')) {
-              inferredCategory = 'CPU';
-            } else if (name.includes('motherboard') || name.includes('mobo') || name.includes('b550') || name.includes('b650') || name.includes('b850') || name.includes('x670') || name.includes('z790')) {
-              inferredCategory = 'Motherboard';
-            } else if (name.includes('rtx') || name.includes('gtx') || name.includes('radeon') || name.includes('gpu') || name.includes('graphics')) {
-              inferredCategory = 'GPU';
-            } else if ((name.includes('ram') || name.includes('memory') || name.includes('ddr')) && !name.includes('storage') && !name.includes('ssd')) {
-              inferredCategory = 'RAM';
-            } else if (name.includes('ssd') || name.includes('hdd') || name.includes('nvme') || name.includes('storage') || name.includes('tb') || name.includes('gb')) {
-              inferredCategory = 'Storage';
-            } else if (name.includes('psu') || name.includes('power supply') || name.includes('watt') || name.includes('80+')) {
-              inferredCategory = 'PSU';
-            } else if (name.includes('case') || name.includes('chassis') || name.includes('tower')) {
-              inferredCategory = 'Case';
-            } else if (name.includes('cooler') || name.includes('cooling') || name.includes('aio') || name.includes('fan')) {
-              inferredCategory = 'Cooling';
-            }
-            
-            if (inferredCategory) {
-              console.log('✅ Inferred category:', inferredCategory, 'for', item.name || item.product_name);
-              item.category = inferredCategory;
-              cartModified = true;
-            } else {
-              console.warn('⚠️ Could not infer category for:', item.name || item.product_name);
-            }
-          }
-        });
-        
-        // Update localStorage if any categories were inferred
-        if (cartModified) {
-          localStorage.setItem("cart", JSON.stringify(cartItems));
-          console.log('✅ Cart updated with inferred categories');
-        }
-        
-        // ✅ CRITICAL FIX: Filter non-peripheral items and validate category field
-        const nonPeripheralCart = cartItems.filter(item => {
-          if (!item) return false; // 🔥 FIX: Skip null/undefined items
-          const cat = item.category || '';
-          return !['Mouse', 'Keyboard', 'Headphones', 'Speakers', 'Webcam'].includes(cat);
-        }).filter(item => {
-          // Ensure each item has a category field
-          if (!item.category) {
-            console.warn('⚠️ Cart item still missing category after inference:', item.name || item.product_name, '- Skipping');
-            return false; // Filter out items without category
-          }
-          return true;
-        });
+        const nonPeripheralCart = prepareCartForCompatibility(cartItems);
 
         console.log('🛒 Analyzing compatibility with', nonPeripheralCart.length, 'cart items');
 
@@ -2308,7 +2428,7 @@ function PCParts() {
 
         // ✅ CRITICAL FIX: Get current viewing category to match against products
         const currentViewingCategory = menuItems[selectedItem]?.category;
-        
+
         console.log('🔍 Current viewing category:', currentViewingCategory);
         console.log('🛒 Cart items categories:', nonPeripheralCart.map(item => item.category).join(', '));
         console.log('📦 Total products in view:', products.length);
@@ -2316,7 +2436,7 @@ function PCParts() {
         // ✅ CRITICAL FIX: Check if viewing same category as any cart item
         const cartCategories = nonPeripheralCart.map(item => item.category);
         const isViewingSameCategoryAsCart = cartCategories.includes(currentViewingCategory);
-        
+
         if (isViewingSameCategoryAsCart) {
           console.log('⚠️ Viewing same category as cart item - no compatibility analysis needed');
           // 🔥 ROOT CAUSE FIX #2: Don't clear scores when viewing same category!
@@ -2325,102 +2445,28 @@ function PCParts() {
           return;
         }
 
-        // ✅ FIX: Call the compatibility analyze endpoint for each cart item
-        // This endpoint returns compatible products per category using Ollama DeepSeek R1
-        console.log('🤖 Calling AI compatibility analysis for', nonPeripheralCart.length, 'cart items');
+        // Call the deterministic batch endpoint once for the current product list
+        console.log('Calling deterministic compatibility analysis for', nonPeripheralCart.length, 'cart items');
         console.log('📦 Current viewing category:', currentViewingCategory);
         console.log('🔍 Products in current view:', products.length);
-        
+
         const scores = {};
-        
-        // ✅ CRITICAL FIX: Get ALL products in current viewing category for AI analysis
-        // Don't just rely on the 1 product AI returns - analyze ALL products in this category
+
         try {
-          // Import axios for direct API call
-          const axios = (await import('axios')).default;
-          const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:5000'
-            : `http://${window.location.hostname}:5000`;
-          
-          // Call the bulk compatibility analysis endpoint with ALL products in current view
-          const response = await axios.post(`${baseURL}/api/compatibility/analyze-bulk`, {
-            cartItems: nonPeripheralCart.map(item => ({
-              id: item.id,
-              name: item.name || item.product_name,
-              category: item.category,
-              brand: item.brand,
-              price: item.price,
-              specifications: item.specifications || {},
-              tier: item.tier || 'unknown'
-            })),
-            targetProducts: products.map(p => ({
-              id: p.id,
-              name: p.name,
-              category: p.category,
-              brand: p.brand,
-              price: p.price,
-              specifications: p.specifications || {},
-              tier: p.tier || 'unknown'
-            })),
-            currentCategory: currentViewingCategory
-          });
-
-          if (response.data && response.data.success && response.data.scores) {
-            // Directly use the scores returned by AI for all products
-            const aiScores = response.data.scores;
-            Object.keys(aiScores).forEach(productId => {
-              scores[productId] = aiScores[productId];
-            });
-            console.log('✅ AI Bulk Compatibility scores loaded:', Object.keys(scores).length, 'products scored');
-          } else {
-            console.warn('⚠️ Bulk API not available, falling back to single-product analysis');
-            
-            // FALLBACK: Use the old method if bulk endpoint doesn't exist
-            for (const cartItem of nonPeripheralCart) {
-              try {
-                const response = await axios.post(`${baseURL}/api/compatibility/analyze`, {
-                  currentProduct: {
-                    id: cartItem.id,
-                    name: cartItem.name || cartItem.product_name,
-                    category: cartItem.category,
-                    brand: cartItem.brand,
-                    price: cartItem.price,
-                    specifications: cartItem.specifications || {},
-                    tier: cartItem.tier || 'unknown'
-                  },
-                  excludeCategories: [] // Don't exclude any categories
-                });
-
-                if (response.data && response.data.success && response.data.data) {
-                  // ✅ CRITICAL FIX: Process each compatible product returned by AI
-                  response.data.data.forEach(compatible => {
-                    // Match products in current viewing category only
-                    const isInCurrentCategory = compatible.category === currentViewingCategory;
-                    const isInProductsList = products.some(p => p.id === compatible.id);
-                    
-                    if (isInCurrentCategory && isInProductsList) {
-                      // Use the compatibility_score from AI (0-100)
-                      const existingScore = scores[compatible.id] || 0;
-                      const newScore = compatible.compatibility_score || 75;
-                      // Take the maximum score if multiple cart items are compatible
-                      scores[compatible.id] = Math.max(existingScore, newScore);
-                    }
-                  });
-                }
-              } catch (err) {
-                console.warn(`Failed to check compatibility for cart item ${cartItem.name}:`, err.message);
-                // Continue with other cart items
-              }
-            }
-          }
+          const apiScores = await fetchCompatibilityFromAPI(nonPeripheralCart, products, currentViewingCategory);
+          Object.assign(scores, apiScores);
         } catch (error) {
-          console.error('❌ Failed to fetch AI compatibility scores:', error);
+          if (!isCanceledRequest(error)) {
+            console.error('Failed to fetch deterministic compatibility scores:', error);
+          }
         }
 
         setCompatibilityScores(scores);
-        console.log('✅ AI Compatibility scores loaded:', Object.keys(scores).length, 'products analyzed from', nonPeripheralCart.length, 'cart items');
+        console.log('Deterministic compatibility scores loaded:', Object.keys(scores).length, 'products analyzed from', nonPeripheralCart.length, 'cart items');
       } catch (error) {
-        console.error('❌ Failed to fetch AI compatibility scores:', error);
+        if (!isCanceledRequest(error)) {
+          console.error('Failed to fetch deterministic compatibility scores:', error);
+        }
         // 🔥 ROOT CAUSE FIX #2: Don't clear scores on error - keep existing ones
         // This prevents badges from disappearing if a single API call fails
         console.log('⚠️ Keeping existing compatibility scores due to API error');
@@ -2446,36 +2492,36 @@ function PCParts() {
     if (compatibilityContext && Object.keys(compatibilityScores).length > 0) {
       // 🔴 CRITICAL: Define compatibility threshold (60 = acceptable, 85 = good)
       const COMPATIBILITY_THRESHOLD = 60;
-      
+
       // Separate products by compatibility score
       const compatibleProducts = sorted.filter(p => {
         const score = compatibilityScores[p.id] || 0;
         return score >= COMPATIBILITY_THRESHOLD; // Only truly compatible products
       });
-      
+
       const marginalProducts = sorted.filter(p => {
         const score = compatibilityScores[p.id] || 0;
         return score > 0 && score < COMPATIBILITY_THRESHOLD; // May work but not recommended
       });
-      
+
       const unscored = sorted.filter(p => {
         const score = compatibilityScores[p.id] || 0;
         return score === 0; // Products with no score (unchecked)
       });
-      
+
       // Sort compatible products by score (highest first)
       compatibleProducts.sort((a, b) => {
         const scoreA = compatibilityScores[a.id] || 0;
         const scoreB = compatibilityScores[b.id] || 0;
         return scoreB - scoreA;
       });
-      
+
       marginalProducts.sort((a, b) => {
         const scoreA = compatibilityScores[a.id] || 0;
         const scoreB = compatibilityScores[b.id] || 0;
         return scoreB - scoreA;
       });
-      
+
       // 🔥 CRITICAL FIX: Respect hideIncompatible toggle
       if (hideIncompatible) {
         // HIDE incompatible products (score < 60)
@@ -2510,196 +2556,151 @@ function PCParts() {
   const shuffleArray = (array) => array.sort(() => Math.random() - 1);
 
 
-  //Function for the HotPicks and ValueForMoney (Real AI Integration with DeepSeek R1 1.5B)
+  //Function for the HotPicks and ValueForMoney (offline deterministic)
   useEffect(() => {
-    const fetchAIHomepageProducts = async () => {
+    const applyHomepageProducts = (homepage) => {
+      const onSalePicks = (homepage.onSale || [])
+        .map(normalizeSalePick)
+        .filter(Boolean)
+        .slice(0, 8);
+
+      const hotPicks = (homepage.hotPicks || [])
+        .map(product => normalizeHomepagePick(product, 'reason', 'Local stock pick'))
+        .slice(0, 8);
+
+      const valuePicks = (homepage.valueForMoney || [])
+        .map(product => normalizeHomepagePick(product, 'reason', 'Local value pick'))
+        .slice(0, 8);
+
+      if (onSalePicks.length > 0) {
+        setRandomOnSale(onSalePicks);
+      }
+
+      if (hotPicks.length > 0 || valuePicks.length > 0) {
+        setRandomHotPicks(hotPicks);
+        setRandomValueForMoney(valuePicks.length ? valuePicks : hotPicks);
+        return true;
+      }
+
+      return false;
+    };
+
+    const fetchHomepageProducts = async () => {
       try {
-        console.log('🔥🤖 Fetching AI-powered Hot Picks and Value for Money using DeepSeek R1 1.5B...');
-        
-        // First, fetch all available products from database
-        const allCategoriesProducts = [];
-        
-        // Get products from major categories for AI analysis
-        const majorCategories = ['CPU', 'GPU', 'RAM', 'Motherboard', 'Storage', 'PSU'];
-        
-        for (const category of majorCategories) {
-          try {
-            const response = await stockAPI.getItems({ 
-              category, 
-              page: 1, 
-              limit: 20,
-              sort: 'popularity',
-              order: 'DESC'
-            });
-            const categoryProducts = response.data?.data || response.data || [];
-            if (Array.isArray(categoryProducts)) {
-              allCategoriesProducts.push(...categoryProducts.map(product => ({
-                ...product,
-                image: api.utils.getFullImageUrl(product.image_url || product.image),
-                price: parseFloat(product.price || 0),
-                category: category,
-                stock: product.stock || 0,
-                brand: product.brand || 'Unknown'
-              })));
-            }
-          } catch (error) {
-            console.warn(`⚠️ Failed to fetch ${category} products:`, error);
-          }
+        if (cachedHomepageProducts && applyHomepageProducts(cachedHomepageProducts)) {
+          return;
         }
-        
-        console.log(`📦 Total products for AI analysis: ${allCategoriesProducts.length}`);
-        
-        if (allCategoriesProducts.length > 0) {
-          // Generate AI-powered Hot Picks (using public kiosk endpoint - no auth required)
-          console.log('🔥🤖 Generating AI Hot Picks with DeepSeek R1 1.5B...');
-          const hotPicksResponse = await aiService.getKioskHotPicks(
-            allCategoriesProducts, 
-            100000, // ₱100k budget
-            { 
-              currentTrends: 'Gaming, Content Creation, Budget Builds',
-              maxRecommendations: 8,
-              analysisType: 'hot_picks'
-            }
-          );
-          
-          // Generate AI-powered Value for Money (using public kiosk endpoint - no auth required)
-          console.log('💰🤖 Generating AI Value for Money with DeepSeek R1 1.5B...');
-          const valueResponse = await aiService.getKioskHotPicks(
-            allCategoriesProducts,
-            100000, // ₱100k budget
-            { 
-              marketConditions: 'Philippine market, Import costs considered',
-              maxRecommendations: 8,
-              analysisType: 'value_for_money'
-            }
-          );
-          
-          // Set AI-powered recommendations
-          console.log('🔍 Hot Picks Response:', JSON.stringify(hotPicksResponse.data, null, 2));
-          console.log('🔍 Value Response:', JSON.stringify(valueResponse.data, null, 2));
-          
-          if (hotPicksResponse.data?.recommendations?.length > 0) {
-            const aiHotPicks = hotPicksResponse.data.recommendations.map(pick => ({
-              ...pick,
-              id: pick.id || pick.componentId,
-              image: api.utils.getFullImageUrl(pick.imageUrl || pick.image_url || pick.image),
-              price: typeof pick.price === 'string' ? pick.price : `₱${parseFloat(pick.price || 0).toLocaleString()}`,
-              aiAnalysis: pick.trendingReason || pick.analysis || pick.reason || 'Popular item'
-            }));
-            setRandomHotPicks(aiHotPicks);
-            console.log('🔥✅ AI Hot Picks set:', aiHotPicks.length, 'items');
-          } else {
-            console.warn('⚠️ Hot picks response is empty or invalid:', hotPicksResponse.data);
-          }
-          
-          if (valueResponse.data?.recommendations?.length > 0) {
-            const aiValuePicks = valueResponse.data.recommendations.map(pick => ({
-              ...pick,
-              id: pick.id || pick.componentId,
-              image: api.utils.getFullImageUrl(pick.imageUrl || pick.image_url || pick.image),
-              price: typeof pick.price === 'string' ? pick.price : `₱${parseFloat(pick.price || 0).toLocaleString()}`,
-              aiAnalysis: pick.valueReason || pick.reason || 'Great value'
-            }));
-            setRandomValueForMoney(aiValuePicks);
-            console.log('💰✅ AI Value for Money set:', aiValuePicks.length, 'items');
-          } else {
-            console.warn('⚠️ Value for Money response is empty or invalid:', valueResponse.data);
-          }
-          
-        } else {
-          console.warn('⚠️ No products available for AI analysis, using fallback');
-          
-          // Fallback: try to get featured products if AI fails
-          try {
-            const response = await kioskAPI.getFeaturedProducts();
-            const fallbackProducts = response.data?.data || [];
-            
-            if (fallbackProducts.length > 0) {
-              const shuffledProducts = shuffleArray([...fallbackProducts]);
-              setRandomHotPicks(shuffledProducts.slice(0, 8));
-              setRandomValueForMoney(shuffledProducts.slice(8, 16));
-              console.log('🔄 Using fallback featured products');
-            }
-          } catch (fallbackError) {
-            console.error('❌ Fallback also failed:', fallbackError);
-            setRandomHotPicks([]);
-            setRandomValueForMoney([]);
-          }
+
+        const homepage = await realtimeKioskAPI.getHomepageProducts(8);
+        cachedHomepageProducts = homepage;
+        if (applyHomepageProducts(homepage)) {
+          return;
         }
-        
+
+        const fallback = shuffleArray(await fetchFeaturedFallback());
+        const fallbackHomepage = {
+          onSale: [],
+          hotPicks: fallback.slice(0, 8),
+          valueForMoney: fallback.slice(8, 16)
+        };
+        cachedHomepageProducts = fallbackHomepage;
+        applyHomepageProducts(fallbackHomepage);
       } catch (error) {
-        console.error('❌ Error in AI homepage products fetch:', error);
-        
-        // Final fallback: try basic featured products
+        console.warn('Error loading homepage product picks:', error);
         try {
-          console.log('� Attempting final fallback to featured products...');
-          const response = await kioskAPI.getFeaturedProducts();
-          const fallbackProducts = response.data?.data || [];
-          
-          if (fallbackProducts.length > 0) {
-            const processedProducts = fallbackProducts.map(product => ({
-              ...product,
-              image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.image),
-              price: `₱${parseFloat(product.effectivePrice || product.price || 0).toLocaleString()}`
-            }));
-            
-            const shuffledProducts = shuffleArray([...processedProducts]);
-            setRandomHotPicks(shuffledProducts.slice(0, 8));
-            setRandomValueForMoney(shuffledProducts.slice(8, 16));
-            console.log('🔄 Final fallback successful');
-          } else {
-            setRandomHotPicks([]);
-            setRandomValueForMoney([]);
-          }
-        } catch (finalError) {
-          console.error('❌ All attempts failed:', finalError);
+          const fallback = shuffleArray(await fetchFeaturedFallback());
+          const fallbackHomepage = {
+            onSale: [],
+            hotPicks: fallback.slice(0, 8),
+            valueForMoney: fallback.slice(8, 16)
+          };
+          cachedHomepageProducts = fallbackHomepage;
+          applyHomepageProducts(fallbackHomepage);
+        } catch {
           setRandomHotPicks([]);
           setRandomValueForMoney([]);
         }
       }
     };
 
-    fetchAIHomepageProducts();
+    if (cachedHomepageProducts && applyHomepageProducts(cachedHomepageProducts)) {
+      homepageProductsLoadedRef.current = true;
+      return;
+    }
+
+    if (homepageProductsLoadedRef.current || homepageProductsScheduledRef.current) {
+      return;
+    }
+
+    homepageProductsScheduledRef.current = true;
+    let timerStarted = false;
+    const loadTimer = setTimeout(() => {
+      timerStarted = true;
+      homepageProductsLoadedRef.current = true;
+      fetchHomepageProducts();
+    }, 0);
+
+    return () => {
+      clearTimeout(loadTimer);
+      if (!timerStarted && !cachedHomepageProducts) {
+        homepageProductsScheduledRef.current = false;
+        homepageProductsLoadedRef.current = false;
+      }
+    };
   }, []); // Only run once on mount
 
   // Real-time On Sale products fetch (NEW)
   useEffect(() => {
+    if (homepageProductsLoadedRef.current || homepageProductsScheduledRef.current) {
+      return undefined;
+    }
+
     const fetchOnSaleProducts = async () => {
+      onSaleRequestRef.current?.abort();
+      const controller = new AbortController();
+      onSaleRequestRef.current = controller;
+
       try {
-        console.log('🛒 Fetching real-time On Sale products...');
-        const response = await kioskAPI.getOnSaleProducts();
-        
-        console.log('🛒 On Sale API Response:', response.data);
-        
-        if (response.data?.success && response.data.data) {
-          console.log('✅ On Sale products fetched:', response.data.data.length, 'products');
-          const processedProducts = response.data.data.map(product => {
-            const originalPrice = parseFloat(product.price || 0);
-            const salePrice = parseFloat(product.salePrice || product.sale_price || product.effectivePrice || 0);
-            const discountPercent = originalPrice > 0 && salePrice > 0 && salePrice < originalPrice 
-              ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-              : 0;
-              
-            return {
-              ...product,
-              image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.image),
-              originalPrice: originalPrice,
-              salePrice: salePrice,
-              discountPercent: discountPercent,
-              price: `₱${salePrice.toLocaleString()}`,
-              formattedOriginalPrice: `₱${originalPrice.toLocaleString()}`,
-              formattedSalePrice: `₱${salePrice.toLocaleString()}`
-            };
-          });
-          setRandomOnSale(processedProducts);
-        } else {
-          console.warn('⚠️ No On Sale products found or invalid response');
+        console.log('Fetching real-time On Sale products...');
+        const saleProducts = await realtimeKioskAPI.getOnSaleProducts(8, { signal: controller.signal });
+
+        if (controller.signal.aborted) return;
+
+        if (!saleProducts.length) {
           setRandomOnSale([]);
+          return;
         }
+
+        const processedProducts = saleProducts.map(product => {
+          const normalizedSalePick = normalizeSalePick(product);
+          if (normalizedSalePick) return normalizedSalePick;
+          const originalPrice = toNumericPrice(product.price);
+          const salePrice = toNumericPrice(product.salePrice || product.sale_price || product.effectivePrice || product.price);
+          const discountPercent = originalPrice > 0 && salePrice > 0 && salePrice < originalPrice
+            ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
+            : 0;
+
+          return {
+            ...product,
+            image: api.utils.getFullImageUrl(product.imageUrl || product.image_url || product.file_path || product.image),
+            originalPrice,
+            salePrice,
+            discountPercent,
+            price: `₱${salePrice.toLocaleString()}`,
+            formattedOriginalPrice: `₱${originalPrice.toLocaleString()}`,
+            formattedSalePrice: `₱${salePrice.toLocaleString()}`
+          };
+        });
+        setRandomOnSale(processedProducts);
       } catch (error) {
-        console.error('❌ Error fetching On Sale products:', error);
-        // Fallback to empty array on error
+        if (!isCanceledRequest(error)) {
+          console.error('Error fetching On Sale products:', error);
+        }
         setRandomOnSale([]);
+      } finally {
+        if (onSaleRequestRef.current === controller) {
+          onSaleRequestRef.current = null;
+        }
       }
     };
 
@@ -2708,108 +2709,46 @@ function PCParts() {
     // Set up interval to refresh On Sale products every 5 minutes for real-time updates
     const interval = setInterval(fetchOnSaleProducts, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      onSaleRequestRef.current?.abort();
+      clearInterval(interval);
+    };
   }, []);
 
-  // Debug: Log state changes to track AI-powered recommendations
+  // Debug: Log state changes to track offline homepage recommendations
   useEffect(() => {
-    console.log('🔥🤖 AI Hot Picks state updated:', randomHotPicks.length, 'items');
-    console.log('💰🤖 AI Value for Money state updated:', randomValueForMoney.length, 'items');
+    console.log('Hot Picks state updated:', randomHotPicks.length, 'items');
+    console.log('Value for Money state updated:', randomValueForMoney.length, 'items');
     console.log('🛒 On Sale state updated:', randomOnSale.length, 'items');
-    
-    // Log AI analysis if available
-    if (randomHotPicks.length > 0 && randomHotPicks[0].aiAnalysis) {
-      console.log('🤖 AI Hot Picks Analysis Available');
-    }
-    if (randomValueForMoney.length > 0 && randomValueForMoney[0].aiAnalysis) {
-      console.log('🤖 AI Value Analysis Available');
-    }
   }, [randomHotPicks, randomValueForMoney, randomOnSale]);
 
-  // 🔄 AUTO-ROTATION: Refresh AI recommendations every 10 minutes to show variety
+  // Auto-refresh local recommendations every 10 minutes to show variety
   useEffect(() => {
     const rotateRecommendations = async () => {
       try {
-        console.log('🔄 Auto-rotating AI recommendations...');
-        
-        // Fetch fresh products from all categories
         const categories = ['CPU', 'GPU', 'Motherboard', 'RAM', 'Storage', 'PSU', 'Case'];
-        const allProducts = [];
-        
-        for (const category of categories) {
-          try {
-            const response = await stockAPI.getByCategory(category);
-            const categoryProducts = response.data?.data || response.data || [];
-            if (Array.isArray(categoryProducts)) {
-              allProducts.push(...categoryProducts.map(product => ({
-                ...product,
-                image: api.utils.getFullImageUrl(product.image_url || product.image),
-                price: parseFloat(product.price || 0),
-                category: category,
-                stock: product.stock || 0,
-                brand: product.brand || 'Unknown'
-              })));
-            }
-          } catch (error) {
-            console.warn(`⚠️ Failed to fetch ${category} for rotation:`, error);
-          }
-        }
-        
-        if (allProducts.length > 0) {
-          // Generate new AI recommendations
-          const hotPicksResponse = await aiService.getKioskHotPicks(
-            allProducts,
-            100000,
-            {
-              currentTrends: 'Gaming, Content Creation, Budget Builds',
-              maxRecommendations: 8,
-              analysisType: 'hot_picks'
-            }
-          );
-          
-          const valueResponse = await aiService.getKioskHotPicks(
-            allProducts,
-            100000,
-            {
-              marketConditions: 'Philippine market, Import costs considered',
-              maxRecommendations: 8,
-              analysisType: 'value_for_money'
-            }
-          );
-          
-          // Update recommendations if we got valid data
-          if (hotPicksResponse.data?.recommendations?.length > 0) {
-            const aiHotPicks = hotPicksResponse.data.recommendations.map(pick => ({
-              ...pick,
-              id: pick.id || pick.componentId,
-              image: api.utils.getFullImageUrl(pick.imageUrl || pick.image_url || pick.image),
-              price: typeof pick.price === 'string' ? pick.price : `₱${parseFloat(pick.price || 0).toLocaleString()}`,
-              aiAnalysis: pick.trendingReason || pick.analysis || pick.reason || 'Popular item'
-            }));
-            setRandomHotPicks(aiHotPicks);
-            console.log('🔄✅ Hot Picks rotated:', aiHotPicks.length, 'items');
-          }
-          
-          if (valueResponse.data?.recommendations?.length > 0) {
-            const aiValuePicks = valueResponse.data.recommendations.map(pick => ({
-              ...pick,
-              id: pick.id || pick.componentId,
-              image: api.utils.getFullImageUrl(pick.imageUrl || pick.image_url || pick.image),
-              price: typeof pick.price === 'string' ? pick.price : `₱${parseFloat(pick.price || 0).toLocaleString()}`,
-              aiAnalysis: pick.valueReason || pick.reason || 'Great value'
-            }));
-            setRandomValueForMoney(aiValuePicks);
-            console.log('🔄✅ Value for Money rotated:', aiValuePicks.length, 'items');
-          }
-        }
+        const allProducts = (await fetchAllCategoryProducts(categories))
+          .map(product => normalizeHomepagePick(product, 'reason', 'Local stock pick'));
+
+        if (allProducts.length === 0) return;
+
+        const shuffled = shuffleArray([...allProducts]);
+        const valuePicks = [...allProducts]
+          .filter(product => toNumericPrice(product.numericPrice || product.price) > 0)
+          .sort((a, b) => toNumericPrice(a.numericPrice || a.price) - toNumericPrice(b.numericPrice || b.price));
+
+        setRandomHotPicks(shuffled.slice(0, 8));
+        setRandomValueForMoney((valuePicks.length ? valuePicks : shuffled).slice(0, 8));
       } catch (error) {
-        console.error('❌ Auto-rotation failed:', error);
+        if (!isCanceledRequest(error)) {
+          console.warn('Homepage product rotation failed:', error);
+        }
       }
     };
-    
+
     // Rotate every 10 minutes (600000ms)
     const rotationInterval = setInterval(rotateRecommendations, 10 * 60 * 1000);
-    
+
     return () => clearInterval(rotationInterval);
   }, []); // Only run once on mount
 
@@ -2819,13 +2758,13 @@ function PCParts() {
       setCarouselStartIndex(prevIndex => {
         const maxItems = Math.max(randomHotPicks.length, randomValueForMoney.length);
         if (maxItems <= ITEMS_PER_PAGE) return 0; // No rotation needed
-        
+
         const nextIndex = prevIndex + ITEMS_PER_PAGE;
         // Loop back to start when reaching end
         return nextIndex >= maxItems ? 0 : nextIndex;
       });
     }, ROTATION_INTERVAL);
-    
+
     return () => clearInterval(carouselInterval);
   }, [randomHotPicks.length, randomValueForMoney.length]);
 
@@ -2846,48 +2785,56 @@ function PCParts() {
 
   //Function for Product-List
   const handleProductClick = (category, product, index) => {
+    const normalizedProduct = normalizeKioskProduct(product, { category });
     // Ensure we have a valid product with all necessary data
     console.log('🖱️ Product clicked:', { category, product, index });
-    
+
     // Fallback if category is undefined - try to get from product object
-    const safeCategory = category || product.category || "unknown-category";
-    
+    const safeCategory = category || normalizedProduct.category || product.category || "unknown-category";
+
     // Ensure price is a valid number before parsing
-    const formattedPrice =
-      typeof product.price === "number"
-        ? product.price
-        : (typeof product.price === "string"
-          ? parseFloat(product.price.replace(/[^\d.]/g, "")) || 0
-          : 0);
-    
+    const formattedPrice = (() => {
+      if (typeof product.price === "number") return product.price;
+      if (typeof product.price === "string") return Number.parseFloat(product.price.replaceAll(/[^\d.]/g, "")) || 0;
+      return 0;
+    })();
+
     // Create comprehensive product data for ProductPage
     // 🔥 CRITICAL FIX: Ensure proper handling of NULL/empty data
-    const productDescription = product.description || product.details;
-    const productSpecs = product.specifications;
-    
+    const productDescription = normalizedProduct.description || product.description || product.details;
+    const productSpecs = normalizedProduct.specifications || product.specifications;
+
+    // Resolve specifications: keep valid objects, fallback to string
+    const resolvedSpecs = (() => {
+      if (productSpecs == null || productSpecs === '') return "No specifications provided.";
+      if (typeof productSpecs === 'object' && Object.keys(productSpecs).length === 0) return "No specifications provided.";
+      return productSpecs;
+    })();
+
     const productData = {
       productName: product.name || "Unknown Product",
       productPrice: formattedPrice,
-      productImage: api.utils.getFullImageUrl(product.image || product.image_url) || "./assets/default.png",
-      details: productDescription && productDescription !== '' 
-        ? productDescription 
+      productImage: normalizedProduct.image || "./assets/default.png",
+      image: normalizedProduct.image,
+      imageUrl: normalizedProduct.imageUrl,
+      image_url: normalizedProduct.image_url,
+      imagePath: normalizedProduct.imagePath,
+      details: productDescription && productDescription !== ''
+        ? productDescription
         : "No details available.",
-      // 🔥 CRITICAL: Handle specifications properly for React Router state serialization
-      specifications: productSpecs != null && productSpecs !== '' 
-        ? (typeof productSpecs === 'object' 
-            ? (Object.keys(productSpecs).length > 0 ? productSpecs : "No specifications provided.") 
-            : productSpecs)
-        : "No specifications provided.",
+      specifications: resolvedSpecs,
       brand: product.brand || "Unknown Brand",
       stock: product.stock || 0,
-      category: safeCategory,
-      id: product.id,
+      category: normalizedProduct.category || safeCategory,
+      categoryKey: normalizedProduct.categoryKey,
+      id: normalizedProduct.id || product.id,
       previousCategory: selectedItem, // Store the selected category index
     };
-    
+
     console.log('📦 Navigating to product page with data:', productData);
 
-    navigate(`/product/${safeCategory}-${index}`, {
+    const routeId = normalizedProduct.id || product.id || `${safeCategory}-${index}`;
+    navigate(`/product/${routeId}`, {
       state: productData
     });
   };
@@ -2919,23 +2866,21 @@ function PCParts() {
       const newSelection = selectedForCompare.filter(p => (p.id || p.name) !== productId);
       setSelectedForCompare(newSelection);
       console.log('➖ Removed product, new count:', newSelection.length);
-    } else {
+    } else if (selectedForCompare.length < 2) {
       // Add to selection (max 2)
-      if (selectedForCompare.length < 2) {
-        const newSelection = [...selectedForCompare, product];
-        setSelectedForCompare(newSelection);
-        console.log('➕ Added product, new count:', newSelection.length);
-        
-        // Auto-show modal when 2 products selected
-        if (newSelection.length === 2) {
-          console.log('🎯 2 products selected! Ready to compare');
-        }
-      } else {
-        // Replace oldest selection
-        const newSelection = [selectedForCompare[1], product];
-        setSelectedForCompare(newSelection);
-        console.log('🔄 Replaced oldest selection, new count:', newSelection.length);
+      const newSelection = [...selectedForCompare, product];
+      setSelectedForCompare(newSelection);
+      console.log('➕ Added product, new count:', newSelection.length);
+
+      // Auto-show modal when 2 products selected
+      if (newSelection.length === 2) {
+        console.log('🎯 2 products selected! Ready to compare');
       }
+    } else {
+      // Replace oldest selection
+      const newSelection = [selectedForCompare[1], product];
+      setSelectedForCompare(newSelection);
+      console.log('🔄 Replaced oldest selection, new count:', newSelection.length);
     }
   };
 
@@ -2943,7 +2888,7 @@ function PCParts() {
     console.log('🔍 Starting comparison...');
     console.log('Selected products:', selectedForCompare);
     console.log('Selected count:', selectedForCompare.length);
-    
+
     if (selectedForCompare.length === 2) {
       console.log('✅ Opening comparison modal');
       setShowCompareModal(true);
@@ -2966,7 +2911,7 @@ function PCParts() {
     );
 
     if (existingItemIndex > -1) {
-      existingCart[existingItemIndex].quantity = 
+      existingCart[existingItemIndex].quantity =
         (existingCart[existingItemIndex].quantity || 1) + 1;
     } else {
       existingCart.push({ ...product, quantity: 1 });
@@ -2974,8 +2919,8 @@ function PCParts() {
 
     localStorage.setItem("cart", JSON.stringify(existingCart));
     setCartCount(existingCart.reduce((sum, item) => sum + (item.quantity || 1), 0));
-    window.dispatchEvent(new Event('cartUpdated'));
-    
+    globalThis.dispatchEvent(new Event('cartUpdated'));
+
     console.log('✅ Product added to cart');
   };
 
@@ -3007,26 +2952,138 @@ function PCParts() {
     // Immediately update UI for instant responsiveness (no debounce for UI)
     const newBrand = brand === selectedBrand ? '' : brand;
     setSelectedBrand(newBrand);
-    
+
     // The useEffect will handle the API call with debouncing automatically
   };
 
   // Close pop-up when clicking outside
   const handleOutsideClick = (e) => {
-    if (e.target && e.target.classList && e.target.classList.contains("popup-overlay")) {
+    if (e.target?.classList?.contains("popup-overlay")) {
       setShowFilter(false);
     }
   };
 
+  // Extracted handlers to reduce nesting depth
+  const handleQuantityDecrease = (e, product) => {
+    e.stopPropagation();
+    const productId = product.id || product.name;
+    const qty = getProductQuantityInCart(product.name);
+    if (qty === 1) {
+      const updatedCart = cart.filter(item => item.name !== product.name);
+      setCart(updatedCart);
+      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      globalThis.dispatchEvent(new Event('cartUpdated'));
+      setExpandedProducts(prev => ({ ...prev, [productId]: false }));
+      if (expandTimers[productId]) {
+        clearTimeout(expandTimers[productId]);
+        setExpandTimers(prev => {
+          const newTimers = { ...prev };
+          delete newTimers[productId];
+          return newTimers;
+        });
+      }
+    } else {
+      const updatedCart = cart.map(item => {
+        if (item.name === product.name) {
+          const newQty = item.quantity - 1;
+          return { ...item, quantity: newQty, totalPrice: item.totalPrice - (item.totalPrice / item.quantity) };
+        }
+        return item;
+      });
+      setCart(updatedCart);
+      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      globalThis.dispatchEvent(new Event('cartUpdated'));
+      startAutoCollapseTimer(productId);
+    }
+  };
 
-  return (
+  const handleQuantityIncrease = (e, product, idx) => {
+    e.stopPropagation();
+    const productId = product.id || product.name;
+    handleProductClick(product.category, product, idx);
+    startAutoCollapseTimer(productId);
+  };
+
+  const handleExpandQuantity = (e, product) => {
+    e.stopPropagation();
+    const productId = product.id || product.name;
+    setExpandedProducts(prev => ({ ...prev, [productId]: true }));
+    startAutoCollapseTimer(productId);
+  };
+
+  const handleClearSpecFilter = (specKey) => {
+    const newFilters = { ...specFilters };
+    delete newFilters[specKey];
+    setSpecFilters(newFilters);
+  };
+
+  const handleSetSpecFilter = (specKey, value) => {
+    setSpecFilters({ ...specFilters, [specKey]: value });
+  };
+
+  const handleToggleSpecSection = (specKey) => { // NOSONAR - used in IIFE JSX below
+    const newOpenState = { ...specSectionOpen };
+    newOpenState[specKey] = !newOpenState[specKey];
+    setSpecSectionOpen(newOpenState);
+  };
+
+  const renderSpecFilterValues = (specKey, values, currentValue) => ( // NOSONAR - used in IIFE JSX below
+    <div className="filter-options">
+      <button
+        className={`filter-btn ${currentValue ? '' : 'active'}`}
+        onClick={() => handleClearSpecFilter(specKey)}
+      >All</button>
+      {values.map(value => (
+        <button
+          key={value}
+          className={`filter-btn ${currentValue === value ? 'active' : ''}`}
+          onClick={() => handleSetSpecFilter(specKey, value)}
+        >
+          {value}
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderCancelOrderModal = () => ( // NOSONAR - used in IIFE JSX below
+    <div className="pc-customized-modal-overlay">
+      <div className="pc-customized-modal-background"></div>
+      <div className="pc-customized-modal">
+        <div className="pc-customized-modal-icon" />
+        <h2 className="pc-customized-modal-title">
+          ARE YOU SURE YOU WANT TO<br /><span>CANCEL ORDER?</span>
+        </h2>
+        <div className="pc-customized-modal-buttons">
+          <button className="pc-customized-modal-btn" onClick={() => setShowCancelOrderModal(false)}>NO</button>
+          <button className="pc-customized-modal-btn yes" onClick={() => { setShowCancelOrderModal(false); handleCancelOrder(); }}>Yes</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStartOverModal = () => ( // NOSONAR - used in IIFE JSX below
+    <div className="pc-customized-modal-overlay">
+      <div className="pc-customized-modal-background"></div>
+      <div className="pc-customized-modal">
+        <div className="pc-customized-modal-icon" />
+        <h2 className="pc-customized-modal-title">ARE YOU SURE YOU WANT TO<br /><span>START OVER?</span></h2>
+        <div className="pc-customized-modal-buttons">
+          <button className="pc-customized-modal-btn" onClick={() => setShowStartOverModal(false)}>NO</button>
+          <button className="pc-customized-modal-btn yes" onClick={() => { setShowStartOverModal(false); handleStartOver(); }}>Yes</button>
+        </div>
+      </div>
+    </div>
+  );
+
+
+  return (() => ( // NOSONAR - IIFE pattern used for React JSX scoping
     <div className="pc-parts-container">
       {/* Sidebar */}
       <div className="sidebar">
         <div className="logo1">
           <img src={logoComponent} alt="PC Wise" className="logo" />
         </div>
-        
+
         {/* Home Button - Separated */}
         <div className="home-section">
           <button
@@ -3070,33 +3127,43 @@ function PCParts() {
             <section className="home-section">
               <div className="carousel-container">
                 <div className="carousel-slider">
-                  <div className="carousel-slide" onClick={() => handleLargeBoxClick("whats-new-1")}>
+                  <button type="button" className="carousel-slide" tabIndex={0} onClick={() => handleLargeBoxClick("whats-new-1")} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleLargeBoxClick("whats-new-1"); }}>
                     <div className="home-large-box">
                       <img src={PCWise} className="carousel-image" alt="What's new" />
                     </div>
-                  </div>
-                  <div className="carousel-slide" onClick={() => handleLargeBoxClick("whats-new-2")}>
+                  </button>
+                  <button type="button" className="carousel-slide" tabIndex={0} onClick={() => handleLargeBoxClick("whats-new-2")} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleLargeBoxClick("whats-new-2"); }}>
                     <div className="home-large-box">
                       <img src={Frame} className="carousel-image" alt="What's new" />
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
             </section>
 
-            {/* On Sale Section */}
-            {randomOnSale.length > 0 && (
-              <section className="home-section">
-                <h3>On Sale 🏷️</h3>
-                <div className="home-grid">
-                  {randomOnSale.map((product, index) => (
-                    <div
+            {/* Discounted Section */}
+            <section className="home-section">
+              <h3>Discounted</h3>
+              <div className="home-grid">
+                {randomOnSale.map((product, index) => (
+                    <button
+                      type="button"
                       className="home-box"
                       key={product.id}
+                      tabIndex={0}
                       onClick={() => handleProductClick(product.category, product, index)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleProductClick(product.category, product, index); }}
                     >
                       <div className="home-box-image-container">
-                        <img src={product.image} alt={product.name} className="home-box-image" />
+                        <KioskProductImage
+                          product={product}
+                          alt={product.name}
+                          className="home-box-image"
+                          fallbackSrc={SystemUnit1}
+                          sizes="180px"
+                          width="180"
+                          height="180"
+                        />
                         {product.discountPercent > 0 && (
                           <div className="home-sale-badge">
                             {product.discountPercent}% OFF
@@ -3107,14 +3174,13 @@ function PCParts() {
                       <div className="home-sale-pricing">
                         <p className="home-sale-price">{product.formattedSalePrice}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+                    </button>
+                ))}
+              </div>
+            </section>
 
 
-            {/* Value for Money Section - AI Powered */}
+            {/* Value for Money Section */}
             {randomValueForMoney.length > 0 && (
               <section className="home-section">
                 <h3>Value for Money 💰</h3>
@@ -3129,15 +3195,26 @@ function PCParts() {
                         : []
                     )
                     .map((product, index) => (
-                    <div
+                    <button
+                      type="button"
                       className="home-box"
                       key={product.id || index}
+                      tabIndex={0}
                       onClick={() => handleProductClick(product.category, product, index)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleProductClick(product.category, product, index); }}
                     >
-                      <img src={product.image} alt={product.name} className="home-box-image" />
+                      <KioskProductImage
+                        product={product}
+                        alt={product.name}
+                        className="home-box-image"
+                        fallbackSrc={SystemUnit1}
+                        sizes="180px"
+                        width="180"
+                        height="180"
+                      />
                       <p className="home-box-name">{product.name}</p>
                       <p className="home-box-price">{product.price}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -3158,15 +3235,26 @@ function PCParts() {
                         : []
                     )
                     .map((product, index) => (
-                    <div
+                    <button
+                      type="button"
                       className="home-box"
                       key={product.id || index}
+                      tabIndex={0}
                       onClick={() => handleProductClick(product.category, product, index)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleProductClick(product.category, product, index); }}
                     >
-                      <img src={product.image} alt={product.name} className="home-box-image" />
+                      <KioskProductImage
+                        product={product}
+                        alt={product.name}
+                        className="home-box-image"
+                        fallbackSrc={SystemUnit1}
+                        sizes="180px"
+                        width="180"
+                        height="180"
+                      />
                       <p className="home-box-name">{product.name}</p>
                       <p className="home-box-price">{product.price}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -3178,12 +3266,12 @@ function PCParts() {
             {/* Category Header Section */}
             <div className={`category-header-section ${menuItems[selectedItem].category === 'Peripherals' && activePeripheral === null ? 'peripheral-grid-mode' : ''}`}>
               <h2 className="category-title-parts">
-                {menuItems[selectedItem].category === 'Peripherals' && activePeripheral 
-                  ? activePeripheral 
+                {menuItems[selectedItem].category === 'Peripherals' && activePeripheral
+                  ? activePeripheral
                   : menuItems[selectedItem].name}
                 <span className="category-count">[{products.length}]</span>
               </h2>
-            
+
             {/* Brands & Filter Section - Hide when showing peripheral category grid */}
             {!(menuItems[selectedItem].category === 'Peripherals' && activePeripheral === null) && (
             <div className="pc-parts-brands-filter-section">
@@ -3202,7 +3290,7 @@ function PCParts() {
                       <img src={dropdown} alt="Dropdown Arrow" />
                     </span>
                   </button>
-                  
+
                   {brandDropdownOpen && (
                     <div className="pc-parts-brand-dropdown-menu">
                       {/* All Brands option */}
@@ -3216,7 +3304,7 @@ function PCParts() {
                       >
                         All Brands ({totalCategoryItems})
                       </button>
-                      
+
                       {/* Individual brand options */}
                       {availableBrands && availableBrands.length > 0 ? (
                         availableBrands.map((brand) => {
@@ -3247,9 +3335,9 @@ function PCParts() {
               {/* Filter & Sort Button */}
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginRight: '5px', }}>
                 <button className="pc-parts-filter-button" onClick={toggleFilterPopup}> <img src={filter} alt="Filter Icon" />FILTER & SORT</button>
-                
+
                 {/* TASK 5: Compare Mode Toggle Button */}
-                <button 
+                <button
                   className={`pc-parts-filter-button ${compareMode ? 'comparing-active' : ''}`}
                   onClick={toggleCompareMode}
                 >
@@ -3264,14 +3352,14 @@ function PCParts() {
             {compareMode && selectedForCompare.length > 0 && !showCompareModal && (
               <div className="comparison-floating-bar">
                 <span className="comparison-floating-count">
-                  {selectedForCompare.length} product{selectedForCompare.length !== 1 ? 's' : ''} selected
+                  {selectedForCompare.length} product{selectedForCompare.length === 1 ? '' : 's'} selected
                 </span>
                 {selectedForCompare.length === 2 && (
                   <button className="comparison-floating-button"
                     onClick={handleStartComparison}
                     onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
                     onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                  > 
+                  >
                   Compare
                   </button>
                 )}
@@ -3298,22 +3386,25 @@ function PCParts() {
                     'Speakers': speaker,
                     'Webcam': webcam
                   };
-                  
+
                   const iconSrc = subcatIcons[subcat] || monitor; // Default to monitor if not found
-                  
+
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={subcat}
                       className="peripheral-category-box"
+                      tabIndex={0}
                       onClick={() => setActivePeripheral(subcat)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActivePeripheral(subcat); } }}
                     >
                       <div className="peripheral-category-icon">
                         <img src={iconSrc} alt={`${subcat} icon`} />
                       </div>
                       <div className="peripheral-category-name">{subcat.toUpperCase()}
-              
+
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -3325,18 +3416,19 @@ function PCParts() {
 
                   {/* FIXED: Use dedicated products-grid for consistent 3-column layout */}
                   <div className="products-grid">
-                {isLoading || isLoadingCompatibility ? (
+                {(isLoading || isLoadingCompatibility) && (
                   <div className="loading-indicator">
                     <div className="loading-spinner"></div>
                     <p>{isLoadingCompatibility ? 'Analyzing compatibility...' : 'Loading products...'}</p>
                   </div>
-                ) : sortedProducts && sortedProducts.length > 0 ? (
+                )}
+                {!isLoading && !isLoadingCompatibility && sortedProducts && sortedProducts.length > 0 && (
                   sortedProducts.map((product, idx) => {
                     const productId = product.id || product.name;
                     const isSelectedForCompare = selectedForCompare.some(
                       p => (p.id || p.name) === productId
                     );
-                    
+
                     // ✅ FIX: Cart check for badge display
                     const cartItems = JSON.parse(localStorage.getItem("cart")) || [];
                     const hasNonPeripheralInCart = cartItems.some(item => {
@@ -3344,7 +3436,7 @@ function PCParts() {
                       const cat = item.category || '';
                       return !['Mouse', 'Keyboard', 'Headphones', 'Speakers', 'Webcam', 'Monitor'].includes(cat);
                     });
-                    
+
                     // 🔥 CRITICAL FIX: Get cart item categories (what user already selected)
                     const cartCategories = cartItems
                       .filter(item => {
@@ -3353,26 +3445,26 @@ function PCParts() {
                         return !['Mouse', 'Keyboard', 'Headphones', 'Speakers', 'Webcam', 'Monitor'].includes(cat);
                       })
                       .map(item => item.category);
-                    
+
                     // 🔥 CRITICAL FIX: Check if current viewing category is in cart
                     const currentViewingCategory = menuItems[selectedItem]?.category;
                     const isViewingSameCategoryAsCart = cartCategories.includes(currentViewingCategory);
-                    
+
                     // 🔥 CRITICAL FIX: Check if this product's category is peripheral
                     const isPeripheralProduct = ['Mouse', 'Keyboard', 'Headphones', 'Speakers', 'Webcam', 'Monitor'].includes(product.category);
-                    
+
                     const compatibilityScore = compatibilityScores[product.id] || 0;
                     const isCompatible = compatibilityScore > 0;
-                    
+
                     // 🔥 CRITICAL FIX: Badge should show when:
                     // 1. Cart has non-peripheral items
                     // 2. Currently viewing category is NOT in cart (e.g., cart has CPU, viewing Cooling)
                     // 3. This product is NOT a peripheral
                     // 4. Product has compatibility score
                     const shouldShowBadge = hasNonPeripheralInCart && !isViewingSameCategoryAsCart && !isPeripheralProduct && compatibilityScore > 0;
-                    
+
                     // 🔍 DEBUG: Log badge conditions for first 3 products
-                    if (idx < 3) {
+                    if (VERBOSE_KIOSK_LOGS && idx < 3) {
                       console.log(`🏷️ Badge Check [${product.name}]:`, {
                         hasNonPeripheralInCart,
                         cartCategories,
@@ -3385,11 +3477,13 @@ function PCParts() {
                         shouldShowBadge
                       });
                     }
-                    
+
                     return (
                       <div
+                        role="button"
                         key={product.id || `${product.name}-${idx}`}
                         className={`product-item ${isSelectedForCompare ? 'selected-for-compare' : ''} ${shouldShowBadge ? 'compatible-product' : ''}`}
+                        tabIndex={0}
                         onClick={() => {
                           // ✅ FIX: In compare mode, clicking card toggles selection
                           if (compareMode) {
@@ -3402,7 +3496,17 @@ function PCParts() {
                             );
                           }
                         }}
-                        style={{ 
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            if (compareMode) {
+                              handleCompareSelect(product);
+                            } else {
+                              handleProductClick(menuItems[selectedItem]?.category || "unknown", product, idx);
+                            }
+                          }
+                        }}
+                        style={{
                           cursor: 'pointer', // ✅ FIX: Always show pointer cursor
                           position: 'relative',
                           height: '229px',
@@ -3438,19 +3542,23 @@ function PCParts() {
                         )}
 
                         {/* Product Image */}
-                        <div 
+                        <div
                           className="product-image-container"
                         >
-                          <img
-                            src={product.image}
+                          <KioskProductImage
+                            product={product}
                             alt={product.name}
                             className="product-image"
+                            fallbackSrc={SystemUnit1}
+                            sizes="(max-width: 768px) 45vw, 220px"
+                            width="220"
+                            height="220"
                           />
-                          
+
                           {/* ✅ TIER BADGE REMOVED FROM KIOSK VIEW
-                              Tier data is still sent to backend for AI compatibility filtering
+                              Tier data is still sent to backend for deterministic compatibility filtering
                               but NOT displayed to users. This is admin-only information.
-                              
+
                               Previous code (REMOVED):
                               - Displayed tier badges (Entry, Mid, High, Elite)
                               - Confused users with internal classification system
@@ -3466,54 +3574,17 @@ function PCParts() {
                               ? product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                               : "0.00"}
                           </p>
-                          
+
                         </div>
                         {/* Hide add-product button when in compare mode */}
                         {!compareMode && (
                           <>
-                            {getProductQuantityInCart(product.name) > 0 ? (
-                              expandedProducts[product.id || product.name] ? (
+                            {getProductQuantityInCart(product.name) > 0 && expandedProducts[product.id || product.name] && (
                                 // STATE 2: Show full controls (delete - quantity - +)
                                 <div className="pc-parts-quantity-controls">
-                                  <button 
+                                  <button
                                     className="pc-parts-quantity-btn delete-btn"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const productId = product.id || product.name;
-                                      const qty = getProductQuantityInCart(product.name);
-                                      if (qty === 1) {
-                                        // Remove from cart
-                                        const updatedCart = cart.filter(item => item.name !== product.name);
-                                        setCart(updatedCart);
-                                        localStorage.setItem("cart", JSON.stringify(updatedCart));
-                                        window.dispatchEvent(new Event('cartUpdated'));
-                                        // Collapse after deletion
-                                        setExpandedProducts(prev => ({ ...prev, [productId]: false }));
-                                        // Clear timer since we're collapsing manually
-                                        if (expandTimers[productId]) {
-                                          clearTimeout(expandTimers[productId]);
-                                          setExpandTimers(prev => {
-                                            const newTimers = { ...prev };
-                                            delete newTimers[productId];
-                                            return newTimers;
-                                          });
-                                        }
-                                      } else {
-                                        // Decrease quantity
-                                        const updatedCart = cart.map(item => {
-                                          if (item.name === product.name) {
-                                            const newQty = item.quantity - 1;
-                                            return { ...item, quantity: newQty, totalPrice: item.totalPrice - (item.totalPrice / item.quantity) };
-                                          }
-                                          return item;
-                                        });
-                                        setCart(updatedCart);
-                                        localStorage.setItem("cart", JSON.stringify(updatedCart));
-                                        window.dispatchEvent(new Event('cartUpdated'));
-                                        // ⏱️ Restart timer on interaction
-                                        startAutoCollapseTimer(productId);
-                                      }
-                                    }}
+                                    onClick={(e) => handleQuantityDecrease(e, product)}
                                   >
                                     {getProductQuantityInCart(product.name) === 1 ? (
                                       <img src={deleteIcon} alt="Delete" style={{ width: '13px', height: '14px' }} />
@@ -3522,45 +3593,41 @@ function PCParts() {
                                     )}
                                   </button>
                                   <span className="pc-parts-quantity-number">{getProductQuantityInCart(product.name)}</span>
-                                  <button 
+                                  <button
                                     className="pc-parts-quantity-btn add-btn"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const productId = product.id || product.name;
-                                      handleProductClick(product.category, product, idx);
-                                      // ⏱️ Restart timer on interaction
-                                      startAutoCollapseTimer(productId);
-                                    }}
+                                    onClick={(e) => handleQuantityIncrease(e, product, idx)}
                                   >
                                     <img src={addIcon} alt="Add" style={{ width: '14px', height: '14px' }} />
                                   </button>
                                 </div>
-                              ) : (
+                            )}
+                            {getProductQuantityInCart(product.name) > 0 && !expandedProducts[product.id || product.name] && (
                                 // STATE 1: Show just quantity number (clickable to expand)
-                                <div 
+                                <button
+                                  type="button"
                                   className="pc-parts-add-product in-cart-collapsed"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const productId = product.id || product.name;
-                                    setExpandedProducts(prev => ({ ...prev, [productId]: true }));
-                                    startAutoCollapseTimer(productId); // ⏱️ Start 5-second timer
-                                  }}
+                                  tabIndex={0}
+                                  onClick={(e) => handleExpandQuantity(e, product)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExpandQuantity(e, product); } }}
                                 >
                                   {getProductQuantityInCart(product.name)}
-                                </div>
-                              )
-                            ) : (
+                                </button>
+                            )}
+                            {getProductQuantityInCart(product.name) === 0 && (
                               // Show add button when not in cart
-                              <div 
+                              <button
+                                type="button"
                                 className="pc-parts-add-product"
+                                tabIndex={0}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleAddToCartFromComparison(product);
                                 }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleAddToCartFromComparison(product); } }}
                                 style={{ cursor: 'pointer' }}
                               >
                                 +
-                              </div>
+                              </button>
                             )}
                           </>
                         )}
@@ -3568,7 +3635,8 @@ function PCParts() {
                       </div>
                     );
                   })
-                ) : (
+                )}
+                {!isLoading && !isLoadingCompatibility && (!sortedProducts || sortedProducts.length === 0) && (
                   <div className="no-products-message">
                     <p>No products available for the selected criteria.</p>
                   </div>
@@ -3586,15 +3654,18 @@ function PCParts() {
 
           {/* Left: Cart icon, TOTAL, and price */}
           <div className="pc-parts-order-info">
-            <div 
-              className="pc-parts-cart-icon" 
+            <button
+              type="button"
+              className="pc-parts-cart-icon"
               data-count="0"
+              tabIndex={0}
               onClick={() => navigate("/order-summary", { state: { from: "pc-parts" } })}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate("/order-summary", { state: { from: "pc-parts" } }); } }}
               style={{ cursor: 'pointer' }}
             >
               <img src={Chest} alt="Cart Icon" />
               <span className="pc-parts-notification">{cartCount}</span>
-            </div>
+            </button>
             <div className="pc-parts-total-label">
               <span className="pc-parts-total">TOTAL</span>
               <span className="pc-parts-price">
@@ -3621,8 +3692,8 @@ function PCParts() {
             </button>
 
             <div className="pc-parts-action-buttons">
-              <button 
-                className="pc-parts-cancel-order" 
+              <button
+                className="pc-parts-cancel-order"
                 onClick={() => {
                   if (cartCount === 0) {
                     // When cart is empty, act as Back button
@@ -3643,15 +3714,15 @@ function PCParts() {
 
       {/* ✅ ENHANCED: Comprehensive Filter & Sort Modal */}
       {showFilter && (
-        <div className="popup-overlay" onClick={handleOutsideClick}>
-          <div className="popup" onClick={(e) => e.stopPropagation()}>
+        <div className="popup-overlay" role="none" onClick={handleOutsideClick} onKeyDown={(e) => { if (e.key === 'Escape') handleOutsideClick(e); }}>
+          <dialog open className="popup" aria-modal="true" aria-label="Filter and Sort"> {/* NOSONAR - dialog is natively interactive */}
             <div className="filter-header-top">
               <h3 className="popup-title">FILTER & SORT</h3>
               <button className="clear-all-btn" onClick={handleClearAll}>Clear All</button>
             </div>
 
             {/* ✅ REMOVED: Brand section (now handled outside modal) */}
-            
+
             {/* Price Range Filter */}
             <div className="filter-section">
               <div className="filter-header">
@@ -3729,144 +3800,69 @@ function PCParts() {
             {Object.entries(availableSpecFilters).map(([specKey, values]) => {
               // Format spec key for display (convert snake_case to Title Case)
               const displayName = formatSpecKey(specKey);
-              
+
               // Skip if only one value (no point filtering)
               if (values.length <= 1) return null;
-              
+
               const isOpen = specSectionOpen[specKey];
               const currentValue = specFilters[specKey];
-              
+
               return (
                 <div key={specKey} className="filter-section">
                   <div className="filter-header">
                     <span>{displayName}</span>
-                    <button 
+                    <button
                       className="toggle-button"
-                      onClick={() => {
-                        const newOpenState = { ...specSectionOpen };
-                        newOpenState[specKey] = !newOpenState[specKey];
-                        setSpecSectionOpen(newOpenState);
-                      }}
+                      onClick={() => handleToggleSpecSection(specKey)}
                     >
                       {isOpen ? "−" : "+"}
                     </button>
                   </div>
-                  
-                  {isOpen && (
-                    <div className="filter-options">
-                      <button
-                        className={`filter-btn ${!currentValue ? 'active' : ''}`}
-                        onClick={() => {
-                          const newFilters = { ...specFilters };
-                          delete newFilters[specKey];
-                          setSpecFilters(newFilters);
-                        }}
-                      >All</button>
-                      {values.map(value => (
-                        <button
-                          key={value}
-                          className={`filter-btn ${currentValue === value ? 'active' : ''}`}
-                          onClick={() => setSpecFilters({
-                            ...specFilters,
-                            [specKey]: value
-                          })}
-                        >
-                          {value}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+
+                  {isOpen && renderSpecFilterValues(specKey, values, currentValue)}
                 </div>
               );
             })}
-        
-          </div>
+
+          </dialog>
         </div>
       )}
 
       {/* Cancel Order Confirmation Modal */}
-      {showCancelOrderModal && (
-        <div className="pc-customized-modal-overlay">
-          <div className="pc-customized-modal-background"></div>
-          <div className="pc-customized-modal">
-            <div className="pc-customized-modal-icon" />
-            <h2 className="pc-customized-modal-title">
-              ARE YOU SURE YOU WANT TO<br /><span>CANCEL ORDER?</span>
-            </h2>
-            <div className="pc-customized-modal-buttons">
-              <button
-                className="pc-customized-modal-btn"
-                onClick={() => setShowCancelOrderModal(false)}
-              >
-                NO
-              </button>
-              <button
-                className="pc-customized-modal-btn yes"
-                onClick={() => {
-                  setShowCancelOrderModal(false);
-                  handleCancelOrder();
-                }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showCancelOrderModal && renderCancelOrderModal()}
 
       {/* Start Over Confirmation Modal */}
-      {showStartOverModal && (
-        <div className="pc-customized-modal-overlay">
-          <div className="pc-customized-modal-background"></div>
-          <div className="pc-customized-modal">
-            <div className="pc-customized-modal-icon" />
-            <h2 className="pc-customized-modal-title">ARE YOU SURE YOU WANT TO<br /><span>START OVER?</span></h2>
-            <div className="pc-customized-modal-buttons">
-              <button
-                className="pc-customized-modal-btn"
-                onClick={() => setShowStartOverModal(false)}
-              >
-                NO
-              </button>
-              <button
-                className="pc-customized-modal-btn yes"
-                onClick={() => {
-                  setShowStartOverModal(false);
-                  handleStartOver();
-                }}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showStartOverModal && renderStartOverModal()}
 
       {/* TASK 5: Product Comparison Modal */}
       {showCompareModal && selectedForCompare.length === 2 && (
-        <CompareProducts
-          products={selectedForCompare}
-          onClose={handleCloseComparison}
-          onAddToCart={handleAddToCartFromComparison}
-        />
+        <React.Suspense fallback={null}>
+          <CompareProducts
+            products={selectedForCompare}
+            onClose={handleCloseComparison}
+            onAddToCart={handleAddToCartFromComparison}
+          />
+        </React.Suspense>
       )}
 
       {/* ✅ Enhanced Compatibility Validation Modal for Order Summary */}
       {showCompatibilityValidationModal && (
-        <CompatibilityValidationModal
-          isOpen={showCompatibilityValidationModal}
-          cartItems={cart}
-          pageName="PC-Parts"
-          onClose={() => setShowCompatibilityValidationModal(false)}
-          onProceed={() => {
-            setShowCompatibilityValidationModal(false);
-            navigate("/order-summary", { state: { from: "pc-parts" } });
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <CompatibilityValidationModal
+            isOpen={showCompatibilityValidationModal}
+            cartItems={cart}
+            pageName="PC-Parts"
+            onClose={() => setShowCompatibilityValidationModal(false)}
+            onProceed={() => {
+              setShowCompatibilityValidationModal(false);
+              navigate("/order-summary", { state: { from: "pc-parts" } });
+            }}
+          />
+        </React.Suspense>
       )}
 
     </div>
-  );
+  ))();
 }
 
 export default PCParts;

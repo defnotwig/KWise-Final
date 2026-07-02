@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom"; // Navigation hook
 import logoComponent from '../assets/PCParts/logoComponent.svg';
 import Customized from "../assets/Customized.webp";
 import PreBuilt from "../assets/PreBuilt.webp";
-import AIIcon from "../assets/PCBuildCategory/aicustom.svg";
 import "./PCBuildCategory.css";
 
 const PCBuildCategory = () => {
@@ -14,9 +13,6 @@ const PCBuildCategory = () => {
     if (category === "customized-manual") {
       // Manual customization - existing flow, navigate to PC Customizer
       navigate("/pc-customized");
-    } else if (category === "customized-ai") {
-      // AI-powered customization - new unified flow
-      navigate("/customize-ai");
     } else if (category === "prebuilt") {
       // Pre-built PC selection - navigate to preset/community options
       navigate("/prebuilt-options");
@@ -50,20 +46,6 @@ const PCBuildCategory = () => {
           <img src={PreBuilt} alt="PreBuilt" className="prebuilt-category" />
           <h1 className="category-title-build">PREBUILT</h1>
           <h1 className="sub-title">PEAK PERFORMANCE</h1>
-        </button>
-
-        {/* Option 3: AI-Powered Customization (bottom wide card) */}
-        <button
-          className="build-option bottom-card ai-option"
-          onClick={() => handleNavigation("customized-ai")}
-        >
-          <div className="ai-icon-wrapper">
-            <img src={AIIcon} alt="Customized with AI" className="customized-ai-category" />
-          </div>
-          <div className="ai-text-wrapper">
-          <h1 className="category-title-ai-build">CUSTOMIZE</h1>
-          <h1 className="sub-title">WITH AI</h1>
-          </div>
         </button>
       </div>
 

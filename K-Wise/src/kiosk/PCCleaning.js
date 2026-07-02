@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/api';
-import aiService from '../api/aiService';
 import PCClean from '../assets/PCCleaning.webp';
 import BasicClean from '../assets/BasicClean.webp';
 import ProClean from '../assets/ProClean.webp';
@@ -17,6 +16,78 @@ const tierIcons = {
   'PREMIUM TIER CLEAN': PremiumClean
 };
 
+const toArray = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+};
+
+const getTierKey = (tier) => String(tier?.tier || tier?.name || '').toLowerCase();
+
+const findRecommendedTierIndex = (tiers, recommendedTier) => {
+  const target = String(recommendedTier || '').toLowerCase();
+  if (!target) return -1;
+
+  return tiers.findIndex(tier => {
+    const tierKey = getTierKey(tier);
+    return tierKey === target || tierKey.includes(target);
+  });
+};
+
+const buildLocalCleaningRecommendation = (assessmentData, tiers) => {
+  if (!assessmentData || !tiers.length) return null;
+
+  const selectedIssues = toArray(assessmentData.selectedIssues);
+  let score = 0;
+  const reasoning = [];
+
+  if (assessmentData.hasCleaned === false) {
+    score += 3;
+    reasoning.push('First-time cleaning benefits from a more complete dust removal pass.');
+  }
+
+  if (assessmentData.lastCleaned === '13+ Months') {
+    score += 3;
+    reasoning.push('The PC has gone more than a year since its last cleaning.');
+  } else if (assessmentData.lastCleaned === '7-12 Months') {
+    score += 2;
+    reasoning.push('The PC is due for a deeper maintenance cleaning.');
+  } else if (assessmentData.lastCleaned === '4-6 Months') {
+    score += 1;
+    reasoning.push('A mid-level clean is enough for normal maintenance timing.');
+  }
+
+  if (assessmentData.pcAge === 'More than a year') {
+    score += 2;
+    reasoning.push('Older systems usually need a more careful internal cleaning.');
+  }
+
+  if (assessmentData.underlyingIssues || selectedIssues.length > 0) {
+    score += Math.min(3, selectedIssues.length || 1);
+    reasoning.push('Reported issues should be checked while the PC is cleaned.');
+  }
+
+  const premiumSignals = selectedIssues.some(issue =>
+    /overheating|shutdown|static|performance|fan/i.test(issue)
+  );
+  const recommendedTier = score >= 6 || premiumSignals
+    ? 'premium'
+    : score >= 3
+      ? 'pro'
+      : 'basic';
+
+  const recommendedIndex = findRecommendedTierIndex(tiers, recommendedTier);
+  const selectedTier = tiers[recommendedIndex] || tiers[0];
+
+  return {
+    recommendedTier: selectedTier?.tier || recommendedTier,
+    displayTier: selectedTier?.name || recommendedTier,
+    reasoning: reasoning.length
+      ? reasoning
+      : ['This tier matches the maintenance level indicated by your assessment.']
+  };
+};
+
 const PCCleaning = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +99,7 @@ const PCCleaning = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // AI Recommendation state
+  // Deterministic recommendation state
   const [aiRecommendation, setAiRecommendation] = useState(null);
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
 
@@ -75,36 +146,31 @@ const PCCleaning = () => {
     };
   }, []);
 
-  // Load AI recommendation if coming from assessment
+  // Load local recommendation if coming from assessment
   useEffect(() => {
     let isMounted = true;
 
-    const loadAIRecommendation = async () => {
+    const loadRecommendation = () => {
       try {
         // Check if we came from assessment
         const assessmentData = location.state?.assessmentAnswers || 
                               JSON.parse(localStorage.getItem('cleaningAssessment') || 'null');
         
         if (!assessmentData) {
-          console.log('ℹ️ No assessment data found - skipping AI recommendation');
+          console.log('No assessment data found - skipping cleaning recommendation');
           return;
         }
 
-        console.log('🤖 Loading AI cleaning tier recommendation...', assessmentData);
         setLoadingRecommendation(true);
 
-        const response = await aiService.getCleaningTierRecommendation(assessmentData);
+        const recommendation = buildLocalCleaningRecommendation(assessmentData, tiers);
         
-        if (isMounted && response.success) {
-          const recommendation = response.data;
+        if (isMounted && recommendation) {
           setAiRecommendation(recommendation);
-          console.log('✅ AI Recommendation received:', recommendation);
+          console.log('Cleaning recommendation prepared:', recommendation);
 
           // Auto-select the recommended tier
-          const recommendedIndex = tiers.findIndex(tier => 
-            tier.tier?.toLowerCase() === recommendation.recommendedTier?.toLowerCase() ||
-            tier.name?.toLowerCase().includes(recommendation.recommendedTier?.toLowerCase())
-          );
+          const recommendedIndex = findRecommendedTierIndex(tiers, recommendation.recommendedTier);
           
           if (recommendedIndex !== -1) {
             setSelectedTier(recommendedIndex);
@@ -112,7 +178,7 @@ const PCCleaning = () => {
           }
         }
       } catch (err) {
-        console.error('❌ Failed to load AI recommendation:', err);
+        console.error('Failed to load cleaning recommendation:', err);
         // Don't show error to user - just proceed without recommendation
       } finally {
         if (isMounted) {
@@ -123,7 +189,7 @@ const PCCleaning = () => {
 
     // Only load recommendation after tiers are loaded
     if (tiers.length > 0) {
-      loadAIRecommendation();
+      loadRecommendation();
     }
   }, [tiers, location.state]);
 
@@ -188,7 +254,7 @@ const PCCleaning = () => {
         <div style={{ textAlign: 'center', padding: '2rem', color: '#f44336' }}>
           <p>{error}</p>
           <button 
-            onClick={() => window.location.reload()} 
+            onClick={() => globalThis.location.reload()} 
             style={{ 
               marginTop: '1rem', 
               padding: '0.5rem 1rem', 
@@ -221,18 +287,19 @@ const PCCleaning = () => {
       <div className="cleaning-tiers">
         {tiers.map((tier, idx) => {
           const isAiRecommended = aiRecommendation && 
-            (tier.tier?.toLowerCase() === aiRecommendation.recommendedTier?.toLowerCase() ||
-             tier.name?.toLowerCase().includes(aiRecommendation.recommendedTier?.toLowerCase()));
+            findRecommendedTierIndex([tier], aiRecommendation.recommendedTier) !== -1;
+          const inclusionItems = toArray(tier.details?.inclusion);
 
           return (
             <React.Fragment key={tier.id || tier.name}>
-              <div
+              <div // NOSONAR - tier card with complex children
                 className={`cleaning-tier-card${selectedTier === idx ? " active" : ""}${isAiRecommended ? " ai-recommended" : ""}`}
                 onClick={() => setSelectedTier(idx)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTier(idx); }}
                 style={{ opacity: selectedTier === idx ? 1 : 0.5 }}
               >
                 {isAiRecommended && (
-                  <div className="ai-recommended-badge">🤖 AI PICK</div>
+                  <div className="ai-recommended-badge">RECOMMENDED</div>
                 )}
                 <img src={tier.icon} alt="tier icon" className="cleaning-tier-star" />
                 <div className="cleaning-tier-details">
@@ -252,8 +319,8 @@ const PCCleaning = () => {
                   <div className="cleaning-tier-inclusion">
                     <span className="cleaning-tier-inclusion-label">Inclusion:</span>
                     <ul>
-                      {tier.details.inclusion && tier.details.inclusion.map((inc, i) => (
-                        <li key={i}>{inc}</li>
+                      {inclusionItems.map((inc, i) => (
+                        <li key={`inc-${i}-${inc.slice(0, 20)}`}>{inc}</li>
                       ))}
                     </ul>
                   </div>
@@ -267,15 +334,15 @@ const PCCleaning = () => {
         })}
       </div>
 
-      {/* AI Recommendation Banner - Moved below tiers */}
+      {/* Recommendation Banner - Moved below tiers */}
       {aiRecommendation && !loadingRecommendation && (
         <div className="ai-recommendation-banner">
           <h3 className="ai-recommendation-title">
-            {aiRecommendation.recommendedTier.toUpperCase()} TIER is best for you!
+            {String(aiRecommendation.displayTier || aiRecommendation.recommendedTier).toUpperCase()} is best for you!
           </h3>
           <div className="ai-recommendation-reasons">
-            {aiRecommendation.reasoning.map((reason, idx) => (
-              <div key={idx} className="ai-reason">
+            {toArray(aiRecommendation.reasoning).map((reason) => (
+              <div key={reason} className="ai-reason">
                 <span className="ai-reason-icon">✓</span> {reason}
               </div>
             ))}

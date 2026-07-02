@@ -2,8 +2,22 @@ import React, { useState, useEffect } from "react";
 import "./PCCheckup.css";
 import CheckUp from "../assets/CheckUp.webp";
 import { useNavigate } from "react-router-dom";
-import aiService from "../api/aiService"; // AI integration for diagnostics
 import api from "../api/api"; // API for diagnostic issues
+
+const buildDiagnosticSummary = (selectedIssues, categories) => {
+  const selectedSet = new Set(selectedIssues);
+  const selectedCategories = categories
+    .filter(cat => (cat.options || []).some(option => selectedSet.has(option)))
+    .map(cat => cat.title);
+
+  return {
+    source: 'deterministic',
+    selectedIssues,
+    categories: selectedCategories,
+    severity: selectedIssues.length > 5 ? 'high' : selectedIssues.length > 2 ? 'medium' : 'low',
+    generatedAt: new Date().toISOString()
+  };
+};
 
 function PCCheckup() {
   const [categories, setCategories] = useState([]);
@@ -11,7 +25,6 @@ function PCCheckup() {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiError, setAiError] = useState(null);
   const navigate = useNavigate();
 
   // Load diagnostic issues from API on component mount
@@ -31,7 +44,7 @@ function PCCheckup() {
           const transformedCategories = diagnosticCategories.map(cat => ({
             title: cat.categoryDisplay || cat.category.toUpperCase(),
             category: cat.category,
-            options: cat.options.map(opt => opt.name)
+            options: (cat.options || []).map(opt => opt.name).filter(Boolean)
           }));
           
           setCategories(transformedCategories);
@@ -78,48 +91,21 @@ function PCCheckup() {
     if (selected.length === 0) return;
     
     setIsAnalyzing(true);
-    setAiError(null);
-    
     try {
-      // AI-Powered Pre-Analysis
-      const diagnosticData = {
-        selectedIssues: selected,
-        systemSpecs: {
-          // Basic system info that can be detected or estimated
-          userReportedIssues: selected,
-          issueCategories: categories.filter(cat => 
-            cat.options.some(opt => selected.includes(opt))
-          ).map(cat => cat.title),
-          symptomSeverity: selected.length > 5 ? 'high' : selected.length > 2 ? 'medium' : 'low'
-        },
-        timestamp: new Date().toISOString()
-      };
-
-      // Call AI service for preliminary analysis
-      const aiAnalysis = await aiService.performPCCheckup(
-        diagnosticData.systemSpecs,
-        { issues: selected, reportedSymptoms: selected },
-        [] // Available services will be loaded from backend
-      );
-
-      // Save both original selections and AI analysis
       localStorage.setItem("diagnosticIssues", JSON.stringify(selected));
-      localStorage.setItem("aiDiagnosticAnalysis", JSON.stringify(aiAnalysis));
+      localStorage.setItem("diagnosticCategories", JSON.stringify(categories));
+      localStorage.setItem("diagnosticAnalysis", JSON.stringify(buildDiagnosticSummary(selected, categories)));
+      localStorage.removeItem("aiDiagnosticAnalysis");
       
-      console.log('🤖 AI Diagnostic Analysis:', aiAnalysis);
+      console.log('Diagnostic summary prepared:', selected.length, 'issues');
       
-      // Navigate to enhanced review with AI insights
       navigate("/review-issues");
       
     } catch (error) {
-      console.error('AI diagnostic analysis failed:', error);
-      setAiError('AI analysis temporarily unavailable');
+      console.error('Diagnostic summary failed:', error);
       
-      // Fallback: Continue with basic flow
       localStorage.setItem("diagnosticIssues", JSON.stringify(selected));
-      setTimeout(() => {
-        navigate("/review-issues");
-      }, 2000);
+      navigate("/review-issues");
     } finally {
       setIsAnalyzing(false);
     }
@@ -183,18 +169,6 @@ function PCCheckup() {
       <div className="pc-checkup-intro">
         <h2 className="pc-checkup-section-title">DIAGNOSTIC TEST</h2>
         <p className="pc-checkup-section-desc">Select all that applies</p>
-        {aiError && (
-          <div style={{ 
-            padding: '10px', 
-            margin: '10px 0', 
-            backgroundColor: '#fff3cd', 
-            color: '#856404', 
-            borderRadius: '5px',
-            fontSize: '14px'
-          }}>
-            ⚠️ {aiError} - Continuing with standard diagnostics
-          </div>
-        )}
       </div>
 
       <div className="pc-checkup-content">
@@ -203,7 +177,7 @@ function PCCheckup() {
             <div key={cat.title} className="pc-checkup-category">
               <h3 className="pc-checkup-category-title">{cat.title}</h3>
               <div className="pc-checkup-options-row">
-                {cat.options.map((option) => (
+                {(cat.options || []).map((option) => (
                   <button
                     key={option}
                     className={`pc-checkup-option-btn${selected.includes(option) ? " selected" : ""}`}
