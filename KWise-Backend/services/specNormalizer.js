@@ -260,13 +260,13 @@ class SpecNormalizer {
   extractCores(specs, name) {
     const specStr = JSON.stringify(specs) + ' ' + name;
     const match = specStr.match(/(\d+)[\s-]?core/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
   }
 
   extractThreads(specs, name) {
     const specStr = JSON.stringify(specs) + ' ' + name;
     const match = specStr.match(/(\d+)[\s-]?thread/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
   }
 
   extractClock(specs, type) {
@@ -287,7 +287,7 @@ class SpecNormalizer {
   extractWattage(specs, name) {
     const specStr = JSON.stringify(specs) + ' ' + name;
     const match = specStr.match(/(\d+)\s*W/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
   }
 
   extractEfficiency(specs, name) {
@@ -305,7 +305,7 @@ class SpecNormalizer {
   extractSpeed(specs, name) {
     const specStr = JSON.stringify(specs) + ' ' + name;
     const match = specStr.match(/(\d+)\s*MHz/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
   }
 
   // Stub methods for other extractors (implement as needed)
@@ -345,7 +345,7 @@ class SpecNormalizer {
   // Helper methods
   extractNumber(specs, pattern) {
     const match = JSON.stringify(specs).match(pattern);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
   }
 
   extractPattern(specs, pattern) {

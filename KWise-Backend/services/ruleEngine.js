@@ -232,7 +232,7 @@ class RuleEngine {
         
         // Also check for Ryzen generations
         const ryzenMatch = component.name.match(/Ryzen\s+(\d+)/i);
-        if (ryzenMatch) enriched.cpu_series = parseInt(ryzenMatch[1]);
+        if (ryzenMatch) enriched.cpu_series = Number.parseInt(ryzenMatch[1], 10);
       }
       
       // Copy other CPU-specific fields

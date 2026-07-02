@@ -6,14 +6,12 @@
  * ⏰ AUTO-RESET: Automatically checks for midnight reset on every queue request
  */
 
-const { query } = require('../config/db');
+const { query, getClient } = require('../config/db');
 const logger = require('../utils/logger');
 const orderLockService = require('./orderLockService');
 
 class QueueManagerService {
-    constructor() {
-        this.initialized = false;
-    }
+    initialized = false;
 
     /**
      * Initialize the queue management system
@@ -43,11 +41,11 @@ class QueueManagerService {
         try {
             // First check if queue numbers already exist to avoid unnecessary INSERT
             const existingCount = await query(`
-                SELECT COUNT(*) as count FROM queue_management 
+                SELECT COUNT(*) as count FROM queue_management
                 WHERE queue_number BETWEEN 1 AND 99
             `);
 
-            const existing = parseInt(existingCount.rows[0].count);
+            const existing = Number.parseInt(existingCount?.rows?.[0]?.count ?? '0', 10);
 
             if (existing < 99) {
                 const result = await query(`
@@ -57,8 +55,9 @@ class QueueManagerService {
                     RETURNING queue_number
                 `);
 
-                if (result.rows.length > 0) {
-                    logger.info(`🔢 Created ${result.rows.length} new queue numbers`);
+                const insertedRows = result?.rows || [];
+                if (insertedRows.length > 0) {
+                    logger.info(`🔢 Created ${insertedRows.length} new queue numbers`);
                 }
             } else {
                 logger.info(`🔢 All queue numbers already initialized (${existing}/99)`);
@@ -79,7 +78,7 @@ class QueueManagerService {
 
             await query(`
                 INSERT INTO order_counters (counter_type, counter_period, current_value, reset_date)
-                VALUES 
+                VALUES
                     ('order_yearly', $1, 0, $2),
                     ('transaction_monthly', $3, 0, $4)
                 ON CONFLICT (counter_type, counter_period) DO NOTHING
@@ -115,10 +114,10 @@ class QueueManagerService {
                 logger.warn('⚠️ Auto-reset check failed (non-critical):', resetError.message);
                 // Continue with queue assignment even if auto-reset check fails
             }
-            
+
             // STEP 2: Get next available queue number (uses enhanced get_next_queue_number function)
             const result = await query(`SELECT get_next_queue_number() as queue_number`);
-            
+
             return result.rows.length > 0 ? result.rows[0].queue_number : null;
         } catch (error) {
             logger.error('❌ Error getting next queue number:', error);
@@ -181,8 +180,8 @@ class QueueManagerService {
     async updateQueueStatus(queueNumber, status, orderId = null) {
         try {
             await query(`
-                UPDATE queue_management 
-                SET 
+                UPDATE queue_management
+                SET
                     status = $1,
                     order_id = $2,
                     updated_at = NOW(),
@@ -208,7 +207,7 @@ class QueueManagerService {
         try {
             // ✅ CRITICAL FIX: Use transaction for atomic completion
             await query('BEGIN');
-            
+
             try {
                 // First get the queue information INCLUDING is_now_serving flag
                 const queueInfo = await query(`
@@ -220,8 +219,8 @@ class QueueManagerService {
 
                 // Update order status to completed
                 await query(`
-                    UPDATE orders 
-                    SET 
+                    UPDATE orders
+                    SET
                         queue_status = 'completed',
                         queue_completed_at = NOW(),
                         status = 'completed',
@@ -240,8 +239,8 @@ class QueueManagerService {
                     // Queue numbers CANNOT be reused within the same day/cycle
                     // ✅ DUAL-STATION FIX: Clear ALL station fields to prevent conflicts
                     await query(`
-                        UPDATE queue_management 
-                        SET 
+                        UPDATE queue_management
+                        SET
                             status = 'completed',
                             order_id = NULL,
                             is_now_serving = FALSE,
@@ -263,7 +262,7 @@ class QueueManagerService {
                 } else {
                     logger.info(`✅ Order ${orderId} completed (no queue assignment found)`);
                 }
-                
+
                 // ✅ COMMIT transaction immediately
                 await query('COMMIT');
                 logger.info(`✅ Complete order transaction committed for order ${orderId}`);
@@ -289,7 +288,7 @@ class QueueManagerService {
             // ✅ FIX: Direct query without GROUP BY to avoid order_items aggregation issues
             // Only return queues that are truly active (not completed/cancelled)
             const result = await query(`
-                SELECT 
+                SELECT
                     qm.queue_number,
                     qm.status as queue_status,
                     qm.is_now_serving,
@@ -308,7 +307,7 @@ class QueueManagerService {
                     o.queue_assigned_at
                 FROM queue_management qm
                 INNER JOIN orders o ON qm.order_id = o.id
-                WHERE 
+                WHERE
                     qm.order_id IS NOT NULL
                     AND o.status NOT IN ('completed', 'cancelled')
                     AND o.queue_status NOT IN ('completed', 'cancelled')
@@ -321,7 +320,7 @@ class QueueManagerService {
                 result.rows.map(async (order) => {
                     try {
                         const itemsResult = await query(`
-                            SELECT 
+                            SELECT
                                 id,
                                 component_name,
                                 item_name,
@@ -366,7 +365,7 @@ class QueueManagerService {
     async getQueueStats() {
         try {
             const result = await query(`
-                SELECT 
+                SELECT
                     COUNT(CASE WHEN status = 'available' AND used_in_cycle = FALSE THEN 1 END) as available_queues,
                     COUNT(CASE WHEN used_in_cycle = TRUE THEN 1 END) as used_queues,
                     COUNT(CASE WHEN status = 'assigned' THEN 1 END) as assigned_queues,
@@ -396,13 +395,13 @@ class QueueManagerService {
             countersResult.rows.forEach(row => {
                 counters[row.counter_type] = {
                     period: row.counter_period,
-                    value: parseInt(row.current_value)
+                    value: Number.parseInt(row.current_value, 10)
                 };
             });
 
             // Get today's completed/cancelled counts from orders table (more reliable)
             const todayStats = await query(`
-                SELECT 
+                SELECT
                     COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_today,
                     COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_today
                 FROM orders
@@ -413,23 +412,23 @@ class QueueManagerService {
             const todayData = todayStats.rows[0];
 
             return {
-                activeCount: parseInt(stats.processing_queues) || 0,
-                pendingCount: parseInt(stats.assigned_queues) || 0,
-                completedToday: parseInt(todayData.completed_today) || 0,
-                cancelledToday: parseInt(todayData.cancelled_today) || 0,
-                totalQueues: parseInt(stats.total_queues) || 0,
-                availableQueues: parseInt(availability.available_queues) || 0,
-                usedQueues: parseInt(availability.used_queues) || 0,
-                currentCycle: parseInt(availability.current_cycle) || 1,
+                activeCount: Number.parseInt(stats.processing_queues, 10) || 0,
+                pendingCount: Number.parseInt(stats.assigned_queues, 10) || 0,
+                completedToday: Number.parseInt(todayData.completed_today, 10) || 0,
+                cancelledToday: Number.parseInt(todayData.cancelled_today, 10) || 0,
+                totalQueues: Number.parseInt(stats.total_queues, 10) || 0,
+                availableQueues: Number.parseInt(availability.available_queues, 10) || 0,
+                usedQueues: Number.parseInt(availability.used_queues, 10) || 0,
+                currentCycle: Number.parseInt(availability.current_cycle, 10) || 1,
                 needsReset: availability.needs_reset || false,
-                lastAssignedQueue: parseInt(availability.last_assigned_queue) || 0,
+                lastAssignedQueue: Number.parseInt(availability.last_assigned_queue, 10) || 0,
                 // ⏰ NEW: Auto-reset countdown fields
                 lastResetDate: availability.last_reset_date,
                 nextAutoResetAt: availability.next_auto_reset_at,
-                hoursUntilReset: parseFloat(availability.hours_until_reset) || 0,
+                hoursUntilReset: Number.parseFloat(availability.hours_until_reset) || 0,
                 resetType: availability.reset_type || 'auto',
                 counters,
-                efficiency: Math.round((parseInt(availability.available_queues) / 99) * 100) || 0
+                efficiency: Math.round((Number.parseInt(availability.available_queues, 10) / 99) * 100) || 0
             };
         } catch (error) {
             logger.error('❌ Error getting queue stats:', error);
@@ -453,17 +452,7 @@ class QueueManagerService {
                 totalAmount,
                 paymentMethod = 'Cash',
                 serviceType = 'self-order',
-                serviceFee = 0,
-                laborCharges = 0,
-                otherCharges = 0,
-                serviceNotes = null,
-                underlyingIssues = null,
                 cleaningAssessment = null,
-                manualProcessing = false,
-                manualProcessingNotes = null,
-                phoneNumber = null,
-                notes = null,
-                transactionOrigin = null
             } = orderData;
 
             // Validate required fields (customerName can be null/empty for kiosk orders)
@@ -477,150 +466,173 @@ class QueueManagerService {
 
             logger.info('✅ Creating order - validation passed');
 
-            // ✅ SIMPLIFIED: Use a simple, fast function call instead of complex transaction
-            // PostgreSQL function handles everything atomically
-            const result = await query(`
-                WITH new_queue AS (
-                    SELECT queue_number
-                    FROM queue_management
-                    WHERE status = 'available'
-                    ORDER BY queue_number
-                    LIMIT 1
-                    FOR UPDATE SKIP LOCKED
-                ),
-                new_order_id AS (
-                    SELECT generate_formatted_order_id() as order_id
-                ),
-                new_transaction_id AS (
-                    SELECT generate_formatted_transaction_id() as transaction_id
-                ),
-                new_order_number AS (
-                    -- ✅ FIX: Use sequence with timestamp to ensure uniqueness (prevents duplicate constraint violation)
-                    SELECT 'KW' || TO_CHAR(NOW(), 'YYYYMMDDHH24MISS') || '-' || LPAD(nextval('order_number_sequence')::TEXT, 4, '0') as order_number
-                ),
-                inserted_order AS (
-                    INSERT INTO orders (
-                        order_number,
-                        order_id_formatted,
-                        transaction_id_formatted,
-                        customer_name,
-                        customer_email,
-                        total_amount,
-                        payment_method,
-                        payment_status,
-                        status,
-                        queue_number,
-                        queue_status,
-                        queue_assigned_at,
-                        service_type,
-                        assessment_data
-                    )
-                    SELECT
-                        (SELECT order_number FROM new_order_number),
-                        (SELECT order_id FROM new_order_id),
-                        (SELECT transaction_id FROM new_transaction_id),
-                        $1,
-                        $2,
-                        $3,
-                        $4,
-                        'pending',
-                        'pending',
-                        (SELECT queue_number FROM new_queue),
-                        'assigned',
-                        NOW(),
-                        $5,
-                        $6::jsonb
-                    RETURNING id, order_number, order_id_formatted, transaction_id_formatted, queue_number
-                ),
-                updated_queue AS (
-                    UPDATE queue_management
-                    SET 
-                        status = 'assigned',
-                        order_id = (SELECT id FROM inserted_order),
-                        assigned_at = NOW(),
-                        updated_at = NOW()
-                    WHERE queue_number = (SELECT queue_number FROM new_queue)
-                    RETURNING queue_number
-                )
-                SELECT * FROM inserted_order
-            `, [
-                customerName || null,
-                customerEmail || null,
-                parseFloat(totalAmount),
-                paymentMethod,
-                serviceType,
-                cleaningAssessment ? JSON.stringify(cleaningAssessment) : null
-            ]);
+            // ✅ FIX: Use a dedicated DB client so the full operation (order CTE + items) runs in ONE transaction.
+            // If any item insertion fails the whole order rolls back — no orphaned order records without items.
+            const client = await getClient();
+            try {
+                await client.query('BEGIN');
+                const statementTimeoutMs = Math.max(
+                    250,
+                    Math.min(Number.parseInt(process.env.ORDER_CREATE_STATEMENT_TIMEOUT_MS || '3000', 10) || 3000, 10000)
+                );
+                await client.query(`SET LOCAL statement_timeout = ${statementTimeoutMs}`);
 
-            if (result.rows.length === 0) {
-                throw new Error('No queue numbers available. All queues are currently busy.');
-            }
-
-            const order = result.rows[0];
-            logger.info(`✅ Order created: ${order.order_id_formatted} -> Queue #${order.queue_number}`);
-
-            // Add order items
-            for (const item of items) {
-                const hasDescription = item.description && item.description.trim().length > 0;
-
-                if (hasDescription) {
-                    await query(`
-                        INSERT INTO order_items (
-                            order_id,
-                            stock_item_id,
-                            item_name,
-                            component_name,
-                            quantity,
-                            price,
-                            amount,
+                // Atomic CTE: inserts the order record and assigns the queue in one statement
+                const result = await client.query(`
+                    WITH new_queue AS (
+                        SELECT queue_number
+                        FROM queue_management
+                        WHERE status = 'available'
+                        ORDER BY queue_number
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+                    ),
+                    new_order_id AS (
+                        SELECT generate_formatted_order_id() as order_id
+                    ),
+                    new_transaction_id AS (
+                        SELECT generate_formatted_transaction_id() as transaction_id
+                    ),
+                    new_order_number AS (
+                        -- ✅ FIX: Use sequence with timestamp to ensure uniqueness (prevents duplicate constraint violation)
+                        SELECT 'KW' || TO_CHAR(NOW(), 'YYYYMMDDHH24MISS') || '-' || LPAD(nextval('order_number_sequence')::TEXT, 4, '0') as order_number
+                    ),
+                    inserted_order AS (
+                        INSERT INTO orders (
+                            order_number,
+                            order_id_formatted,
+                            transaction_id_formatted,
+                            customer_name,
+                            customer_email,
+                            total_amount,
+                            payment_method,
+                            payment_status,
                             status,
-                            description
-                        ) VALUES ($1, NULL, $2, $3, $4, $5, $6, 'pending', $7)
-                    `, [
-                        order.id,
-                        item.name,
-                        item.category || item.name,
-                        item.quantity || 1,
-                        parseFloat(item.price || 0),
-                        parseFloat(item.totalPrice || item.price || 0),
-                        item.description
-                    ]);
-                } else {
-                    await query(`
-                        INSERT INTO order_items (
-                            order_id,
-                            stock_item_id,
-                            item_name,
-                            component_name,
-                            quantity,
-                            price,
-                            amount,
-                            status
-                        ) VALUES ($1, NULL, $2, $3, $4, $5, $6, 'pending')
-                    `, [
-                        order.id,
-                        item.name,
-                        item.category || item.name,
-                        item.quantity || 1,
-                        parseFloat(item.price || 0),
-                        parseFloat(item.totalPrice || item.price || 0)
-                    ]);
+                            queue_number,
+                            queue_status,
+                            queue_assigned_at,
+                            service_type,
+                            assessment_data
+                        )
+                        SELECT
+                            (SELECT order_number FROM new_order_number),
+                            (SELECT order_id FROM new_order_id),
+                            (SELECT transaction_id FROM new_transaction_id),
+                            $1,
+                            $2,
+                            $3,
+                            $4,
+                            'pending',
+                            'pending',
+                            (SELECT queue_number FROM new_queue),
+                            'assigned',
+                            NOW(),
+                            $5,
+                            $6::jsonb
+                        RETURNING id, order_number, order_id_formatted, transaction_id_formatted, queue_number
+                    ),
+                    updated_queue AS (
+                        UPDATE queue_management
+                        SET
+                            status = 'assigned',
+                            order_id = (SELECT id FROM inserted_order),
+                            assigned_at = NOW(),
+                            updated_at = NOW()
+                        WHERE queue_number = (SELECT queue_number FROM new_queue)
+                        RETURNING queue_number
+                    )
+                    SELECT * FROM inserted_order
+                `, [
+                    customerName || null,
+                    customerEmail || null,
+                    Number.parseFloat(totalAmount),
+                    paymentMethod,
+                    serviceType,
+                    cleaningAssessment ? JSON.stringify(cleaningAssessment) : null
+                ]);
+
+                if (result.rows.length === 0) {
+                    throw new Error('No queue numbers available. All queues are currently busy.');
                 }
+
+                const order = result.rows[0];
+                logger.info(`✅ Order created: ${order.order_id_formatted} -> Queue #${order.queue_number}`);
+
+                // Insert order items within the same transaction — failure rolls back order + items together
+                for (const item of items) {
+                    // Guard against NaN: coerce non-numeric prices to 0 instead of letting NaN reach the DB
+                    const safePrice = Number.isFinite(Number(item.price)) ? Number(item.price) : 0;
+                    const safeTotalPrice = Number.isFinite(Number(item.totalPrice)) ? Number(item.totalPrice) : safePrice;
+                    const hasDescription = item.description && item.description.trim().length > 0;
+
+                    if (hasDescription) {
+                        await client.query(`
+                            INSERT INTO order_items (
+                                order_id,
+                                stock_item_id,
+                                item_name,
+                                component_name,
+                                quantity,
+                                price,
+                                amount,
+                                status,
+                                description
+                            ) VALUES ($1, NULL, $2, $3, $4, $5, $6, 'pending', $7)
+                        `, [
+                            order.id,
+                            item.name,
+                            item.category || item.name,
+                            item.quantity || 1,
+                            safePrice,
+                            safeTotalPrice,
+                            item.description
+                        ]);
+                    } else {
+                        await client.query(`
+                            INSERT INTO order_items (
+                                order_id,
+                                stock_item_id,
+                                item_name,
+                                component_name,
+                                quantity,
+                                price,
+                                amount,
+                                status
+                            ) VALUES ($1, NULL, $2, $3, $4, $5, $6, 'pending')
+                        `, [
+                            order.id,
+                            item.name,
+                            item.category || item.name,
+                            item.quantity || 1,
+                            safePrice,
+                            safeTotalPrice
+                        ]);
+                    }
+                }
+
+                await client.query('COMMIT');
+                logger.info(`🛒 Order ${order.order_id_formatted} complete with ${items.length} items`);
+
+                return {
+                    orderId: order.id,
+                    orderNumber: order.order_number,
+                    orderIdFormatted: order.order_id_formatted,
+                    transactionIdFormatted: order.transaction_id_formatted,
+                    queueNumber: order.queue_number,
+                    totalAmount: Number.parseFloat(totalAmount),
+                    items: items
+                };
+            } catch (txError) {
+                await client.query('ROLLBACK');
+                logger.error('❌ Error creating order, transaction rolled back:', txError);
+                throw txError;
+            } finally {
+                client.release();
             }
-
-            logger.info(`🛒 Order complete with ${items.length} items`);
-
-            return {
-                orderId: order.id,
-                orderNumber: order.order_number,
-                orderIdFormatted: order.order_id_formatted,
-                transactionIdFormatted: order.transaction_id_formatted,
-                queueNumber: order.queue_number,
-                totalAmount: parseFloat(totalAmount),
-                items: items
-            };
         } catch (error) {
-            logger.error('❌ Error creating order:', error);
+            logger.debug('createOrderWithQueue failed before transaction completed', {
+                error: error.message
+            });
             throw error;
         }
     }

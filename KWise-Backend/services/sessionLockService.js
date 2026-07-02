@@ -14,7 +14,7 @@
  */
 
 const { query } = require('../config/db');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const logger = require('../utils/logger');
 
 class SessionLockService {

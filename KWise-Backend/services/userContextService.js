@@ -40,9 +40,9 @@ async function getUserContext(userId) {
             profile,
             orders: {
                 total: orders.length,
-                totalSpent: orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
+                totalSpent: orders.reduce((sum, o) => sum + Number.parseFloat(o.total_price || 0), 0),
                 averageOrderValue: orders.length > 0 
-                    ? orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0) / orders.length 
+                    ? orders.reduce((sum, o) => sum + Number.parseFloat(o.total_price || 0), 0) / orders.length 
                     : 0,
                 recentOrders: orders.slice(0, 5),
                 categoryPreferences: analyzeCategoryPreferences(orders)
@@ -150,7 +150,7 @@ async function getOrderHistory(userId) {
         return result.rows.map(order => ({
             id: order.id,
             orderNumber: order.order_number,
-            totalPrice: parseFloat(order.total_price) || 0,
+            totalPrice: Number.parseFloat(order.total_price) || 0,
             status: order.status,
             orderType: order.order_type,
             createdAt: order.created_at,
@@ -214,7 +214,7 @@ async function getInteractionPatterns(userId) {
 
         const favoriteCategories = searchResult.rows.map(r => ({
             category: r.category,
-            count: parseInt(r.count)
+            count: Number.parseInt(r.count, 10)
         }));
 
         // Get price range from search/browse history
@@ -231,13 +231,13 @@ async function getInteractionPatterns(userId) {
 
         return {
             visits: 0, // Would track from analytics
-            searches: searchResult.rows.reduce((sum, r) => sum + parseInt(r.count), 0),
+            searches: searchResult.rows.reduce((sum, r) => sum + Number.parseInt(r.count, 10), 0),
             comparisons: 0, // Would track from comparison tool usage
             favoriteCategories,
             priceRange: {
-                min: parseFloat(priceData.min_price) || 5000,
-                max: parseFloat(priceData.max_price) || 50000,
-                average: parseFloat(priceData.avg_price) || 20000
+                min: Number.parseFloat(priceData.min_price) || 5000,
+                max: Number.parseFloat(priceData.max_price) || 50000,
+                average: Number.parseFloat(priceData.avg_price) || 20000
             }
         };
 
@@ -273,7 +273,7 @@ async function getBuildHistory(userId) {
         return result.rows.map(build => ({
             id: build.id,
             name: build.build_name,
-            totalPrice: parseFloat(build.total_price) || 0,
+            totalPrice: Number.parseFloat(build.total_price) || 0,
             purpose: build.purpose,
             components: build.components,
             createdAt: build.created_at
@@ -350,7 +350,7 @@ function computeExperienceLevel(orders, builds, interactions) {
 
 function computeBudgetTier(orders, builds) {
     const allSpending = [
-        ...orders.map(o => parseFloat(o.totalPrice) || 0),
+        ...orders.map(o => Number.parseFloat(o.totalPrice) || 0),
         ...builds.map(b => b.totalPrice || 0)
     ];
 

@@ -167,9 +167,9 @@ class RealWorldDataService {
 
       // Calculate satisfaction score (0-100)
       // Formula: (avg_rating/5 * 80) + (positive_feedback/total * 20) - (critical_issues/total * 30)
-      const baseScore = (parseFloat(avg_rating || 0) / 5) * 80;
-      const positiveBonus = total_ratings > 0 ? (parseInt(positive_feedback || 0) / parseInt(total_ratings)) * 20 : 0;
-      const criticalPenalty = total_ratings > 0 ? (parseInt(critical_issues || 0) / parseInt(total_ratings)) * 30 : 0;
+      const baseScore = (Number.parseFloat(avg_rating || 0) / 5) * 80;
+      const positiveBonus = total_ratings > 0 ? (Number.parseInt(positive_feedback || 0, 10) / Number.parseInt(total_ratings, 10)) * 20 : 0;
+      const criticalPenalty = total_ratings > 0 ? (Number.parseInt(critical_issues || 0, 10) / Number.parseInt(total_ratings, 10)) * 30 : 0;
       const satisfactionScore = Math.max(0, Math.min(100, baseScore + positiveBonus - criticalPenalty));
 
       // Update component metadata
@@ -183,7 +183,7 @@ class RealWorldDataService {
             'last_updated', NOW()
           )
         WHERE id = $4`,
-        [satisfactionScore.toFixed(2), parseInt(total_ratings || 0), parseFloat(avg_rating || 0).toFixed(2), componentId]
+        [satisfactionScore.toFixed(2), Number.parseInt(total_ratings || 0, 10), Number.parseFloat(avg_rating || 0).toFixed(2), componentId]
       );
 
       logger.info(`📊 Updated satisfaction score for component #${componentId}: ${satisfactionScore.toFixed(2)}`);
@@ -524,7 +524,7 @@ class RealWorldDataService {
         .sort()
         .map(key => `${key}:${components[key]}`)
         .join('|');
-      const buildHash = require('crypto').createHash('md5').update(sortedComponents).digest('hex');
+      const buildHash = require('node:crypto').createHash('md5').update(sortedComponents).digest('hex');
 
       const result = await query(
         `INSERT INTO successful_builds (
@@ -619,10 +619,10 @@ class RealWorldDataService {
       if (existing.rows.length > 0) {
         // Update existing pattern
         const pattern = existing.rows[0];
-        const newCount = parseInt(pattern.build_count) + 1;
-        const newAvgPerf = ((parseFloat(pattern.avg_performance) * pattern.build_count) + buildData.performance_rating) / newCount;
-        const newAvgStab = ((parseFloat(pattern.avg_stability) * pattern.build_count) + buildData.stability_rating) / newCount;
-        const newAvgSat = ((parseFloat(pattern.avg_satisfaction) * pattern.build_count) + buildData.satisfaction_rating) / newCount;
+        const newCount = Number.parseInt(pattern.build_count, 10) + 1;
+        const newAvgPerf = ((Number.parseFloat(pattern.avg_performance) * pattern.build_count) + buildData.performance_rating) / newCount;
+        const newAvgStab = ((Number.parseFloat(pattern.avg_stability) * pattern.build_count) + buildData.stability_rating) / newCount;
+        const newAvgSat = ((Number.parseFloat(pattern.avg_satisfaction) * pattern.build_count) + buildData.satisfaction_rating) / newCount;
 
         await query(
           `UPDATE build_patterns
@@ -758,7 +758,7 @@ class RealWorldDataService {
         .sort()
         .map(key => `${key}:${components[key]}`)
         .join('|');
-      const buildHash = require('crypto').createHash('md5').update(sortedComponents).digest('hex');
+      const buildHash = require('node:crypto').createHash('md5').update(sortedComponents).digest('hex');
 
       const result = await query(
         `SELECT * FROM build_patterns WHERE build_hash = $1`,
@@ -772,10 +772,10 @@ class RealWorldDataService {
       const pattern = result.rows[0];
 
       return {
-        build_count: parseInt(pattern.build_count),
-        avg_performance: parseFloat(pattern.avg_performance),
-        avg_stability: parseFloat(pattern.avg_stability),
-        avg_satisfaction: parseFloat(pattern.avg_satisfaction),
+        build_count: Number.parseInt(pattern.build_count, 10),
+        avg_performance: Number.parseFloat(pattern.avg_performance),
+        avg_stability: Number.parseFloat(pattern.avg_stability),
+        avg_satisfaction: Number.parseFloat(pattern.avg_satisfaction),
         first_seen: pattern.first_seen,
         last_seen: pattern.last_seen,
         confidence_score: this.calculateConfidenceScore(pattern)
@@ -792,7 +792,7 @@ class RealWorldDataService {
    * Based on number of builds and recency
    */
   calculateConfidenceScore(pattern) {
-    const buildCount = parseInt(pattern.build_count);
+    const buildCount = Number.parseInt(pattern.build_count, 10);
     const daysSinceLastSeen = (Date.now() - new Date(pattern.last_seen).getTime()) / (1000 * 60 * 60 * 24);
 
     // Base score from build count (0-70 points)
@@ -839,7 +839,7 @@ class RealWorldDataService {
 
       // Add for successful builds
       if (similarBuilds.length > 0) {
-        const avgSatisfaction = similarBuilds.reduce((sum, b) => sum + parseFloat(b.avg_rating), 0) / similarBuilds.length;
+        const avgSatisfaction = similarBuilds.reduce((sum, b) => sum + Number.parseFloat(b.avg_rating), 0) / similarBuilds.length;
         confidence += (avgSatisfaction / 5) * 30; // Up to +30 for 5-star builds
         confidence += Math.min(20, similarBuilds.length * 4); // Up to +20 for 5+ similar builds
       }
@@ -853,7 +853,7 @@ class RealWorldDataService {
         major_issues: majorIssues,
         similar_builds: similarBuilds.length,
         avg_build_satisfaction: similarBuilds.length > 0 
-          ? (similarBuilds.reduce((sum, b) => sum + parseFloat(b.avg_rating), 0) / similarBuilds.length).toFixed(2)
+          ? (similarBuilds.reduce((sum, b) => sum + Number.parseFloat(b.avg_rating), 0) / similarBuilds.length).toFixed(2)
           : null,
         warnings: knownIssues.filter(i => i.severity === 'critical' || i.severity === 'major'),
         recommendations: similarBuilds.slice(0, 3)

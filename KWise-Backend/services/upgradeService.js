@@ -19,9 +19,6 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const enhancedAIService = require('./enhancedAIService'); // PHASE 1: Enhanced AI integration
-const PromptTemplates = require('./promptTemplates'); // PHASE 2: Advanced prompt templates
-const MetadataEnrichmentService = require('./metadataEnrichmentService'); // PHASE 2: Metadata enrichment
 
 /**
  * ============================================================================
@@ -100,6 +97,15 @@ async function generateDualUpgrades(component, category, options = {}) {
 async function analyzeUpgradePath(currentBuild, userContext, options = {}) {
     try {
         logger.info(`🤖 AI-Enhanced Upgrade Analysis: ${currentBuild.name || 'Custom Build'}`);
+
+        return {
+            success: false,
+            code: 'AI_REMOVED',
+            source: 'deterministic',
+            message: 'AI upgrade analysis is disabled in offline kiosk mode',
+            fallback: true,
+            recommendations: []
+        };
 
         // Step 1: Enrich current build metadata
         const enrichedBuild = await MetadataEnrichmentService.enrichPartsMetadata(
@@ -181,10 +187,10 @@ async function getMarketData(components) {
             if (result.rows.length > 0) {
                 const data = result.rows[0];
                 marketData.currentPrices[category] = {
-                    average: parseFloat(data.avg_price),
-                    min: parseFloat(data.min_price),
-                    max: parseFloat(data.max_price),
-                    availableOptions: parseInt(data.available_count)
+                    average: Number.parseFloat(data.avg_price),
+                    min: Number.parseFloat(data.min_price),
+                    max: Number.parseFloat(data.max_price),
+                    availableOptions: Number.parseInt(data.available_count, 10)
                 };
             }
         }
@@ -214,8 +220,8 @@ async function getMarketData(components) {
 async function getStockUpgrade(component, category) {
     try {
         const categoryTable = getCategoryTable(category);
-        const currentPrice = parseFloat(component.price) || 0;
-        const currentPerformance = parseFloat(component.performance_index) || 0;
+        const currentPrice = Number.parseFloat(component.price) || 0;
+        const currentPerformance = Number.parseFloat(component.performance_index) || 0;
 
         logger.info(`🔍 Searching stock upgrade: category=${category}, table=${categoryTable}, currentPrice=${currentPrice}, currentPerf=${currentPerformance}`);
 
@@ -279,7 +285,7 @@ async function getStockUpgrade(component, category) {
  */
 async function isBestInCategory(component, category) {
     try {
-        const currentPerformance = parseFloat(component.performance_index) || 0;
+        const currentPerformance = Number.parseFloat(component.performance_index) || 0;
 
         const result = await query(`
             SELECT COUNT(*) as higher_count
@@ -290,7 +296,7 @@ async function isBestInCategory(component, category) {
                 AND COALESCE(performance_index, 0) > $2
         `, [category, currentPerformance]);
 
-        const higherCount = parseInt(result.rows[0].higher_count);
+        const higherCount = Number.parseInt(result.rows[0].higher_count, 10);
         logger.info(`🏆 Best in category check: ${higherCount} products higher than ${component.name}`);
 
         return higherCount === 0;
@@ -310,7 +316,7 @@ async function isBestInCategory(component, category) {
  */
 async function getExternalUpgrade(component, category, variant = 1) {
     try {
-        const currentPrice = parseFloat(component.price) || 0;
+        const currentPrice = Number.parseFloat(component.price) || 0;
         const currentYear = new Date().getFullYear();
         
         // Generate realistic external upgrade prediction
@@ -369,7 +375,7 @@ async function getExternalUpgrade(component, category, variant = 1) {
  * ============================================================================
  */
 function generateExternalPrediction(component, category, variant, currentYear) {
-    const currentPrice = parseFloat(component.price) || 0;
+    const currentPrice = Number.parseFloat(component.price) || 0;
     const componentName = component.name.toLowerCase();
 
     // Category-specific predictions
