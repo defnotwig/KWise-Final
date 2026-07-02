@@ -1,0 +1,17 @@
+# Build output
+build/
+node_modules/
+
+# Backup and deprecated files — these contain parse errors and should not be linted.
+# They are kept for reference but are not part of the active codebase.
+src/kiosk/FutureUpgrade_OLD.js
+src/kiosk/FutureUpgrade_ORIGINAL_BACKUP.js
+src/kiosk/PC-Parts-ModernBackup.js
+src/kiosk/PC-Parts-backup-20250924-203657.js
+src/kiosk/PC-Parts.backup.js
+src/kiosk/PaymentWindow-OLD.js
+src/pages/Orders/StockDetail.backup.js
+src/pages/ReferenceEmailDemo.deprecated.js
+src/pages/ReferenceEmailDemo.js
+src/pages/LoginEnhanced.js
+src/services/websocketService-disabled.js

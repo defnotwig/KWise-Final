@@ -5,7 +5,12 @@
   "main": "launcher.js",
   "scripts": {
     "start-all": "node launcher.js",
-    "build-exe": "npx pkg . --targets node18-win-x64 --output kwise-launcher.exe"
+    "stress:live-stack": "npm --prefix KWise-Backend run stress:live-stack",
+    "build-exe": "npx pkg . --targets node18-win-x64 --output kwise-launcher.exe",
+    "codex-lb:docker": "docker compose -f codex-lb/docker-compose.yml up --build",
+    "codex-lb:backend": "cd codex-lb && uv run fastapi run app/main.py --reload",
+    "codex-lb:frontend": "cd codex-lb/frontend && bun run dev",
+    "codex-lb:test": "cd codex-lb && uv run pytest -q"
   },
   "bin": "launcher.js",
   "devDependencies": {
