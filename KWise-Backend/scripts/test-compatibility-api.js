@@ -274,7 +274,7 @@ async function testGpuCaseClearance() {
     
     // Find large GPU (>320mm)
     const largeGpu = gpuResponse.data.parts.find(p => 
-      parseInt(p.specifications?.length_mm) > 320 ||
+      Number.parseInt(p.specifications?.length_mm, 10) > 320 ||
       p.name.toLowerCase().includes('rtx 4070') ||
       p.name.toLowerCase().includes('rx 7800')
     );
@@ -343,7 +343,7 @@ async function testRamPerSlotCapacity() {
     
     // Find 32GB RAM stick (if available)
     const largeRam = ramResponse.data.parts.find(p => 
-      parseInt(p.specifications?.capacity_gb) >= 32 ||
+      Number.parseInt(p.specifications?.capacity_gb, 10) >= 32 ||
       p.name.toLowerCase().includes('32gb')
     );
     

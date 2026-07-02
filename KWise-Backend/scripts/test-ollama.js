@@ -4,9 +4,9 @@
  */
 
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn } = require('node:child_process');
 
 // Colors
 const colors = {

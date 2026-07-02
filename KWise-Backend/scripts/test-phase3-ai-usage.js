@@ -134,7 +134,7 @@ async function testCacheStatistics() {
         passCount++;
         
         // Parse hit rate
-        const hitRate = parseFloat(stats.hitRate);
+        const hitRate = Number.parseFloat(stats.hitRate);
         if (hitRate >= 50) {
           logSuccess(`Cache hit rate ${hitRate}% >= 50% (excellent) ✅`);
           passCount++;
@@ -369,9 +369,9 @@ async function runAllTests() {
   log(`  - AI Calls: ${aiCalls} (${aiUsagePercentage}%)`, aiCalls > 0 ? 'green' : 'red');
   log(`  - Fallback Calls: ${fallbackCalls} (${fallbackPercentage}%)`, 'reset');
   
-  if (parseFloat(aiUsagePercentage) >= 60) {
+  if (Number.parseFloat(aiUsagePercentage) >= 60) {
     logSuccess(`\n🎯 PHASE 3 GOAL ACHIEVED: AI usage ${aiUsagePercentage}% >= 60% (Target: 80%)`);
-  } else if (parseFloat(aiUsagePercentage) >= 40) {
+  } else if (Number.parseFloat(aiUsagePercentage) >= 40) {
     logInfo(`\n🎯 PHASE 3 PROGRESS: AI usage ${aiUsagePercentage}% (Target: 80%, improving...)`);
   } else {
     logInfo(`\n⚠️ PHASE 3 NEEDS MORE WORK: AI usage ${aiUsagePercentage}% < 40% (Target: 80%)`);

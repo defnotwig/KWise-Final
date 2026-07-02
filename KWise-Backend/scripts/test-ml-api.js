@@ -5,7 +5,7 @@
  * Verifies ML routes are accessible via HTTP
  */
 
-const http = require('http');
+const http = require('node:http');
 
 const BASE_URL = 'http://localhost:5000';
 

@@ -1,6 +1,6 @@
 const pool = require('../config/db');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 async function updateFunction() {
   try {

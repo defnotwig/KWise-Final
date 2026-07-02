@@ -235,7 +235,7 @@ async function testSatisfactionScoring(token, userId) {
                 [realComponentId]
             );
 
-            const score = parseFloat(result.rows[0].satisfaction_score);
+            const score = Number.parseFloat(result.rows[0].satisfaction_score);
             const passed = score >= 0 && score <= 100;
             logTest(category, 'Calculate satisfaction score', passed);
         } catch (error) {
@@ -262,7 +262,7 @@ async function testSatisfactionScoring(token, userId) {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             const result = await pool.query('SELECT satisfaction_score FROM get_component_satisfaction_score($1)', [realComponentId]);
-            const score = parseFloat(result.rows[0].satisfaction_score);
+            const score = Number.parseFloat(result.rows[0].satisfaction_score);
             const passed = score >= 75; // Should be high for 5-star rating
             logTest(category, 'Score reflects positive feedback', passed);
         } catch (error) {
@@ -272,7 +272,7 @@ async function testSatisfactionScoring(token, userId) {
         // Test 2.3: Default score for no feedback
         try {
             const result = await pool.query('SELECT satisfaction_score FROM get_component_satisfaction_score(9999)');
-            const score = parseFloat(result.rows[0].satisfaction_score);
+            const score = Number.parseFloat(result.rows[0].satisfaction_score);
             const passed = score === 48; // Default neutral score (3/5 * 80 = 48)
             logTest(category, 'Default score for no feedback', passed);
         } catch (error) {
@@ -503,7 +503,7 @@ async function testCompatibilityConfidence(token) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            const confidence = parseFloat(response.data.confidence);
+            const confidence = Number.parseFloat(response.data.confidence);
             const passed = response.status === 200 && confidence >= 0 && confidence <= 100;
             logTest(category, 'Calculate confidence score', passed);
         } catch (error) {

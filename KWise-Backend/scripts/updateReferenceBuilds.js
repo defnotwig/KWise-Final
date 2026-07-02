@@ -157,7 +157,7 @@ async function generateBuildForConfig(usage, budgetRange) {
                     brand: component.brand,
                     stock: component.stock
                 };
-                build.totalBudget += parseFloat(component.price);
+                build.totalBudget += Number.parseFloat(component.price);
                 logger.debug(`  ✓ Selected ${category}: ${component.name} (₱${component.price})`);
             } else {
                 logger.warn(`  ⚠️  No suitable ${category} found within budget ₱${componentBudget.toFixed(0)}`);

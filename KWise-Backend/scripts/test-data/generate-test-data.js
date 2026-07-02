@@ -148,7 +148,7 @@ async function generateTestOrders(count = 25) {
 
 async function main() {
     const args = parseArgs();
-    const count = parseInt(args.count) || 50;
+    const count = Number.parseInt(args.count, 10) || 50;
     
     if (!args.type) {
         console.log(`

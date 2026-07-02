@@ -207,7 +207,7 @@ async function main() {
       
       // Verify price filtering
       const allInRange = upgrades.every(upgrade => {
-        const price = parseFloat(upgrade.price);
+        const price = Number.parseFloat(upgrade.price);
         return price >= 10000 && price <= 30000;
       });
       
