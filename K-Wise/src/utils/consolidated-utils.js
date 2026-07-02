@@ -15,7 +15,7 @@
  * @returns {string} Formatted currency string
  */
 export const formatCurrency = (amount, currency = 'PHP') => {
-    const numAmount = parseFloat(amount) || 0;
+    const numAmount = Number.parseFloat(amount) || 0;
     return new Intl.NumberFormat('en-PH', {
         style: 'currency',
         currency: currency,
@@ -62,7 +62,7 @@ export const capitalizeWords = (str) => {
  * @returns {string} Random ID
  */
 export const generateId = (prefix = 'id') => {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 /**
@@ -118,7 +118,7 @@ export const isValidEmail = (email) => {
 export const isValidPhoneNumber = (phone) => {
     // Philippine phone number formats
     const phoneRegex = /^(\+63|0)?[789]\d{9}$/;
-    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+    return phoneRegex.test(phone.replaceAll(/[\s\-()]/g, ''));
 };
 
 /**
@@ -127,7 +127,7 @@ export const isValidPhoneNumber = (phone) => {
  * @returns {string} Formatted phone number
  */
 export const formatPhoneNumber = (phone) => {
-    const cleaned = phone.replace(/\D/g, '');
+    const cleaned = phone.replaceAll(/\D/g, '');
     
     if (cleaned.length === 11 && cleaned.startsWith('0')) {
         return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
@@ -149,8 +149,8 @@ export const calculateOrderTotal = (items, taxRate = 0.12) => {
     const validItems = items.filter(item => item && typeof item === 'object');
     
     const subtotal = validItems.reduce((sum, item) => {
-        const price = parseFloat(item.price) || 0;
-        const quantity = parseInt(item.quantity) || 0;
+        const price = Number.parseFloat(item.price) || 0;
+        const quantity = Number.parseInt(item.quantity, 10) || 0;
         return sum + (price * quantity);
     }, 0);
     
@@ -201,14 +201,22 @@ export const copyToClipboard = async (text) => {
     try {
         await navigator.clipboard.writeText(text);
         return true;
-    } catch (err) {
-        // Fallback for older browsers
+    } catch (clipboardErr) {
+        // Fallback for older browsers - execCommand is deprecated but no alternative exists for fallback
+        console.warn('Clipboard API failed, using fallback:', clipboardErr.message);
         const textArea = document.createElement('textarea');
         textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
         document.body.appendChild(textArea);
         textArea.select();
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
+        let successful = false;
+        try {
+            successful = document.execCommand('copy'); // NOSONAR - intentional fallback for older browsers
+        } catch {
+            // execCommand not supported
+        }
+        textArea.remove();
         return successful;
     }
 };
@@ -256,7 +264,7 @@ export const showToast = (message, type = 'info', duration = 3000) => {
     // Remove after duration
     setTimeout(() => {
         toast.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(toast), 300);
+        setTimeout(() => toast.remove(), 300);
     }, duration);
 };
 
@@ -266,9 +274,9 @@ export const showToast = (message, type = 'info', duration = 3000) => {
  */
 export const getBrowserInfo = () => {
     const ua = navigator.userAgent;
-    const isChrome = /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor);
+    const isChrome = /Chrome/.test(ua) && !/Edg/.test(ua);
     const isFirefox = /Firefox/.test(ua);
-    const isSafari = /Safari/.test(ua) && /Apple Computer/.test(navigator.vendor);
+    const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
     const isEdge = /Edg/.test(ua);
     const isMobile = /Mobi|Android/i.test(ua);
     

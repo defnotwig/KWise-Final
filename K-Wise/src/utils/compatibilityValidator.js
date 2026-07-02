@@ -104,9 +104,10 @@ class CompatibilityValidator {
 
       // Handle different response formats
       const compatibilityData = response?.data || response;
-      const score = compatibilityData?.compatibility_score || compatibilityData?.compatibilityScore || compatibilityData?.score || compatibilityData?.confidence * 100 || 50;
+      const score = compatibilityData?.compatibility_score ?? compatibilityData?.compatibilityScore ?? compatibilityData?.score ?? (compatibilityData?.confidence ? compatibilityData.confidence * 100 : 50);
       const issues = compatibilityData?.compatibility_issues || compatibilityData?.issues || [];
       const warnings = compatibilityData?.warnings || compatibilityData?.suggestions || [];
+      const missingSpecs = compatibilityData?.missingSpecs || compatibilityData?.manualChecks || [];
 
       // Determine if component should be blocked
       const criticalIssues = issues.filter(issue => 
@@ -123,6 +124,8 @@ class CompatibilityValidator {
         score: score,
         issues: criticalIssues,
         warnings: warnings,
+        missingSpecs,
+        status: compatibilityData?.status || compatibilityData?.verdict || 'manual_check',
         blocking: blocking,
         message: blocking 
           ? `⚠️ Incompatible: ${criticalIssues.map(i => i.message).join(', ')}`
@@ -165,40 +168,40 @@ class CompatibilityValidator {
   async validateProductList(selectedComponents, products) {
     try {
       // If no components selected, return all products as compatible
-      const validComponents = Object.entries(selectedComponents)
-        .filter(([key, component]) => component && component.id)
-        .reduce((obj, [key, component]) => {
-          obj[key] = component.id;
-          return obj;
-        }, {});
+      const contextParts = Object.values(selectedComponents || {})
+        .filter(component => component && component.id);
 
-      if (Object.keys(validComponents).length === 0) {
+      if (contextParts.length === 0) {
         return products.map(product => ({
           ...product,
           compatibility_score: 100,
           compatibility_compatible: true,
           compatibility_issues: [],
           compatibility_warnings: [],
+          compatibility_missing_specs: [],
           compatibility_blocking: false
         }));
       }
 
-      console.log('🔍 Batch validating', products.length, 'products against', Object.keys(validComponents).length, 'selected components');
+      console.log('🔍 Batch validating', products.length, 'products against', contextParts.length, 'selected components');
 
       // Call backend batch compatibility API
-      const response = await api.post('/kiosk/compatibility/batch-analyze', {
-        selectedParts: validComponents,
-        candidateProducts: products.map(p => ({ id: p.id, category: p.category }))
+      const response = await api.kiosk.checkCompatibilityBatch({
+        contextParts,
+        candidates: products,
+        targetCategory: products[0]?.category
       });
 
-      if (!response.data.success) {
-        console.error('❌ Batch compatibility check failed:', response.data.message);
+      if (!response.success) {
+        console.error('❌ Batch compatibility check failed:', response.message);
         return products; // Return original products without scores
       }
 
+      const compatibilityResults = response.data || response.results || [];
+
       // Attach compatibility scores to products
       const scoredProducts = products.map(product => {
-        const compatResult = response.data.data.find(r => r.product_id === product.id);
+        const compatResult = compatibilityResults.find(r => String(r.product_id || r.id) === String(product.id));
         
         if (!compatResult) {
           return {
@@ -207,13 +210,15 @@ class CompatibilityValidator {
             compatibility_compatible: false,
             compatibility_issues: [{ severity: 'critical', message: 'Compatibility data not found' }],
             compatibility_warnings: [],
+            compatibility_missing_specs: [],
             compatibility_blocking: true
           };
         }
 
-        const score = compatResult.compatibility_score || compatResult.compatibilityScore || 0;
+        const score = compatResult.compatibility_score ?? compatResult.compatibilityScore ?? compatResult.score ?? 0;
         const issues = compatResult.compatibility_issues || compatResult.issues || [];
         const warnings = compatResult.warnings || [];
+        const missingSpecs = compatResult.missingSpecs || compatResult.manualChecks || [];
         const criticalIssues = issues.filter(i => 
           i.severity === 'critical' || i.severity === 'blocker'
         );
@@ -221,10 +226,12 @@ class CompatibilityValidator {
         return {
           ...product,
           compatibility_score: score,
-          compatibility_compatible: score >= 50 && criticalIssues.length === 0,
+          compatibility_status: compatResult.status || compatResult.verdict || compatResult.compatibility_status,
+          compatibility_compatible: compatResult.compatible !== false && score >= 50 && criticalIssues.length === 0,
           compatibility_issues: criticalIssues,
           compatibility_warnings: warnings,
-          compatibility_blocking: criticalIssues.length > 0 || score < 50
+          compatibility_missing_specs: missingSpecs,
+          compatibility_blocking: compatResult.compatible === false || criticalIssues.length > 0 || score < 50
         };
       });
 

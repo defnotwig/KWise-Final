@@ -137,7 +137,7 @@ export const TOP_SPECS_BY_CATEGORY = {
 export function getTopSpecsForCategory(category) {
   if (!category) return [];
   
-  const catLower = category.toLowerCase().replace(/\s+/g, '');
+  const catLower = category.toLowerCase().replaceAll(/\s+/g, '');
   
   // Map variations to canonical names
   const categoryMap = {
@@ -222,9 +222,9 @@ export function extractTopSpecFilters(products, category) {
     
     filters[key] = Array.from(valueSet).sort((a, b) => {
       // Try numeric sort first
-      const numA = parseFloat(a);
-      const numB = parseFloat(b);
-      if (!isNaN(numA) && !isNaN(numB)) {
+      const numA = Number.parseFloat(a);
+      const numB = Number.parseFloat(b);
+      if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
         return numA - numB;
       }
       // Fallback to string sort

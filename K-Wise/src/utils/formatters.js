@@ -6,7 +6,7 @@ export const formatDate = (date) => {
 
     try {
         const d = new Date(date);
-        if (isNaN(d.getTime())) return 'Invalid Date';
+        if (Number.isNaN(d.getTime())) return 'Invalid Date';
 
         return d.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -25,8 +25,8 @@ export const formatCurrency = (amount) => {
     if (amount === null || amount === undefined) return '₱0.00';
 
     try {
-        const num = parseFloat(amount);
-        if (isNaN(num)) return '₱0.00';
+        const num = Number.parseFloat(amount);
+        if (Number.isNaN(num)) return '₱0.00';
 
         return new Intl.NumberFormat('en-PH', {
             style: 'currency',
@@ -43,8 +43,8 @@ export const formatNumber = (num) => {
     if (num === null || num === undefined) return '0';
 
     try {
-        const number = parseFloat(num);
-        if (isNaN(number)) return '0';
+        const number = Number.parseFloat(num);
+        if (Number.isNaN(number)) return '0';
 
         return new Intl.NumberFormat('en-PH').format(number);
     } catch (error) {
@@ -57,8 +57,8 @@ export const formatPercentage = (value, decimals = 2) => {
     if (value === null || value === undefined) return '0%';
 
     try {
-        const num = parseFloat(value);
-        if (isNaN(num)) return '0%';
+        const num = Number.parseFloat(value);
+        if (Number.isNaN(num)) return '0%';
 
         return `${num.toFixed(decimals)}%`;
     } catch (error) {
@@ -74,7 +74,7 @@ export const formatFileSize = (bytes) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 // Format phone number
@@ -82,7 +82,7 @@ export const formatPhoneNumber = (phone) => {
     if (!phone) return 'N/A';
 
     // Remove all non-digits
-    const cleaned = phone.replace(/\D/g, '');
+    const cleaned = phone.replaceAll(/\D/g, '');
 
     // Format Philippine phone number
     if (cleaned.length === 11 && cleaned.startsWith('09')) {
@@ -122,7 +122,7 @@ export const exportToCSV = (data, filename = 'export.csv') => {
                     const value = row[header];
                     // Escape commas and quotes
                     if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-                        return `"${value.replace(/"/g, '""')}"`;
+                        return `"${value.replaceAll(/"/g, '""')}"`;
                     }
                     return value || '';
                 }).join(',')

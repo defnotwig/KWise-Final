@@ -9,9 +9,9 @@ export const parseSpecs = (specString) => {
     const threadMatch = specString.match(/(\d+)\s*Threads/i);
     const boostMatch = specString.match(/([\d.]+)\s*GHz\s*Boost/i);
   
-    if (coreMatch) specs.cores = parseInt(coreMatch[1]);
-    if (threadMatch) specs.threads = parseInt(threadMatch[1]);
-    if (boostMatch) specs.boostGHz = parseFloat(boostMatch[1]);
+    if (coreMatch) specs.cores = Number.parseInt(coreMatch[1], 10);
+    if (threadMatch) specs.threads = Number.parseInt(threadMatch[1], 10);
+    if (boostMatch) specs.boostGHz = Number.parseFloat(boostMatch[1]);
   
     return specs;
   };

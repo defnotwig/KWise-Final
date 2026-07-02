@@ -92,8 +92,8 @@ export const formatSpecifications = (specifications) => {
 
             // Format key name
             const formattedKey = key
-                .replace(/_/g, ' ')
-                .replace(/([a-z])([A-Z])/g, '$1 $2')
+                .replaceAll('_', ' ')
+                .replaceAll(/([a-z])([A-Z])/g, '$1 $2')
                 .split(' ')
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                 .join(' ');

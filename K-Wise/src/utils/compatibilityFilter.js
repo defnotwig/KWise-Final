@@ -72,12 +72,12 @@ const detectDDRType = (name, description = '', specs = {}) => {
  * Extract TDP (Thermal Design Power) in watts
  */
 const extractTDP = (name, description = '', specs = {}) => {
-    if (specs?.tdp) return parseInt(specs.tdp);
-    if (specs?.power) return parseInt(specs.power);
+    if (specs?.tdp) return Number.parseInt(specs.tdp, 10);
+    if (specs?.power) return Number.parseInt(specs.power, 10);
     
     const text = `${name} ${description}`;
     const match = text.match(/(\d+)\s?W(?:att)?/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 };
 
 /**
@@ -94,23 +94,23 @@ const extractGPULength = (product = {}) => {
     const description = product.description || '';
     
     // 🔥 PRIORITY 1: Check dimensions.length_mm (most authoritative)
-    if (dims.length_mm) return parseInt(dims.length_mm);
+    if (dims.length_mm) return Number.parseInt(dims.length_mm, 10);
     
     // 🔥 PRIORITY 2: Check specifications.length_mm
-    if (specs?.length_mm) return parseInt(specs.length_mm);
+    if (specs?.length_mm) return Number.parseInt(specs.length_mm, 10);
     if (specs?.Length) {
         // Handle "267mm" or "267" format
-        const lengthStr = String(specs.Length).replace(/[^\d]/g, '');
-        if (lengthStr) return parseInt(lengthStr);
+        const lengthStr = String(specs.Length).replaceAll(/[^\d]/g, '');
+        if (lengthStr) return Number.parseInt(lengthStr, 10);
     }
-    if (specs?.length) return parseInt(specs.length);
-    if (specs?.card_length) return parseInt(specs.card_length);
-    if (specs?.gpu_length_mm) return parseInt(specs.gpu_length_mm);
+    if (specs?.length) return Number.parseInt(specs.length, 10);
+    if (specs?.card_length) return Number.parseInt(specs.card_length, 10);
+    if (specs?.gpu_length_mm) return Number.parseInt(specs.gpu_length_mm, 10);
     
     // 🔥 PRIORITY 3: Parse from name/description (fallback)
     const text = `${name} ${description}`;
     const match = text.match(/(\d{3})\s?mm/);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 };
 
 /**
@@ -123,27 +123,27 @@ const extractCoolerHeight = (product = {}) => {
     const description = product.description || '';
     
     // 🔥 PRIORITY 1: Check dimensions.height_mm
-    if (dims.height_mm) return parseInt(dims.height_mm);
+    if (dims.height_mm) return Number.parseInt(dims.height_mm, 10);
     
     // 🔥 PRIORITY 2: Check specifications.height
-    if (specs?.height_mm) return parseInt(specs.height_mm);
-    if (specs?.height) return parseInt(specs.height);
-    if (specs?.cooler_height) return parseInt(specs.cooler_height);
+    if (specs?.height_mm) return Number.parseInt(specs.height_mm, 10);
+    if (specs?.height) return Number.parseInt(specs.height, 10);
+    if (specs?.cooler_height) return Number.parseInt(specs.cooler_height, 10);
     
     // 🔥 PRIORITY 3: Parse from description (fallback)
     const match = description.match(/(\d{2,3})\s?mm.*height/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 };
 
 /**
  * Extract PSU wattage
  */
 const extractWattage = (name, specs = {}) => {
-    if (specs?.wattage) return parseInt(specs.wattage);
-    if (specs?.power) return parseInt(specs.power);
+    if (specs?.wattage) return Number.parseInt(specs.wattage, 10);
+    if (specs?.power) return Number.parseInt(specs.power, 10);
     
     const match = name.match(/(\d{3,4})\s?W/);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
 };
 
 /**
@@ -234,10 +234,10 @@ const extractRadiatorSize = (product = {}) => {
     
     // Check specs first (most reliable)
     if (specs.radiator_size) {
-        const size = parseInt(String(specs.radiator_size).replace(/mm/gi, ''));
-        if (!isNaN(size)) return size;
+        const size = Number.parseInt(String(specs.radiator_size).replaceAll(/mm/ig, ''), 10);
+        if (!Number.isNaN(size)) return size;
     }
-    if (specs.radiator_mm) return parseInt(specs.radiator_mm);
+    if (specs.radiator_mm) return Number.parseInt(specs.radiator_mm, 10);
     
     const text = `${name} ${description}`;
     
@@ -286,8 +286,8 @@ const extractCaseRadiatorSupport = (product = {}) => {
     // First try numeric fields
     for (const field of numericFields) {
         if (field !== undefined && field !== null) {
-            const size = parseInt(String(field).replace(/mm/gi, ''));
-            if (!isNaN(size) && size > 0 && size < 600) { // Sanity check: radiators are 120-480mm
+            const size = Number.parseInt(String(field).replaceAll(/mm/ig, ''), 10);
+            if (!Number.isNaN(size) && size > 0 && size < 600) { // Sanity check: radiators are 120-480mm
                 console.log(`🔍 Case ${product.name} max radiator support: ${size}mm (from numeric field)`);
                 return size;
             }
@@ -305,9 +305,9 @@ const extractCaseRadiatorSupport = (product = {}) => {
             // Extract all numeric values followed by "mm"
             const matches = field.match(/(\d{2,3})mm/g);
             if (matches && matches.length > 0) {
-                const sizes = matches.map(m => parseInt(m.replace('mm', '')));
+                const sizes = matches.map(m => Number.parseInt(m.replace('mm', ''), 10));
                 const maxSize = Math.max(...sizes);
-                if (!isNaN(maxSize) && maxSize > 0) {
+                if (!Number.isNaN(maxSize) && maxSize > 0) {
                     console.log(`🔍 Case ${product.name} max radiator support: ${maxSize}mm (parsed from "${field}")`);
                     return maxSize;
                 }
@@ -578,12 +578,12 @@ export const filterCompatibleProducts = (products, selectedComponents, currentCa
             
             if (maxCoolerHeight) {
                 if (typeof maxCoolerHeight === 'string') {
-                    maxCoolerHeight = parseInt(maxCoolerHeight.replace(/mm/gi, ''));
+                    maxCoolerHeight = Number.parseInt(maxCoolerHeight.replaceAll(/mm/ig, ''), 10);
                 } else {
-                    maxCoolerHeight = parseInt(maxCoolerHeight);
+                    maxCoolerHeight = Number.parseInt(maxCoolerHeight, 10);
                 }
                 
-                if (!isNaN(maxCoolerHeight)) {
+                if (!Number.isNaN(maxCoolerHeight)) {
                     console.log(`🧊 Cooler Filter: Case max cooler height ${maxCoolerHeight}mm, filtering air coolers...`);
                     
                     filtered = filtered.filter(cooler => {
@@ -629,12 +629,12 @@ export const filterCompatibleProducts = (products, selectedComponents, currentCa
             let caseMaxGPU = caseDims.max_gpu_length_mm || caseSpecs.max_gpu_length_mm || caseSpecs.max_gpu_length;
             
             if (typeof caseMaxGPU === 'string') {
-                caseMaxGPU = parseInt(caseMaxGPU.replace(/mm/gi, ''));
+                caseMaxGPU = Number.parseInt(caseMaxGPU.replaceAll(/mm/ig, ''), 10);
             } else {
-                caseMaxGPU = parseInt(caseMaxGPU);
+                caseMaxGPU = Number.parseInt(caseMaxGPU, 10);
             }
             
-            if (caseMaxGPU && !isNaN(caseMaxGPU)) {
+            if (caseMaxGPU && !Number.isNaN(caseMaxGPU)) {
                 filtered = filtered.filter(gpu => {
                     const gpuLength = extractGPULength(gpu);
                     if (!gpuLength) return true; // Unknown length - allow it
@@ -781,12 +781,12 @@ export const filterCompatibleProducts = (products, selectedComponents, currentCa
                     
                     // Convert string to number (remove "mm" suffix if present)
                     if (typeof caseMaxGPU === 'string') {
-                        caseMaxGPU = parseInt(caseMaxGPU.replace(/mm/gi, ''));
+                        caseMaxGPU = Number.parseInt(caseMaxGPU.replaceAll(/mm/ig, ''), 10);
                     } else {
-                        caseMaxGPU = parseInt(caseMaxGPU);
+                        caseMaxGPU = Number.parseInt(caseMaxGPU, 10);
                     }
                     
-                    if (!caseMaxGPU || isNaN(caseMaxGPU)) return true; // Unknown max - allow it
+                    if (!caseMaxGPU || Number.isNaN(caseMaxGPU)) return true; // Unknown max - allow it
                     
                     const fits = caseMaxGPU >= gpuLength;
                     if (!fits) {
@@ -814,12 +814,12 @@ export const filterCompatibleProducts = (products, selectedComponents, currentCa
                     
                     // Convert string to number (remove "mm" suffix if present)
                     if (typeof caseMaxCooler === 'string') {
-                        caseMaxCooler = parseInt(caseMaxCooler.replace(/mm/gi, ''));
+                        caseMaxCooler = Number.parseInt(caseMaxCooler.replaceAll(/mm/ig, ''), 10);
                     } else {
-                        caseMaxCooler = parseInt(caseMaxCooler);
+                        caseMaxCooler = Number.parseInt(caseMaxCooler, 10);
                     }
                     
-                    if (!caseMaxCooler || isNaN(caseMaxCooler)) return true; // Unknown max - allow it
+                    if (!caseMaxCooler || Number.isNaN(caseMaxCooler)) return true; // Unknown max - allow it
                     return caseMaxCooler >= coolerHeight;
                 });
             }

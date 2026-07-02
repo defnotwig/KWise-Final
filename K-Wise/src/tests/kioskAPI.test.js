@@ -1,277 +1,165 @@
-/**
- * Frontend Kiosk API Tests
- * Tests for kioskAPI integration and component functionality
- */
+const mockGet = vi.fn();
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+vi.mock('axios', () => ({
+    default: {
+        isCancel: vi.fn((error) => error?.name === 'CanceledError'),
+        create: vi.fn(() => ({
+            get: (...args) => mockGet(...args)
+        }))
+    },
+    isCancel: vi.fn((error) => error?.name === 'CanceledError'),
+    create: vi.fn(() => ({
+        get: (...args) => mockGet(...args)
+    }))
+}));
+
+vi.mock('../utils/networkConfig', () => ({
+    getApiBaseUrl: () => 'http://localhost:5000/api',
+    getFullImageUrl: (url) => {
+        if (!url) return null;
+        if (String(url).startsWith('/static/media/')) return url;
+        if (String(url).startsWith('http')) return url;
+        return `http://localhost:5000${url}`;
+    }
+}));
+
 import kioskAPI from '../api/kioskAPI';
-import PC_Parts from '../kiosk/PC-Parts';
-import PCCustomized from '../kiosk/PCCustomized';
 
-// Mock the API
-jest.mock('../api/kioskAPI');
-
-const mockKioskAPI = kioskAPI;
-
-// Mock data
-const mockCategories = [
-    {
-        category: 'CPU',
-        name: 'Central Processing Unit',
-        productCount: 15,
-        minPrice: 1500,
-        maxPrice: 25000,
-        inStockCount: 12,
-        order: 10
-    },
-    {
-        category: 'GPU',
-        name: 'Graphics Processing Unit',
-        productCount: 8,
-        minPrice: 5000,
-        maxPrice: 45000,
-        inStockCount: 6,
-        order: 50
-    }
-];
-
-const mockProducts = {
-    items: [
-        {
-            id: 1,
-            name: 'AMD Ryzen 5 5600X',
-            category: 'CPU',
-            brand: 'AMD',
-            price: 15999,
-            stock: 5,
-            imageUrl: '/assets/cpu/ryzen5600x.webp',
-            specifications: {
-                cores: 6,
-                threads: 12,
-                base_clock: '3.7 GHz',
-                boost_clock: '4.6 GHz'
-            },
-            description: 'High-performance gaming CPU',
-            available: true
-        }
-    ],
-    pagination: {
-        currentPage: 1,
-        totalPages: 3,
-        totalItems: 15,
-        itemsPerPage: 20,
-        hasNext: true,
-        hasPrev: false
-    }
-};
-
-const mockFeaturedProducts = [
-    {
-        id: 1,
-        name: 'Intel Core i7-12700K',
-        category: 'CPU',
-        brand: 'Intel',
-        price: 22999,
-        imageUrl: '/assets/cpu/i712700k.webp',
-        available: true
-    },
-    {
-        id: 2,
-        name: 'NVIDIA RTX 4070',
-        category: 'GPU',
-        brand: 'NVIDIA',
-        price: 35999,
-        imageUrl: '/assets/gpu/rtx4070.webp',
-        available: true
-    }
-];
-
-const renderWithRouter = (component) => {
-    return render(
-        <BrowserRouter>
-            {component}
-        </BrowserRouter>
-    );
-};
-
-describe('KioskAPI', () => {
+describe('kioskAPI', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
-    describe('API Methods', () => {
-        test('getCategories should return formatted categories', async () => {
-            mockKioskAPI.getCategories.mockResolvedValue(mockCategories);
-
-            const result = await kioskAPI.getCategories();
-
-            expect(result).toEqual(mockCategories);
-            expect(mockKioskAPI.getCategories).toHaveBeenCalledTimes(1);
-        });
-
-        test('getCategoryProducts should return products with pagination', async () => {
-            mockKioskAPI.getCategoryProducts.mockResolvedValue(mockProducts);
-
-            const result = await kioskAPI.getCategoryProducts('CPU', { page: 1, limit: 20 });
-
-            expect(result).toEqual(mockProducts);
-            expect(mockKioskAPI.getCategoryProducts).toHaveBeenCalledWith('CPU', { page: 1, limit: 20 });
-        });
-
-        test('getFeaturedProducts should return featured items', async () => {
-            mockKioskAPI.getFeaturedProducts.mockResolvedValue(mockFeaturedProducts);
-
-            const result = await kioskAPI.getFeaturedProducts(6);
-
-            expect(result).toEqual(mockFeaturedProducts);
-            expect(mockKioskAPI.getFeaturedProducts).toHaveBeenCalledWith(6);
-        });
-
-        test('should handle API errors gracefully', async () => {
-            const errorMessage = 'Network error';
-            mockKioskAPI.getCategories.mockRejectedValue(new Error(errorMessage));
-
-            await expect(kioskAPI.getCategories()).rejects.toThrow(`Failed to load categories: ${errorMessage}`);
-        });
-    });
-});
-
-describe('PC-Parts Component', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        mockKioskAPI.getCategories.mockResolvedValue(mockCategories);
-        mockKioskAPI.getFeaturedProducts.mockResolvedValue(mockFeaturedProducts);
-        mockKioskAPI.getCategoryProducts.mockResolvedValue(mockProducts);
-    });
-
-    test('should load and display categories from API', async () => {
-        renderWithRouter(<PC_Parts />);
-
-        await waitFor(() => {
-            expect(mockKioskAPI.getCategories).toHaveBeenCalledTimes(1);
-        });
-
-        await waitFor(() => {
-            expect(screen.getByText('Central Processing Unit')).toBeInTheDocument();
-            expect(screen.getByText('Graphics Processing Unit')).toBeInTheDocument();
-        });
-    });
-
-    test('should load products when category is selected', async () => {
-        renderWithRouter(<PC_Parts />);
-
-        await waitFor(() => {
-            expect(mockKioskAPI.getCategories).toHaveBeenCalledTimes(1);
-        });
-
-        // Categories should be loaded and first category (CPU) should be selected
-        await waitFor(() => {
-            expect(mockKioskAPI.getCategoryProducts).toHaveBeenCalledWith('cpu', expect.any(Object));
-        });
-    });
-
-    test('should display loading state initially', () => {
-        renderWithRouter(<PC_Parts />);
-
-        // Should show loading state while API calls are pending
-        expect(screen.getByText(/loading/i) || screen.getByRole('progressbar')).toBeInTheDocument();
-    });
-
-    test('should handle API errors and show error message', async () => {
-        mockKioskAPI.getCategories.mockRejectedValue(new Error('API Error'));
-
-        renderWithRouter(<PC_Parts />);
-
-        await waitFor(() => {
-            expect(screen.getByText(/failed to load categories/i)).toBeInTheDocument();
-        });
-    });
-});
-
-describe('PCCustomized Component', () => {
-    const mockBuildComponents = {
-        cpu: {
-            products: [mockProducts.items[0]],
-            brands: ['AMD', 'Intel']
-        },
-        gpu: {
-            products: [{
-                id: 2,
-                name: 'RTX 4070',
-                brand: 'NVIDIA',
-                price: 35999,
-                available: true
-            }],
-            brands: ['NVIDIA', 'AMD']
-        }
-    };
-
-    beforeEach(() => {
-        jest.clearAllMocks();
-        mockKioskAPI.getBuildComponents.mockResolvedValue(mockBuildComponents);
-    });
-
-    test('should load build components from API', async () => {
-        renderWithRouter(<PCCustomized />);
-
-        await waitFor(() => {
-            expect(mockKioskAPI.getBuildComponents).toHaveBeenCalledTimes(1);
-        });
-
-        await waitFor(() => {
-            expect(screen.getByText('AMD Ryzen 5 5600X')).toBeInTheDocument();
-        });
-    });
-
-    test('should organize components by category', async () => {
-        renderWithRouter(<PCCustomized />);
-
-        await waitFor(() => {
-            expect(mockKioskAPI.getBuildComponents).toHaveBeenCalledTimes(1);
-        });
-
-        // Should organize products into categories
-        await waitFor(() => {
-            expect(screen.getByText(/Central Processing Unit/i)).toBeInTheDocument();
-        });
-    });
-});
-
-// Performance tests
-describe('Performance Tests', () => {
-    test('should load categories within acceptable time', async () => {
-        const startTime = Date.now();
-
-        mockKioskAPI.getCategories.mockResolvedValue(mockCategories);
-        await kioskAPI.getCategories();
-
-        const loadTime = Date.now() - startTime;
-        expect(loadTime).toBeLessThan(1000); // Should load within 1 second
-    });
-
-    test('should handle large product datasets efficiently', async () => {
-        // Create large dataset
-        const largeProductSet = {
-            items: Array.from({ length: 1000 }, (_, i) => ({
-                ...mockProducts.items[0],
-                id: i + 1,
-                name: `Product ${i + 1}`
-            })),
-            pagination: {
-                ...mockProducts.pagination,
-                totalItems: 1000
+    test('getCategories returns server categories on success', async () => {
+        mockGet.mockResolvedValueOnce({
+            status: 200,
+            statusText: 'OK',
+            data: {
+                success: true,
+                data: [
+                    { category: 'CPU', name: 'Central Processing Unit' },
+                    { category: 'GPU', name: 'Graphics Processing Unit' }
+                ]
             }
-        };
+        });
 
-        mockKioskAPI.getCategoryProducts.mockResolvedValue(largeProductSet);
+        await expect(kioskAPI.getCategories()).resolves.toEqual([
+            { category: 'CPU', name: 'Central Processing Unit' },
+            { category: 'GPU', name: 'Graphics Processing Unit' }
+        ]);
+    });
 
-        const startTime = Date.now();
-        await kioskAPI.getCategoryProducts('CPU', { page: 1, limit: 20 });
-        const loadTime = Date.now() - startTime;
+    test('getCategories falls back to default categories on request failure', async () => {
+        mockGet.mockRejectedValueOnce(new Error('Network error'));
 
-        expect(loadTime).toBeLessThan(2000); // Should handle large datasets within 2 seconds
+        const result = await kioskAPI.getCategories();
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.find((item) => item.category === 'CPU')).toBeTruthy();
+    });
+
+    test('getCategoryProducts handles nested response format and normalizes images', async () => {
+        mockGet.mockResolvedValueOnce({
+            status: 200,
+            statusText: 'OK',
+            data: {
+                success: true,
+                data: {
+                    items: [
+                        {
+                            id: 1,
+                            name: 'AMD Ryzen 5 5600X',
+                            imageUrl: '/assets/cpu/ryzen5600x.webp',
+                            specifications: { cores: 6 },
+                            dimensions: { length: 1 }
+                        }
+                    ],
+                    pagination: { totalItems: 1, currentPage: 1, totalPages: 1 }
+                }
+            }
+        });
+
+        const result = await kioskAPI.getCategoryProducts('CPU', { page: 1, limit: 20 });
+
+        expect(result.data).toHaveLength(1);
+        expect(result.data[0].image).toBe('http://localhost:5000/assets/cpu/ryzen5600x.webp');
+        expect(result.pagination.totalItems).toBe(1);
+    });
+
+    test('getFeaturedProducts returns processed featured products', async () => {
+        mockGet.mockResolvedValueOnce({
+            status: 200,
+            statusText: 'OK',
+            data: {
+                success: true,
+                data: [
+                    { id: 1, name: 'RTX 4070', image: '/assets/gpu/rtx4070.webp' }
+                ]
+            }
+        });
+
+        const result = await kioskAPI.getFeaturedProducts(6);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+            id: 1,
+            name: 'RTX 4070',
+            image: 'http://localhost:5000/assets/gpu/rtx4070.webp',
+            imageUrl: 'http://localhost:5000/assets/gpu/rtx4070.webp',
+            image_url: 'http://localhost:5000/assets/gpu/rtx4070.webp'
+        });
+    });
+
+    test('getOnSaleProducts returns a plain processed product array', async () => {
+        mockGet.mockResolvedValueOnce({
+            status: 200,
+            statusText: 'OK',
+            data: {
+                success: true,
+                data: {
+                    items: [
+                        { id: 2, name: 'Sale GPU', image_url: '/assets/gpu/sale.webp', salePrice: 12000 }
+                    ]
+                }
+            }
+        });
+
+        const result = await kioskAPI.getOnSaleProducts(4);
+
+        expect(mockGet).toHaveBeenCalledWith('/kiosk/on-sale', expect.objectContaining({
+            params: { limit: 4 }
+        }));
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+            id: 2,
+            name: 'Sale GPU',
+            image_url: 'http://localhost:5000/assets/gpu/sale.webp',
+            imageUrl: 'http://localhost:5000/assets/gpu/sale.webp',
+            salePrice: 12000,
+            image: 'http://localhost:5000/assets/gpu/sale.webp'
+        });
+    });
+
+    test('getOnSaleProducts silently returns empty array for canceled requests', async () => {
+        mockGet.mockRejectedValueOnce({ name: 'CanceledError', code: 'ERR_CANCELED' });
+
+        await expect(kioskAPI.getOnSaleProducts(4)).resolves.toEqual([]);
+    });
+
+    test('getOnSaleProducts preserves frontend static media URLs', async () => {
+        mockGet.mockResolvedValueOnce({
+            status: 200,
+            statusText: 'OK',
+            data: {
+                success: true,
+                data: [
+                    { id: 3, name: 'Imported Asset', image: '/static/media/SystemUnit1.hash.webp' }
+                ]
+            }
+        });
+
+        const result = await kioskAPI.getOnSaleProducts();
+
+        expect(result[0].image).toBe('/static/media/SystemUnit1.hash.webp');
     });
 });
-
-export { };

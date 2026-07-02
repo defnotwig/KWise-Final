@@ -79,7 +79,7 @@ export const loadEnhancedCompatibleProducts = async (productDetails, currentCate
         id: product.id,
         name: product.name,
         price: product.price_formatted || `₱${product.price?.toLocaleString()}`,
-        image: product.image_url ? getFullImageUrl(product.image_url) : categoryImages[product.category] || defaultImage,
+        image: getFullImageUrl(product.image_url) || categoryImages[product.category] || defaultImage,
         category: product.category,
         compatibility_score: product.compatibility_score || 90,
         compatibility_status: product.compatibility_status || 'excellent',

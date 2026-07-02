@@ -79,7 +79,7 @@ export const saveCartItems = (cartItems) => {
  */
 export const calculateCartCount = (cartItems) => {
     const cleanedItems = cleanCartItems(cartItems);
-    return cleanedItems.reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0);
+    return cleanedItems.reduce((acc, item) => acc + (Number.parseInt(item.quantity, 10) || 0), 0);
 };
 
 /**
@@ -90,8 +90,8 @@ export const calculateCartCount = (cartItems) => {
 export const calculateCartTotal = (cartItems) => {
     const cleanedItems = cleanCartItems(cartItems);
     return cleanedItems.reduce((acc, item) => {
-        const price = parseFloat(item.price) || 0;
-        const quantity = parseInt(item.quantity) || 0;
+        const price = Number.parseFloat(item.price) || 0;
+        const quantity = Number.parseInt(item.quantity, 10) || 0;
         return acc + (price * quantity);
     }, 0);
 };
@@ -111,17 +111,17 @@ export const addToCart = (item, quantity = 1) => {
     const cartItems = getCartItems();
     const existingItemIndex = cartItems.findIndex(cartItem => cartItem.id === item.id);
     
-    if (existingItemIndex !== -1) {
-        // Item exists, update quantity
-        cartItems[existingItemIndex].quantity = (cartItems[existingItemIndex].quantity || 0) + quantity;
-        console.log(`📦 Updated quantity for "${item.name}": ${cartItems[existingItemIndex].quantity}`);
-    } else {
+    if (existingItemIndex === -1) {
         // New item, add to cart
         cartItems.push({
             ...item,
             quantity: quantity
         });
         console.log(`📦 Added "${item.name}" to cart: ${quantity}x`);
+    } else {
+        // Item exists, update quantity
+        cartItems[existingItemIndex].quantity = (cartItems[existingItemIndex].quantity || 0) + quantity;
+        console.log(`📦 Updated quantity for "${item.name}": ${cartItems[existingItemIndex].quantity}`);
     }
     
     saveCartItems(cartItems);
@@ -184,7 +184,7 @@ export const clearCart = () => {
     }
 };
 
-export default {
+const cartUtils = {
     cleanCartItems,
     getCartItems,
     saveCartItems,
@@ -195,3 +195,5 @@ export default {
     updateCartItemQuantity,
     clearCart
 };
+
+export default cartUtils;
