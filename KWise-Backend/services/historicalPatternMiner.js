@@ -60,8 +60,8 @@ class HistoricalPatternMiner {
               avg_confidence: pattern.avg_confidence,
               personas: pattern.personas
             },
-            frequency: parseInt(pattern.frequency),
-            confidence_score: parseFloat(pattern.avg_confidence) || 85,
+            frequency: Number.parseInt(pattern.frequency, 10),
+            confidence_score: Number.parseFloat(pattern.avg_confidence) || 85,
             last_seen: pattern.last_seen
           });
         }
@@ -122,7 +122,7 @@ class HistoricalPatternMiner {
           
           const config = configMap.get(configKey);
           config.frequency++;
-          config.total_revenue += parseFloat(build.total_amount) || 0;
+          config.total_revenue += Number.parseFloat(build.total_amount) || 0;
           if (new Date(build.created_at) > new Date(config.last_order)) {
             config.last_order = build.created_at;
           }

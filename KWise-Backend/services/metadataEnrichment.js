@@ -160,7 +160,7 @@ function inferPSUWattage(psuName) {
   for (const pattern of patterns) {
     const match = psuName.match(pattern);
     if (match) {
-      return parseInt(match[1]);
+      return Number.parseInt(match[1], 10);
     }
   }
   
@@ -201,7 +201,7 @@ function inferRAMSpeed(ramName) {
   for (const pattern of patterns) {
     const match = ramName.match(pattern);
     if (match) {
-      return parseInt(match[1]);
+      return Number.parseInt(match[1], 10);
     }
   }
   
@@ -247,10 +247,10 @@ function inferRAMCapacity(ramName) {
     if (match) {
       if (match[2]) {
         // 2x8GB format
-        return parseInt(match[1]) * parseInt(match[2]);
+        return Number.parseInt(match[1], 10) * Number.parseInt(match[2], 10);
       } else {
         // 16GB format
-        return parseInt(match[1]);
+        return Number.parseInt(match[1], 10);
       }
     }
   }
@@ -267,12 +267,12 @@ function inferStorageCapacity(storageName) {
   // Match patterns like: "1TB", "512GB", "2 TB"
   const tbMatch = storageName.match(/(\d+)\s*tb/i);
   if (tbMatch) {
-    return parseInt(tbMatch[1]) * 1000; // Convert TB to GB
+    return Number.parseInt(tbMatch[1], 10) * 1000; // Convert TB to GB
   }
   
   const gbMatch = storageName.match(/(\d+)\s*gb/i);
   if (gbMatch) {
-    return parseInt(gbMatch[1]);
+    return Number.parseInt(gbMatch[1], 10);
   }
   
   return null;
@@ -405,7 +405,7 @@ function enrichProduct(product) {
  * @returns {Promise<Object>} Enrichment statistics
  */
 async function enrichAllProducts() {
-  console.log('🔄 Starting product metadata enrichment...\n');
+  logger.debug('🔄 Starting product metadata enrichment...\n');
   
   try {
     // Get all active products
@@ -417,7 +417,7 @@ async function enrichAllProducts() {
     `);
     
     const products = result.rows;
-    console.log(`📦 Found ${products.length} active products\n`);
+    logger.debug(`📦 Found ${products.length} active products\n`);
     
     const stats = {
       total: products.length,
@@ -460,21 +460,21 @@ async function enrichAllProducts() {
           stats.byCategory[category].fields += enrichedProduct.enrichmentCount;
         }
         
-        console.log(`✅ [${category}] ${product.name.substring(0, 50)} - ${enrichedProduct.enrichmentCount} fields enriched`);
+        logger.debug(`✅ [${category}] ${product.name.substring(0, 50)} - ${enrichedProduct.enrichmentCount} fields enriched`);
       }
     }
     
-    console.log('\n📊 Enrichment Statistics:');
-    console.log(`   Total Products: ${stats.total}`);
-    console.log(`   Products Enriched: ${stats.enriched}`);
-    console.log(`   Total Fields Added: ${stats.fieldsEnriched}`);
-    console.log(`   Enrichment Rate: ${((stats.enriched / stats.total) * 100).toFixed(1)}%\n`);
+    logger.debug('\n📊 Enrichment Statistics:');
+    logger.debug(`Total Products: ${stats.total}`);
+    logger.debug(`Products Enriched: ${stats.enriched}`);
+    logger.debug(`Total Fields Added: ${stats.fieldsEnriched}`);
+    logger.debug(`Enrichment Rate: ${((stats.enriched / stats.total) * 100).toFixed(1)}%\n`);
     
-    console.log('📊 By Category:');
+    logger.debug('📊 By Category:');
     Object.keys(stats.byCategory).forEach(cat => {
       const catStats = stats.byCategory[cat];
       if (catStats.total > 0) {
-        console.log(`   ${cat}: ${catStats.enriched}/${catStats.total} (${catStats.fields} fields)`);
+        logger.debug(`${cat}: ${catStats.enriched}/${catStats.total} (${catStats.fields} fields)`);
       }
     });
     

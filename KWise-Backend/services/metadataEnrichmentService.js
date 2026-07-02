@@ -351,7 +351,7 @@ class MetadataEnrichmentService {
       
       return result.rows.map(row => ({
         description: row.issue,
-        frequency: parseInt(row.frequency),
+        frequency: Number.parseInt(row.frequency, 10),
         source: 'community_reports'
       }));
     } catch (error) {

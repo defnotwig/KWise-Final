@@ -76,7 +76,7 @@ function getFallbackSuggestion(currentBuild, budget = 500) {
   }
 
   // RAM upgrade
-  if (currentBuild.ram && parseInt(currentBuild.ram) < 32) {
+  if (currentBuild.ram && Number.parseInt(currentBuild.ram, 10) < 32) {
     const ramType = currentBuild.ram.includes('DDR5') ? 'DDR5' : 'DDR4';
     const ramUpgrade = fallbackSuggestions.ram[ramType];
     if (ramUpgrade && ramUpgrade.price <= budget) {

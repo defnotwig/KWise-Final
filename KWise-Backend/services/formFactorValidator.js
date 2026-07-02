@@ -126,7 +126,7 @@ class FormFactorValidator {
     const caseDims = caseComponent.dimensions || {};
 
     // 🔥 CRITICAL FIX: Extract GPU length from dimensions FIRST
-    const gpuLength = parseFloat(
+    const gpuLength = Number.parseFloat(
       gpuDims.length_mm ||
       gpuSpecs.length_mm ||
       gpuSpecs.length ||
@@ -136,7 +136,7 @@ class FormFactorValidator {
     );
 
     // 🔥 CRITICAL FIX: Extract case max GPU length from dimensions FIRST
-    const maxGPULength = parseFloat(
+    const maxGPULength = Number.parseFloat(
       caseDims.max_gpu_length_mm ||
       caseSpecs.max_gpu_length_mm ||
       caseSpecs['Max Gpu Length'] ||
@@ -198,7 +198,7 @@ class FormFactorValidator {
     const caseSpecs = caseComponent.specifications || {};
 
     // Extract cooler height from multiple possible field names
-    const coolerHeight = parseFloat(
+    const coolerHeight = Number.parseFloat(
       coolerSpecs.height_mm ||
       coolerSpecs.height ||
       coolerSpecs.cooler_height_mm ||
@@ -206,7 +206,7 @@ class FormFactorValidator {
     );
 
     // Extract case max cooler height from multiple possible field names
-    const maxCoolerHeight = parseFloat(
+    const maxCoolerHeight = Number.parseFloat(
       caseSpecs.max_cooler_height_mm ||
       caseSpecs['Max Cpu Cooler Height'] ||
       caseSpecs.max_cpu_cooler_height ||
@@ -355,7 +355,7 @@ class FormFactorValidator {
     if (typeof value === 'number') return value;
     if (typeof value === 'string') {
       const match = value.match(/(\d+(\.\d+)?)/);
-      return match ? parseFloat(match[1]) : null;
+      return match ? Number.parseFloat(match[1]) : null;
     }
     return null;
   }

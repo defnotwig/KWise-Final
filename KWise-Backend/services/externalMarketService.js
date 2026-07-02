@@ -108,7 +108,7 @@ class ExternalMarketService {
       const startTime = Date.now();
       
       // Step 1: Generate AI recommendations (parallel with validation setup)
-      const [aiSuggestions, _] = await Promise.all([
+      const [aiSuggestions] = await Promise.all([
         this.getAISuggestions(currentBuild, budget, bottlenecks, usage),
         Promise.resolve() // Placeholder for future parallel operations
       ]);
@@ -324,7 +324,7 @@ Ensure all products are real and prices are accurate for October 2025 Philippine
     }
 
     // Check 3: Price is a valid number
-    if (typeof suggestion.price !== 'number' || isNaN(suggestion.price) || suggestion.price <= 0) {
+    if (typeof suggestion.price !== 'number' || Number.isNaN(suggestion.price) || suggestion.price <= 0) {
       return {
         isValid: false,
         reason: 'Invalid price format',
@@ -341,7 +341,7 @@ Ensure all products are real and prices are accurate for October 2025 Philippine
 
     // Check 5: Performance gain is reasonable
     if (suggestion.performanceGain) {
-      const gain = parseInt(suggestion.performanceGain);
+      const gain = Number.parseInt(suggestion.performanceGain, 10);
       if (gain > 500 || gain < 5) {
         warnings.push(`Unrealistic performance gain: ${suggestion.performanceGain}`);
         score -= 15;
@@ -536,14 +536,14 @@ Ensure all products are real and prices are accurate for October 2025 Philippine
     }
 
     cleaned = cleaned
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
-      .replace(/<[^>]*>/g, '')
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
+      .replaceAll(/<think>[\s\S]*?<\/think>/gi, '')
+      .replaceAll(/<[^>]*>/g, '')
+      .replaceAll(/```json\n?/g, '')
+      .replaceAll(/```\n?/g, '')
       .trim();
 
     // Extract JSON object
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    const jsonMatch = /\{[\s\S]*\}/.exec(cleaned);
     return jsonMatch ? jsonMatch[0] : cleaned;
   }
 

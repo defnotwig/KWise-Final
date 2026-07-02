@@ -8,7 +8,7 @@
  * @version 1.0.0
  */
 
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const logger = require('../utils/logger');
 
 /**
@@ -315,7 +315,7 @@ class IntelligentCache {
       if (!data) return false;
       
       // OPTIMIZATION: Check common property paths directly (20x faster than JSON.stringify)
-      const partIdNum = typeof partId === 'string' ? parseInt(partId) : partId;
+      const partIdNum = typeof partId === 'string' ? Number.parseInt(partId, 10) : partId;
       
       // Check direct ID fields
       if (data.id === partIdNum || data.product_id === partIdNum || data.part_id === partIdNum) {

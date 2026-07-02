@@ -5,9 +5,19 @@
  */
 
 const { Mutex } = require('async-mutex');
-const crypto = require('crypto');
-const { query } = require('../config/db');
+const crypto = require('node:crypto');
+const { query, pool } = require('../config/db');
 const logger = require('../utils/logger');
+
+const parseIntegerSetting = (value, fallback) => {
+    const parsedValue = Number.parseInt(String(value ?? ''), 10);
+    return Number.isNaN(parsedValue) ? fallback : parsedValue;
+};
+
+const parseCurrencyAmount = (value, fallback = 0) => {
+    const parsedValue = Number.parseFloat(String(value ?? ''));
+    return Number.isNaN(parsedValue) ? fallback : parsedValue;
+};
 
 class OrderLockService {
     constructor() {
@@ -16,10 +26,12 @@ class OrderLockService {
         
         // Configuration
         this.config = {
-            lockTimeout: parseInt(process.env.ORDER_LOCK_TIMEOUT_MS) || 10000, // 10 seconds
-            hashWindowMinutes: parseInt(process.env.ORDER_HASH_WINDOW_MINUTES) || 5, // 5 minutes
-            cleanupInterval: parseInt(process.env.PENDING_ORDERS_CLEANUP_INTERVAL_MS) || 60000 // 1 minute
+            lockTimeout: parseIntegerSetting(process.env.ORDER_LOCK_TIMEOUT_MS, 10000),
+            hashWindowMinutes: parseIntegerSetting(process.env.ORDER_HASH_WINDOW_MINUTES, 5),
+            cleanupInterval: parseIntegerSetting(process.env.PENDING_ORDERS_CLEANUP_INTERVAL_MS, 60000)
         };
+        this.completedOrderCache = new Map();
+        this.cleanupIntervalId = null;
 
         // Start automatic cleanup
         this.startAutomaticCleanup();
@@ -30,6 +42,49 @@ class OrderLockService {
         logger.info(`   - Cleanup interval: ${this.config.cleanupInterval}ms`);
     }
 
+    getCompletionTtlMs() {
+        return Math.max(1, this.config.hashWindowMinutes) * 60 * 1000;
+    }
+
+    rememberCompletedOrder(orderHash, orderResult, items) {
+        this.completedOrderCache.set(orderHash, {
+            expiresAt: Date.now() + this.getCompletionTtlMs(),
+            order: {
+                isDuplicate: true,
+                orderId: orderResult.orderId,
+                orderNumber: orderResult.orderNumber,
+                orderIdFormatted: orderResult.orderIdFormatted,
+                transactionIdFormatted: orderResult.transactionIdFormatted,
+                queueNumber: orderResult.queueNumber,
+                totalAmount: parseCurrencyAmount(orderResult.totalAmount),
+                items
+            }
+        });
+    }
+
+    getRememberedCompletedOrder(orderHash) {
+        const cached = this.completedOrderCache.get(orderHash);
+        if (!cached) {
+            return null;
+        }
+
+        if (cached.expiresAt <= Date.now()) {
+            this.completedOrderCache.delete(orderHash);
+            return null;
+        }
+
+        return cached.order;
+    }
+
+    cleanupCompletedOrderCache() {
+        const now = Date.now();
+        for (const [orderHash, cached] of this.completedOrderCache.entries()) {
+            if (cached.expiresAt <= now) {
+                this.completedOrderCache.delete(orderHash);
+            }
+        }
+    }
+
     /**
      * Generate order hash for deduplication
      * Hash includes: customer name, items (sorted), total, time window
@@ -38,13 +93,29 @@ class OrderLockService {
      */
     generateOrderHash(orderData) {
         try {
+            if (orderData.idempotencyKey) {
+                const explicitHash = crypto
+                    .createHash('sha256')
+                    .update(String(orderData.idempotencyKey))
+                    .digest('hex')
+                    .slice(0, 32);
+                logger.debug(`Generated idempotency order hash: ${explicitHash.substring(0, 8)}...`);
+                return explicitHash;
+            }
+
             const { customerName, items, totalAmount } = orderData;
+            let normalizedItems = [];
+            if (Array.isArray(items)) {
+                normalizedItems = items;
+            } else if (items) {
+                normalizedItems = [items];
+            }
 
             // Sort items by name for consistent hashing
-            const sortedItems = items
+            const sortedItems = normalizedItems
                 .map(item => ({
-                    name: item.name,
-                    price: parseFloat(item.price || 0).toFixed(2),
+                    name: String(item?.name || '').trim(),
+                    price: parseCurrencyAmount(item?.price).toFixed(2),
                     quantity: item.quantity || 1
                 }))
                 .sort((a, b) => a.name.localeCompare(b.name));
@@ -55,9 +126,9 @@ class OrderLockService {
 
             // Create hash input string
             const hashInput = JSON.stringify({
-                customer: (customerName || '').trim().toLowerCase(),
+                customer: String(customerName || '').trim().toLowerCase(),
                 items: sortedItems,
-                total: parseFloat(totalAmount || 0).toFixed(2),
+                total: parseCurrencyAmount(totalAmount).toFixed(2),
                 window: timeWindow
             });
 
@@ -89,7 +160,7 @@ class OrderLockService {
                     created_at
                 FROM pending_orders
                 WHERE order_hash = $1 
-                AND status = 'pending'
+                AND status IN ('pending', 'completed')
                 AND expires_at > NOW()
                 ORDER BY created_at DESC
                 LIMIT 1
@@ -125,11 +196,17 @@ class OrderLockService {
                     status,
                     created_at,
                     expires_at
-                ) VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '${this.config.hashWindowMinutes} minutes')
+                ) VALUES ($1, $2, $3, NOW(), NOW() + $4 * INTERVAL '1 minute')
                 ON CONFLICT (order_hash) DO UPDATE
-                SET order_data = EXCLUDED.order_data
+                SET
+                    order_data = EXCLUDED.order_data,
+                    status = EXCLUDED.status,
+                    order_id = NULL,
+                    created_at = NOW(),
+                    completed_at = NULL,
+                    expires_at = EXCLUDED.expires_at
                 RETURNING id
-            `, [orderHash, JSON.stringify(orderData), 'pending']);
+            `, [orderHash, JSON.stringify(orderData), 'pending', Number.parseInt(this.config.hashWindowMinutes, 10) || 30]);
 
             const pendingId = result.rows[0].id;
             logger.debug(`Added pending order: ID=${pendingId}, Hash=${orderHash.substring(0, 8)}...`);
@@ -147,7 +224,7 @@ class OrderLockService {
      */
     async completePendingOrder(orderHash, orderId) {
         try {
-            await query(`
+            await pool.query(`
                 UPDATE pending_orders
                 SET 
                     status = 'completed',
@@ -169,7 +246,7 @@ class OrderLockService {
      */
     async failPendingOrder(orderHash) {
         try {
-            await query(`
+            await pool.query(`
                 UPDATE pending_orders
                 SET 
                     status = 'failed',
@@ -190,8 +267,9 @@ class OrderLockService {
      */
     async cleanupExpiredOrders() {
         try {
+            this.cleanupCompletedOrderCache();
             const result = await query('SELECT cleanup_expired_pending_orders() as count');
-            const count = result.rows[0].count;
+            const count = Number(result?.rows?.[0]?.count ?? 0);
             
             if (count > 0) {
                 logger.info(`🧹 Cleaned up ${count} expired pending orders`);
@@ -212,11 +290,12 @@ class OrderLockService {
             logger.info('🧪 Skipping automatic cleanup interval in test mode');
             return;
         }
-        setInterval(() => {
+        this.cleanupIntervalId = setInterval(() => {
             this.cleanupExpiredOrders().catch(err => {
                 logger.error('Auto-cleanup error:', err);
             });
         }, this.config.cleanupInterval);
+        this.cleanupIntervalId.unref?.();
 
         logger.info(`🧹 Automatic cleanup started (every ${this.config.cleanupInterval}ms)`);
     }
@@ -230,6 +309,15 @@ class OrderLockService {
     async executeWithLock(orderCreationFn, orderData) {
         // Generate order hash for deduplication
         const orderHash = this.generateOrderHash(orderData);
+
+        const rememberedOrder = this.getRememberedCompletedOrder(orderHash);
+        if (rememberedOrder) {
+            logger.warn('Returning remembered completed duplicate order');
+            return {
+                ...rememberedOrder,
+                items: orderData.items
+            };
+        }
 
         // Check for duplicate BEFORE acquiring lock (fast path)
         const duplicate = await this.checkDuplicateOrder(orderHash);
@@ -259,7 +347,7 @@ class OrderLockService {
                         orderIdFormatted: existingOrder.order_id_formatted,
                         transactionIdFormatted: existingOrder.transaction_id_formatted,
                         queueNumber: existingOrder.queue_number,
-                        totalAmount: parseFloat(existingOrder.total_amount),
+                        totalAmount: parseCurrencyAmount(existingOrder.total_amount),
                         items: orderData.items
                     };
                 }
@@ -280,6 +368,15 @@ class OrderLockService {
             logger.debug(`🔒 Lock acquired for order creation`);
 
             // Double-check for duplicates after acquiring lock (race condition safety)
+            const rememberedOrderAfterLock = this.getRememberedCompletedOrder(orderHash);
+            if (rememberedOrderAfterLock) {
+                logger.warn('Returning remembered completed duplicate order after lock');
+                return {
+                    ...rememberedOrderAfterLock,
+                    items: orderData.items
+                };
+            }
+
             const duplicateAfterLock = await this.checkDuplicateOrder(orderHash);
             if (duplicateAfterLock) {
                 logger.warn('🚫 Duplicate order rejected (post-lock check)');
@@ -306,7 +403,7 @@ class OrderLockService {
                             orderIdFormatted: existingOrder.order_id_formatted,
                             transactionIdFormatted: existingOrder.transaction_id_formatted,
                             queueNumber: existingOrder.queue_number,
-                            totalAmount: parseFloat(existingOrder.total_amount),
+                            totalAmount: parseCurrencyAmount(existingOrder.total_amount),
                             items: orderData.items
                         };
                     }
@@ -326,8 +423,14 @@ class OrderLockService {
             logger.info('📝 Creating new order (no duplicate found)');
             const result = await orderCreationFn();
 
-            // Mark as completed
-            await this.completePendingOrder(orderHash, result.orderId);
+            this.rememberCompletedOrder(orderHash, result, orderData.items);
+            if (process.env.ORDER_PERSIST_IDEMPOTENCY_COMPLETIONS === 'true') {
+                this.completePendingOrder(orderHash, result.orderId).catch((error) => {
+                    logger.warn('Pending order completion update skipped after response-path completion', {
+                        error: error.message
+                    });
+                });
+            }
 
             logger.info(`✅ Order created successfully: ID=${result.orderId}`);
             return {
@@ -338,8 +441,13 @@ class OrderLockService {
         } catch (error) {
             logger.error('❌ Error during locked order creation:', error);
             
-            // Mark as failed
-            await this.failPendingOrder(orderHash);
+            if (process.env.ORDER_PERSIST_IDEMPOTENCY_COMPLETIONS === 'true') {
+                this.failPendingOrder(orderHash).catch((failError) => {
+                    logger.warn('Pending order failure update skipped after order error', {
+                        error: failError.message
+                    });
+                });
+            }
             
             throw error;
         } finally {
