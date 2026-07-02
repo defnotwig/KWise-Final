@@ -1121,7 +1121,7 @@ class AIController {
             logger.info(`Matched ${category} (exact product from reference build)`, {
               productId,
               name: exactProduct.rows[0].name,
-              price: `₱${parseFloat(exactProduct.rows[0].price).toLocaleString()}`
+              price: `₱${Number.parseFloat(exactProduct.rows[0].price).toLocaleString()}`
             });
             continue;
           } else {
@@ -1245,7 +1245,7 @@ class AIController {
           description,
           matched: topMatch.name,
           similarity: (topMatch.name_similarity * 100).toFixed(1) + '%',
-          price: `₱${parseFloat(topMatch.price).toLocaleString()}`,
+          price: `₱${Number.parseFloat(topMatch.price).toLocaleString()}`,
           targetPrice: targetPrice ? `₱${targetPrice.toLocaleString()}` : 'N/A'
         });
         
@@ -1935,9 +1935,9 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
     const gtxMatch = name.match(/gtx\s*(\d{2})/i);
     const rxMatch = name.match(/rx\s*(\d)/i);
     
-    if (rtxMatch) return parseInt(rtxMatch[1]) * 1000; // RTX 4090 → 4000
-    if (gtxMatch) return parseInt(gtxMatch[1].charAt(0)) * 100; // GTX 1080 → 1000
-    if (rxMatch) return parseInt(rxMatch[1]) * 1000; // RX 7900 → 7000
+    if (rtxMatch) return Number.parseInt(rtxMatch[1], 10) * 1000; // RTX 4090 → 4000
+    if (gtxMatch) return Number.parseInt(gtxMatch[1].charAt(0), 10) * 100; // GTX 1080 → 1000
+    if (rxMatch) return Number.parseInt(rxMatch[1], 10) * 1000; // RX 7900 → 7000
     
     return 0;
   }
@@ -1950,7 +1950,7 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
   extractCPUCores(name) {
     // Look for explicit core mentions: "8-Core", "6 cores"
     const coreMatch = name.match(/(\d+)[-\s]?cores?/i);
-    if (coreMatch) return parseInt(coreMatch[1]);
+    if (coreMatch) return Number.parseInt(coreMatch[1], 10);
     
     // Ryzen heuristics: Ryzen 9 = 12-16 cores, Ryzen 7 = 8 cores, Ryzen 5 = 6 cores, Ryzen 3 = 4 cores
     if (name.includes('ryzen 9') || name.includes('r9')) return 12;
@@ -1974,7 +1974,7 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
    */
   extractRAMCapacity(name) {
     const gbMatch = name.match(/(\d+)\s*gb/i);
-    return gbMatch ? parseInt(gbMatch[1]) : 8; // Default 8GB
+    return gbMatch ? Number.parseInt(gbMatch[1], 10) : 8; // Default 8GB
   }
 
   /**
@@ -2012,8 +2012,8 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
         AND endpoint LIKE '%estimate%'
       `;
       const estimationsResult = await db.query(estimationsQuery);
-      const totalEstimations = parseInt(estimationsResult.rows[0]?.total || 0);
-      const avgConfidence = parseFloat(estimationsResult.rows[0]?.avg_confidence || 0);
+      const totalEstimations = Number.parseInt(estimationsResult.rows[0]?.total || 0, 10);
+      const avgConfidence = Number.parseFloat(estimationsResult.rows[0]?.avg_confidence || 0);
 
       // Get total recommendations
       const recommendationsQuery = `
@@ -2023,7 +2023,7 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
         AND endpoint LIKE '%recommend%'
       `;
       const recommendationsResult = await db.query(recommendationsQuery);
-      const totalRecommendations = parseInt(recommendationsResult.rows[0]?.total || 0);
+      const totalRecommendations = Number.parseInt(recommendationsResult.rows[0]?.total || 0, 10);
 
       // Get AI-assisted orders (orders with ai_assisted flag)
       const ordersQuery = `
@@ -2034,8 +2034,8 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
         AND ai_assisted = true
       `;
       const ordersResult = await db.query(ordersQuery);
-      const aiAssistedOrders = parseInt(ordersResult.rows[0]?.total || 0);
-      const aiAssistedRevenue = parseFloat(ordersResult.rows[0]?.revenue || 0);
+      const aiAssistedOrders = Number.parseInt(ordersResult.rows[0]?.total || 0, 10);
+      const aiAssistedRevenue = Number.parseFloat(ordersResult.rows[0]?.revenue || 0);
 
       // Calculate success rate (estimations with confidence >= 80%)
       const successQuery = `
@@ -2046,7 +2046,7 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
         AND CAST(response->>'confidence' AS DECIMAL) >= 80
       `;
       const successResult = await db.query(successQuery);
-      const highConfidenceCount = parseInt(successResult.rows[0]?.high_confidence || 0);
+      const highConfidenceCount = Number.parseInt(successResult.rows[0]?.high_confidence || 0, 10);
       const estimationSuccessRate = totalEstimations > 0 
         ? (highConfidenceCount / totalEstimations) * 100 
         : 0;
@@ -2059,7 +2059,7 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
         AND user_accepted = true
       `;
       const acceptanceResult = await db.query(acceptanceQuery);
-      const acceptedCount = parseInt(acceptanceResult.rows[0]?.accepted || 0);
+      const acceptedCount = Number.parseInt(acceptanceResult.rows[0]?.accepted || 0, 10);
       const recommendationAcceptanceRate = totalRecommendations > 0
         ? (acceptedCount / totalRecommendations) * 100
         : 0;
@@ -2079,8 +2079,8 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
       const usageResult = await db.query(usageQuery);
       const usageOverTime = usageResult.rows.map(row => ({
         date: new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        estimations: parseInt(row.estimations),
-        recommendations: parseInt(row.recommendations)
+        estimations: Number.parseInt(row.estimations, 10),
+        recommendations: Number.parseInt(row.recommendations, 10)
       })).reverse();
 
       // Get confidence distribution
@@ -2101,11 +2101,11 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
         ORDER BY range DESC
       `;
       const confidenceResult = await db.query(confidenceQuery);
-      const totalConfidence = confidenceResult.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
+      const totalConfidence = confidenceResult.rows.reduce((sum, row) => sum + Number.parseInt(row.count, 10), 0);
       const confidenceDistribution = confidenceResult.rows.map(row => ({
         range: row.range,
-        count: parseInt(row.count),
-        percentage: totalConfidence > 0 ? ((parseInt(row.count) / totalConfidence) * 100).toFixed(1) : 0
+        count: Number.parseInt(row.count, 10),
+        percentage: totalConfidence > 0 ? ((Number.parseInt(row.count, 10) / totalConfidence) * 100).toFixed(1) : 0
       }));
 
       // Get popular upgrade paths
@@ -2127,9 +2127,9 @@ Output ONLY JSON: {"bottlenecks": ["GPU", "RAM"]}`;
       const popularUpgrades = upgradesResult.rows.map(row => ({
         category: row.category || 'Unknown',
         product_name: row.product_name || 'Unknown',
-        count: parseInt(row.count),
-        avg_price: parseFloat(row.avg_price || 0),
-        total_revenue: parseFloat(row.total_revenue || 0)
+        count: Number.parseInt(row.count, 10),
+        avg_price: Number.parseFloat(row.avg_price || 0),
+        total_revenue: Number.parseFloat(row.total_revenue || 0)
       }));
 
       // Get recent interactions
@@ -2944,8 +2944,8 @@ Respond in JSON format:
       const finalExamples = trainingExamples.slice(0, limit);
       
       // Save to JSONL file
-      const fs = require('fs');
-      const path = require('path');
+      const fs = require('node:fs');
+      const path = require('node:path');
       const outputDir = path.join(__dirname, '../../ai/training/datasets');
       const outputFile = path.join(outputDir, 'pc_hardware_training_dataset.jsonl');
       
