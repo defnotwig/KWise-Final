@@ -456,14 +456,14 @@ class WebSocketService {
             
             try {
                 const orders = await query('SELECT COUNT(*) as count FROM orders WHERE created_at > NOW() - INTERVAL \'24 hours\'');
-                orders24h = parseInt(orders.rows[0]?.count || 0);
+                orders24h = Number.parseInt(orders.rows[0]?.count || 0, 10);
             } catch (e) {
                 // Silent fail for non-critical metric
             }
             
             try {
                 const stock = await query('SELECT SUM(stock) as total_stock FROM pc_parts WHERE is_active = true');
-                totalStock = parseInt(stock.rows[0]?.total_stock || 0);
+                totalStock = Number.parseInt(stock.rows[0]?.total_stock || 0, 10);
             } catch (e) {
                 // Silent fail for non-critical metric
             }
@@ -476,14 +476,14 @@ class WebSocketService {
                     WHERE o.created_at > NOW() - INTERVAL '24 hours' 
                     AND o.status != 'cancelled'
                 `);
-                revenue24h = parseFloat(revenue.rows[0]?.revenue || 0);
+                revenue24h = Number.parseFloat(revenue.rows[0]?.revenue || 0);
             } catch (e) {
                 // Silent fail for non-critical metric
             }
             
             try {
                 const users = await query('SELECT COUNT(*) as count FROM users WHERE last_active_at > NOW() - INTERVAL \'5 minutes\' OR last_activity > NOW() - INTERVAL \'5 minutes\'');
-                activeUsers = parseInt(users.rows[0]?.count || 0);
+                activeUsers = Number.parseInt(users.rows[0]?.count || 0, 10);
             } catch (e) {
                 // Silent fail for non-critical metric
             }
