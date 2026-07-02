@@ -67,7 +67,7 @@ function formatDate(date = new Date()) {
     }
     
     // Validate date object
-    if (!dateObj || isNaN(dateObj.getTime())) {
+    if (!dateObj || Number.isNaN(dateObj.getTime())) {
         dateObj = new Date(); // Fallback to current date
     }
     

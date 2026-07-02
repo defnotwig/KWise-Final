@@ -29,7 +29,7 @@ class InMemoryCache {
      * Generate cache key from query and params
      */
     generateKey(query, params = []) {
-        const crypto = require('crypto');
+        const crypto = require('node:crypto');
         const hash = crypto.createHash('md5');
         hash.update(query);
         hash.update(JSON.stringify(params));

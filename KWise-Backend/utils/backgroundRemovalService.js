@@ -1,6 +1,6 @@
 const sharp = require('sharp');
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require('node:fs').promises;
+const path = require('node:path');
 const logger = require('./logger');
 
 /**

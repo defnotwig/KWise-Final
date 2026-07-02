@@ -67,8 +67,8 @@ function createPart(body = {}) {
     name: body.name || `Part ${partId}`,
     category: body.category || 'CPU',
     brand: body.brand || 'Test Brand',
-    price: parseFloat(body.price || 0),
-    stock: parseInt(body.stock || 0),
+    price: Number.parseFloat(body.price || 0),
+    stock: Number.parseInt(body.stock || 0, 10),
     description: body.description || '',
     specifications: body.specifications ? JSON.parse(JSON.stringify(body.specifications)) : {},
     image_url: body.image_url || '/test/image.png',
@@ -194,8 +194,8 @@ function getNowServing() {
 }
 
 function getTransactions(query = {}) {
-  const page = Math.max(parseInt(query.page || 1, 10), 1);
-  const limit = Math.max(Math.min(parseInt(query.limit || 20, 10), 50), 1);
+  const page = Math.max(Number.parseInt(query.page || 1, 10), 1);
+  const limit = Math.max(Math.min(Number.parseInt(query.limit || 20, 10), 50), 1);
   const start = (page - 1) * limit;
   const assistedBy = query.assistedBy ? Number(query.assistedBy) : null;
 

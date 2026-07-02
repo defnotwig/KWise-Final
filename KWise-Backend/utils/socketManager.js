@@ -2,6 +2,7 @@
 // Socket.IO Real-time Implementation for K-Wise Admin
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
+const db = require('../config/db');
 
 let io;
 
@@ -18,19 +19,29 @@ const initializeSocket = (server) => {
   // Socket authentication middleware
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
-      
+      const cookies = String(socket.handshake.headers.cookie || '')
+        .split(';')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .reduce((parsed, entry) => {
+          const index = entry.indexOf('=');
+          if (index > -1) parsed[entry.slice(0, index)] = decodeURIComponent(entry.slice(index + 1));
+          return parsed;
+        }, {});
+      const token = cookies.jwt;
       if (!token) {
-        return next(new Error('Authentication token required'));
+        return next(new Error('Authentication cookie required'));
       }
 
-      if (!process.env.JWT_SECRET) {
-        return next(new Error('JWT_SECRET environment variable is not configured'));
+      const jwtSecret = process.env.JWT_SECRET || require('../config/config').jwt.secret;
+      const decoded = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
+      const userResult = await db.query('SELECT id, name, role FROM users WHERE id = $1 AND is_active = true', [decoded.id]);
+      if (userResult.rows.length === 0) {
+        return next(new Error('Authentication user not found'));
       }
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = decoded.id;
-      socket.userRole = decoded.role;
-      socket.userName = decoded.name;
+      socket.userId = userResult.rows[0].id;
+      socket.userRole = userResult.rows[0].role;
+      socket.userName = userResult.rows[0].name;
       
       next();
     } catch (error) {
@@ -136,16 +147,7 @@ const initializeSocket = (server) => {
 // Helper functions
 const updateUserStatus = async (userId, status) => {
   try {
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'KWiseDB',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASS || 'password'
-    });
-
-    await pool.query(
+    await db.query(
       'UPDATE users SET last_active_at = NOW(), status = $1 WHERE id = $2',
       [status, userId]
     );
@@ -156,16 +158,7 @@ const updateUserStatus = async (userId, status) => {
 
 const saveMessage = async (messageData) => {
   try {
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'KWiseDB',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASS || 'password'
-    });
-
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO messages (sender_id, recipient_id, content, message_type, created_at) 
        VALUES ($1, $2, $3, $4, NOW()) RETURNING id`,
       [messageData.senderId, messageData.recipientId, messageData.content, messageData.type]
@@ -180,16 +173,7 @@ const saveMessage = async (messageData) => {
 
 const markNotificationAsRead = async (notificationId, userId) => {
   try {
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'KWiseDB',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASS || 'password'
-    });
-
-    await pool.query(
+    await db.query(
       'UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = $1 AND user_id = $2',
       [notificationId, userId]
     );

@@ -16,13 +16,13 @@ async function getUserStats(limitRecent = 5) {
     ]);
 
     const roles = { superadmin: 0, admin: 0, developer: 0 };
-    rolesBreakdown.rows.forEach(r => { if (roles[r.role] !== undefined) roles[r.role] = parseInt(r.count); });
+    rolesBreakdown.rows.forEach(r => { if (roles[r.role] !== undefined) roles[r.role] = Number.parseInt(r.count, 10); });
 
     return {
       totals: {
-        all: parseInt(totalUsers.rows[0]?.count || 0),
-        active: parseInt(activeUsers.rows[0]?.count || 0),
-        inactive: parseInt(inactiveUsers.rows[0]?.count || 0)
+        all: Number.parseInt(totalUsers.rows[0]?.count || 0, 10),
+        active: Number.parseInt(activeUsers.rows[0]?.count || 0, 10),
+        inactive: Number.parseInt(inactiveUsers.rows[0]?.count || 0, 10)
       },
       roles,
       recent: recentUsers.rows,
@@ -52,10 +52,10 @@ async function getLogStats(limitRecent = 10) {
 
     return {
       counts: {
-        total: parseInt(total.rows[0]?.count || 0),
-        error: parseInt(errors.rows[0]?.count || 0),
-        warning: parseInt(warnings.rows[0]?.count || 0),
-        info: parseInt(info.rows[0]?.count || 0)
+        total: Number.parseInt(total.rows[0]?.count || 0, 10),
+        error: Number.parseInt(errors.rows[0]?.count || 0, 10),
+        warning: Number.parseInt(warnings.rows[0]?.count || 0, 10),
+        info: Number.parseInt(info.rows[0]?.count || 0, 10)
       },
       recentActions: recent.rows,
       timestamp: new Date().toISOString()
@@ -80,11 +80,11 @@ async function getOrderStats() {
       query("SELECT COUNT(*) as count FROM orders WHERE status = 'cancelled'")
     ]);
     return {
-      total: parseInt(total.rows[0]?.count || 0),
-      pending: parseInt(pending.rows[0]?.count || 0),
-      processing: parseInt(processing.rows[0]?.count || 0),
-      completed: parseInt(completed.rows[0]?.count || 0),
-      cancelled: parseInt(cancelled.rows[0]?.count || 0),
+      total: Number.parseInt(total.rows[0]?.count || 0, 10),
+      pending: Number.parseInt(pending.rows[0]?.count || 0, 10),
+      processing: Number.parseInt(processing.rows[0]?.count || 0, 10),
+      completed: Number.parseInt(completed.rows[0]?.count || 0, 10),
+      cancelled: Number.parseInt(cancelled.rows[0]?.count || 0, 10),
       timestamp: new Date().toISOString()
     };
   } catch (e) {
