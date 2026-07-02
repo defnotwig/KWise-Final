@@ -5,7 +5,58 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import './CompatibilityReportModal.css';
+
+const getStatusLabel = (status) => {
+    switch (status) {
+        case 'optimal': return '✅ Optimal';
+        case 'minimal': return '⚠️ Minimal';
+        case 'insufficient': return '❌ Insufficient';
+        case 'oversized': return 'ℹ️ Oversized';
+        case 'no_psu': return '⚠️ No PSU';
+        default: return 'N/A';
+    }
+};
+
+const getConfidenceClass = (confidence) => {
+    if (confidence >= 70) return 'high';
+    if (confidence >= 50) return 'medium';
+    return 'low';
+};
+
+const getConfidenceColor = (confidence) => {
+    if (confidence >= 70) return '#10b981';
+    if (confidence >= 50) return '#f59e0b';
+    return '#ef4444';
+};
+
+const getSeverityClass = (severity) => {
+    if (severity === 'critical') return 'critical';
+    if (severity === 'major') return 'major';
+    return 'minor';
+};
+
+const getSeverityLabel = (severity) => {
+    if (severity === 'critical') return '🚫 CRITICAL';
+    if (severity === 'major') return '⚠️ MAJOR';
+    return 'ℹ️ MINOR';
+};
+
+const getIssueIcon = (severity) => {
+    switch (severity) {
+        case 'critical': return '🚫';
+        case 'error': return '❌';
+        case 'warning': return '⚠️';
+        default: return 'ℹ️';
+    }
+};
+
+const getIssuesColor = (criticalIssues, majorIssues) => {
+    if (criticalIssues > 0) return '#ef4444';
+    if (majorIssues > 0) return '#f59e0b';
+    return '#10b981';
+};
 
 const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysisData }) => {
     const [activeTab, setActiveTab] = useState('overview');
@@ -22,8 +73,8 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
         const handleEscape = (e) => {
             if (e.key === 'Escape' && isOpen) onClose();
         };
-        window.addEventListener('keydown', handleEscape);
-        return () => window.removeEventListener('keydown', handleEscape);
+        globalThis.addEventListener('keydown', handleEscape);
+        return () => globalThis.removeEventListener('keydown', handleEscape);
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
@@ -159,18 +210,14 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
 
         return (
             <div className="analysis-layer">
-                <div className="layer-header" onClick={() => toggleLayer('power')}>
+                <button type="button" className="layer-header" onClick={() => toggleLayer('power')}>
                     <span className="layer-icon">⚡</span>
                     <span className="layer-title">Power Budget Analysis</span>
                     <span className={`layer-status ${status}`}>
-                        {status === 'optimal' ? '✅ Optimal' :
-                         status === 'minimal' ? '⚠️ Minimal' :
-                         status === 'insufficient' ? '❌ Insufficient' :
-                         status === 'oversized' ? 'ℹ️ Oversized' :
-                         status === 'no_psu' ? '⚠️ No PSU' : 'N/A'}
+                        {getStatusLabel(status)}
                     </span>
                     <span className="layer-toggle">{expandedLayers.power ? '▼' : '▶'}</span>
-                </div>
+                </button>
                 {expandedLayers.power && (
                     <div className="layer-content">
                         <p className="layer-message">{message}</p>
@@ -237,7 +284,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="power-recommendations">
                                 <h4>💡 Recommendations</h4>
                                 {recommendations.map((rec, idx) => (
-                                    <div key={idx} className="recommendation-item">
+                                    <div key={`rec-${idx}-${String(rec).slice(0, 20)}`} className="recommendation-item">
                                         {rec}
                                     </div>
                                 ))}
@@ -252,7 +299,6 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
     // Render clearance analysis layer
     const renderClearanceLayer = () => {
         const compatible = clearanceAnalysis?.compatible !== false;
-        const status = clearanceAnalysis?.status || 'unknown';
         const message = clearanceAnalysis?.message || 'No clearance analysis available';
         const criticalIssues = clearanceAnalysis?.critical_issues || [];
         const warnings = clearanceAnalysis?.warnings || [];
@@ -260,14 +306,14 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
 
         return (
             <div className="analysis-layer">
-                <div className="layer-header" onClick={() => toggleLayer('clearance')}>
+                <button type="button" className="layer-header" onClick={() => toggleLayer('clearance')}>
                     <span className="layer-icon">📏</span>
                     <span className="layer-title">Physical Clearance</span>
                     <span className={`layer-status ${compatible ? 'success' : 'error'}`}>
                         {compatible ? '✅ All Fit' : '❌ Issues Found'}
                     </span>
                     <span className="layer-toggle">{expandedLayers.clearance ? '▼' : '▶'}</span>
-                </div>
+                </button>
                 {expandedLayers.clearance && (
                     <div className="layer-content">
                         <p className="layer-message">{message}</p>
@@ -276,7 +322,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="clearance-issues">
                                 <h4>❌ Critical Clearance Issues</h4>
                                 {criticalIssues.map((issue, idx) => (
-                                    <div key={idx} className="clearance-issue critical">
+                                    <div key={`clearance-${idx}-${(issue.check || '').slice(0, 15)}`} className="clearance-issue critical">
                                         <div className="issue-header">{issue.check || 'Clearance Check'}</div>
                                         <div className="issue-message">{issue.warning || issue.message}</div>
                                         {issue.measurements && (
@@ -298,7 +344,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="clearance-warnings">
                                 <h4>⚠️ Clearance Warnings</h4>
                                 {warnings.map((warning, idx) => (
-                                    <div key={idx} className="clearance-warning">
+                                    <div key={`warn-${idx}-${(warning.warning || warning.message || '').slice(0, 15)}`} className="clearance-warning">
                                         <div className="warning-message">{warning.warning || warning.message}</div>
                                         {warning.solution && (
                                             <div className="warning-solution">💡 {warning.solution}</div>
@@ -349,21 +395,21 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
 
         return (
             <div className="analysis-layer">
-                <div className="layer-header" onClick={() => toggleLayer('pairwise')}>
+                <button type="button" className="layer-header" onClick={() => toggleLayer('pairwise')}>
                     <span className="layer-icon">🔗</span>
                     <span className="layer-title">Component Compatibility</span>
                     <span className={`layer-status ${compatible ? 'success' : 'warning'}`}>
                         {summary.total_pairs_checked || 0} pairs checked
                     </span>
                     <span className="layer-toggle">{expandedLayers.pairwise ? '▼' : '▶'}</span>
-                </div>
+                </button>
                 {expandedLayers.pairwise && (
                     <div className="layer-content">
                         {criticalIssues.length > 0 && (
                             <div className="pairwise-issues">
                                 <h4>❌ Compatibility Issues</h4>
                                 {criticalIssues.map((issue, idx) => (
-                                    <div key={idx} className="pairwise-issue">
+                                    <div key={`pair-issue-${idx}-${(issue.message || String(issue)).slice(0, 15)}`} className="pairwise-issue">
                                         <div className="issue-message">{issue.message || issue}</div>
                                         {issue.solution && (
                                             <div className="issue-solution">💡 {issue.solution}</div>
@@ -377,7 +423,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="pairwise-warnings">
                                 <h4>⚠️ Compatibility Warnings</h4>
                                 {warnings.map((warning, idx) => (
-                                    <div key={idx} className="pairwise-warning">
+                                    <div key={`pair-warn-${idx}-${(warning.message || String(warning)).slice(0, 15)}`} className="pairwise-warning">
                                         {warning.message || warning}
                                     </div>
                                 ))}
@@ -398,7 +444,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                     </thead>
                                     <tbody>
                                         {pairs.map((pair, idx) => (
-                                            <tr key={idx} className={pair.compatible ? 'compatible' : 'incompatible'}>
+                                            <tr key={`pair-${idx}-${pair.componentA || pair.component_a || ''}`} className={pair.compatible ? 'compatible' : 'incompatible'}>
                                                 <td>{pair.componentA || pair.component_a || 'N/A'}</td>
                                                 <td>{pair.componentB || pair.component_b || 'N/A'}</td>
                                                 <td>
@@ -429,7 +475,6 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
     // Render bottleneck analysis layer
     const renderBottleneckLayer = () => {
         const balanced = bottleneckAnalysis?.balanced !== false;
-        const status = bottleneckAnalysis?.status || 'unknown';
         const message = bottleneckAnalysis?.message || 'No bottleneck analysis available';
         const bottlenecks = bottleneckAnalysis?.bottlenecks || [];
         const warnings = bottleneckAnalysis?.warnings || [];
@@ -437,14 +482,14 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
 
         return (
             <div className="analysis-layer">
-                <div className="layer-header" onClick={() => toggleLayer('bottleneck')}>
+                <button type="button" className="layer-header" onClick={() => toggleLayer('bottleneck')}>
                     <span className="layer-icon">🎯</span>
                     <span className="layer-title">Performance Balance</span>
                     <span className={`layer-status ${balanced ? 'success' : 'warning'}`}>
                         {balanced ? '✅ Balanced' : '⚠️ Bottlenecks Found'}
                     </span>
                     <span className="layer-toggle">{expandedLayers.bottleneck ? '▼' : '▶'}</span>
-                </div>
+                </button>
                 {expandedLayers.bottleneck && (
                     <div className="layer-content">
                         <p className="layer-message">{message}</p>
@@ -453,7 +498,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="bottleneck-issues">
                                 <h4>🎯 Performance Bottlenecks</h4>
                                 {bottlenecks.map((bottleneck, idx) => (
-                                    <div key={idx} className="bottleneck-item">
+                                    <div key={`bn-${idx}-${bottleneck.type || ''}`} className="bottleneck-item">
                                         <div className="bottleneck-header">
                                             <span className="bottleneck-severity">{bottleneck.severity || 'warning'}</span>
                                             <span className="bottleneck-type">{bottleneck.type || 'Component Mismatch'}</span>
@@ -476,7 +521,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="bottleneck-warnings">
                                 <h4>⚠️ Performance Warnings</h4>
                                 {warnings.map((warning, idx) => (
-                                    <div key={idx} className="bottleneck-warning">
+                                    <div key={`bn-warn-${idx}-${(warning.message || String(warning)).slice(0, 15)}`} className="bottleneck-warning">
                                         <div className="warning-message">{warning.message || warning}</div>
                                         {warning.suggestion && (
                                             <div className="warning-suggestion">💡 {warning.suggestion}</div>
@@ -501,24 +546,21 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
     // PRIORITY 3: Render real-world data layer
     const renderRealWorldLayer = () => (
         <div className="analysis-layer">
-            <div className="layer-header" onClick={() => toggleLayer('realWorld')}>
+            <button type="button" className="layer-header" onClick={() => toggleLayer('realWorld')}>
                 <span className="layer-icon">🌍</span>
                 <span className="layer-title">Real-World Feedback & Known Issues</span>
                 <span className={`layer-status ${realWorldData.status || 'medium_confidence'}`}>
                     {realWorldData.confidence}% confidence ({realWorldData.similar_builds} builds)
                 </span>
                 <span className="layer-toggle">{expandedLayers.realWorld ? '▼' : '▶'}</span>
-            </div>
+            </button>
             {expandedLayers.realWorld && (
                 <div className="layer-content">
                     {/* Confidence Score Display */}
                     <div className="real-world-confidence">
                         <div className="confidence-header">
                             <span className="confidence-label">Community Confidence Score</span>
-                            <span className={`confidence-value ${
-                                realWorldData.confidence >= 70 ? 'high' :
-                                realWorldData.confidence >= 50 ? 'medium' : 'low'
-                            }`}>
+                            <span className={`confidence-value ${getConfidenceClass(realWorldData.confidence)}`}>
                                 {realWorldData.confidence}%
                             </span>
                         </div>
@@ -527,8 +569,11 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                 className="confidence-bar-fill"
                                 style={{ 
                                     width: `${realWorldData.confidence}%`,
-                                    background: realWorldData.confidence >= 70 ? '#10b981' :
-                                               realWorldData.confidence >= 50 ? '#f59e0b' : '#ef4444'
+                                    background: (() => {
+                                        if (realWorldData.confidence >= 70) return '#10b981';
+                                        if (realWorldData.confidence >= 50) return '#f59e0b';
+                                        return '#ef4444';
+                                    })()
                                 }}
                             />
                         </div>
@@ -556,15 +601,11 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <h4>⚠️ Known Issues from Community</h4>
                             {realWorldData.warnings.map((warning, idx) => (
                                 <div 
-                                    key={idx} 
-                                    className={`known-issue-card ${
-                                        warning.severity === 'critical' ? 'critical' :
-                                        warning.severity === 'major' ? 'major' : 'minor'
-                                    }`}
+                                    key={`ki-${idx}-${(warning.title || warning.message || '').slice(0, 15)}`} 
+                                    className={`known-issue-card ${getSeverityClass(warning.severity)}`}
                                 >
                                     <div className="issue-severity-badge">
-                                        {warning.severity === 'critical' ? '🚫 CRITICAL' :
-                                         warning.severity === 'major' ? '⚠️ MAJOR' : 'ℹ️ MINOR'}
+                                        {getSeverityLabel(warning.severity)}
                                     </div>
                                     <div className="issue-title">{warning.title || warning.message}</div>
                                     {warning.workaround && (
@@ -592,7 +633,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                         <div className="community-recommendations">
                             <h4>💡 Community Recommendations</h4>
                             {realWorldData.recommendations.map((rec, idx) => (
-                                <div key={idx} className="community-rec-card">
+                                <div key={`crec-${idx}-${String(rec).slice(0, 20)}`} className="community-rec-card">
                                     <span className="rec-icon">👍</span>
                                     <span className="rec-text">{rec}</span>
                                 </div>
@@ -618,11 +659,11 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
     // Render recommendations tab
     const renderRecommendations = () => (
         <div className="recommendations-section">
-            <h3>AI Recommendations</h3>
+            <h3>Compatibility Recommendations</h3>
             {recommendations.length > 0 ? (
                 <div className="recommendations-list">
                     {recommendations.map((rec, idx) => (
-                        <div key={idx} className="recommendation-card">
+                        <div key={`rcard-${idx}-${rec.type || ''}`} className="recommendation-card">
                             <div className="recommendation-header">
                                 <span className="recommendation-type">{rec.type}</span>
                                 <span className="recommendation-priority">{rec.priority}</span>
@@ -632,7 +673,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                 <div className="recommendation-alternatives">
                                     <strong>Suggested Alternatives:</strong>
                                     {rec.alternatives.map((alt, altIdx) => (
-                                        <div key={altIdx} className="alternative-item">
+                                        <div key={`alt-${altIdx}-${(alt.name || '').slice(0, 15)}`} className="alternative-item">
                                             <span className="alt-name">{alt.name}</span>
                                             <span className="alt-price">${alt.price?.toFixed(2)}</span>
                                         </div>
@@ -651,8 +692,10 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
     );
 
     return (
-        <div className="compatibility-modal-overlay" onClick={onClose}>
-            <div className="compatibility-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="compatibility-modal-overlay" role="none" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+            <dialog open className="compatibility-modal" aria-label="Compatibility Analysis Report">
+                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                <div className="modal-inner" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="modal-header">
                     <h2>Compatibility Analysis Report</h2>
@@ -698,11 +741,9 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                 <div className="issues-summary">
                                     <h3>Compatibility Issues</h3>
                                     {issues.map((issue, idx) => (
-                                        <div key={idx} className={`issue-item ${issue.severity}`}>
+                                        <div key={`issue-${idx}-${issue.severity || ''}`} className={`issue-item ${issue.severity}`}>
                                             <span className="issue-icon">
-                                                {issue.severity === 'critical' ? '🚫' :
-                                                 issue.severity === 'error' ? '❌' :
-                                                 issue.severity === 'warning' ? '⚠️' : 'ℹ️'}
+                                                {getIssueIcon(issue.severity)}
                                             </span>
                                             <div className="issue-content">
                                                 <span className="issue-message">{issue.message}</span>
@@ -735,8 +776,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                             <div className="real-world-summary-card">
                                 <div className="summary-stat">
                                     <span className="stat-value" style={{
-                                        color: realWorldData.confidence >= 70 ? '#10b981' :
-                                               realWorldData.confidence >= 50 ? '#f59e0b' : '#ef4444'
+                                        color: getConfidenceColor(realWorldData.confidence)
                                     }}>
                                         {realWorldData.confidence}%
                                     </span>
@@ -755,8 +795,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                 </div>
                                 <div className="summary-stat">
                                     <span className="stat-value" style={{
-                                        color: realWorldData.critical_issues > 0 ? '#ef4444' :
-                                               realWorldData.major_issues > 0 ? '#f59e0b' : '#10b981'
+                                        color: getIssuesColor(realWorldData.critical_issues, realWorldData.major_issues)
                                     }}>
                                         {realWorldData.known_issues}
                                     </span>
@@ -780,13 +819,12 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                 <div className="issues-list-container">
                                     {realWorldData.warnings.map((warning, idx) => (
                                         <div 
-                                            key={idx} 
+                                            key={`ki-detail-${idx}-${(warning.title || warning.message || '').slice(0, 15)}`} 
                                             className={`known-issue-detail-card ${warning.severity || 'minor'}`}
                                         >
                                             <div className="issue-header-row">
                                                 <span className={`severity-indicator ${warning.severity || 'minor'}`}>
-                                                    {warning.severity === 'critical' ? '🚫 CRITICAL' :
-                                                     warning.severity === 'major' ? '⚠️ MAJOR' : 'ℹ️ MINOR'}
+                                                    {getSeverityLabel(warning.severity)}
                                                 </span>
                                                 {warning.verification_count > 0 && (
                                                     <span className="verification-badge">
@@ -846,7 +884,7 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                                     <h4>💡 Community Recommendations</h4>
                                     <div className="rec-cards-grid">
                                         {realWorldData.recommendations.map((rec, idx) => (
-                                            <div key={idx} className="rec-card">
+                                            <div key={`rcard2-${idx}-${String(rec).slice(0, 20)}`} className="rec-card">
                                                 <span className="rec-icon">👍</span>
                                                 <span className="rec-text">{rec}</span>
                                             </div>
@@ -866,9 +904,17 @@ const CompatibilityReportModal = ({ isOpen, onClose, buildConfiguration, analysi
                     <button className="print-button">🖨️ Print</button>
                     <button className="close-footer-button" onClick={onClose}>Close</button>
                 </div>
-            </div>
+                </div>
+            </dialog>
         </div>
     );
+};
+
+CompatibilityReportModal.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+    buildConfiguration: PropTypes.object,
+    analysisData: PropTypes.object
 };
 
 export default CompatibilityReportModal;

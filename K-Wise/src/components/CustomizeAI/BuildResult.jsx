@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/CustomizeAI.css';
 import api from '../../api/api';
@@ -52,7 +53,7 @@ const BuildResult = ({ buildResult, buildError, assessment }) => {
    * Using window.location for full page reload to reset CustomizeAI component state
    */
   const handleTryAgain = () => {
-    window.location.href = '/customize-ai';
+    globalThis.location.href = '/customize-ai';
   };
 
   /**
@@ -72,8 +73,8 @@ const BuildResult = ({ buildResult, buildError, assessment }) => {
           We couldn't generate a PC build recommendation. This could be because:
         </p>
         <ul className="error-reasons">
-          {buildError.reasons && buildError.reasons.map((reason, index) => (
-            <li key={index}>{reason}</li>
+          {buildError.reasons?.map((reason, index) => (
+            <li key={`reason-${index}-${reason.slice(0, 20)}`}>{reason}</li>
           ))}
         </ul>
         <div className="action-buttons-row">
@@ -139,7 +140,7 @@ const BuildResult = ({ buildResult, buildError, assessment }) => {
 
   // Calculate total price
   const totalPrice = buildComponents.reduce((sum, item) => {
-    return sum + (parseFloat(item.component?.price) || 0);
+    return sum + (Number.parseFloat(item.component?.price) || 0);
   }, 0);
 
   // Calculate AI confidence (mock calculation based on components found)
@@ -181,7 +182,7 @@ const BuildResult = ({ buildResult, buildError, assessment }) => {
             : null;
 
           return (
-            <div key={index} className="build-component-wrapper">
+            <div key={item.category} className="build-component-wrapper">
               <div className="build-component-category">
                 <h1>
                   {item.category}
@@ -205,7 +206,7 @@ const BuildResult = ({ buildResult, buildError, assessment }) => {
                 <div className="build-component-details">
                   <p className="build-component-name">{item.component.name}</p>
                   <p className="build-component-price">
-                    ₱{parseFloat(item.component.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₱{Number.parseFloat(item.component.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -223,6 +224,15 @@ const BuildResult = ({ buildResult, buildError, assessment }) => {
         </div>
     </div>
   );
+};
+
+BuildResult.propTypes = {
+  buildResult: PropTypes.object,
+  buildError: PropTypes.shape({
+    message: PropTypes.string,
+    reasons: PropTypes.arrayOf(PropTypes.string),
+  }),
+  assessment: PropTypes.object,
 };
 
 export default BuildResult;

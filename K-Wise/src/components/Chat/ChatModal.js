@@ -3,8 +3,10 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faPaperPlane, faTimes, faUser, faEllipsisH, faPenToSquare, faSync } from '@fortawesome/free-solid-svg-icons';
+import { getApiBaseUrl, getServerBaseUrl } from '../../utils/networkConfig';
 import './ChatModal.css';
 
 const ChatModal = ({ isOpen, onClose, currentUser }) => {
@@ -23,12 +25,10 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
     const lastMessageCountRef = useRef(0);
 
     // Memoized API base URL
-    const API_BASE = useMemo(() => 'http://localhost:5000/api', []);
+    const API_BASE = useMemo(() => getApiBaseUrl(), []);
     
     // Memoized auth headers
-    const authHeaders = useMemo(() => ({
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
+    const authHeaders = useMemo(() => ({        'Content-Type': 'application/json'
     }), []);
 
     // Optimized fetch conversations with caching
@@ -157,7 +157,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
             fetchConversations();
             
             // Trigger navbar unread count refresh by dispatching a custom event
-            window.dispatchEvent(new CustomEvent('messagesRead'));
+            globalThis.dispatchEvent(new CustomEvent('messagesRead'));
         } catch (error) {
             console.error('Error marking messages as read:', error);
         }
@@ -285,7 +285,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                 }, 300);
                 
                 // Trigger navbar unread count refresh for other users
-                window.dispatchEvent(new CustomEvent('newMessageSent'));
+                globalThis.dispatchEvent(new CustomEvent('newMessageSent'));
             } else {
                 // Mark message as failed
                 setMessages(prev => 
@@ -309,13 +309,13 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
     // Enhanced message rendering with typing indicators and status
     const renderMessagesWithDivider = useCallback(() => {
         if (messages.length === 0 && !typingUsers.size) {
-            return (
-                <div className="no-messages">
+            return [
+                <div key="no-messages" className="no-messages">
                     <FontAwesomeIcon icon={faComments} size="2x" />
                     <p>No messages yet</p>
                     <small>Start the conversation!</small>
                 </div>
-            );
+            ];
         }
 
         const messageElements = [];
@@ -562,7 +562,8 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                 </div>
                             ) : (
                                 conversations.map(conv => (
-                                    <div
+                                    <button
+                                        type="button"
                                         key={conv.other_user_id}
                                         className={`conversation-item ${
                                             activeConversation?.id === conv.other_user_id ? 'active' : ''
@@ -572,7 +573,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                         <div className="conversation-avatar">
                                             {conv.profile_image ? (
                                                 <img 
-                                                    src={`http://localhost:5000/assets/users/${conv.other_user_role}/${conv.profile_image}`}
+                                                    src={`${getServerBaseUrl()}/assets/users/${conv.other_user_role}/${conv.profile_image}`}
                                                     alt={conv.other_user_name}
                                                 />
                                             ) : (
@@ -605,7 +606,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                                 <div className="online-indicator" title="Online">🟢</div>
                                             )}
                                         </div>
-                                    </div>
+                                    </button>
                                 ))
                             )}
                         </div>
@@ -620,7 +621,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                         <div className="user-avatar">
                                             {activeConversation.profile_image ? (
                                                 <img 
-                                                    src={`http://localhost:5000/assets/users/${activeConversation.role}/${activeConversation.profile_image}`}
+                                                    src={`${getServerBaseUrl()}/assets/users/${activeConversation.role}/${activeConversation.profile_image}`}
                                                     alt={activeConversation.name}
                                                 />
                                             ) : (
@@ -658,7 +659,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                                 setNewMessage(e.target.value);
                                                 handleTyping();
                                             }}
-                                            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                                            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                                             disabled={connectionStatus === 'error'}
                                         />
                                         <button
@@ -702,7 +703,8 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                     <p>No available users to chat with</p>
                                 ) : (
                                     availableUsers.map(user => (
-                                        <div
+                                        <button
+                                            type="button"
                                             key={user.id}
                                             className="available-user-item"
                                             onClick={() => startNewConversation(user)}
@@ -710,7 +712,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                             <div className="user-avatar">
                                                 {user.profile_image ? (
                                                     <img 
-                                                        src={`http://localhost:5000/assets/users/${user.role}/${user.profile_image}`}
+                                                        src={`${getServerBaseUrl()}/assets/users/${user.role}/${user.profile_image}`}
                                                         alt={user.name}
                                                     />
                                                 ) : (
@@ -723,7 +725,7 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
                                                 <div className="user-name">{user.name}</div>
                                                 <div className="user-role">{user.role}</div>
                                             </div>
-                                        </div>
+                                        </button>
                                     ))
                                 )}
                             </div>
@@ -733,6 +735,14 @@ const ChatModal = ({ isOpen, onClose, currentUser }) => {
             </div>
         </div>
     );
+};
+
+ChatModal.propTypes = {
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func,
+    currentUser: PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    }),
 };
 
 export default ChatModal;

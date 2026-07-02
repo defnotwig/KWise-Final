@@ -149,7 +149,7 @@ const EditBuild = () => {
 
   // Calculate total
   const totalPrice = steps.reduce((sum, step) => {
-    return sum + (parseFloat(step.component?.price) || 0);
+    return sum + (Number.parseFloat(step.component?.price) || 0);
   }, 0);
 
   const handleReplace = async (categoryKey, categoryIndex) => {
@@ -324,7 +324,7 @@ const EditBuild = () => {
                 <div className="edit-build-step-details">
                   <p className="edit-build-step-title">{step.component.name}</p>
                   <p className="edit-build-step-price">
-                    ₱{parseFloat(step.component.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₱{Number.parseFloat(step.component.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 
@@ -452,7 +452,7 @@ const EditBuild = () => {
               id: component.id,
               product_id: component.id,
               name: component.name,
-              price: parseFloat(component.price),
+              price: Number.parseFloat(component.price),
               image: component.image_url || component.image,
               image_url: component.image_url || component.image,
               category: component.category || key.toUpperCase(),

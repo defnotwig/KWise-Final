@@ -138,11 +138,11 @@ const CustomizeAI = () => {
    */
   const findMatchingBuild = (builds, userAssessment) => {
     // Create search key from assessment
-    const usageKey = userAssessment.usage.toLowerCase().replace(/ /g, '-');
-    const budgetKey = userAssessment.budget.toLowerCase().replace(/ /g, '-');
-    const performanceKey = userAssessment.performance.toLowerCase().replace(/ /g, '-');
+    const usageKey = userAssessment.usage.toLowerCase().replaceAll(' ', '-');
+    const budgetKey = userAssessment.budget.toLowerCase().replaceAll(' ', '-');
+    const performanceKey = userAssessment.performance.toLowerCase().replaceAll(' ', '-');
     const gamingKey = userAssessment.gamingPreference 
-      ? userAssessment.gamingPreference.toLowerCase().replace(/ /g, '-')
+      ? userAssessment.gamingPreference.toLowerCase().replaceAll(' ', '-')
       : null;
 
     let searchKey;

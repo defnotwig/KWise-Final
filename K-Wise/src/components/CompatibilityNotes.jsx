@@ -19,11 +19,10 @@ import React, { useState } from 'react';
 import './CompatibilityNotes.css';
 import '../styles/EnhancedCompatibility.css'; // Phase 2.4: Import enhanced styles
 import {
-  getCompatibilityBadgeClass,
-  formatCompatibilityTooltip
+  getCompatibilityBadgeClass
 } from '../utils/enhancedCompatibilityHelper'; // Phase 2.4: Import helper functions
 
-const CompatibilityNotes = ({ compatibilityData, buildComponents }) => {
+const getScoreEmoji = (score) => {\n  if (score >= 90) return '🟢';\n  if (score >= 80) return '🟡';\n  if (score >= 70) return '🟠';\n  return '🔴';\n};\n\nconst CompatibilityNotes = ({ compatibilityData, buildComponents }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!compatibilityData) return null;
@@ -219,9 +218,6 @@ const CompatibilityNotes = ({ compatibilityData, buildComponents }) => {
   // Generate lettered labels (A, B, C, ...)
   const getLabel = (index) => String.fromCharCode(65 + index); // 65 = 'A'
 
-  // Calculate totals for badge
-  const totalIssues = problems.length + warnings.length;
-
   // Determine badge status
   const getBadgeStatus = () => {
     if (problems.length > 0) return 'incompatible';
@@ -274,9 +270,6 @@ const CompatibilityNotes = ({ compatibilityData, buildComponents }) => {
                                         85;
                   
                   const componentAnalysis = compatibilityData?.detailed_analysis?.[category];
-                  const hasBiosWarning = componentAnalysis?.bios_update_required || 
-                                        (category === 'cpu' && compatibilityData?.bios_warning);
-                  const isAiAnalyzed = compatibilityData?.ai_analyzed || componentAnalysis?.ai_analyzed;
                   
                   return (
                     <div key={category} className="component-card">
@@ -286,7 +279,7 @@ const CompatibilityNotes = ({ compatibilityData, buildComponents }) => {
                           className={`compatibility-badge ${getCompatibilityBadgeClass(componentScore)}`}
                           title={componentAnalysis ? `Socket: ${componentAnalysis.socket || 'N/A'} | Power: ${componentAnalysis.power || 'N/A'}` : 'Component compatibility score'}
                         >
-                          {componentScore >= 90 ? '🟢' : componentScore >= 80 ? '🟡' : componentScore >= 70 ? '🟠' : '🔴'} {componentScore}%
+                          {getScoreEmoji(componentScore)} {componentScore}%
                         </span>
                       </div>
                       <div className="component-name">{component.name}</div>

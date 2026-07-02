@@ -1,6 +1,142 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { FiChevronUp, FiChevronDown, FiCheck, FiAlertTriangle, FiAlertCircle } from 'react-icons/fi';
+import { getServerBaseUrl } from '../../utils/networkConfig';
+import { buildCompatibilityPayload } from '../../utils/kioskContracts';
 import './CompatibilityNotes.css';
+
+/**
+ * Extract and validate component ID from a component object
+ */
+const extractComponentId = (comp) => {
+    let itemId = comp.id || comp.product_id;
+    if (typeof itemId === 'string') {
+        itemId = Number.parseInt(itemId, 10);
+    }
+    if (!itemId || Number.isNaN(itemId) || itemId === 0) {
+        return null;
+    }
+    return itemId;
+};
+
+/**
+ * Check if a product name indicates a service/upgrade item
+ */
+const isServiceOrUpgradeByName = (nameLower) => {
+    return nameLower.includes('upgrade') || nameLower.includes('service') ||
+           nameLower.includes('manual') || nameLower.includes('processing') ||
+           nameLower.includes('labor') || nameLower.includes('installation');
+};
+
+/**
+ * Infer component category from product name keywords
+ */
+const inferCategoryFromName = (nameLower) => {
+    if (nameLower.includes('ryzen') || nameLower.includes('intel') || nameLower.includes('core i') ||
+        nameLower.includes('i5-') || nameLower.includes('i7-') || nameLower.includes('i9-') || nameLower.includes('i3-')) {
+        return 'cpu';
+    }
+    if (nameLower.includes('rtx') || nameLower.includes('gtx') || nameLower.includes('radeon') ||
+        nameLower.includes('geforce') || nameLower.includes('rx 7') || nameLower.includes('rx 6')) {
+        return 'gpu';
+    }
+    if (nameLower.includes('motherboard') || nameLower.includes('b550') || nameLower.includes('b650') ||
+        nameLower.includes('b660') || nameLower.includes('b760') || nameLower.includes('x570') ||
+        nameLower.includes('x670') || nameLower.includes('z690') || nameLower.includes('z790') ||
+        nameLower.includes('a620') || nameLower.includes('b450')) {
+        return 'motherboard';
+    }
+    if (nameLower.includes('ddr4') || nameLower.includes('ddr5') ||
+        (nameLower.includes('ram') && !nameLower.includes('program')) ||
+        nameLower.includes('memory') || nameLower.includes('dimm') ||
+        nameLower.includes('vengeance') || nameLower.includes('trident')) {
+        return 'ram';
+    }
+    if (nameLower.includes('ssd') || nameLower.includes('nvme') || nameLower.includes('hdd') ||
+        nameLower.includes('hard drive') || nameLower.includes('samsung 99') ||
+        nameLower.includes('western digital') || nameLower.includes('seagate') ||
+        nameLower.includes('crucial') || nameLower.includes('980 pro') ||
+        nameLower.includes('970 evo') || nameLower.includes('adata') || nameLower.includes('legend')) {
+        return 'storage';
+    }
+    if (nameLower.includes('cooler') || nameLower.includes('deepcool') || nameLower.includes('noctua') ||
+        nameLower.includes('cooling') || nameLower.includes('aio') || nameLower.includes('liquid') ||
+        nameLower.includes('hyper 212') || nameLower.includes('tower cooler')) {
+        return 'cooling';
+    }
+    if (nameLower.includes('psu') || nameLower.includes('power supply') || nameLower.includes(' w ') ||
+        nameLower.includes('watt') || nameLower.includes('corsair rm') || nameLower.includes('evga') ||
+        nameLower.includes('seasonic') || nameLower.includes('modular')) {
+        return 'psu';
+    }
+    if ((nameLower.includes('case') && !nameLower.includes('showcase')) || nameLower.includes('chassis') ||
+        nameLower.includes('darkflash') || nameLower.includes('nzxt') || nameLower.includes('mid tower') ||
+        nameLower.includes('full tower') || nameLower.includes('atx case')) {
+        return 'case';
+    }
+    return '';
+};
+
+/**
+ * Infer component category from specifications fields
+ */
+const inferCategoryFromSpecs = (specs) => {
+    if (specs.socket || specs.cores || specs.threads || specs.base_clock) return 'cpu';
+    if (specs.vram || specs.cuda_cores || specs.ray_tracing) return 'gpu';
+    if (specs.chipset || specs.form_factor_motherboard || specs.memory_slots) return 'motherboard';
+    if (specs.memory_type || specs.speed_mhz || specs.capacity_per_stick) return 'ram';
+    if (specs.capacity_gb || specs.interface_type || specs.read_speed) return 'storage';
+    if (specs.tdp_w || specs.fan_size || specs.radiator_size) return 'cooling';
+    if (specs.wattage || specs.efficiency_rating || specs.modular) return 'psu';
+    if (specs.max_gpu_length || specs.max_cooler_height || specs.expansion_slots) return 'case';
+    return '';
+};
+
+/**
+ * Category keyword mappings for component classification
+ */
+const CATEGORY_KEYWORDS = [
+    { key: 'cpu', keywords: ['cpu', 'processor', 'central processing'] },
+    { key: 'gpu', keywords: ['gpu', 'graphics', 'video card'] },
+    { key: 'motherboard', keywords: ['motherboard', 'mobo', 'mainboard'] },
+    { key: 'ram', keywords: ['ram', 'memory'] },
+    { key: 'storage', keywords: ['storage', 'ssd', 'hdd', 'nvme', 'hard drive'] },
+    { key: 'psu', keywords: ['psu', 'power supply', 'power'] },
+    { key: 'case', keywords: ['case', 'chassis', 'pc case', 'enclosure'] },
+    { key: 'cooling', keywords: ['cool', 'cooler', 'fan', 'cpu cooler', 'cpu-cooler', 'aio', 'liquid'] }
+];
+
+const ARRAY_CATEGORY_KEYS = new Set(['ram', 'storage']);
+
+/**
+ * Add component data to an array-type field in the formatted object
+ */
+const pushToArrayField = (formatted, key, componentData) => {
+    if (!formatted[key]) formatted[key] = [];
+    if (Array.isArray(formatted[key])) {
+        formatted[key].push(componentData);
+    } else {
+        formatted[key] = [formatted[key], componentData];
+    }
+};
+
+/**
+ * Map a component to the formatted build structure based on its category.
+ * Returns true if mapped, false if category unknown.
+ */
+const addComponentToFormatted = (category, componentData, formatted) => {
+    for (const { key, keywords } of CATEGORY_KEYWORDS) {
+        if (keywords.some(kw => category.includes(kw))) {
+            if (ARRAY_CATEGORY_KEYS.has(key)) {
+                pushToArrayField(formatted, key, componentData);
+            } else {
+                formatted[key] = componentData;
+            }
+            return true;
+        }
+    }
+    return false;
+};
 
 /**
  * PCPartPicker-style Compatibility Notes Component
@@ -30,10 +166,6 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
      */
     const formatComponentsForAPI = (components) => {
         const formatted = {};
-        
-        // 🔥 CRITICAL: Define valid PC component categories (skip services, upgrades, etc.)
-        // eslint-disable-next-line no-unused-vars
-        const _validCategories = ['cpu', 'gpu', 'motherboard', 'ram', 'memory', 'storage', 'ssd', 'hdd', 'nvme', 'psu', 'power', 'case', 'chassis', 'cooling', 'cooler', 'fan'];
         const skipCategories = ['service', 'upgrade', 'manual', 'processing', 'labor', 'installation', 'warranty', 'accessory', 'peripheral'];
         
         console.log('📦 CompatibilityNotes - formatComponentsForAPI input:', components?.length || 0, 'components');
@@ -43,20 +175,19 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
             return formatted;
         }
         
+        const sharedFormatted = buildCompatibilityPayload(components, { arrayCategories: true });
+        if (Object.keys(sharedFormatted).length > 0) {
+            return sharedFormatted;
+        }
+
         components.forEach((comp, index) => {
             if (!comp) {
                 console.log(`⚠️ Skipping null component at index ${index}`);
                 return;
             }
             
-            // 🔥 CRITICAL FIX: Ensure ID is a valid integer (skip if ID is 0 or invalid)
-            let itemId = comp.id || comp.product_id;
-            if (typeof itemId === 'string') {
-                itemId = parseInt(itemId, 10);
-            }
-            
-            // Skip items with invalid IDs (0, NaN, null, undefined)
-            if (!itemId || isNaN(itemId) || itemId === 0) {
+            const itemId = extractComponentId(comp);
+            if (!itemId) {
                 console.log(`⚠️ Skipping component with invalid ID: ${comp.name} (id: ${comp.id})`);
                 return;
             }
@@ -70,58 +201,22 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                 return;
             }
             
-            // 🔥 FALLBACK: If no category, try to infer from product name
             if (!category && comp.name) {
                 const nameLower = comp.name.toLowerCase();
                 
-                // Skip upgrade/service items based on name
-                if (nameLower.includes('upgrade') || nameLower.includes('service') || nameLower.includes('manual') || nameLower.includes('processing') || nameLower.includes('labor') || nameLower.includes('installation')) {
+                if (isServiceOrUpgradeByName(nameLower)) {
                     console.log(`⚠️ Skipping service/upgrade item: ${comp.name}`);
                     return;
                 }
                 
-                if (nameLower.includes('ryzen') || nameLower.includes('intel') || nameLower.includes('core i') || nameLower.includes('i5-') || nameLower.includes('i7-') || nameLower.includes('i9-') || nameLower.includes('i3-')) {
-                    category = 'cpu';
-                } else if (nameLower.includes('rtx') || nameLower.includes('gtx') || nameLower.includes('radeon') || nameLower.includes('geforce') || nameLower.includes('rx 7') || nameLower.includes('rx 6')) {
-                    category = 'gpu';
-                } else if (nameLower.includes('motherboard') || nameLower.includes('b550') || nameLower.includes('b650') || nameLower.includes('b660') || nameLower.includes('b760') || nameLower.includes('x570') || nameLower.includes('x670') || nameLower.includes('z690') || nameLower.includes('z790') || nameLower.includes('a620') || nameLower.includes('b450')) {
-                    category = 'motherboard';
-                } else if (nameLower.includes('ddr4') || nameLower.includes('ddr5') || (nameLower.includes('ram') && !nameLower.includes('program')) || nameLower.includes('memory') || nameLower.includes('dimm') || nameLower.includes('vengeance') || nameLower.includes('trident')) {
-                    category = 'ram';
-                } else if (nameLower.includes('ssd') || nameLower.includes('nvme') || nameLower.includes('hdd') || nameLower.includes('hard drive') || nameLower.includes('samsung 99') || nameLower.includes('western digital') || nameLower.includes('seagate') || nameLower.includes('crucial') || nameLower.includes('980 pro') || nameLower.includes('970 evo') || nameLower.includes('adata') || nameLower.includes('legend')) {
-                    category = 'storage';
-                } else if (nameLower.includes('cooler') || nameLower.includes('deepcool') || nameLower.includes('noctua') || nameLower.includes('cooling') || nameLower.includes('aio') || nameLower.includes('liquid') || nameLower.includes('hyper 212') || nameLower.includes('tower cooler')) {
-                    category = 'cooling';
-                } else if (nameLower.includes('psu') || nameLower.includes('power supply') || nameLower.includes(' w ') || nameLower.includes('watt') || nameLower.includes('corsair rm') || nameLower.includes('evga') || nameLower.includes('seasonic') || nameLower.includes('modular')) {
-                    category = 'psu';
-                } else if ((nameLower.includes('case') && !nameLower.includes('showcase')) || nameLower.includes('chassis') || nameLower.includes('darkflash') || nameLower.includes('nzxt') || nameLower.includes('mid tower') || nameLower.includes('full tower') || nameLower.includes('atx case')) {
-                    category = 'case';
-                }
+                category = inferCategoryFromName(nameLower);
                 if (category) {
                     console.log(`🔮 Inferred category "${category}" from name: ${comp.name}`);
                 }
             }
             
-            // 🔥 ADDITIONAL FALLBACK: Check specifications for socket/form_factor hints
             if (!category && comp.specifications) {
-                const specs = comp.specifications;
-                if (specs.socket || specs.cores || specs.threads || specs.base_clock) {
-                    category = 'cpu';
-                } else if (specs.vram || specs.cuda_cores || specs.ray_tracing) {
-                    category = 'gpu';
-                } else if (specs.chipset || specs.form_factor_motherboard || specs.memory_slots) {
-                    category = 'motherboard';
-                } else if (specs.memory_type || specs.speed_mhz || specs.capacity_per_stick) {
-                    category = 'ram';
-                } else if (specs.capacity_gb || specs.interface_type || specs.read_speed) {
-                    category = 'storage';
-                } else if (specs.tdp_w || specs.fan_size || specs.radiator_size) {
-                    category = 'cooling';
-                } else if (specs.wattage || specs.efficiency_rating || specs.modular) {
-                    category = 'psu';
-                } else if (specs.max_gpu_length || specs.max_cooler_height || specs.expansion_slots) {
-                    category = 'case';
-                }
+                category = inferCategoryFromSpecs(comp.specifications);
                 if (category) {
                     console.log(`🔮 Inferred category "${category}" from specifications`);
                 }
@@ -140,52 +235,14 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                 image_url: comp.image_url || comp.image || ''
             };
 
-            // 🔥 ENHANCED: Map ALL category name variations to API format
-            // 🔥 CRITICAL FIX: RAM and Storage can have MULTIPLE components - use arrays
-            if (category.includes('cpu') || category.includes('processor') || category.includes('central processing')) {
-                formatted.cpu = componentData;
-                console.log('✅ Added CPU:', comp.name);
-            } else if (category.includes('gpu') || category.includes('graphics') || category.includes('video card')) {
-                formatted.gpu = componentData;
-                console.log('✅ Added GPU:', comp.name);
-            } else if (category.includes('motherboard') || category.includes('mobo') || category.includes('mainboard')) {
-                formatted.motherboard = componentData;
-                console.log('✅ Added Motherboard:', comp.name);
-            } else if (category.includes('ram') || category.includes('memory')) {
-                // 🔥 FIX: RAM can have multiple sticks - use array
-                if (!formatted.ram) {
-                    formatted.ram = [];
-                }
-                if (Array.isArray(formatted.ram)) {
-                    formatted.ram.push(componentData);
-                } else {
-                    formatted.ram = [formatted.ram, componentData];
-                }
-                console.log('✅ Added RAM:', comp.name);
-            } else if (category.includes('storage') || category.includes('ssd') || category.includes('hdd') || category.includes('nvme') || category.includes('hard drive')) {
-                // 🔥 FIX: Storage can have multiple drives - use array
-                if (!formatted.storage) {
-                    formatted.storage = [];
-                }
-                if (Array.isArray(formatted.storage)) {
-                    formatted.storage.push(componentData);
-                } else {
-                    formatted.storage = [formatted.storage, componentData];
-                }
-                console.log('✅ Added Storage:', comp.name);
-            } else if (category.includes('psu') || category.includes('power supply') || category.includes('power')) {
-                formatted.psu = componentData;
-                console.log('✅ Added PSU:', comp.name);
-            } else if (category.includes('case') || category.includes('chassis') || category.includes('pc case') || category.includes('enclosure')) {
-                formatted.case = componentData;
-                console.log('✅ Added Case:', comp.name);
-            } else if (category.includes('cool') || category.includes('cooler') || category.includes('fan') || category.includes('cpu cooler') || category.includes('cpu-cooler') || category.includes('aio') || category.includes('liquid')) {
-                formatted.cooling = componentData;
-                console.log('✅ Added Cooling:', comp.name);
+            const mapped = addComponentToFormatted(category, componentData, formatted);
+            if (mapped) {
+                console.log(`✅ Added ${category.toUpperCase()}: ${comp.name}`);
             } else {
-                // 🔥 CRITICAL FIX: Skip unknown categories entirely instead of adding them
-                // This prevents 400 errors from invalid component types like "service"
-                console.warn(`⚠️ Skipping unknown category for ${comp.name}: "${category}"`);
+                const PERIPHERAL_CATEGORIES = new Set(['mouse', 'keyboard', 'monitor', 'headset', 'webcam', 'speakers', 'printer', 'scanner', 'router', 'cable', 'adapter', 'accessory']);
+                if (!PERIPHERAL_CATEGORIES.has(category)) {
+                    console.warn(`⚠️ Skipping unknown category for ${comp.name}: "${category}"`);
+                }
             }
         });
         
@@ -264,7 +321,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
         
         const isVagueMessage = (msg) => {
             const lowerMsg = msg.toLowerCase();
-            return vaguePatterns.some(pattern => lowerMsg.includes(pattern));
+            return Boolean(globalThis.__KWISE_HIDE_VAGUE_COMPATIBILITY_NOTES__)
+                && vaguePatterns.some(pattern => lowerMsg.includes(pattern));
         };
         
         if (data.all_issues && Array.isArray(data.all_issues)) {
@@ -354,8 +412,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                     const componentLower = component.toLowerCase();
                     
                     // If message starts with emoji or symbol, insert component after it
-                    if (msg.match(/^[ℹ️⚠️❌✅]/)) {
-                        const emoji = msg.match(/^[ℹ️⚠️❌✅]/)[0];
+                    if (msg.match(/^(?:ℹ️|⚠️|❌|✅)/u)) {
+                        const emoji = msg.match(/^(?:ℹ️|⚠️|❌|✅)/u)[0];
                         const rest = msg.substring(emoji.length).trim();
                         if (!rest.toLowerCase().startsWith(componentLower) && !rest.toLowerCase().startsWith(`[${componentLower}`)) {
                             msg = `${emoji} [${component.toUpperCase()}] ${rest}`;
@@ -393,12 +451,11 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                     msg.toLowerCase().includes(pattern)
                 );
                 
-                if (!isInformational) {
-                    warnings.push(msg);
-                } else {
+                if (isInformational) {
                     console.log('📝 Filtered informational warning (moved to compatible):', msg.substring(0, 50));
-                    // Move informational messages to compatible notes instead
-                    compatibleNotes.push(`✅ ${msg.replace(/^[ℹ️⚠️❌]\s*/, '')}`);
+                    compatibleNotes.push(`✅ ${msg.replace(/^(?:ℹ️|⚠️|❌)\s*/u, '')}`);
+                } else {
+                    warnings.push(msg);
                 }
             });
         }
@@ -447,13 +504,11 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
     const analyzeBuildCompatibility = async () => {
         setLoading(true);
         try {
-            // Get token (may be null for guest users)
-            const token = localStorage.getItem('token');
-
+            // Get token (may be null for guest users)
             // Prepare component data for analysis
             const components = Array.isArray(buildComponents)
                 ? buildComponents
-                : Object.values(buildComponents || {}).filter(c => c && c.id);
+                : Object.values(buildComponents || {}).filter(c => c?.id);
 
             console.log('🔍 Analyzing build compatibility for', components.length, 'components');
 
@@ -475,8 +530,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
             if (Object.keys(formattedComponents).length === 0) {
                 console.warn('⚠️ No components could be formatted for API, showing fallback');
                 setCompatibilityData({
-                    compatible: { notes: ['Unable to analyze components - missing category information'], disclaimers: [] },
-                    warnings: { warnings: [], notes: [], disclaimers: [] },
+                    compatible: { notes: [], disclaimers: [] },
+                    warnings: { warnings: ['Unable to analyze components because required category or ID data is missing. Refresh the cart or re-add the affected items.'], notes: [], disclaimers: [] },
                     problems: { problems: [], notes: [], disclaimers: [] }
                 });
                 setLoading(false);
@@ -488,15 +543,12 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                 'Content-Type': 'application/json'
             };
 
-            // Add token only if it exists and is valid
-            if (token && token !== 'null' && token !== 'undefined') {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
 
             // Call advanced full-build compatibility check endpoint (uses ALL services)
-            const response = await fetch('http://localhost:5000/api/compatibility/advanced/full-build', {
+            const response = await fetch(`${getServerBaseUrl()}/api/compatibility/advanced/full-build`, {
                 method: 'POST',
                 headers: headers,
+                credentials: 'include',
                 body: JSON.stringify({
                     components: formattedComponents
                 })
@@ -519,7 +571,7 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
             // Set fallback empty data
             setCompatibilityData({
                 compatible: { notes: [], disclaimers: [] },
-                warnings: { warnings: [], notes: [], disclaimers: [] },
+                warnings: { warnings: [`Compatibility check failed: ${error.message || 'Unable to contact compatibility service.'}`], notes: [], disclaimers: [] },
                 problems: { problems: [], notes: [], disclaimers: [] }
             });
         } finally {
@@ -625,18 +677,18 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                     if (part.type === 'component') {
                         // Render component name in bold with distinct color
                         return (
-                            <strong key={`comp-${partIdx}`} className="pcpart-compat-component-name">
+                            <strong key={`comp-${part.content}`} className="pcpart-compat-component-name">
                                 {part.content}
                             </strong>
                         );
                     }
                     
                     // Split text by emoji patterns to preserve them
-                    const textParts = part.content.split(/([🔴⚠️✅📏🔧⏱️💡🌡️⚡🎯📊])/g);
+                    const textParts = part.content.split(/((?:🔴|⚠️|✅|📏|🔧|⏱️|💡|🌡️|⚡|🎯|📊))/gu);
                     
                     return textParts.map((textPart, idx) => {
                         // Check if part is an emoji
-                        if (/[🔴⚠️✅📏🔧⏱️💡🌡️⚡🎯📊]/.test(textPart)) {
+                        if (/(?:🔴|⚠️|✅|📏|🔧|⏱️|💡|🌡️|⚡|🎯|📊)/u.test(textPart)) {
                             return <span key={`${partIdx}-emoji-${idx}`} className="pcpart-compat-emoji">{textPart}</span>;
                         }
                         
@@ -678,8 +730,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-notes-section">
                                     <h4 className="pcpart-compat-subsection-title">Note:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {compatible.notes.map((note, index) => (
-                                            <li key={`note-${index}`}>{formatMessage(note)}</li>
+                                        {compatible.notes.map((note) => (
+                                            <li key={note}>{formatMessage(note)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -689,8 +741,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-disclaimers-section">
                                     <h4 className="pcpart-compat-subsection-title">Disclaimer:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {compatible.disclaimers.map((disclaimer, index) => (
-                                            <li key={`disclaimer-${index}`}>{formatMessage(disclaimer)}</li>
+                                        {compatible.disclaimers.map((disclaimer) => (
+                                            <li key={disclaimer}>{formatMessage(disclaimer)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -723,8 +775,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-warnings-subsection">
                                     <h4 className="pcpart-compat-subsection-title">Warning/s:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {warnings.warnings.map((warning, index) => (
-                                            <li key={`warning-${index}`}>{formatMessage(warning)}</li>
+                                        {warnings.warnings.map((warning) => (
+                                            <li key={warning}>{formatMessage(warning)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -734,8 +786,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-notes-section">
                                     <h4 className="pcpart-compat-subsection-title">Note:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {warnings.notes.map((note, index) => (
-                                            <li key={`w-note-${index}`}>{formatMessage(note)}</li>
+                                        {warnings.notes.map((note) => (
+                                            <li key={`w-${note}`}>{formatMessage(note)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -745,8 +797,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-disclaimers-section">
                                     <h4 className="pcpart-compat-subsection-title">Disclaimer:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {warnings.disclaimers.map((disclaimer, index) => (
-                                            <li key={`w-disclaimer-${index}`}>{formatMessage(disclaimer)}</li>
+                                        {warnings.disclaimers.map((disclaimer) => (
+                                            <li key={`w-disc-${disclaimer}`}>{formatMessage(disclaimer)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -779,8 +831,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-problems-subsection">
                                     <h4 className="pcpart-compat-subsection-title">Problem/s:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {problems.problems.map((problem, index) => (
-                                            <li key={`problem-${index}`}>{formatMessage(problem)}</li>
+                                        {problems.problems.map((problem) => (
+                                            <li key={problem}>{formatMessage(problem)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -790,8 +842,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-notes-section">
                                     <h4 className="pcpart-compat-subsection-title">Note:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {problems.notes.map((note, index) => (
-                                            <li key={`p-note-${index}`}>{formatMessage(note)}</li>
+                                        {problems.notes.map((note) => (
+                                            <li key={`p-${note}`}>{formatMessage(note)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -801,8 +853,8 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
                                 <div className="pcpart-compat-disclaimers-section">
                                     <h4 className="pcpart-compat-subsection-title">Disclaimer:</h4>
                                     <ul className="pcpart-compat-list">
-                                        {problems.disclaimers.map((disclaimer, index) => (
-                                            <li key={`p-disclaimer-${index}`}>{formatMessage(disclaimer)}</li>
+                                        {problems.disclaimers.map((disclaimer) => (
+                                            <li key={`p-disc-${disclaimer}`}>{formatMessage(disclaimer)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -820,6 +872,14 @@ const CompatibilityNotes = ({ buildComponents, buildType = 'custom' }) => {
             )}
         </div>
     );
+};
+
+CompatibilityNotes.propTypes = {
+    buildComponents: PropTypes.oneOfType([
+        PropTypes.array,
+        PropTypes.object
+    ]),
+    buildType: PropTypes.string
 };
 
 export default CompatibilityNotes;

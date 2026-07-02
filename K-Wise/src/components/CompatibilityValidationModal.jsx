@@ -24,6 +24,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import './CompatibilityValidationModal.css';
 import { getApiBaseUrl } from '../utils/networkConfig';
 
@@ -39,58 +40,116 @@ const formatIssueMessage = (issue) => {
   return `${comp1} ↔ ${comp2}: ${rule}`;
 };
 
-const formatIssueDetails = (issue) => {
-  // ENHANCEMENT: Build ultra-verbose detailed explanation with specific measurements and solutions
-  if (issue.details) {
-    // Backend already provides detailed explanation - use it directly
-    return issue.details;
-  }
-  
-  // Build detailed explanation from issue properties
-  let details = '';
-  
-  if (issue.message) {
-    details = issue.message;
-  }
-  
-  // Add component names if available
+const appendSection = (details, text) => details ? `${details}\n\n${text}` : text;
+
+const buildComponentSection = (issue) => {
   const comp1 = issue.component_a || issue.component1;
   const comp2 = issue.component_b || issue.component2;
   const comp = issue.component;
+  if (!comp1 && !comp2 && !comp) return '';
+  let section = '🔧 Components Affected:\n';
+  if (comp1) section += `   • ${comp1}\n`;
+  if (comp2) section += `   • ${comp2}\n`;
+  if (comp && comp !== comp1 && comp !== comp2) section += `   • ${comp}\n`;
+  return section;
+};
+
+const formatIssueDetails = (issue) => {
+  if (issue.details) return issue.details;
   
-  if (comp1 || comp2 || comp) {
-    details += details ? '\n\n' : '';
-    details += `🔧 Components Affected:\n`;
-    if (comp1) details += `   • ${comp1}\n`;
-    if (comp2) details += `   • ${comp2}\n`;
-    if (comp && comp !== comp1 && comp !== comp2) details += `   • ${comp}\n`;
-  }
+  let details = issue.message || '';
   
-  // Add rule information
-  if (issue.rule) {
-    details += details ? '\n\n' : '';
-    details += `📋 Rule: ${issue.rule}`;
-  }
-  
-  // Add fix/solution if available
-  if (issue.fix) {
-    details += details ? '\n\n' : '';
-    details += `💡 Solutions:\n${issue.fix}`;
-  }
-  
-  // Add impact assessment if available
-  if (issue.impact) {
-    details += details ? '\n\n' : '';
-    details += `⚠️ Impact: ${issue.impact}`;
-  }
-  
-  // Add compatibility penalty
-  if (issue.penalty) {
-    details += details ? '\n\n' : '';
-    details += `📊 Compatibility Penalty: -${issue.penalty} points`;
-  }
+  const compSection = buildComponentSection(issue);
+  if (compSection) details = appendSection(details, compSection);
+  if (issue.rule) details = appendSection(details, `📋 Rule: ${issue.rule}`);
+  if (issue.fix) details = appendSection(details, `💡 Solutions:\n${issue.fix}`);
+  if (issue.impact) details = appendSection(details, `⚠️ Impact: ${issue.impact}`);
+  if (issue.penalty) details = appendSection(details, `📊 Compatibility Penalty: -${issue.penalty} points`);
   
   return details || 'Compatibility issue detected. Please verify component specifications with manufacturer before purchase.';
+};
+
+// Category lookup maps (module-level constants)
+const DB_CATEGORY_TO_KEY = {
+  'cpu': 'cpu', 'processor': 'cpu', 'central processing unit': 'cpu',
+  'gpu': 'gpu', 'graphics card': 'gpu', 'video card': 'gpu', 'graphics processing unit': 'gpu',
+  'motherboard': 'motherboard', 'mainboard': 'motherboard',
+  'ram': 'ram', 'memory': 'ram', 'memory (ram)': 'ram',
+  'storage': 'storage', 'ssd': 'storage', 'hdd': 'storage', 'hard drive': 'storage', 'solid state drive': 'storage',
+  'cooling': 'cooling', 'cpu cooler': 'cooling', 'cooler': 'cooling',
+  'psu': 'psu', 'power supply': 'psu', 'power supply unit': 'psu',
+  'case': 'case', 'pc case': 'case', 'chassis': 'case'
+};
+const CATEGORY_TO_DISPLAY = {
+  'central processing unit': 'CPU', 'central_processing_unit': 'CPU', 'processor': 'CPU', 'cpu': 'CPU',
+  'graphics processing unit': 'GPU', 'graphics_processing_unit': 'GPU', 'graphics card': 'GPU', 'video card': 'GPU', 'gpu': 'GPU',
+  'cpu cooler': 'Cooling', 'cpu_cooler': 'Cooling', 'cooler': 'Cooling', 'cooling': 'Cooling',
+  'memory (ram)': 'RAM', 'memory': 'RAM', 'ram': 'RAM',
+  'motherboard': 'Motherboard', 'mainboard': 'Motherboard',
+  'storage': 'Storage', 'ssd': 'Storage', 'hdd': 'Storage',
+  'power supply unit': 'PSU', 'power_supply_unit': 'PSU', 'power supply': 'PSU', 'psu': 'PSU',
+  'pc case': 'Case', 'pc_case': 'Case', 'case': 'Case', 'chassis': 'Case'
+};
+
+const refetchCartItems = async (cartItems) => {
+  const freshCartItems = [];
+  for (const item of cartItems) {
+    if (!item.id) { freshCartItems.push(item); continue; }
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/stock/${item.id}`);
+      if (!response.ok) throw new Error(`Failed to fetch component ${item.id}`);
+      const data = await response.json();
+      freshCartItems.push(data.success && data.data ? data.data : item);
+    } catch (fetchError) {
+      console.debug('Fetch fallback for item', item.id, fetchError.message);
+      freshCartItems.push(item);
+    }
+  }
+  return freshCartItems;
+};
+
+const processCartItem = (item) => {
+  if (!item?.category || !item?.id) {
+    let reason = 'Missing ID field';
+    if (!item) reason = 'null item';
+    else if (!item.category) reason = 'Missing category field';
+    return { skip: true, reason, name: item?.name || 'Unknown' };
+  }
+  const lowerCategory = item.category.toLowerCase().trim();
+  let categoryKey = lowerCategory
+    .replaceAll(/\s+/g, '_')
+    .replaceAll(/central_processing_unit/ig, 'cpu')
+    .replaceAll(/graphics_processing_unit/ig, 'gpu')
+    .replaceAll(/memory_\(ram\)/ig, 'ram')
+    .replaceAll(/memory/ig, 'ram')
+    .replaceAll(/cpu_cooler/ig, 'cooling')
+    .replaceAll(/power_supply_unit/ig, 'psu')
+    .replaceAll(/pc_case/ig, 'case');
+  categoryKey = DB_CATEGORY_TO_KEY[lowerCategory] || categoryKey;
+  const normalizedCategory = CATEGORY_TO_DISPLAY[lowerCategory] || item.category;
+  const fullProduct = {
+    id: item.id, name: item.name, category: normalizedCategory,
+    brand: item.brand || null, price: item.price || 0,
+    specifications: item.specifications || item.normalized_specs || item.specs || {},
+    dimensions: item.dimensions || {}, image_url: item.image_url || null
+  };
+  return { skip: false, categoryKey, fullProduct };
+};
+
+const buildComponentsFromItems = (itemsToValidate) => {
+  const components = {};
+  const skippedItems = [];
+  const multiSlot = { ram: [], storage: [] };
+  for (const item of itemsToValidate) {
+    const result = processCartItem(item);
+    if (result.skip) { skippedItems.push({ name: result.name, reason: result.reason }); continue; }
+    if (result.categoryKey === 'ram') multiSlot.ram.push(result.fullProduct);
+    else if (result.categoryKey === 'storage') multiSlot.storage.push(result.fullProduct);
+    else components[result.categoryKey] = result.fullProduct;
+  }
+  if (multiSlot.ram.length > 0) components.ram = multiSlot.ram.length === 1 ? multiSlot.ram[0] : multiSlot.ram;
+  if (multiSlot.storage.length > 0) components.storage = multiSlot.storage.length === 1 ? multiSlot.storage[0] : multiSlot.storage;
+  return { components, skippedItems };
 };
 
 const CompatibilityValidationModal = ({
@@ -119,211 +178,14 @@ const CompatibilityValidationModal = ({
         throw new Error('Cart is empty. Add components before validating compatibility.');
       }
 
-      // 🔥 CRITICAL FIX: Refetch fresh component data from API to avoid stale/cached data
-      console.log('🔄 Refetching fresh component data from API...');
-      const freshCartItems = [];
-      for (const item of cartItems) {
-        if (!item.id) {
-          console.warn(`⚠️ Skipping item without ID: ${item.name}`);
-          continue;
-        }
-        
-        try {
-          // Fetch fresh data from /api/stock/:id
-          const response = await fetch(`${getApiBaseUrl()}/stock/${item.id}`);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch component ${item.id}`);
-          }
-          
-          const data = await response.json();
-          if (data.success && data.data) {
-            freshCartItems.push(data.data);
-            console.log(`✅ Refetched fresh data for ${data.data.name} (ID: ${item.id})`);
-          } else {
-            console.warn(`⚠️ No data returned for component ${item.id}, using original`);
-            freshCartItems.push(item);
-          }
-        } catch (fetchError) {
-          console.error(`❌ Error fetching component ${item.id}:`, fetchError.message);
-          // Fallback to original item if fetch fails
-          freshCartItems.push(item);
-        }
-      }
-      
-      console.log(`✅ Refetched ${freshCartItems.length} components with fresh data`);
-      
-      // Use fresh data for validation instead of potentially stale cartItems
+      // Refetch fresh component data from API
+      const freshCartItems = await refetchCartItems(cartItems);
       const itemsToValidate = freshCartItems.length > 0 ? freshCartItems : cartItems;
 
-      // 🔥 CRITICAL FIX: Convert cartItems to components object with MULTI-SLOT SUPPORT
-      // Problem: Multiple RAM/Storage items were overwriting each other
-      // Solution: Use FIRST item for single-slot categories, aggregate info for multi-slot (RAM/Storage)
-      const components = {};
-      const skippedItems = [];
-      const multiSlotComponents = { ram: [], storage: [] }; // Track multi-slot items
-      
-      itemsToValidate.forEach(item => {
-        if (!item) {
-          console.warn('⚠️ Skipping null/undefined cart item');
-          return;
-        }
+      // Convert cart items to components object
+      const { components, skippedItems } = buildComponentsFromItems(itemsToValidate);
 
-        if (!item.category) {
-          console.warn(`⚠️ Item missing category field: ${item.name || 'Unknown'} (ID: ${item.id})`);
-          skippedItems.push({ name: item.name, reason: 'Missing category field' });
-          return;
-        }
-
-        if (!item.id) {
-          console.warn(`⚠️ Item missing ID field: ${item.name || 'Unknown'} (category: ${item.category})`);
-          skippedItems.push({ name: item.name, reason: 'Missing ID field' });
-          return;
-        }
-
-        // Enhanced category key normalization
-        let categoryKey = item.category.toLowerCase()
-          .trim()
-          .replace(/\s+/g, '_')
-          .replace(/central_processing_unit/gi, 'cpu')
-          .replace(/graphics_processing_unit/gi, 'gpu')
-          .replace(/memory_\(ram\)/gi, 'ram')
-          .replace(/memory/gi, 'ram')
-          .replace(/cpu_cooler/gi, 'cooling')
-          .replace(/power_supply_unit/gi, 'psu')
-          .replace(/pc_case/gi, 'case');
-        
-        // Map known database categories to standard keys
-        const dbCategoryToKey = {
-          'cpu': 'cpu',
-          'processor': 'cpu',
-          'central processing unit': 'cpu',
-          'gpu': 'gpu',
-          'graphics card': 'gpu',
-          'video card': 'gpu',
-          'graphics processing unit': 'gpu',
-          'motherboard': 'motherboard',
-          'mainboard': 'motherboard',
-          'ram': 'ram',
-          'memory': 'ram',
-          'memory (ram)': 'ram',
-          'storage': 'storage',
-          'ssd': 'storage',
-          'hdd': 'storage',
-          'hard drive': 'storage',
-          'solid state drive': 'storage',
-          'cooling': 'cooling',
-          'cpu cooler': 'cooling',
-          'cooler': 'cooling',
-          'psu': 'psu',
-          'power supply': 'psu',
-          'power supply unit': 'psu',
-          'case': 'case',
-          'pc case': 'case',
-          'chassis': 'case'
-        };
-
-        const lowerCategory = item.category.toLowerCase().trim();
-        categoryKey = dbCategoryToKey[lowerCategory] || categoryKey;
-        
-        console.log(`🔧 Processing item: "${item.name}", DB category: "${item.category}" → key: "${categoryKey}"`);
-        
-        // Normalize category to match backend expected format
-        const categoryMap = {
-          'central processing unit': 'CPU',
-          'central_processing_unit': 'CPU',
-          'processor': 'CPU',
-          'cpu': 'CPU',
-          'graphics processing unit': 'GPU',
-          'graphics_processing_unit': 'GPU',
-          'graphics card': 'GPU',
-          'video card': 'GPU',
-          'gpu': 'GPU',
-          'cpu cooler': 'Cooling',
-          'cpu_cooler': 'Cooling',
-          'cooler': 'Cooling',
-          'cooling': 'Cooling',
-          'memory (ram)': 'RAM',
-          'memory': 'RAM',
-          'ram': 'RAM',
-          'motherboard': 'Motherboard',
-          'mainboard': 'Motherboard',
-          'storage': 'Storage',
-          'ssd': 'Storage',
-          'hdd': 'Storage',
-          'power supply unit': 'PSU',
-          'power_supply_unit': 'PSU',
-          'power supply': 'PSU',
-          'psu': 'PSU',
-          'pc case': 'Case',
-          'pc_case': 'Case',
-          'case': 'Case',
-          'chassis': 'Case'
-        };
-        
-        const normalizedCategory = categoryMap[lowerCategory] || item.category;
-        
-        console.log(`📝 Normalized category: "${item.category}" → "${normalizedCategory}"`);
-        
-        // 🔥 CRITICAL FIX: Include BOTH specifications AND dimensions for backend validation
-        const fullProduct = {
-          id: item.id,
-          name: item.name,
-          category: normalizedCategory,
-          brand: item.brand || null,
-          price: item.price || 0,
-          specifications: item.specifications || item.normalized_specs || item.specs || {},
-          dimensions: item.dimensions || {},  // ✅ ADDED: Physical measurements for clearance validation
-          image_url: item.image_url || null
-        };
-        
-        console.log(`🔍 Product data for "${item.name}":`, {
-          hasSpecifications: !!fullProduct.specifications && Object.keys(fullProduct.specifications).length > 0,
-          hasDimensions: !!fullProduct.dimensions && Object.keys(fullProduct.dimensions).length > 0,
-          specKeys: Object.keys(fullProduct.specifications || {}),
-          dimKeys: Object.keys(fullProduct.dimensions || {})
-        });
-        
-        // 🔥 CRITICAL FIX: Handle multi-slot components (RAM, Storage) differently
-        // Backend EXPECTS ARRAYS for RAM and Storage to validate ALL drives
-        if (categoryKey === 'ram') {
-          multiSlotComponents.ram.push(fullProduct);
-          console.log(`💾 Added RAM to multi-slot array (${multiSlotComponents.ram.length} total)`);
-        } else if (categoryKey === 'storage') {
-          multiSlotComponents.storage.push(fullProduct);
-          console.log(`💿 Added Storage to multi-slot array (${multiSlotComponents.storage.length} total)`);
-        } else {
-          // Single-slot component - direct assignment
-          components[categoryKey] = fullProduct;
-        }
-      });
-      
-      // 🔥 FIX: Send RAM and Storage as ARRAYS (backend supports this!)
-      // This ensures ALL RAM kits and storage drives are validated together
-      if (multiSlotComponents.ram.length > 0) {
-        components.ram = multiSlotComponents.ram.length === 1 
-          ? multiSlotComponents.ram[0]  // Single RAM: send object
-          : multiSlotComponents.ram;     // Multiple RAM: send array
-        console.log(`💾 RAM for validation: ${multiSlotComponents.ram.length === 1 ? '1 kit (object)' : multiSlotComponents.ram.length + ' kits (array)'}`);
-      }
-      if (multiSlotComponents.storage.length > 0) {
-        components.storage = multiSlotComponents.storage.length === 1
-          ? multiSlotComponents.storage[0]  // Single drive: send object
-          : multiSlotComponents.storage;     // Multiple drives: send array
-        console.log(`💿 Storage for validation: ${multiSlotComponents.storage.length === 1 ? '1 drive (object)' : multiSlotComponents.storage.length + ' drives (array)'}`);
-      }
-      
-      // 🔥 LOG MULTI-SLOT AGGREGATION RESULTS
-      console.log(`📊 Multi-slot aggregation complete:`, {
-        ramCount: multiSlotComponents.ram.length,
-        storageCount: multiSlotComponents.storage.length,
-        ramSentToBackend: Array.isArray(components.ram) ? `${components.ram.length} kits (array)` : (components.ram ? '1 kit (object)' : 'none'),
-        storageSentToBackend: Array.isArray(components.storage) ? `${components.storage.length} drives (array)` : (components.storage ? '1 drive (object)' : 'none')
-      });
-      
-      console.log('📦 Total components converted:', Object.keys(components).length);
-      console.log('🔑 Component keys:', Object.keys(components).join(', '));
-
-      // ✅ FIX: Validate that we actually have components to validate
+      // Validate that we actually have components
       if (Object.keys(components).length === 0) {
         console.error('❌ NO COMPONENTS CONVERTED!');
         console.error('Skipped items:', skippedItems);
@@ -344,7 +206,7 @@ const CompatibilityValidationModal = ({
         throw new Error(
           `Unable to validate compatibility: Cart items are missing required fields.\n\n` +
           `Received ${cartItems.length} cart items, but none have valid category and ID fields.\n` +
-          `${skippedItems.length > 0 ? `\nSkipped ${skippedItems.length} items:\n${skippedItems.map(s => `- ${s.name}: ${s.reason}`).join('\n')}` : ''}` +
+          (skippedItems.length > 0 ? '\nSkipped ' + skippedItems.length + ' items:\n' + skippedItems.map(s => '- ' + s.name + ': ' + s.reason).join('\n') : '') +
           `\n\nThis is likely a data integrity issue. Try:\n` +
           `1. Refresh the page\n` +
           `2. Clear cart and re-add items\n` +
@@ -688,7 +550,7 @@ const CompatibilityValidationModal = ({
   // Generate letter labels (A, B, C, ...)
   // eslint-disable-next-line no-unused-vars
   const _getLetterLabel = (index) => {
-    return String.fromCharCode(65 + index); // 65 = 'A' in ASCII
+    return String.fromCodePoint(65 + index); // 65 = 'A' in ASCII
   };
 
   const handleProceed = () => {
@@ -699,12 +561,69 @@ const CompatibilityValidationModal = ({
     onProceed(freshComponents);
   };
 
+  // NOSONAR - used in IIFE JSX below
+  const renderProblemsView = () => {
+    const isCustomizePage = ['PC-Customize', 'PC-Customized'].includes(pageName);
+    let heading = 'COMPATIBILITY WARNINGS DETECTED';
+    if (shouldBlockCheckout) heading = 'CRITICAL COMPATIBILITY ISSUES';
+    else if (isCustomizePage) heading = 'COMPATIBILITY NOTES';
+
+    let subtext = 'Do you want to proceed?\nThe following issues were detected:';
+    if (shouldBlockCheckout) subtext = 'You must resolve these critical issues before proceeding. Please review and update your component selection.';
+    else if (isCustomizePage) subtext = 'Your build used step-by-step compatibility filtering.\nThe following notes are informational - you may proceed.';
+
+    let issueLabel = '⚠️ Compatibility Warnings:';
+    if (shouldBlockCheckout) issueLabel = '⚠️ Critical Issues:';
+    else if (isCustomizePage) issueLabel = '📋 Validation Notes:';
+
+    const bgColor = shouldBlockCheckout ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 193, 7, 0.1)';
+    const borderColor = shouldBlockCheckout ? '2px solid rgba(255, 59, 48, 0.3)' : '2px solid rgba(255, 193, 7, 0.3)';
+    const labelColor = shouldBlockCheckout ? '#FF3B30' : '#FFC107';
+
+    return (<>
+      <h2 style={{ color: '#fff', fontSize: '32px', fontWeight: 'bold', marginBottom: '20px', textTransform: 'UPPERCASE' }}>
+        {heading}
+      </h2>
+      <p style={{ color: '#ccc', fontSize: '24px', marginBottom: '30px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+        {subtext}
+      </p>
+      <div style={{ background: bgColor, border: borderColor, padding: '20px', marginBottom: '30px', textAlign: 'left' }}>
+        <h4 style={{ color: labelColor, fontSize: '14px', fontWeight: 'bold', marginBottom: '15px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {issueLabel}
+        </h4>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {problems.map((problem, index) => (
+            <li key={`problem-${index}-${problem.message?.slice(0, 20)}`} style={{ color: '#fff', fontSize: '14px', padding: '8px 0', borderBottom: index < problems.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none', display: 'flex', alignItems: 'flex-start' }}>
+              <span style={{ marginRight: '8px', color: '#FF3B30', fontWeight: 'bold', fontSize: '20px' }}>•</span>
+              <span style={{ flex: 1 }}>{problem.message}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+        <button onClick={onClose} style={{ padding: '12px 32px', background: 'transparent', border: '2px solid #00F5A0', color: '#fff', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' }} onMouseOver={(e) => { e.target.style.background = 'rgba(0, 245, 160, 0.1)'; }} onFocus={(e) => { e.target.style.background = 'rgba(0, 245, 160, 0.1)'; }} onMouseOut={(e) => { e.target.style.background = 'transparent'; }} onBlur={(e) => { e.target.style.background = 'transparent'; }}>
+          Go Back
+        </button>
+        {!shouldBlockCheckout && (
+          <button onClick={handleProceed} style={{ padding: '12px 32px', background: '#00E083', border: 'none', color: '#002024', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' }} onMouseOver={(e) => { e.target.style.background = '#FFA500'; }} onFocus={(e) => { e.target.style.background = '#FFA500'; }} onMouseOut={(e) => { e.target.style.background = '#FFB800'; }} onBlur={(e) => { e.target.style.background = '#FFB800'; }}>
+            Proceed Anyway (Not Recommended)
+          </button>
+        )}
+      </div>
+      <p style={{ color: '#888', fontSize: '12px', marginTop: '20px', fontStyle: 'italic' }}>
+        {shouldBlockCheckout ? '🔴 You cannot proceed until these issues are resolved.' : '💡 Need help? Click "Go Back" to review and fix compatibility issues.'}
+      </p>
+    </>);
+  };
+
   return (
-    <div className="compatibility-modal-overlay" onClick={onClose}>
+    <div className="compatibility-modal-overlay" role="none" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
       <div className='pc-customized-modal-background'></div>
-      <div 
+      <dialog 
+        open
         className="pc-customized-modal" 
-        onClick={(e) => e.stopPropagation()}
+        aria-modal="true"
+        aria-label="Compatibility Validation"
         style={{
           maxWidth: '727px',
           padding: '40px 32px 32px 32px',
@@ -712,183 +631,42 @@ const CompatibilityValidationModal = ({
           textAlign: 'center'
         }}
       >
-        {loading ? (
-          <div style={{ padding: '40px 20px' }}>
-            <div className="spinner" style={{ margin: '0 auto 20px' }}></div>
-            <p style={{ color: '#fff', fontSize: '16px' }}>Analyzing {cartItems.length} component(s)...</p>
-          </div>
-        ) : error ? (
-          <div style={{ padding: '20px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
-            <h3 style={{ color: '#fff', marginBottom: '10px' }}>Validation Error</h3>
-            <p style={{ color: '#ccc', marginBottom: '20px' }}>{error}</p>
-            <button 
-              onClick={validateCompatibility}
-              style={{
-                background: '#00F5A0',
-                color: '#000',
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Retry Validation
-            </button>
-          </div>
-        ) : validationResult && problems.length > 0 ? (
-          <>
-            {/* Warning Message - Dynamic based on page and blocking status */}
-            <h2 style={{ 
-              color: '#fff', 
-              fontSize: '32px', 
-              fontWeight: 'bold', 
-              marginBottom: '20px',
-              textTransform: 'UPPERCASE'
-            }}>
-              {shouldBlockCheckout 
-                ? 'CRITICAL COMPATIBILITY ISSUES' 
-                : (['PC-Customize', 'PC-Customized'].includes(pageName)
-                    ? 'COMPATIBILITY NOTES'
-                    : 'COMPATIBILITY WARNINGS DETECTED')}
-            </h2>
-            
-            <p style={{ 
-              color: '#ccc', 
-              fontSize: '24px', 
-              marginBottom: '30px',
-              lineHeight: '1.6',
-              whiteSpace: 'pre-line'
-            }}>
-              {shouldBlockCheckout
-                ? 'You must resolve these critical issues before proceeding. Please review and update your component selection.'
-                : (['PC-Customize', 'PC-Customized'].includes(pageName)
-                    ? 'Your build used step-by-step compatibility filtering.\nThe following notes are informational - you may proceed.'
-                    : 'Do you want to proceed?\nThe following issues were detected:')}
-            </p>
-
-            {/* Critical Issues List */}
-            <div style={{
-              background: shouldBlockCheckout ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 193, 7, 0.1)',
-              border: shouldBlockCheckout ? '2px solid rgba(255, 59, 48, 0.3)' : '2px solid rgba(255, 193, 7, 0.3)',
-              padding: '20px',
-              marginBottom: '30px',
-              textAlign: 'left'
-            }}>
-              <h4 style={{ 
-                color: shouldBlockCheckout ? '#FF3B30' : '#FFC107', 
-                fontSize: '14px', 
-                fontWeight: 'bold', 
-                marginBottom: '15px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                {shouldBlockCheckout 
-                  ? '⚠️ Critical Issues:' 
-                  : (['PC-Customize', 'PC-Customized'].includes(pageName)
-                      ? '📋 Validation Notes:'
-                      : '⚠️ Compatibility Warnings:')}
-              </h4>
-              <ul style={{ 
-                listStyle: 'none', 
-                padding: 0, 
-                margin: 0 
-              }}>
-                {problems.map((problem, index) => (
-                  <li 
-                    key={index} 
-                    style={{
-                      color: '#fff',
-                      fontSize: '14px',
-                      padding: '8px 0',
-                      borderBottom: index < problems.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-                      display: 'flex',
-                      alignItems: 'flex-start'
-                    }}
-                  >
-                    <span style={{ 
-                      marginRight: '8px',
-                      color: '#FF3B30',
-                      fontWeight: 'bold',
-                      fontSize: '20px',
-                    }}>
-                      •
-                    </span>
-                    <span style={{ flex: 1 }}>
-                      {problem.message}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ 
-              display: 'flex', 
-              gap: '12px', 
-              justifyContent: 'center' 
-            }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: '12px 32px',
-                  background: 'transparent',
-                  border: '2px solid #00F5A0',
-                  color: '#fff',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.background = 'rgba(0, 245, 160, 0.1)';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.background = 'transparent';
-                }}
-              >
-                Go Back
-              </button>
-              
-              {!shouldBlockCheckout && (
-                <button
-                  onClick={handleProceed}
+        {(() => {
+          if (loading) {
+            return (
+              <div style={{ padding: '40px 20px' }}>
+                <div className="spinner" style={{ margin: '0 auto 20px' }}></div>
+                <p style={{ color: '#fff', fontSize: '16px' }}>Analyzing {cartItems.length} component(s)...</p>
+              </div>
+            );
+          }
+          if (error) {
+            return (
+              <div style={{ padding: '20px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+                <h3 style={{ color: '#fff', marginBottom: '10px' }}>Validation Error</h3>
+                <p style={{ color: '#ccc', marginBottom: '20px' }}>{error}</p>
+                <button 
+                  onClick={validateCompatibility}
                   style={{
-                    padding: '12px 32px',
-                    background: '#00E083',
+                    background: '#00F5A0',
+                    color: '#000',
+                    padding: '12px 24px',
                     border: 'none',
-                    color: '#002024',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
+                    borderRadius: '8px',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.background = '#FFA500';
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.background = '#FFB800';
+                    fontWeight: 'bold'
                   }}
                 >
-                Proceed Anyway (Not Recommended)
+                  Retry Validation
                 </button>
-              )}
-            </div>
-
-            {/* Helper Text */}
-            <p style={{ 
-              color: '#888', 
-              fontSize: '12px', 
-              marginTop: '20px',
-              fontStyle: 'italic'
-            }}>
-              {shouldBlockCheckout
-                ? '🔴 You cannot proceed until these issues are resolved.'
-                : '💡 Need help? Click "Go Back" to review and fix compatibility issues.'}
-            </p>
-          </>
-        ) : (
+              </div>
+            );
+          }
+          if (validationResult && problems.length > 0) {
+            return renderProblemsView();
+          }
+          return (
           /* No Critical Issues - Allow Proceed */
           <>
 
@@ -913,17 +691,31 @@ const CompatibilityValidationModal = ({
               onMouseOver={(e) => {
                 e.target.style.background = '#00D890';
               }}
+              onFocus={(e) => {
+                e.target.style.background = '#00D890';
+              }}
               onMouseOut={(e) => {
+                e.target.style.background = '#00F5A0';
+              }}
+              onBlur={(e) => {
                 e.target.style.background = '#00F5A0';
               }}
             >
               Proceed to Payment
             </button>
-          </>
-        )}
-      </div>
+          </>);
+        })()}
+      </dialog>
     </div>
   );
+};
+
+CompatibilityValidationModal.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  onProceed: PropTypes.func,
+  cartItems: PropTypes.array,
+  pageName: PropTypes.string
 };
 
 export default CompatibilityValidationModal;

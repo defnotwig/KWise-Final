@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import PropTypes from 'prop-types';
+import { getServerBaseUrl } from '../utils/networkConfig';
+import { useAuth } from '../contexts/AuthContext';
 import './AssistanceNotification.css';
 
 const AssistanceNotification = ({ io }) => {
+  const { currentUser } = useAuth();
   const [pendingRequests, setPendingRequests] = useState([]);
   const [currentRequest, setCurrentRequest] = useState(null);
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showClickPrompt, setShowClickPrompt] = useState(false);
+
+  const removeRequestById = useCallback((id) => {
+    setPendingRequests(prev => prev.filter(req => req.id !== id));
+  }, []);
 
   // Define stopNotificationSound early so it can be used in handleAcknowledge
   const stopNotificationSound = useCallback(() => {
@@ -35,7 +43,7 @@ const AssistanceNotification = ({ io }) => {
     if (!isPlaying && audioRef.current && showClickPrompt) {
       console.log('🎯 Confirm clicked - attempting to play sound with user interaction before acknowledging');
       audioRef.current.loop = true;
-      audioRef.current.volume = 1.0;
+      audioRef.current.volume = 1;
       
       try {
         await audioRef.current.play();
@@ -51,26 +59,15 @@ const AssistanceNotification = ({ io }) => {
     }
 
     try {
-      // Get admin info from localStorage (correct key is 'currentUser')
-      const userStr = localStorage.getItem('currentUser');
-      if (!userStr) {
-        console.error('❌ No user found in localStorage');
+      if (!currentUser) {
         alert('User session not found. Please log in again.');
         return;
       }
-      
-      const user = JSON.parse(userStr);
-      console.log('👤 Acknowledging as:', user.name, '(ID:', user.id, ')');
-      
-      const response = await fetch(`http://localhost:5000/api/assistance/${currentRequest.id}/acknowledge`, {
+      const response = await fetch(`${getServerBaseUrl()}/api/assistance/${currentRequest.id}/acknowledge`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          admin_id: user.id,
-          admin_name: user.name || user.username || 'Admin'
-        })
+        }
       });
 
       if (!response.ok) {
@@ -91,7 +88,7 @@ const AssistanceNotification = ({ io }) => {
       console.error('❌ Error acknowledging assistance:', error);
       alert('Failed to acknowledge assistance. Please try again.');
     }
-  }, [currentRequest, stopNotificationSound, isPlaying, showClickPrompt]); // Added dependencies
+  }, [currentRequest, currentUser, stopNotificationSound, isPlaying, showClickPrompt]); // Added dependencies
 
   useEffect(() => {
     if (!io) return;
@@ -113,7 +110,7 @@ const AssistanceNotification = ({ io }) => {
     // Listen for acknowledged requests (cleanup)
     io.on('assistance:acknowledged', (data) => {
       console.log('✅ Assistance acknowledged:', data);
-      setPendingRequests(prev => prev.filter(req => req.id !== data.id));
+      removeRequestById(data.id);
       if (currentRequest?.id === data.id) {
         handleAcknowledge();
       }
@@ -123,7 +120,8 @@ const AssistanceNotification = ({ io }) => {
       io.off('assistance:request');
       io.off('assistance:acknowledged');
     };
-  }, [io, currentRequest, handleAcknowledge]); // Added handleAcknowledge
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [io, currentRequest, handleAcknowledge]);
 
   // Auto-advance to next pending request when current is dismissed
   useEffect(() => {
@@ -144,7 +142,36 @@ const AssistanceNotification = ({ io }) => {
       
       return () => clearTimeout(playTimer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRequest, isPlaying]);
+
+  const retryAudioPlay = () => {
+    audioRef.current.play().catch(e => console.error('❌ Retry failed:', e));
+  };
+
+  const handlePlayError = (finalErr) => {
+    console.error('❌ Error playing notification sound:', finalErr);
+    console.error('Error name:', finalErr.name);
+    console.error('Error message:', finalErr.message);
+    
+    if (finalErr.name === 'NotAllowedError') {
+      console.warn('⚠️ Audio autoplay blocked by browser - user interaction required');
+      console.log('💡 Showing click prompt to user');
+      setShowClickPrompt(true);
+    } else if (finalErr.name === 'NotSupportedError') {
+      console.error('❌ Audio format not supported by browser');
+    } else if (finalErr.name === 'AbortError') {
+      console.warn('⚠️ Audio playback aborted - retrying...');
+      setTimeout(retryAudioPlay, 100);
+    }
+  };
+
+  const onPlaySuccess = () => {
+    console.log('✅ Notification sound playing in LOOP mode');
+    console.log('🔁 Loop enabled:', audioRef.current.loop);
+    console.log('🔊 Volume:', audioRef.current.volume);
+    setIsPlaying(true);
+  };
 
   const playNotificationSound = () => {
     if (!audioRef.current) {
@@ -161,7 +188,7 @@ const AssistanceNotification = ({ io }) => {
       
       // Enable looping BEFORE playing
       audioRef.current.loop = true;
-      audioRef.current.volume = 1.0; // Ensure volume is at maximum
+      audioRef.current.volume = 1; // Ensure volume is at maximum
       
       // WORKAROUND: Try muted autoplay first (browsers allow this)
       // Then show prompt to unmute
@@ -174,52 +201,19 @@ const AssistanceNotification = ({ io }) => {
         mutedPlayPromise
           .then(() => {
             console.log('✅ Muted autoplay successful - now attempting to unmute...');
-            // Try to unmute immediately
             audioRef.current.muted = false;
-            console.log('✅ Notification sound playing in LOOP mode');
-            console.log('🔁 Loop enabled:', audioRef.current.loop);
-            console.log('🔊 Volume:', audioRef.current.volume);
             console.log('🔇 Muted:', audioRef.current.muted);
             console.log('⏱️ Duration:', audioRef.current.duration);
-            setIsPlaying(true);
-            setShowClickPrompt(false); // Hide prompt since it's playing
+            onPlaySuccess();
+            setShowClickPrompt(false);
           })
           .catch(err => {
             console.error('❌ Muted autoplay failed, trying unmuted:', err);
-            // If muted autoplay fails, try unmuted
             audioRef.current.muted = false;
             const playPromise = audioRef.current.play();
             
             if (playPromise !== undefined) {
-              playPromise
-                .then(() => {
-                  console.log('✅ Notification sound playing in LOOP mode');
-                  console.log('🔁 Loop enabled:', audioRef.current.loop);
-                  console.log('🔊 Volume:', audioRef.current.volume);
-                  console.log('⏱️ Duration:', audioRef.current.duration);
-                  setIsPlaying(true);
-                })
-                .catch(finalErr => {
-                  console.error('❌ Error playing notification sound:', finalErr);
-                  console.error('Error name:', finalErr.name);
-                  console.error('Error message:', finalErr.message);
-                  
-                  // Handle specific error types
-                  if (finalErr.name === 'NotAllowedError') {
-                    console.warn('⚠️ Audio autoplay blocked by browser - user interaction required');
-                    console.log('💡 Showing click prompt to user');
-                    setShowClickPrompt(true);
-                    // Don't retry automatically - wait for user click
-                  } else if (finalErr.name === 'NotSupportedError') {
-                    console.error('❌ Audio format not supported by browser');
-                  } else if (finalErr.name === 'AbortError') {
-                    console.warn('⚠️ Audio playback aborted - retrying...');
-                    // Retry after a short delay
-                    setTimeout(() => {
-                      audioRef.current.play().catch(e => console.error('❌ Retry failed:', e));
-                    }, 100);
-                  }
-                });
+              playPromise.then(onPlaySuccess).catch(handlePlayError);
             }
           });
       }
@@ -233,7 +227,7 @@ const AssistanceNotification = ({ io }) => {
     if (!isPlaying && audioRef.current && showClickPrompt) {
       console.log('🎯 Dismiss clicked - attempting to play sound with user interaction');
       audioRef.current.loop = true;
-      audioRef.current.volume = 1.0;
+      audioRef.current.volume = 1;
       audioRef.current.play()
         .then(() => {
           console.log('✅ Audio started playing from Dismiss button');
@@ -244,7 +238,7 @@ const AssistanceNotification = ({ io }) => {
             stopNotificationSound();
             setCurrentRequest(null);
             if (currentRequest) {
-              setPendingRequests(prev => prev.filter(req => req.id !== currentRequest.id));
+              removeRequestById(currentRequest.id);
             }
           }, 500);
         })
@@ -254,7 +248,7 @@ const AssistanceNotification = ({ io }) => {
           stopNotificationSound();
           setCurrentRequest(null);
           if (currentRequest) {
-            setPendingRequests(prev => prev.filter(req => req.id !== currentRequest.id));
+            removeRequestById(currentRequest.id);
           }
         });
     } else {
@@ -262,7 +256,7 @@ const AssistanceNotification = ({ io }) => {
       setCurrentRequest(null);
       // Remove from pending list
       if (currentRequest) {
-        setPendingRequests(prev => prev.filter(req => req.id !== currentRequest.id));
+        removeRequestById(currentRequest.id);
       }
     }
   };
@@ -275,7 +269,7 @@ const AssistanceNotification = ({ io }) => {
       
       // Try to play audio with user interaction
       audioRef.current.loop = true;
-      audioRef.current.volume = 1.0;
+      audioRef.current.volume = 1;
       audioRef.current.play()
         .then(() => {
           console.log('✅ Audio started playing after user interaction');
@@ -302,31 +296,15 @@ const AssistanceNotification = ({ io }) => {
         ref={audioRef}
         src="/sounds/bellding-254774.mp3"
         preload="auto"
-        playsInline
-        muted={false}
-        onError={(e) => {
-          console.error('❌ Audio file failed to load:', e);
-          console.error('Audio error code:', audioRef.current?.error?.code);
-          console.error('Audio error message:', audioRef.current?.error?.message);
-          console.error('Audio src:', audioRef.current?.src);
-          console.error('Audio readyState:', audioRef.current?.readyState);
-        }}
-        onCanPlay={() => {
-          console.log('✅ Audio file ready to play');
-          console.log('Audio src:', audioRef.current?.src);
-          console.log('Audio duration:', audioRef.current?.duration);
-          console.log('Audio readyState:', audioRef.current?.readyState);
-        }}
-        onPlay={() => console.log('▶️ Audio started playing')}
-        onPause={() => console.log('⏸️ Audio paused')}
-        onEnded={() => console.log('⏹️ Audio ended (should loop)')}
-        onLoadedMetadata={() => console.log('📊 Audio metadata loaded')}
-      />
+        muted={false}>
+        <track kind="captions" />
+      </audio>
+      {/* Audio event handlers moved to useEffect to avoid inline handler issues */}
 
       {/* Notification Modal - Only shown when there's a request */}
       {currentRequest && (
       <div className="assistance-notification-overlay">
-        <div className="assistance-notification-modal" onClick={handleModalClick}>
+        <button type="button" className="assistance-notification-modal" onClick={handleModalClick}>
           <div className="assistance-notification-header">
             <div className="assistance-icon-pulse">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
@@ -410,11 +388,18 @@ const AssistanceNotification = ({ io }) => {
               ✓ Confirm - I'm On My Way
             </button>
           </div>
-        </div>
+        </button>
       </div>
       )}
     </>
   );
+};
+
+AssistanceNotification.propTypes = {
+    io: PropTypes.shape({
+        on: PropTypes.func.isRequired,
+        off: PropTypes.func.isRequired,
+    }),
 };
 
 export default AssistanceNotification;
