@@ -18,7 +18,7 @@
  */
 
 const logger = require('../utils/logger');
-const enhancedAIService = require('./enhancedAIService');
+const enhancedAIService = null;
 const PromptTemplates = require('./promptTemplates');
 const MetadataEnrichmentService = require('./metadataEnrichmentService');
 
@@ -272,7 +272,7 @@ function extractTdp(specifications) {
     const specStr = JSON.stringify(specifications).toLowerCase();
     const tdpMatch = specStr.match(/(\d+)\s*w(?:att)?/);
     
-    return tdpMatch ? parseInt(tdpMatch[1]) : null;
+    return tdpMatch ? Number.parseInt(tdpMatch[1], 10) : null;
 }
 
 /**
@@ -284,10 +284,10 @@ function extractPsuWattage(psu) {
     if (!psu) return 0;
     
     const nameMatch = psu.name?.match(/(\d+)\s*w/i);
-    if (nameMatch) return parseInt(nameMatch[1]);
+    if (nameMatch) return Number.parseInt(nameMatch[1], 10);
     
     const specMatch = JSON.stringify(psu.specifications)?.match(/(\d+)\s*w/i);
-    if (specMatch) return parseInt(specMatch[1]);
+    if (specMatch) return Number.parseInt(specMatch[1], 10);
     
     return 0;
 }

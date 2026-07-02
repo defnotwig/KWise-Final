@@ -19,7 +19,7 @@ const aiCircuitBreaker = require('./aiCircuitBreaker');
 const PromptTemplates = require('./promptTemplates');
 const JSONExtractor = require('../ai/utils/jsonExtractor');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 // PHASE 4 & 5: Optional advanced features (graceful degradation if not available)
 let MetadataEnrichmentService, aiLogger, embeddingService, promptExperimentManager;
@@ -27,38 +27,50 @@ let MetadataEnrichmentService, aiLogger, embeddingService, promptExperimentManag
 try {
   MetadataEnrichmentService = require('./metadataEnrichmentService');
 } catch (e) {
-  logger.warn('⚠️ MetadataEnrichmentService not available - using basic metadata');
+  logger.warn('⚠️ MetadataEnrichmentService not available - using basic metadata', { error: e.message });
   MetadataEnrichmentService = { enrichPartsMetadata: async (parts) => ({}) };
 }
 
 try {
   aiLogger = require('./aiLogger');
 } catch (e) {
-  logger.warn('⚠️ AI Logger not available - logging disabled');
+  logger.warn('⚠️ AI Logger not available - logging disabled', { error: e.message });
   aiLogger = { logAICall: async () => {}, logMetrics: async () => {} };
 }
 
 try {
   embeddingService = require('./embeddingService');
 } catch (e) {
-  logger.warn('⚠️ Embedding Service not available - similar builds disabled');
+  logger.warn('⚠️ Embedding Service not available - similar builds disabled', { error: e.message });
   embeddingService = { findSimilarBuilds: async () => [], extractPatterns: async () => ({}) };
 }
 
 try {
   promptExperimentManager = require('./promptExperimentManager');
 } catch (e) {
-  logger.warn('⚠️ Prompt Experiment Manager not available - A/B testing disabled');
-  promptExperimentManager = { selectVariant: (exp) => ({ template: exp, variant: 'default' }) };
+  logger.warn('⚠️ Prompt Experiment Manager not available - A/B testing disabled', { error: e.message });
+  promptExperimentManager = {
+    getActiveExperiments: async () => [],
+    selectVariant: async (template) => ({ prompt_template: template, variant_id: 'default' }),
+    recordOutcome: async () => {}
+  };
+}
+
+// PHASE 4: RAG Pipeline for hybrid retrieval (vector + BM25 with RRF fusion)
+let ragPipeline;
+try {
+  ragPipeline = require('./ragPipeline');
+} catch (e) {
+  logger.warn('⚠️ RAG Pipeline not available - hybrid retrieval disabled', { error: e.message });
+  ragPipeline = { retrieveCompatibilityContext: async () => ({ context: '', stats: {} }), initialized: false };
 }
 
 class EnhancedAIService {
+  initialized = false;
+  scenarios = ['compatibility', 'upgrade', 'reference_build', 'diagnostic', 'cleaning', 'future_upgrade'];
+
   constructor() {
-    this.initialized = false;
-    this.scenarios = ['compatibility', 'upgrade', 'reference_build', 'diagnostic', 'cleaning', 'future_upgrade'];
-    
     logger.info('🚀 Enhanced AI Service initializing...');
-    this.initialize();
   }
 
   async initialize() {
@@ -79,6 +91,305 @@ class EnhancedAIService {
     }
   }
 
+  getPrometheusMetrics() {
+    return globalThis.prometheusMetrics || null;
+  }
+
+  async getCompatibilityCacheResult(cacheKey, scenario, startTime, parts, userContext) {
+    const cached = intelligentCache.get(cacheKey, scenario);
+    if (!cached) {
+      return null;
+    }
+
+    logger.info('✅ Compatibility analysis (CACHE HIT)', {
+      latency: `${Date.now() - startTime}ms`
+    });
+
+    await aiLogger.logAICall(scenario, { parts, userContext }, cached, 0);
+
+    return {
+      ...cached,
+      source: 'cache',
+      cached: true
+    };
+  }
+
+  async getSimilarBuildContext(parts) {
+    try {
+      const similarBuilds = await embeddingService.findSimilarBuilds(parts, 5);
+      if (!similarBuilds?.length) {
+        return { similarBuilds: [], patterns: {} };
+      }
+
+      const patterns = await embeddingService.extractPatterns(similarBuilds);
+      const averageSimilarity = (similarBuilds.reduce((sum, build) => sum + build.similarity, 0) / similarBuilds.length).toFixed(2);
+
+      logger.info('🔍 Found similar builds', {
+        count: similarBuilds.length,
+        avgSimilarity: averageSimilarity
+      });
+
+      return { similarBuilds, patterns };
+    } catch (error) {
+      logger.warn('⚠️ Embedding service unavailable, continuing without similar builds', { error: error.message });
+      return { similarBuilds: [], patterns: {} };
+    }
+  }
+
+  async getCompatibilityExperimentContext(userContext) {
+    try {
+      const activeExperiments = await promptExperimentManager.getActiveExperiments();
+      const compatExperiment = activeExperiments.find((experiment) => experiment.experiment_id.includes('compatibility'));
+
+      if (!compatExperiment) {
+        return { experimentId: null, selectedVariant: null };
+      }
+
+      const experimentId = compatExperiment.experiment_id;
+      const userId = userContext.user_id || 'anonymous';
+      const selectedVariant = await promptExperimentManager.selectVariant(experimentId, userId);
+
+      logger.info('🧪 A/B experiment active', { experimentId, variant: selectedVariant.variant_id });
+
+      return { experimentId, selectedVariant };
+    } catch (error) {
+      logger.warn('⚠️ Experiment manager unavailable, using default prompts', { error: error.message });
+      return { experimentId: null, selectedVariant: null };
+    }
+  }
+
+  async buildCompatibilityPromptContext(parts, userContext, deterministicResults, metadata, similarBuildContext, selectedVariant) {
+    let prompt = PromptTemplates.generateCompatibilityPrompt(
+      parts,
+      userContext,
+      deterministicResults,
+      metadata
+    );
+
+    if (similarBuildContext.similarBuilds.length > 0) {
+      prompt = embeddingService.enrichPromptWithSimilarBuilds(
+        prompt,
+        similarBuildContext.similarBuilds,
+        similarBuildContext.patterns
+      );
+    }
+
+    const ragContextResult = await this.getRagCompatibilityContext(parts, userContext);
+    if (ragContextResult.ragContext) {
+      prompt.task = `${prompt.task}\n\n${ragContextResult.ragContext}`;
+    }
+
+    if (selectedVariant?.prompt_template) {
+      prompt.task = selectedVariant.prompt_template;
+      logger.info('🧪 Using A/B variant prompt', { variant: selectedVariant.variant_id });
+    }
+
+    return {
+      prompt,
+      ragContext: ragContextResult.ragContext,
+      ragStats: ragContextResult.ragStats
+    };
+  }
+
+  async getRagCompatibilityContext(parts, userContext) {
+    try {
+      const ragResult = await ragPipeline.retrieveCompatibilityContext(parts, userContext);
+      const ragContext = ragResult.context || '';
+      const ragStats = ragResult.stats || {};
+
+      if (ragContext) {
+        logger.info('🔗 RAG context injected into prompt', {
+          contextLength: ragContext.length,
+          ...ragStats
+        });
+      }
+
+      return { ragContext, ragStats };
+    } catch (error) {
+      logger.warn('⚠️ RAG context retrieval failed, continuing without', { error: error.message });
+      return { ragContext: '', ragStats: {} };
+    }
+  }
+
+  buildAiResponseCacheKey(prompt, parts) {
+    return prompt.task + JSON.stringify(parts);
+  }
+
+  async getCachedAiCompatibilityResponse(aiCacheKey, userContext, deterministicResults, scenario, startTime) {
+    try {
+      const aiResponseCache = require('./aiResponseCache');
+      const cachedResponse = aiResponseCache.get(aiCacheKey, { userContext, deterministicResults });
+      if (!cachedResponse) {
+        logger.info('⚠️ AI Response Cache MISS - calling Ollama', { scenario });
+        return null;
+      }
+
+      logger.info('✅ AI Response Cache HIT - returning cached response', {
+        scenario,
+        cacheAge: Math.floor((Date.now() - cachedResponse.cachedAt) / 1000) + 's'
+      });
+
+      this.recordPrometheusRequest({
+        model: 'deepseek-r1:1.5b',
+        scenario,
+        latency: Date.now() - startTime,
+        cacheStatus: 'hit',
+        status: 'success',
+        tokensUsed: 0
+      });
+
+      return cachedResponse;
+    } catch (error) {
+      logger.warn('⚠️ AI Response Cache check failed:', error.message);
+      return null;
+    }
+  }
+
+  async executeCompatibilityRequest(prompt, fallback, scenario, parts) {
+    return aiCircuitBreaker.call(
+      async () => {
+        return ollamaService.generateResponse(
+          prompt.task,
+          prompt.system,
+          { max_tokens: 3000, temperature: 0.1 }
+        );
+      },
+      fallback,
+      { scenario, partsCount: Object.keys(parts).length }
+    );
+  }
+
+  validateCompatibilityResult(parsedResult, scenario) {
+    const validation = PromptTemplates.validateResponse(parsedResult, scenario);
+    if (!validation.valid) {
+      logger.warn('⚠️ AI response validation warnings', { errors: validation.errors });
+    }
+  }
+
+  async cacheSuccessfulCompatibilityResult(cacheKey, aiCacheKey, userContext, deterministicResults, scenario, parsedResult) {
+    const cacheConfidence = parsedResult.confidence || 70;
+    if (cacheConfidence >= 50) {
+      intelligentCache.set(cacheKey, parsedResult, scenario, cacheConfidence);
+    }
+
+    try {
+      if (cacheConfidence < 60) {
+        return;
+      }
+
+      const aiResponseCache = require('./aiResponseCache');
+      const ttl = cacheConfidence >= 80 ? 7200 : 3600;
+      aiResponseCache.set(aiCacheKey, { userContext, deterministicResults }, parsedResult, ttl);
+      logger.info('💾 Stored in AI Response Cache', { scenario, ttl: `${ttl}s`, confidence: cacheConfidence });
+    } catch (error) {
+      logger.warn('⚠️ Failed to store in AI Response Cache:', error.message);
+    }
+  }
+
+  async recordCompatibilityExperimentOutcome(experimentId, selectedVariant, outcome) {
+    if (!experimentId || !selectedVariant) {
+      return;
+    }
+
+    await promptExperimentManager.recordOutcome(experimentId, selectedVariant.variant_id, outcome);
+  }
+
+  recordPrometheusRequest({ model, scenario, latency, cacheStatus, status, tokensUsed }) {
+    const metrics = this.getPrometheusMetrics();
+    if (!metrics) {
+      return;
+    }
+
+    metrics.recordAiRequest(model, scenario, latency, cacheStatus, status, tokensUsed);
+  }
+
+  buildCompatibilityAnalysisResponse(parsedResult, result, latency, enrichment) {
+    return {
+      ...parsedResult,
+      source: result.source,
+      latency,
+      circuitState: result.circuitState,
+      metadata_enriched: true,
+      similar_builds_used: enrichment.similarBuilds.length,
+      experiment_variant: enrichment.selectedVariant ? enrichment.selectedVariant.variant_id : null,
+      rag_context_used: enrichment.ragContext.length > 0,
+      rag_stats: enrichment.ragStats
+    };
+  }
+
+  async handleSuccessfulCompatibilityAnalysis({
+    result,
+    cacheKey,
+    aiCacheKey,
+    scenario,
+    startTime,
+    parts,
+    userContext,
+    deterministicResults,
+    enrichment
+  }) {
+    const latency = Date.now() - startTime;
+    const responseData = result.data || result.response || result || '';
+    const parsedResult = this.parseCompatibilityResponse(responseData, deterministicResults);
+
+    this.validateCompatibilityResult(parsedResult, scenario);
+    await this.cacheSuccessfulCompatibilityResult(cacheKey, aiCacheKey, userContext, deterministicResults, scenario, parsedResult);
+    await aiLogger.logAICall(scenario, { parts, userContext, deterministicResults }, parsedResult, latency);
+
+    this.recordPrometheusRequest({
+      model: 'deepseek-r1:1.5b',
+      scenario,
+      latency,
+      cacheStatus: 'miss',
+      status: 'success',
+      tokensUsed: result.tokensUsed || 0
+    });
+
+    await this.recordCompatibilityExperimentOutcome(enrichment.experimentId, enrichment.selectedVariant, {
+      conversion: parsedResult.confidence >= 80,
+      confidence: parsedResult.confidence,
+      latency,
+      feedback: null
+    });
+
+    logger.info('✅ Compatibility analysis (AI Enhanced)', {
+      latency: `${latency}ms`,
+      confidence: parsedResult.confidence,
+      source: result.source,
+      metadata_enriched: true,
+      similar_builds_used: enrichment.similarBuilds.length
+    });
+
+    return this.buildCompatibilityAnalysisResponse(parsedResult, result, latency, enrichment);
+  }
+
+  async handleFallbackCompatibilityAnalysis({ result, scenario, startTime, parts, userContext, deterministicResults, enrichment }) {
+    const latency = Date.now() - startTime;
+    const parsedResult = result.data;
+
+    await aiLogger.logAICall(scenario, { parts, userContext, deterministicResults }, parsedResult, latency);
+    await this.recordCompatibilityExperimentOutcome(enrichment.experimentId, enrichment.selectedVariant, {
+      conversion: false,
+      confidence: parsedResult.confidence || 0,
+      latency,
+      error: true
+    });
+
+    logger.warn('⚠️ Compatibility analysis (FALLBACK)', {
+      latency: `${latency}ms`,
+      reason: result.reason
+    });
+
+    return this.buildCompatibilityAnalysisResponse(parsedResult, result, latency, enrichment);
+  }
+
+  async handleCompatibilityAnalysisError(error, scenario, startTime, parts, userContext, deterministicResults) {
+    logger.error('❌ Compatibility analysis failed', { error: error.message });
+    const errorLatency = Date.now() - startTime;
+    await aiLogger.logAICall(scenario, { parts, userContext, deterministicResults }, { error: error.message }, errorLatency);
+    return this.generateFallbackCompatibility(parts, deterministicResults);
+  }
+
   /**
    * Analyze compatibility with intelligent caching and circuit breaker
    * ENHANCED PHASE 2: Now uses advanced prompt templates and metadata enrichment
@@ -94,246 +405,70 @@ class EnhancedAIService {
     const startTime = Date.now();
     
     try {
-      // Generate cache key
       const cacheKey = intelligentCache.generateKey(parts, userContext, scenario);
-      
-      // Check cache first
-      const cached = await intelligentCache.get(cacheKey, scenario);
-      if (cached) {
-        logger.info('✅ Compatibility analysis (CACHE HIT)', {
-          latency: `${Date.now() - startTime}ms`
-        });
-        
-        // PHASE 4: Log cache hit
-        await aiLogger.logAICall(scenario, { parts, userContext }, cached, 0);
-        
-        return {
-          ...cached,
-          source: 'cache',
-          cached: true
-        };
+      const cachedResult = await this.getCompatibilityCacheResult(cacheKey, scenario, startTime, parts, userContext);
+      if (cachedResult) {
+        return cachedResult;
       }
-      
-      // PHASE 2 ENHANCEMENT: Enrich parts with metadata
+
       const metadata = await MetadataEnrichmentService.enrichPartsMetadata(parts);
-      
-      // PHASE 5: Find similar builds using vector embeddings
-      let similarBuilds = [];
-      let patterns = {};
-      try {
-        similarBuilds = await embeddingService.findSimilarBuilds(parts, 5);
-        if (similarBuilds && similarBuilds.length > 0) {
-          patterns = await embeddingService.extractPatterns(similarBuilds);
-          logger.info('🔍 Found similar builds', { 
-            count: similarBuilds.length,
-            avgSimilarity: (similarBuilds.reduce((sum, b) => sum + b.similarity, 0) / similarBuilds.length).toFixed(2)
-          });
-        }
-      } catch (embError) {
-        logger.warn('⚠️ Embedding service unavailable, continuing without similar builds', { error: embError.message });
-      }
-      
-      // PHASE 5: Check for active A/B experiments
-      let selectedVariant = null;
-      let experimentId = null;
-      try {
-        const activeExperiments = await promptExperimentManager.getActiveExperiments();
-        const compatExperiment = activeExperiments.find(exp => exp.experiment_id.includes('compatibility'));
-        if (compatExperiment) {
-          experimentId = compatExperiment.experiment_id;
-          const userId = userContext.user_id || 'anonymous';
-          selectedVariant = await promptExperimentManager.selectVariant(experimentId, userId);
-          logger.info('🧪 A/B experiment active', { experimentId, variant: selectedVariant.variant_id });
-        }
-      } catch (expError) {
-        logger.warn('⚠️ Experiment manager unavailable, using default prompts', { error: expError.message });
-      }
-      
-      // PHASE 2 ENHANCEMENT: Use advanced prompt template
-      let prompt = PromptTemplates.generateCompatibilityPrompt(
-        parts, 
-        userContext, 
+      const similarBuildContext = await this.getSimilarBuildContext(parts);
+      const experimentContext = await this.getCompatibilityExperimentContext(userContext);
+      const promptContext = await this.buildCompatibilityPromptContext(
+        parts,
+        userContext,
         deterministicResults,
-        metadata
+        metadata,
+        similarBuildContext,
+        experimentContext.selectedVariant
       );
-      
-      // PHASE 5: Enrich prompt with similar builds if available
-      if (similarBuilds.length > 0) {
-        prompt = embeddingService.enrichPromptWithSimilarBuilds(prompt, similarBuilds, patterns);
+      const aiCacheKey = this.buildAiResponseCacheKey(promptContext.prompt, parts);
+      const aiCachedResponse = await this.getCachedAiCompatibilityResponse(
+        aiCacheKey,
+        userContext,
+        deterministicResults,
+        scenario,
+        startTime
+      );
+      if (aiCachedResponse) {
+        return aiCachedResponse;
       }
-      
-      // PHASE 5: Use experiment variant prompt if applicable
-      if (selectedVariant && selectedVariant.prompt_template) {
-        prompt.task = selectedVariant.prompt_template;
-        logger.info('🧪 Using A/B variant prompt', { variant: selectedVariant.variant_id });
-      }
-      
-      // PHASE 3.2 WEEK 2: Check AI Response Cache before making API call
-      let aiCacheKey = null;
-      let aiCachedResponse = null;
-      try {
-        const aiResponseCache = require('./aiResponseCache');
-        aiCacheKey = prompt.task + JSON.stringify(parts);
-        aiCachedResponse = aiResponseCache.get(aiCacheKey, { userContext, deterministicResults });
-        
-        if (aiCachedResponse) {
-          logger.info('✅ AI Response Cache HIT - returning cached response', {
-            scenario,
-            cacheAge: Math.floor((Date.now() - aiCachedResponse.cachedAt) / 1000) + 's'
-          });
-          
-          // Record cache hit metrics
-          if (global.prometheusMetrics) {
-            global.prometheusMetrics.recordAiRequest(
-              'deepseek-r1:1.5b',
-              scenario,
-              Date.now() - startTime,
-              'hit',
-              'success',
-              0 // No tokens used for cache hit
-            );
-          }
-          
-          return aiCachedResponse;
-        } else {
-          logger.info('⚠️ AI Response Cache MISS - calling Ollama', { scenario });
-        }
-      } catch (cacheError) {
-        logger.warn('⚠️ AI Response Cache check failed:', cacheError.message);
-        // Continue without cache
-      }
-      
-      // Call AI with circuit breaker protection
+
       const fallback = this.generateFallbackCompatibility(parts, deterministicResults);
-      
-      const result = await aiCircuitBreaker.call(
-        async () => {
-          return await ollamaService.generateResponse(
-            prompt.task,
-            prompt.system,
-            { max_tokens: 3000, temperature: 0.1 }
-          );
-        },
-        fallback,
-        { scenario, partsCount: Object.keys(parts).length }
-      );
-      
-      const latency = Date.now() - startTime;
-      
-      // Parse and validate AI response
-      let parsedResult;
+      const result = await this.executeCompatibilityRequest(promptContext.prompt, fallback, scenario, parts);
+      const enrichment = {
+        similarBuilds: similarBuildContext.similarBuilds,
+        selectedVariant: experimentContext.selectedVariant,
+        experimentId: experimentContext.experimentId,
+        ragContext: promptContext.ragContext,
+        ragStats: promptContext.ragStats
+      };
+
       if (result.success) {
-        // 🔧 NULL-SAFE ACCESS: Handle all response structures
-        const responseData = result.data || result.response || result || '';
-        parsedResult = this.parseCompatibilityResponse(responseData, deterministicResults);
-        
-        // PHASE 2 ENHANCEMENT: Validate against JSON schema
-        const validation = PromptTemplates.validateResponse(parsedResult, scenario);
-        if (!validation.valid) {
-          logger.warn('⚠️ AI response validation warnings', { errors: validation.errors });
-        }
-        
-        // 🔧 WEEK 2 OPTIMIZATION: Lower confidence threshold for caching (50% instead of 70%)
-        const cacheConfidence = parsedResult.confidence || 70;
-        if (cacheConfidence >= 50) {
-          // Cache successful result with lower threshold to improve hit rate
-          intelligentCache.set(
-            cacheKey,
-            parsedResult,
-            scenario,
-            cacheConfidence
-          );
-        }
-        
-        // PHASE 3.2 WEEK 2: Store in AI Response Cache for future requests
-        try {
-          if (aiCacheKey && cacheConfidence >= 60) {
-            const aiResponseCache = require('./aiResponseCache');
-            const ttl = cacheConfidence >= 80 ? 7200 : 3600; // 2 hours for high confidence, 1 hour otherwise
-            aiResponseCache.set(
-              aiCacheKey,
-              { userContext, deterministicResults },
-              parsedResult,
-              ttl
-            );
-            logger.info('💾 Stored in AI Response Cache', { scenario, ttl: `${ttl}s`, confidence: cacheConfidence });
-          }
-        } catch (cacheStoreError) {
-          logger.warn('⚠️ Failed to store in AI Response Cache:', cacheStoreError.message);
-        }
-        
-        // PHASE 4: Log successful AI call
-        await aiLogger.logAICall(scenario, { parts, userContext, deterministicResults }, parsedResult, latency);
-        
-        // PHASE 3.2 WEEK 2: Record AI metrics in Prometheus
-        if (global.prometheusMetrics) {
-          global.prometheusMetrics.recordAiRequest(
-            'deepseek-r1:1.5b',
-            scenario,
-            latency,
-            'miss',
-            'success',
-            result.tokensUsed || 0
-          );
-        }
-        
-        // PHASE 5: Record experiment outcome if active
-        if (experimentId && selectedVariant) {
-          await promptExperimentManager.recordOutcome(experimentId, selectedVariant.variant_id, {
-            conversion: parsedResult.confidence >= 80,
-            confidence: parsedResult.confidence,
-            latency,
-            feedback: null // Will be set later by admin
-          });
-        }
-        
-        logger.info('✅ Compatibility analysis (AI Enhanced)', {
-          latency: `${latency}ms`,
-          confidence: parsedResult.confidence,
-          source: result.source,
-          metadata_enriched: true,
-          similar_builds_used: similarBuilds.length
-        });
-      } else {
-        parsedResult = result.data;
-        
-        // PHASE 4: Log fallback usage
-        await aiLogger.logAICall(scenario, { parts, userContext, deterministicResults }, parsedResult, latency);
-        
-        // PHASE 5: Record experiment error if active
-        if (experimentId && selectedVariant) {
-          await promptExperimentManager.recordOutcome(experimentId, selectedVariant.variant_id, {
-            conversion: false,
-            confidence: parsedResult.confidence || 0,
-            latency,
-            error: true
-          });
-        }
-        
-        logger.warn('⚠️ Compatibility analysis (FALLBACK)', {
-          latency: `${latency}ms`,
-          reason: result.reason
+        return this.handleSuccessfulCompatibilityAnalysis({
+          result,
+          cacheKey,
+          aiCacheKey,
+          scenario,
+          startTime,
+          parts,
+          userContext,
+          deterministicResults,
+          enrichment
         });
       }
-      
-      return {
-        ...parsedResult,
-        source: result.source,
-        latency,
-        circuitState: result.circuitState,
-        metadata_enriched: true,
-        similar_builds_used: similarBuilds.length,
-        experiment_variant: selectedVariant ? selectedVariant.variant_id : null
-      };
-      
+
+      return this.handleFallbackCompatibilityAnalysis({
+        result,
+        scenario,
+        startTime,
+        parts,
+        userContext,
+        deterministicResults,
+        enrichment
+      });
     } catch (error) {
-      logger.error('❌ Compatibility analysis failed', { error: error.message });
-      
-      // PHASE 4: Log error
-      const errorLatency = Date.now() - startTime;
-      await aiLogger.logAICall(scenario, { parts, userContext, deterministicResults }, { error: error.message }, errorLatency);
-      
-      return this.generateFallbackCompatibility(parts, deterministicResults);
+      return this.handleCompatibilityAnalysisError(error, scenario, startTime, parts, userContext, deterministicResults);
     }
   }
 
@@ -410,122 +545,138 @@ Return strictly valid JSON (NO PLACEHOLDER TEXT - fill with actual analysis):
    */
   parseCompatibilityResponse(response, deterministicResults) {
     try {
-      // ✅ ENHANCED DIAGNOSTIC: Log FULL raw response to see what AI is returning
-      logger.info('=== 🔍 AI RESPONSE DEBUG START ===');
-      logger.info(`🔍 Response Type: ${typeof response}`);
-      logger.info(`🔍 Response Length: ${response?.length || 0}`);
-      logger.info(`🔍 First 1000 chars: ${response?.substring(0, 1000) || 'null'}`);
-      if (response && response.length > 1000) {
-        logger.info(`🔍 Last 500 chars: ${response?.substring(response.length - 500) || 'null'}`);
-      }
-      logger.info('=== 🔍 AI RESPONSE DEBUG END ===');
-      
-      // 🔥 FIX #1.2: Use robust JSON extractor with retry logic for DeepSeek R1 responses
-      let parsed = JSONExtractor.extractJSON(response);
-      
-      if (!parsed) {
-        logger.warn('⚠️ First JSON extraction attempt failed, trying cleanup...', {
-          responseLength: response?.length || 0,
-          responseStart: response?.substring(0, 200) || 'null'
-        });
-        
-        // Retry with cleaned response (remove thinking tags, markdown, etc.)
-        const cleaned = JSONExtractor.cleanResponse(response);
-        parsed = JSONExtractor.extractJSON(cleaned);
-        
-        if (!parsed) {
-          logger.error('❌ All JSON extraction attempts failed:', {
-            responseLength: response?.length || 0,
-            responseStart: response?.substring(0, 200) || 'null',
-            cleanedStart: cleaned?.substring(0, 200) || 'null',
-            fullResponse: response // ✅ Log full response for debugging
-          });
-          throw new Error('No JSON found in response after multiple extraction attempts');
-        } else {
-          logger.info('✅ JSON extracted after cleanup');
-        }
-      }
-      
-      // 🔥 ROOT CAUSE FIX #1: AI returns various field names instead of "compatible_products"
-      // Normalize ALL possible field name variations
-      const possibleFieldNames = [
-        'compatible',  // ✅ FIX: AI often returns just "compatible" instead of "compatible_products"
-        'compatible_components', // ✅ FIX: AI returns "compatible_components" instead of "compatible_products"
-        'compatible_cores', 
-        'compatible_coolers', 
-        'compatible_cooling', 
-        'compatible_motherboards',
-        'compatible_gpus',
-        'compatible_rams',
-        'compatible_storage',
-        'compatible_psus',
-        'compatible_cases'
-      ];
-      
-      for (const fieldName of possibleFieldNames) {
-        if (parsed[fieldName] && !parsed.compatible_products) {
-          logger.warn(`⚠️ AI returned "${fieldName}" instead of "compatible_products", normalizing...`);
-          parsed.compatible_products = parsed[fieldName];
-          delete parsed[fieldName];
-          break;
-        }
-      }
-      
-      // Validate required fields (more flexible now)
-      if (!parsed.overall_assessment && !parsed.compatible_products) {
-        logger.error('❌ Missing required fields in AI response', {
-          parsedKeys: Object.keys(parsed),
-          parsed: parsed
-        });
-        throw new Error('Missing required fields in AI response (need overall_assessment or compatible_products)');
-      }
-      
-      // ✅ ENHANCED DIAGNOSTIC: Log what was successfully parsed
-      logger.info('=== ✅ PARSED JSON DEBUG START ===');
-      logger.info(`✅ Parsed Keys: ${Object.keys(parsed).join(', ')}`);
-      logger.info(`✅ Has compatible_products: ${!!parsed.compatible_products}`);
-      logger.info(`✅ compatible_products type: ${Array.isArray(parsed.compatible_products) ? 'array' : typeof parsed.compatible_products}`);
-      logger.info(`✅ compatible_products value:`, parsed.compatible_products);
-      logger.info(`✅ compatible_products length: ${parsed.compatible_products?.length || 0}`);
-      logger.info(`✅ Has scores: ${!!parsed.scores}`);
-      logger.info(`✅ Has reasons: ${!!parsed.reasons}`);
-      logger.info(`✅ Parsed object:`, JSON.stringify(parsed, null, 2));
-      logger.info('=== ✅ PARSED JSON DEBUG END ===');
-      
-      // ROOT CAUSE FIX #6: Preserve ALL fields from AI response, especially compatible_products!
-      // The AI returns: compatible_products, scores, reasons
-      // We were only keeping: overall_assessment, confidence, issues, strengths, upgrade_priorities
-      // This caused compatible_products to be lost, triggering "AI response invalid" warnings
-      const merged = {
-        // Compatibility response fields (from compatibilityService prompt)
-        compatible_products: parsed.compatible_products || [],
-        scores: parsed.scores || {},
-        reasons: parsed.reasons || {},
-        
-        // Upgrade response fields  
-        overall_assessment: parsed.overall_assessment || 'compatible',
-        confidence: parsed.confidence || 85,
-        issues: [
-          ...(deterministicResults.issues || []),
-          ...(parsed.issues || [])
-        ],
-        strengths: parsed.strengths || [],
-        upgrade_priorities: parsed.upgrade_priorities || [],
-        reasoning: parsed.reasoning || 'AI analysis completed',
-        deterministic_score: deterministicResults.percentageScore || 0,
-        ai_score: parsed.confidence || 0,
-        data_sources: {
-          deterministic: true,
-          ai: true
-        }
-      };
-      
-      return merged;
-      
+      const parsed = this.extractCompatibilityPayload(response);
+      this.normalizeCompatibilityResponseFields(parsed);
+      this.validateCompatibilityResponsePayload(parsed);
+      this.logParsedCompatibilityDebug(parsed);
+      return this.mergeCompatibilityResponse(parsed, deterministicResults);
     } catch (error) {
       logger.error('❌ Failed to parse AI compatibility response', { error: error.message });
       throw error;
     }
+  }
+
+  extractCompatibilityPayload(response) {
+    this.logCompatibilityResponseDebug(response);
+
+    const initialParse = JSONExtractor.extractJSON(response);
+    if (initialParse) {
+      logger.info('✅ JSON extracted on first pass');
+      return initialParse;
+    }
+
+    logger.warn('⚠️ First JSON extraction attempt failed, trying cleanup...', {
+      responseLength: response?.length || 0,
+      responseStart: response?.substring(0, 200) || 'null'
+    });
+
+    const cleaned = JSONExtractor.cleanResponse(response);
+    const cleanedParse = JSONExtractor.extractJSON(cleaned);
+    if (cleanedParse) {
+      logger.info('✅ JSON extracted after cleanup');
+      return cleanedParse;
+    }
+
+    logger.error('❌ All JSON extraction attempts failed:', {
+      responseLength: response?.length || 0,
+      responseStart: response?.substring(0, 200) || 'null',
+      cleanedStart: cleaned?.substring(0, 200) || 'null'
+    });
+    throw new Error('No JSON found in response after multiple extraction attempts');
+  }
+
+  logCompatibilityResponseDebug(response) {
+    logger.info('=== 🔍 AI RESPONSE DEBUG START ===');
+    logger.info(`🔍 Response Type: ${typeof response}`);
+    logger.info(`🔍 Response Length: ${response?.length || 0}`);
+    logger.info(`🔍 First 1000 chars: ${response?.substring(0, 1000) || 'null'}`);
+    if (response && response.length > 1000) {
+      logger.info(`🔍 Last 500 chars: ${response.substring(response.length - 500)}`);
+    }
+    logger.info('=== 🔍 AI RESPONSE DEBUG END ===');
+  }
+
+  normalizeCompatibilityResponseFields(parsed) {
+    const possibleFieldNames = [
+      'compatible',
+      'compatible_components',
+      'compatible_cores',
+      'compatible_coolers',
+      'compatible_cooling',
+      'compatible_motherboards',
+      'compatible_gpus',
+      'compatible_rams',
+      'compatible_storage',
+      'compatible_psus',
+      'compatible_cases'
+    ];
+
+    for (const fieldName of possibleFieldNames) {
+      if (parsed[fieldName] && !parsed.compatible_products) {
+        logger.warn(`⚠️ AI returned "${fieldName}" instead of "compatible_products", normalizing...`);
+        parsed.compatible_products = parsed[fieldName];
+        delete parsed[fieldName];
+        return;
+      }
+    }
+  }
+
+  validateCompatibilityResponsePayload(parsed) {
+    if (parsed.compatible_products && !Array.isArray(parsed.compatible_products)) {
+      throw new Error('AI response compatible_products field must be an array');
+    }
+
+    if (parsed.scores && typeof parsed.scores !== 'object') {
+      throw new Error('AI response scores field must be an object');
+    }
+
+    if (parsed.reasons && typeof parsed.reasons !== 'object') {
+      throw new Error('AI response reasons field must be an object');
+    }
+
+    if (!parsed.overall_assessment && !parsed.compatible_products) {
+      logger.error('❌ Missing required fields in AI response', {
+        parsedKeys: Object.keys(parsed),
+        parsed
+      });
+      throw new Error('Missing required fields in AI response (need overall_assessment or compatible_products)');
+    }
+  }
+
+  logParsedCompatibilityDebug(parsed) {
+    logger.info('=== ✅ PARSED JSON DEBUG START ===');
+    logger.info(`✅ Parsed Keys: ${Object.keys(parsed).join(', ')}`);
+    logger.info(`✅ Has compatible_products: ${!!parsed.compatible_products}`);
+    logger.info(`✅ compatible_products type: ${Array.isArray(parsed.compatible_products) ? 'array' : typeof parsed.compatible_products}`);
+    logger.info('✅ compatible_products value:', parsed.compatible_products);
+    logger.info(`✅ compatible_products length: ${parsed.compatible_products?.length || 0}`);
+    logger.info(`✅ Has scores: ${!!parsed.scores}`);
+    logger.info(`✅ Has reasons: ${!!parsed.reasons}`);
+    logger.info('✅ Parsed object:', JSON.stringify(parsed, null, 2));
+    logger.info('=== ✅ PARSED JSON DEBUG END ===');
+  }
+
+  mergeCompatibilityResponse(parsed, deterministicResults) {
+    return {
+      compatible_products: parsed.compatible_products || [],
+      scores: parsed.scores || {},
+      reasons: parsed.reasons || {},
+      overall_assessment: parsed.overall_assessment || 'compatible',
+      confidence: parsed.confidence || 85,
+      issues: [
+        ...(deterministicResults.issues || []),
+        ...(parsed.issues || [])
+      ],
+      strengths: parsed.strengths || [],
+      upgrade_priorities: parsed.upgrade_priorities || [],
+      reasoning: parsed.reasoning || 'AI analysis completed',
+      deterministic_score: deterministicResults.percentageScore || 0,
+      ai_score: parsed.confidence || 0,
+      data_sources: {
+        deterministic: true,
+        ai: true
+      }
+    };
   }
 
   /**
@@ -535,7 +686,7 @@ Return strictly valid JSON (NO PLACEHOLDER TEXT - fill with actual analysis):
    * @returns {Object} - Fallback analysis
    */
   generateFallbackCompatibility(parts, deterministicResults = {}) {
-    const status = deterministicResults.compatible !== false ? 'acceptable' : 'problematic';
+    const status = deterministicResults.compatible === false ? 'problematic' : 'acceptable';
     
     // 🔥 FIX #1.3: Use deterministic scores instead of flat 70 for ALL products
     // This ensures different products get different scores based on actual compatibility
@@ -550,7 +701,7 @@ Return strictly valid JSON (NO PLACEHOLDER TEXT - fill with actual analysis):
           // Check if this product has deterministic results
           const detResult = deterministicResults[product.id];
           const detScore = detResult?.percentageScore || 0;
-          const isCompatible = detResult?.compatible !== false;
+          const isCompatible = detResult?.compatible ?? false;
           
           // Only include compatible products in the list
           if (isCompatible && detScore >= 60) {
@@ -614,7 +765,11 @@ Return strictly valid JSON (NO PLACEHOLDER TEXT - fill with actual analysis):
       const cacheKey = intelligentCache.generateKey(currentBuild, userContext, scenario);
       
       // Check cache
-      const cached = await intelligentCache.get(cacheKey, scenario);
+      const cached = await new Promise((resolve, reject) => {
+        Promise.resolve(intelligentCache.get(cacheKey, scenario))
+          .then(resolve)
+          .catch(reject);
+      });
       if (cached) {
         return {
           ...cached,

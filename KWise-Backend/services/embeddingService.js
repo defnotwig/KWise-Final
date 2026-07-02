@@ -11,8 +11,23 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
 const db = require('../config/db');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const aiCircuitBreaker = require('./aiCircuitBreaker');
+
+const getEmbeddingFromResponse = (response) => {
+  const responseData = response?.data;
+  return responseData?.embedding ?? null;
+};
+
+const getCachedEmbedding = (embeddingCache, cacheKey) => {
+  const cachedEmbedding = embeddingCache.get(cacheKey) ?? null;
+  return cachedEmbedding?.length ? cachedEmbedding : null;
+};
+
+const parseNumericValue = (value, fallback = 0) => {
+  const parsedValue = Number.parseFloat(String(value ?? ''));
+  return Number.isNaN(parsedValue) ? fallback : parsedValue;
+};
 
 class EmbeddingService {
   constructor() {
@@ -33,11 +48,12 @@ class EmbeddingService {
   async generateBuildEmbedding(build) {
     try {
       const cacheKey = this.hashBuild(build);
+      const cachedEmbedding = getCachedEmbedding(this.embeddingCache, cacheKey);
       
       // Check cache first
-      if (this.embeddingCache.has(cacheKey)) {
+      if (cachedEmbedding) {
         logger.debug('✅ Embedding cache hit');
-        return this.embeddingCache.get(cacheKey);
+        return cachedEmbedding;
       }
       
       // Create semantic description
@@ -57,12 +73,13 @@ class EmbeddingService {
               validateStatus: (status) => status === 200 // Only accept 200 status
             }
           );
+          const embeddingVector = getEmbeddingFromResponse(response);
           
-          if (!response.data || !response.data.embedding) {
+          if (!embeddingVector) {
             throw new Error('Invalid embedding response from Ollama');
           }
           
-          return response.data.embedding;
+          return embeddingVector;
         },
         {
           fallbackValue: null, // Return null on circuit breaker failure
@@ -147,7 +164,7 @@ Target Framerate: ${build.target_fps || '60fps'}
     const cpu = build.cpu || build.CPU || {};
     const gpu = build.gpu || build.GPU || {};
     
-    const cpuScore = (cpu.cores || 0) * (parseFloat(cpu.base_clock) || 1);
+    const cpuScore = (cpu.cores || 0) * parseNumericValue(cpu.base_clock, 1);
     const gpuScore = (gpu.vram || 0) * 100;
     const totalScore = cpuScore + gpuScore;
     
@@ -452,6 +469,42 @@ ${this.extractPatterns(similarBuilds)}
     const size = this.embeddingCache.size;
     this.embeddingCache.clear();
     logger.info(`🗑️ Cleared ${size} embeddings from cache`);
+  }
+
+  /**
+   * Generate embedding for raw text (for RAG pipeline queries/documents)
+   * Bypasses buildToSemanticDescription — sends text directly to Ollama
+   * @param {string} text - Raw text to embed
+   * @returns {Promise<Array|null>} Embedding vector or null
+   */
+  async generateTextEmbedding(text) {
+    if (!text || typeof text !== 'string') return null;
+
+    const cacheKey = crypto.createHash('md5').update(text).digest('hex');
+    const cachedEmbedding = getCachedEmbedding(this.embeddingCache, cacheKey);
+
+    if (cachedEmbedding) {
+      return cachedEmbedding;
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.ollamaUrl}/api/embeddings`,
+        { model: this.model, prompt: text },
+        { timeout: 10000, validateStatus: (status) => status === 200 }
+      );
+      const embedding = getEmbeddingFromResponse(response);
+
+      if (!embedding) {
+        return null;
+      }
+
+      this.cacheEmbedding(cacheKey, embedding);
+      return embedding;
+    } catch (error) {
+      logger.warn('⚠️ Text embedding failed', { error: error.message, textLen: text.length });
+      return null;
+    }
   }
 
   /**

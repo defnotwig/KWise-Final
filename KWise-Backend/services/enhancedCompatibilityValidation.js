@@ -246,19 +246,19 @@ function extractCPUGeneration(cpuSpecs) {
         // Ryzen 9 5950X -> 5000 series
         const match = cpuName.match(/RYZEN\s*\d+\s*(\d)[\d]{3}[A-Z]*/);
         if (match) {
-            return parseInt(match[1]) * 1000; // 5950X -> 5000
+            return Number.parseInt(match[1], 10) * 1000; // 5950X -> 5000
         }
         
         // Alternative format: R9 5900X
         const match2 = cpuName.match(/R\d+\s*(\d)[\d]{3}/);
         if (match2) {
-            return parseInt(match2[1]) * 1000;
+            return Number.parseInt(match2[1], 10) * 1000;
         }
         
         // Direct series match: "5000 series", "3000 series"
         const match3 = cpuName.match(/(\d)000\s*SERIES/);
         if (match3) {
-            return parseInt(match3[1]) * 1000;
+            return Number.parseInt(match3[1], 10) * 1000;
         }
     }
     
@@ -267,19 +267,19 @@ function extractCPUGeneration(cpuSpecs) {
         // i9-13900K -> 13th gen
         const match = cpuName.match(/I\d-(\d{2})\d{2,3}[A-Z]*/);
         if (match) {
-            return parseInt(match[1]); // 13900K -> 13
+            return Number.parseInt(match[1], 10); // 13900K -> 13
         }
         
         // Alternative format: Core i9-13900K
         const match2 = cpuName.match(/CORE\s*I\d-(\d{2})\d{2,3}/);
         if (match2) {
-            return parseInt(match2[1]);
+            return Number.parseInt(match2[1], 10);
         }
         
         // Direct generation: "13th Gen", "12th Gen"
         const match3 = cpuName.match(/(\d{1,2})(TH|ST|ND|RD)\s*GEN/);
         if (match3) {
-            return parseInt(match3[1]);
+            return Number.parseInt(match3[1], 10);
         }
     }
     
@@ -541,7 +541,7 @@ function validateMultiGpuCompatibility(allGpus, motherboardSpecs) {
     }
     
     // Check PCIe slot count
-    const pciex16Slots = parseInt(motherboardSpecs.pcie_x16_slots || motherboardSpecs.pcie_slots) || 1;
+    const pciex16Slots = Number.parseInt(motherboardSpecs.pcie_x16_slots || motherboardSpecs.pcie_slots, 10) || 1;
     
     if (gpuCount > pciex16Slots) {
         result.compatible = false;
@@ -641,14 +641,14 @@ function validateStorageSlotTypes(allStorage, motherboardSpecs) {
     // Get motherboard slot counts
     const mbSpecs = motherboardSpecs.specifications || {};
     // 🔥 FIX: Check all possible M.2 slot field names (database uses "M2 Slots")
-    const mbM2Slots = parseInt(
+    const mbM2Slots = Number.parseInt(
         mbSpecs.m2_slots || 
         mbSpecs.m2_slot_count || 
         mbSpecs['M2 Slots'] || 
         mbSpecs['M.2 Slots'] || 
         mbSpecs.m_2_slots || 
         motherboardSpecs.m2_slots
-    ) || 0;
+    , 10) || 0;
     
     // 🐛 DEBUG: Log motherboard specs detection
     logger.debug(`🔍 Motherboard M.2 Detection:`);
@@ -659,13 +659,13 @@ function validateStorageSlotTypes(allStorage, motherboardSpecs) {
     logger.debug(`   mbSpecs['SATA Ports']: ${mbSpecs['SATA Ports']}`);
     logger.debug(`   ✅ FINAL mbM2Slots: ${mbM2Slots}`);
     
-    const mbSataPorts = parseInt(
+    const mbSataPorts = Number.parseInt(
         mbSpecs.sata_ports || 
         mbSpecs.sata_port_count || 
         mbSpecs['SATA Ports'] || 
         mbSpecs['SATA ports'] || 
         motherboardSpecs.sata_ports
-    ) || 6;
+    , 10) || 6;
     
     // ENHANCED: Parse M.2 slot details if available
     let mbNvmeSlots = mbM2Slots; // Default: assume all M.2 slots support NVMe
@@ -790,22 +790,22 @@ function validateGpuPowerConnectors(allGpus, psuSpecs) {
     let psu6pinCount = 0;
     
     const match8pin = psuPcie.match(/(\d+)×?\s*8-pin/i);
-    if (match8pin) psu8pinCount = parseInt(match8pin[1]);
+    if (match8pin) psu8pinCount = Number.parseInt(match8pin[1], 10);
     
     // Also check for (6+2)-pin format which is same as 8-pin
     const match62pin = psuPcie.match(/(\d+)\s*x?\s*\(?6\+2\)?-?pin/i);
-    if (match62pin) psu8pinCount = Math.max(psu8pinCount, parseInt(match62pin[1]));
+    if (match62pin) psu8pinCount = Math.max(psu8pinCount, Number.parseInt(match62pin[1], 10));
     
     // Check pcie_8pin_connectors field directly
     if (psuSpecs.pcie_8pin_connectors) {
-        psu8pinCount = Math.max(psu8pinCount, parseInt(psuSpecs.pcie_8pin_connectors) || 0);
+        psu8pinCount = Math.max(psu8pinCount, Number.parseInt(psuSpecs.pcie_8pin_connectors, 10) || 0);
     }
     
     const match6pin = psuPcie.match(/(\d+)×?\s*6-pin/i);
-    if (match6pin) psu6pinCount = parseInt(match6pin[1]);
+    if (match6pin) psu6pinCount = Number.parseInt(match6pin[1], 10);
     
     if (psuSpecs.pcie_6pin_connectors) {
-        psu6pinCount = Math.max(psu6pinCount, parseInt(psuSpecs.pcie_6pin_connectors) || 0);
+        psu6pinCount = Math.max(psu6pinCount, Number.parseInt(psuSpecs.pcie_6pin_connectors, 10) || 0);
     }
     
     logger.info(`🔍 PSU Connectors: ${psu8pinCount}× 8-pin, ${psu6pinCount}× 6-pin, 12VHPWR=${psuHas12VHPWR}, pcie_connectors="${psuPcie}"`);
@@ -838,10 +838,10 @@ function validateGpuPowerConnectors(allGpus, psuSpecs) {
         } else {
             // Count 8-pin and 6-pin requirements
             const match8 = gpuPower.match(/(\d+)×?\s*8-pin/i);
-            if (match8) required8pin += parseInt(match8[1]);
+            if (match8) required8pin += Number.parseInt(match8[1], 10);
             
             const match6 = gpuPower.match(/(\d+)×?\s*6-pin/i);
-            if (match6) required6pin += parseInt(match6[1]);
+            if (match6) required6pin += Number.parseInt(match6[1], 10);
         }
     });
     
@@ -919,11 +919,11 @@ function validateRamMixing(allRam) {
     const brands = [...new Set(allRam.map(ram => (ram.brand || '').toLowerCase()))];
     const speeds = [...new Set(allRam.map(ram => {
         const specs = ram.specifications || {};
-        return parseInt(specs.speed_mhz || specs.speed || ram.speed || 0);
+        return Number.parseInt(specs.speed_mhz || specs.speed || ram.speed || 0, 10);
     }))];
     const capacities = [...new Set(allRam.map(ram => {
         const specs = ram.specifications || {};
-        return parseInt(specs.capacity_gb || specs.capacity || ram.capacity || 0);
+        return Number.parseInt(specs.capacity_gb || specs.capacity || ram.capacity || 0, 10);
     }))];
     
     logger.info(`🔍 RAM Mixing Check: ${brands.length} brands, ${speeds.length} speeds, ${capacities.length} capacities`);
@@ -1000,7 +1000,7 @@ function validateRamPerSlotCapacity(allRam, motherboardSpecs) {
     
     // Extract motherboard per-slot capacity limit
     const mbSpecs = motherboardSpecs.specifications || {};
-    let maxCapacityPerSlot = parseInt(mbSpecs.max_memory_per_slot || mbSpecs.max_ram_per_dimm) || null;
+    let maxCapacityPerSlot = Number.parseInt(mbSpecs.max_memory_per_slot || mbSpecs.max_ram_per_dimm, 10) || null;
     
     // Determine DDR generation from motherboard
     const ramType = (mbSpecs.ram_type || mbSpecs.memory_type || motherboardSpecs.ram_type || '').toUpperCase();
@@ -1034,7 +1034,7 @@ function validateRamPerSlotCapacity(allRam, motherboardSpecs) {
     
     allRam.forEach(ram => {
         const specs = ram.specifications || {};
-        const capacity = parseInt(specs.capacity_gb || specs.capacity || ram.capacity || 0);
+        const capacity = Number.parseInt(specs.capacity_gb || specs.capacity || ram.capacity || 0, 10);
         const ramName = ram.name || 'RAM';
         
         if (capacity > maxCapacityPerSlot) {
@@ -1222,7 +1222,7 @@ function validateGpuCaseClearance(allGpus, caseSpecs) {
     
     // 🔥 CRITICAL FIX: Prioritize dimensions.max_gpu_length_mm FIRST (most reliable)
     // Also check at top level in case specs were already merged/flattened
-    let caseMaxGpuLength = parseInt(
+    let caseMaxGpuLength = Number.parseInt(
         caseDims.max_gpu_length_mm ||      // Nested dimensions (full component)
         caseSpecs_.max_gpu_length_mm ||    // Nested specifications
         caseSpecs.max_gpu_length_mm ||     // Flat merged specs (from mergeSpecsWithDimensions)
@@ -1230,12 +1230,12 @@ function validateGpuCaseClearance(allGpus, caseSpecs) {
         caseSpecs.gpu_clearance_mm ||
         caseSpecs_.max_gpu_length || 
         caseSpecs.max_gpu_length           // Fallback to string like "265mm"
-    ) || null;
+    , 10) || null;
     
     // 🔥 FIX: Handle string format like "265mm" - extract number
     if (!caseMaxGpuLength && (caseSpecs_.max_gpu_length || caseSpecs.max_gpu_length)) {
         const strValue = String(caseSpecs_.max_gpu_length || caseSpecs.max_gpu_length).replace(/[^\d.]/g, '');
-        caseMaxGpuLength = strValue ? parseInt(strValue) : null;
+        caseMaxGpuLength = strValue ? Number.parseInt(strValue, 10) : null;
     }
     
     if (!caseMaxGpuLength) {
@@ -1258,12 +1258,12 @@ function validateGpuCaseClearance(allGpus, caseSpecs) {
     allGpus.forEach(gpu => {
         const dims = gpu.dimensions || {};
         const specs = gpu.specifications || {};
-        const gpuLength = parseInt(
+        const gpuLength = Number.parseInt(
             dims.length_mm || 
             specs.length_mm || 
             specs.length || 
             gpu.length
-        ) || null;
+        , 10) || null;
         const gpuName = gpu.name || 'GPU';
         
         if (!gpuLength) {

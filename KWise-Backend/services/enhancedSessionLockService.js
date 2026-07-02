@@ -6,7 +6,7 @@
 
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 class EnhancedSessionLockService {
     constructor() {
@@ -223,8 +223,8 @@ class EnhancedSessionLockService {
             .map(item => ({
                 id: item.id || item.product_id,
                 name: item.name,
-                price: parseFloat(item.price || 0),
-                quantity: parseInt(item.quantity || 1)
+                price: Number.parseFloat(item.price || 0),
+                quantity: Number.parseInt(item.quantity || 1, 10)
             }))
             .sort((a, b) => (a.id || a.name).localeCompare(b.id || b.name))
             .map(item => `${item.id}:${item.name}:${item.price}:${item.quantity}`)

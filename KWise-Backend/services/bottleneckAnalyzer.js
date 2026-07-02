@@ -486,7 +486,7 @@ class BottleneckAnalyzer {
   extractRAMCapacity(text) {
     if (!text) return null;
     const match = text.toString().match(/(\d+)\s*GB/i);
-    return match ? parseInt(match[1]) : null;
+    return match ? Number.parseInt(match[1], 10) : null;
   }
 
   /**
@@ -496,7 +496,7 @@ class BottleneckAnalyzer {
     if (typeof value === 'number') return value;
     if (typeof value === 'string') {
       const match = value.match(/(\d+)/);
-      return match ? parseInt(match[1]) : null;
+      return match ? Number.parseInt(match[1], 10) : null;
     }
     return null;
   }

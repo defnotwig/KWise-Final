@@ -101,7 +101,7 @@ class DetailedCompatibilityService {
                 // Check generation matching
                 const extractIntelGen = (name) => {
                     const match = name.match(/(12|13|14|15)\d{3}/);
-                    return match ? parseInt(match[1]) : null;
+                    return match ? Number.parseInt(match[1], 10) : null;
                 };
 
                 const cpuGen = extractIntelGen(cpuName);
@@ -120,8 +120,8 @@ class DetailedCompatibilityService {
         }
 
         // TDP/Power Delivery Check
-        const cpuTDP = parseFloat(cpuSpecs.tdp_w || cpuSpecs.tdp || 65);
-        const maxCpuTDP = parseFloat(mbSpecs.max_cpu_tdp_w || 150);
+        const cpuTDP = Number.parseFloat(cpuSpecs.tdp_w || cpuSpecs.tdp || 65);
+        const maxCpuTDP = Number.parseFloat(mbSpecs.max_cpu_tdp_w || 150);
 
         if (cpuTDP > maxCpuTDP) {
             warnings.push({
@@ -177,10 +177,10 @@ class DetailedCompatibilityService {
         }
 
         // Check slot availability
-        const mbRamSlots = parseInt(mbSpecs.ram_slots || mbSpecs.memory_slots || 4);
+        const mbRamSlots = Number.parseInt(mbSpecs.ram_slots || mbSpecs.memory_slots || 4, 10);
         const totalRamModules = rams.reduce((sum, ram) => {
             const config = ram.specifications?.configuration || '1x8GB';
-            const stickCount = parseInt(config.split('x')[0]) || 1;
+            const stickCount = Number.parseInt(config.split('x')[0], 10) || 1;
             return sum + stickCount;
         }, 0);
 
@@ -196,11 +196,11 @@ class DetailedCompatibilityService {
 
         // Check total capacity
         const totalRamCapacity = rams.reduce((sum, ram) => {
-            const capacity = parseInt(ram.specifications?.capacity || ram.specifications?.total_capacity || 8);
+            const capacity = Number.parseInt(ram.specifications?.capacity || ram.specifications?.total_capacity || 8, 10);
             return sum + capacity;
         }, 0);
 
-        const maxRamCapacity = parseInt(mbSpecs.max_memory_gb || mbSpecs.max_ram || 128);
+        const maxRamCapacity = Number.parseInt(mbSpecs.max_memory_gb || mbSpecs.max_ram || 128, 10);
         if (totalRamCapacity > maxRamCapacity) {
             warnings.push({
                 severity: 'warning',
@@ -289,7 +289,7 @@ class DetailedCompatibilityService {
                 // M suffix typically indicates Micro-ATX
                 detectedFormFactor = 'MICROATX';
             }
-            console.log('   🔍 Form factor detected from name:', detectedFormFactor || 'UNKNOWN');
+            logger.debug('🔍 Form factor detected from name:', detectedFormFactor || 'UNKNOWN');
         }
 
         if (!detectedFormFactor) {
@@ -321,29 +321,29 @@ class DetailedCompatibilityService {
         );
 
         // 🔥 DEBUG: Log validation data
-        console.log('🔍 Form Factor Validation:');
-        console.log('   Motherboard:', motherboard.name, '→', detectedFormFactor);
-        console.log('   Case:', pcCase.name);
-        console.log('   Case supported (original):', formFactorsArray);
-        console.log('   Case supported (normalized):', normalizedSupported);
+        logger.debug('🔍 Form Factor Validation:');
+        logger.debug('Motherboard:', motherboard.name, '→', detectedFormFactor);
+        logger.debug('Case:', pcCase.name);
+        logger.debug('Case supported (original):', formFactorsArray);
+        logger.debug('Case supported (normalized):', normalizedSupported);
 
         // Check if motherboard fits in case
         const isCompatible = normalizedSupported.some(ff => {
-            const ffNorm = ff.replace(/-/g, '');
-            const mbNorm = detectedFormFactor.replace(/-/g, '');
+            const ffNorm = ff.replaceAll('-', '');
+            const mbNorm = detectedFormFactor.replaceAll('-', '');
             const exactMatch = ffNorm === mbNorm;
             const matxMatch = (mbNorm === 'MICROATX' || mbNorm === 'MATX') && (ffNorm === 'MATX' || ffNorm === 'MICROATX');
             const itxMatch = (mbNorm === 'MINIITX' || mbNorm === 'ITX') && (ffNorm === 'ITX' || ffNorm === 'MINIITX' || ffNorm === 'MITX');
             
             if (exactMatch || matxMatch || itxMatch) {
-                console.log('   ✅ MATCH FOUND:', ff, '===', detectedFormFactor);
+                logger.debug('✅ MATCH FOUND:', ff, '===', detectedFormFactor);
             }
             
             return exactMatch || matxMatch || itxMatch;
         });
 
-        console.log('   Final result:', isCompatible ? '✅ COMPATIBLE' : '❌ INCOMPATIBLE');
-        console.log('');
+        logger.debug('Final result:', isCompatible ? '✅ COMPATIBLE' : '❌ INCOMPATIBLE');
+        logger.debug('');
 
         if (!isCompatible && normalizedSupported.length > 0) {
             issues.push({
@@ -374,7 +374,7 @@ class DetailedCompatibilityService {
         const caseDims = pcCase.dimensions || {};
 
         // 🔥 FIX: Check dimensions first, then specifications
-        const gpuLength = parseFloat(
+        const gpuLength = Number.parseFloat(
             gpuDims.length_mm || 
             gpuSpecs.length_mm || 
             gpuSpecs.gpu_length_mm || 
@@ -382,7 +382,7 @@ class DetailedCompatibilityService {
         );
         
         // 🔥 FIX: Prioritize dimensions.max_gpu_length_mm FIRST (most reliable)
-        const maxGpuLength = parseFloat(
+        const maxGpuLength = Number.parseFloat(
             caseDims.max_gpu_length_mm || 
             caseSpecs.max_gpu_length_mm || 
             caseSpecs.gpu_clearance_mm || 
@@ -390,23 +390,23 @@ class DetailedCompatibilityService {
         );
 
         // 🔥 DEBUG: Log GPU clearance validation
-        console.log('🔍 GPU Clearance Validation:');
-        console.log('   GPU:', gpu.name);
-        console.log('   GPU dimensions.length_mm:', gpuDims.length_mm);
-        console.log('   GPU specs.length_mm:', gpuSpecs.length_mm);
-        console.log('   GPU specs.gpu_length_mm:', gpuSpecs.gpu_length_mm);
-        console.log('   GPU parsed length:', gpuLength, 'mm');
-        console.log('   Case:', pcCase.name);
-        console.log('   Case dimensions.max_gpu_length_mm:', caseDims.max_gpu_length_mm);
-        console.log('   Case specs.max_gpu_length_mm:', caseSpecs.max_gpu_length_mm);
-        console.log('   Case specs.gpu_clearance_mm:', caseSpecs.gpu_clearance_mm);
-        console.log('   Case parsed max:', maxGpuLength, 'mm');
+        logger.debug('🔍 GPU Clearance Validation:');
+        logger.debug('GPU:', gpu.name);
+        logger.debug('GPU dimensions.length_mm:', gpuDims.length_mm);
+        logger.debug('GPU specs.length_mm:', gpuSpecs.length_mm);
+        logger.debug('GPU specs.gpu_length_mm:', gpuSpecs.gpu_length_mm);
+        logger.debug('GPU parsed length:', gpuLength, 'mm');
+        logger.debug('Case:', pcCase.name);
+        logger.debug('Case dimensions.max_gpu_length_mm:', caseDims.max_gpu_length_mm);
+        logger.debug('Case specs.max_gpu_length_mm:', caseSpecs.max_gpu_length_mm);
+        logger.debug('Case specs.gpu_clearance_mm:', caseSpecs.gpu_clearance_mm);
+        logger.debug('Case parsed max:', maxGpuLength, 'mm');
 
         if (gpuLength > 0 && maxGpuLength > 0) {
-            console.log('   Comparison:', gpuLength, '>', maxGpuLength, '?');
+            logger.debug('Comparison:', gpuLength, '>', maxGpuLength, '?');
             
             if (gpuLength > maxGpuLength) {
-                console.log('   ❌ GPU TOO LONG!');
+                logger.debug('❌ GPU TOO LONG!');
                 issues.push({
                     severity: 'critical',
                     type: 'gpu_too_long',
@@ -416,14 +416,14 @@ class DetailedCompatibilityService {
                 });
             } else {
                 const clearance = maxGpuLength - gpuLength;
-                console.log('   ✅ GPU FITS! Clearance:', clearance, 'mm');
+                logger.debug('✅ GPU FITS! Clearance:', clearance, 'mm');
                 notes.push(`✅ GPU Fits: ${gpuLength}mm GPU with ${clearance}mm clearance (${maxGpuLength}mm max)`);
             }
         } else {
-            console.log('   ⚠️ Skipping validation (missing length data)');
+            logger.debug('⚠️ Skipping validation (missing length data)');
         }
         
-        console.log('');
+        logger.debug('');
 
         return { compatible: issues.length === 0, issues, warnings, notes };
     }
@@ -455,13 +455,13 @@ class DetailedCompatibilityService {
                              psuSpecs.has_12vhpwr_connector === true ||
                              psuSpecs.has_12vhpwr === true;
 
-        console.log('🔌 GPU-PSU Power Validation:');
-        console.log('   GPU:', gpu.name);
-        console.log('   GPU power_connectors:', gpuPowerConnStr || 'N/A');
-        console.log('   GPU needs 12VHPWR:', gpuNeeds12VHPWR);
-        console.log('   PSU:', psu.name);
-        console.log('   PSU pcie_connectors:', psuPowerConnStr || 'N/A');
-        console.log('   PSU has 12VHPWR:', psuHas12VHPWR);
+        logger.debug('🔌 GPU-PSU Power Validation:');
+        logger.debug('GPU:', gpu.name);
+        logger.debug('GPU power_connectors:', gpuPowerConnStr || 'N/A');
+        logger.debug('GPU needs 12VHPWR:', gpuNeeds12VHPWR);
+        logger.debug('PSU:', psu.name);
+        logger.debug('PSU pcie_connectors:', psuPowerConnStr || 'N/A');
+        logger.debug('PSU has 12VHPWR:', psuHas12VHPWR);
 
         // 12VHPWR validation
         if (gpuNeeds12VHPWR) {
@@ -469,7 +469,7 @@ class DetailedCompatibilityService {
                 notes.push(`✅ 12VHPWR Compatible: PSU has 12VHPWR connector for ${gpu.name}`);
             } else {
                 // Check if PSU has enough 8-pin connectors for adapter
-                const psu8pin = parseInt(psuSpecs.pcie_8pin_connectors || psuSpecs.pcie_8pin || 0);
+                const psu8pin = Number.parseInt(psuSpecs.pcie_8pin_connectors || psuSpecs.pcie_8pin || 0, 10);
                 if (psu8pin >= 2) {
                     warnings.push({
                         severity: 'warning',
@@ -493,14 +493,14 @@ class DetailedCompatibilityService {
             // Legacy 8-pin/6-pin check for non-12VHPWR GPUs
             const gpuPowerReq = gpuSpecs.power_connector_required || {};
             const requiredType = gpuPowerReq.type || '8-pin';
-            const requiredCount = parseInt(gpuPowerReq.count || 1);
+            const requiredCount = Number.parseInt(gpuPowerReq.count || 1, 10);
             const psuConnectors = psuSpecs.power_connectors || {};
-            const availableCount = parseInt(psuConnectors[`pcie_${requiredType.replace('-', '')}`] || 
+            const availableCount = Number.parseInt(psuConnectors[`pcie_${requiredType.replace('-', '')}`] || 
                                            psuSpecs.pcie_8pin_connectors || 
-                                           psuSpecs.pcie_8pin || 0);
+                                           psuSpecs.pcie_8pin || 0, 10);
 
             if (requiredCount > availableCount) {
-                const psuWattage = parseInt(psuSpecs.wattage || 0);
+                const psuWattage = Number.parseInt(psuSpecs.wattage || 0, 10);
                 
                 // If availableCount is 0 but PSU wattage is sufficient, downgrade to warning
                 if (availableCount === 0 && psuWattage >= 500) {
@@ -525,11 +525,11 @@ class DetailedCompatibilityService {
         }
 
         // Check wattage
-        const gpuTDP = parseFloat(gpuSpecs.tdp_w || gpuSpecs.tdp_watts || gpuSpecs.tdp || 150);
-        const cpuTDP = cpu ? parseFloat(cpu.specifications?.tdp_w || cpu.specifications?.tdp || 65) : 65;
+        const gpuTDP = Number.parseFloat(gpuSpecs.tdp_w || gpuSpecs.tdp_watts || gpuSpecs.tdp || 150);
+        const cpuTDP = cpu ? Number.parseFloat(cpu.specifications?.tdp_w || cpu.specifications?.tdp || 65) : 65;
         const systemPower = cpuTDP + gpuTDP + 100; // CPU + GPU + motherboard/RAM/storage overhead
         const recommendedPSU = Math.ceil(systemPower * 1.25); // 25% headroom
-        const psuWattage = parseInt(psuSpecs.wattage || 0);
+        const psuWattage = Number.parseInt(psuSpecs.wattage || 0, 10);
 
         if (psuWattage > 0 && psuWattage < recommendedPSU) {
             warnings.push({
@@ -558,19 +558,19 @@ class DetailedCompatibilityService {
         const storages = Array.isArray(storageComponents) ? storageComponents : [storageComponents];
 
         // 🔥 FIX: Check all possible M.2 slot field names (database uses "M2 Slots")
-        const m2Slots = parseInt(
+        const m2Slots = Number.parseInt(
             mbSpecs.m2_slots || 
             mbSpecs.m2_slots_count || 
             mbSpecs['M2 Slots'] || 
             mbSpecs['M.2 Slots'] || 
             mbSpecs.m_2_slots
-        ) || 2;
-        const sataSlots = parseInt(
+        , 10) || 2;
+        const sataSlots = Number.parseInt(
             mbSpecs.sata_ports || 
             mbSpecs.sata_count || 
             mbSpecs['SATA Ports'] || 
             mbSpecs['SATA ports']
-        ) || 4;
+        , 10) || 4;
 
         let m2Used = 0;
         let sataUsed = 0;
@@ -686,8 +686,8 @@ class DetailedCompatibilityService {
         const coolerSpecs = cooler.specifications || {};
         const caseSpecs = pcCase.specifications || {};
 
-        const coolerHeight = parseFloat(coolerSpecs.height_mm || coolerSpecs.cooler_height_mm || 0);
-        const maxCoolerHeight = parseFloat(caseSpecs.max_cooler_height_mm || caseSpecs.cooler_clearance_mm || 160);
+        const coolerHeight = Number.parseFloat(coolerSpecs.height_mm || coolerSpecs.cooler_height_mm || 0);
+        const maxCoolerHeight = Number.parseFloat(caseSpecs.max_cooler_height_mm || caseSpecs.cooler_clearance_mm || 160);
 
         if (coolerHeight > 0 && maxCoolerHeight > 0) {
             if (coolerHeight > maxCoolerHeight) {
@@ -782,8 +782,8 @@ class DetailedCompatibilityService {
         }
 
         // Also check TDP
-        const coolerTDP = parseInt(coolerSpecs.tdp_rating || coolerSpecs.tdp || 0);
-        const cpuTDP = parseInt(cpuSpecs.tdp || cpuSpecs.TDP || cpuSpecs.tdp_watts || 0);
+        const coolerTDP = Number.parseInt(coolerSpecs.tdp_rating || coolerSpecs.tdp || 0, 10);
+        const cpuTDP = Number.parseInt(cpuSpecs.tdp || cpuSpecs.TDP || cpuSpecs.tdp_watts || 0, 10);
         
         if (coolerTDP > 0 && cpuTDP > 0) {
             if (cpuTDP > coolerTDP) {
